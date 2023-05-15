@@ -1,0 +1,341 @@
+{
+  "name": "database-notebook",
+  "displayName": "Database notebook",
+  "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook.",
+  "version": "0.0.1",
+  "publisher": "cmoog",
+  "icon": "media/logo128.png",
+  "repository": {
+    "url": "https://github.com/l-v-yonsama/db-notebook"
+  },
+  "preview": false,
+  "engines": {
+    "vscode": "^1.46.0",
+    "node": ">= 14.14.0"
+  },
+  "categories": [
+    "Notebooks",
+    "Visualization"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "activationEvents": [
+    "onNotebook:database-notebook-type"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "notebooks": [
+      {
+        "type": "database-notebook-type",
+        "displayName": "Database Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.dbn"
+          }
+        ]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "database-notebook",
+          "title": "SQL Notebook",
+          "icon": "media/dark/database.svg"
+        }
+      ]
+    },
+    "views": {
+      "database-notebook": [
+        {
+          "id": "database-notebook-connections",
+          "name": "DB Explorer",
+          "visibility": "visible",
+          "icon": "media/logo.svg",
+          "contextualTitle": "Connections"
+        },
+        {
+          "type": "webview",
+          "id": "database-notebook.connectionForm",
+          "name": "Resource properties",
+          "contextualTitle": "Resource properties",
+          "visibility": "visible"
+        },
+        {
+          "id": "database-notebook-helpfeedback",
+          "name": "Help and Feedback",
+          "visibility": "collapsed",
+          "icon": "media/logo.svg",
+          "contextualTitle": "Help and Feedback"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "database-notebook.retrieve-resources",
+          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.retrieve-resources",
+          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.show-connection-setting",
+          "when": "view == database-notebook-connections &&  viewItem =~ /^Connection,.+$/",
+          "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.show-connection-setting",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.edit-connection-setting",
+          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.clone-connection-setting",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+$/",
+          "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.delete-connection-setting",
+          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.show-resource-properties",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+,properties.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.show-resource-properties",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+,properties.*/",
+          "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.retrieve-table-records",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.retrieve-table-records",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "db-resourc@2"
+        },
+        {
+          "command": "database-notebook.show-scan-panel",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+scannable$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.show-scan-panel",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+scannable$/",
+          "group": "db-resourc@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "database-notebook.refresh-resources",
+          "when": "view == database-notebook-connections",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.create-connection-setting",
+          "when": "view == database-notebook-connections",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.refresh-resources",
+          "when": "view == ResultSetsType",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "database-notebook.refresh-resources",
+          "when": "view == ResultSetsType",
+          "group": "navigation"
+        }
+      ],
+      "notebook/toolbar": [
+        {
+          "command": "database-notebook.show-all-variables",
+          "group": "navigation/execute@1",
+          "when": "notebookType == 'database-notebook-type' && visibleVariables"
+        },
+        {
+          "command": "database-notebook.show-all-rdh",
+          "group": "navigation/execute@1",
+          "when": "notebookType == 'database-notebook-type' && visibleRdh"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "database-notebook.create-connection-setting",
+        "title": "Create connection setting",
+        "icon": {
+          "dark": "media/dark/add.svg",
+          "light": "media/light/add.svg"
+        },
+        "category": "connection-setting"
+      },
+      {
+        "command": "database-notebook.show-connection-setting",
+        "title": "Show setting",
+        "icon": {
+          "dark": "media/dark/info.svg",
+          "light": "media/light/info.svg"
+        },
+        "category": "connection-setting"
+      },
+      {
+        "command": "database-notebook.edit-connection-setting",
+        "title": "Edit setting",
+        "icon": {
+          "dark": "media/dark/edit.svg",
+          "light": "media/light/edit.svg"
+        },
+        "category": "connection-setting"
+      },
+      {
+        "command": "database-notebook.clone-connection-setting",
+        "title": "Clone setting",
+        "icon": {
+          "dark": "media/dark/files.svg",
+          "light": "media/light/files.svg"
+        },
+        "category": "connection-setting"
+      },
+      {
+        "command": "database-notebook.delete-connection-setting",
+        "title": "Delete setting",
+        "icon": {
+          "dark": "media/dark/trash.svg",
+          "light": "media/light/trash.svg"
+        },
+        "category": "connection-setting"
+      },
+      {
+        "command": "database-notebook.connect",
+        "title": "Connect to Database",
+        "icon": {
+          "dark": "media/dark/pass.svg",
+          "light": "media/light/pass.svg"
+        },
+        "category": "connect-disconnect"
+      },
+      {
+        "command": "database-notebook.disconnect",
+        "title": "Disconnect to Database",
+        "icon": {
+          "dark": "media/dark/error.svg",
+          "light": "media/light/error.svg"
+        },
+        "category": "connect-disconnect"
+      },
+      {
+        "command": "database-notebook.show-resource-properties",
+        "title": "Show resouce properties",
+        "icon": {
+          "dark": "media/dark/info.svg",
+          "light": "media/light/info.svg"
+        }
+      },
+      {
+        "command": "database-notebook.refresh-resources",
+        "title": "Refresh Setting Panel",
+        "shortTitle": "Refresh",
+        "icon": {
+          "dark": "media/dark/refresh.svg",
+          "light": "media/light/refresh.svg"
+        }
+      },
+      {
+        "command": "database-notebook.retrieve-resources",
+        "title": "Retrieve DB Resources",
+        "shortTitle": "Retrieve",
+        "icon": {
+          "dark": "media/dark/list-tree.svg",
+          "light": "media/light/list-tree.svg"
+        }
+      },
+      {
+        "command": "database-notebook.retrieve-table-records",
+        "title": "Retrieve Table Records",
+        "shortTitle": "Retrieve",
+        "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.show-scan-panel",
+        "title": "Open scan pannel",
+        "icon": "$(book)"
+      },
+      {
+        "command": "database-notebook.cell.open-mdh",
+        "title": "Open Resultset Data Holder",
+        "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.cell.specify-connection-to-use",
+        "title": "Specify connection to use",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "database-notebook.show-rdh-diff",
+        "title": "Open Resultset Diff",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "database-notebook.show-all-variables",
+        "title": "All variables",
+        "icon": "$(symbol-variable)"
+      },
+      {
+        "command": "database-notebook.show-all-rdh",
+        "title": "All query results",
+        "icon": "$(table)"
+      }
+    ]
+  },
+  "scripts": {
+    "install:all": "npm install && cd webview-ui && npm install",
+    "start:webview": "cd webview-ui && npm run start",
+    "build:webview": "cd webview-ui && yarn build",
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/glob": "^7.1.3",
+    "@types/node": "14.14.0",
+    "@types/throttle-debounce": "^5.0.0",
+    "@types/vscode": "^1.46.0",
+    "@typescript-eslint/eslint-plugin": "^4.14.1",
+    "@typescript-eslint/parser": "^4.14.1",
+    "eslint": "^7.19.0",
+    "glob": "^7.1.6",
+    "prettier": "^2.2.1",
+    "typescript": "^4.1.3",
+    "vscode-test": "^1.5.0"
+  },
+  "dependencies": {
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.88",
+    "dayjs": "^1.11.7",
+    "exceljs": "^4.3.0",
+    "short-unique-id": "^4.4.4",
+    "store": "^2.0.12",
+    "throttle-debounce": "^5.0.0",
+    "ts-node": "^10.9.1"
+  }
+}
