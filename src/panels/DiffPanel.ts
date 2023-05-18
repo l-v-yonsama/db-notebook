@@ -268,23 +268,25 @@ export class DiffPanel {
         continue;
       }
 
-      const driver = DBDriverResolver.getInstance().createDriver<RDSBaseDriver>(setting);
-      const { ok, message } = await driver.flow(async () => {
-        for (let i = 0; i < beforeList.length; i++) {
-          if (beforeList[i].meta.connectionName !== conName) {
-            continue;
+      const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+        setting,
+        async (driver) => {
+          for (let i = 0; i < beforeList.length; i++) {
+            if (beforeList[i].meta.connectionName !== conName) {
+              continue;
+            }
+            const rdh = beforeList[i];
+            const sql = rdh.sqlStatement!;
+            const afterRdh = await driver.requestSql({
+              sql,
+              conditions: rdh.queryConditions,
+              meta: rdh.meta,
+            });
+            afterList[i] = afterRdh;
           }
-          const rdh = beforeList[i];
-          const sql = rdh.sqlStatement!;
-          const afterRdh = await driver.requestSql({
-            sql,
-            conditions: rdh.queryConditions,
-            meta: rdh.meta,
-          });
-          afterList[i] = afterRdh;
         }
-        DBDriverResolver.getInstance().removeDriver(driver);
-      });
+      );
+
       if (!ok) {
         window.showErrorMessage(message);
       }

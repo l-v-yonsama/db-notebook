@@ -289,8 +289,12 @@ defineExpose({
       >
         <section :style="{ width: `${splitterWidth}px` }">
           <div v-if="activeInnerRdh" class="spPaneWrapper">
-            <RDHViewer :rdh="activeInnerRdh" :width="splitterWidth" :height="splitterHeight">
-            </RDHViewer>
+            <RDHViewer
+              :rdh="activeInnerRdh"
+              :width="splitterWidth"
+              :height="splitterHeight"
+              :readonly="true"
+            />
           </div>
         </section>
       </vscode-panel-view>

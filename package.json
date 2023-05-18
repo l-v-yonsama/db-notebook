@@ -77,12 +77,12 @@
       "view/item/context": [
         {
           "command": "database-notebook.retrieve-resources",
-          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "inline"
         },
         {
           "command": "database-notebook.retrieve-resources",
-          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "others@3"
         },
         {
@@ -97,7 +97,7 @@
         },
         {
           "command": "database-notebook.edit-connection-setting",
-          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "connection-setting@1"
         },
         {
@@ -107,7 +107,7 @@
         },
         {
           "command": "database-notebook.delete-connection-setting",
-          "when": "view == database-notebook-connections && viewItem == Connection,false",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "connection-setting@1"
         },
         {
@@ -138,6 +138,11 @@
         {
           "command": "database-notebook.show-scan-panel",
           "when": "view == database-notebook-connections && viewItem =~ /^.+scannable$/",
+          "group": "db-resourc@2"
+        },
+        {
+          "command": "database-notebook.flush-db",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Redis.*/",
           "group": "db-resourc@2"
         }
       ],
@@ -275,6 +280,12 @@
         "icon": "$(table)"
       },
       {
+        "command": "database-notebook.flush-db",
+        "title": "Delete all the keys of selected DB",
+        "shortTitle": "Flush db",
+        "icon": "$(trash)"
+      },
+      {
         "command": "database-notebook.show-scan-panel",
         "title": "Open scan pannel",
         "icon": "$(book)"
@@ -330,7 +341,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.88",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-0.1.94.tgz",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

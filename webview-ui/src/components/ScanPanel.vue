@@ -12,20 +12,20 @@ import {
   vsCodePanelTab,
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
-import type { DBType } from "@/types/lib/DBType";
 import type { ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
 import RDHViewer from "./RDHViewer.vue";
 import type { DbResource } from "@/types/lib/DbResource";
 import type {
   CloseScanPanelActionCommand,
+  DeleteKeyActionCommand,
   OpenScanPanelActionCommand,
-  OutputActionCommand,
   OutputParams,
   SearchScanPanelActionCommand,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import type { SecondaryItem } from "@/types/Components";
+import type { DBType } from "@/types/lib/DBType";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -95,6 +95,12 @@ const openLogStreamParams = ref({
   logGroupName: "",
   logStream: "",
   startTime: "",
+});
+const deleteKeyParams = ref({
+  visible: false,
+  canAction: false,
+  tabId: "",
+  key: "",
 });
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
@@ -186,6 +192,10 @@ const showTab = (tabId: string) => {
   console.log("showTab activeTabId.value", activeTabId.value);
   isMultiLineKeyword.value = tabItem.multilineKeyword === true;
   openLogStreamParams.value.visible = isMultiLineKeyword.value;
+  deleteKeyParams.value.visible = false;
+  if (tabItem.dbType === "Redis") {
+    deleteKeyParams.value.visible = true;
+  }
 };
 
 const addTabItem = (tabItem: TabItem) => {
@@ -228,24 +238,28 @@ const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData
     setTimeout(resetSpPaneWrapperHeight, 200);
   });
 };
-function actionToolbar(fileType: OutputParams["fileType"]) {
+
+const output = (params: Omit<OutputParams, "tabId">): void => {
+  console.log("output:", params);
   const tabItem = getActiveTabItem();
+  console.log("tabItem=", tabItem);
   if (!tabItem) {
+    console.log("No tab Item");
     return;
   }
-  const { tabId } = tabItem;
-  const action: OutputActionCommand = {
+
+  vscode.postCommand({
     command: "output",
     params: {
-      fileType,
-      tabId,
-      outputWithType: "withComment",
+      tabId: tabItem.tabId,
+      ...params,
     },
-  };
-  vscode.postCommand(action);
-}
+  });
+};
+
 const onCellFocus = (params: CellFocusParams): void => {
   openLogStreamParams.value.canAction = false;
+  deleteKeyParams.value.canAction = false;
   console.log("onCellFocus:", params);
   const tabItem = getActiveTabItem();
   console.log("tabItem=", tabItem);
@@ -254,14 +268,26 @@ const onCellFocus = (params: CellFocusParams): void => {
     return;
   }
   const logGroupName = tabItem.title;
-  const logStream = params.rowValues["@logStream"];
-  const startTime = params.rowValues["@timestamp"];
-  if (tabItem.rootRes["resourceType"] === "LogGroup") {
-    openLogStreamParams.value.parentTabId = tabItem.tabId;
-    openLogStreamParams.value.logGroupName = logGroupName;
-    openLogStreamParams.value.logStream = logStream;
-    openLogStreamParams.value.startTime = startTime;
-    openLogStreamParams.value.canAction = true;
+  switch (tabItem.rootRes["resourceType"]) {
+    case "RedisDatabase":
+      {
+        const key = params.rowValues["key"];
+        deleteKeyParams.value.tabId = tabItem.tabId;
+        deleteKeyParams.value.canAction = true;
+        deleteKeyParams.value.key = key;
+      }
+      break;
+    case "LogGroup":
+      {
+        const logStream = params.rowValues["@logStream"];
+        const startTime = params.rowValues["@timestamp"];
+        openLogStreamParams.value.parentTabId = tabItem.tabId;
+        openLogStreamParams.value.logGroupName = logGroupName;
+        openLogStreamParams.value.logStream = logStream;
+        openLogStreamParams.value.startTime = startTime;
+        openLogStreamParams.value.canAction = true;
+      }
+      break;
   }
 };
 
@@ -279,6 +305,18 @@ const openStream = (): void => {
   vscode.postCommand(action);
 };
 
+const deleteKey = (): void => {
+  const action: DeleteKeyActionCommand = {
+    command: "DeleteKey",
+    params: {
+      tabId: deleteKeyParams.value.tabId,
+      key: deleteKeyParams.value.key,
+    },
+  };
+  deleteKeyParams.value.canAction = false;
+  vscode.postCommand(action);
+};
+
 defineExpose({
   addTabItem,
   removeTabItem,
@@ -289,10 +327,16 @@ defineExpose({
 <template>
   <section class="ScanPanel">
     <div class="tab-container-actions">
-      <button @click="actionToolbar('excel')" title="Output as Excel">
+      <button
+        @click="output({ fileType: 'excel', outputWithType: 'withComment' })"
+        title="Output as Excel"
+      >
         <fa icon="file-excel" />
       </button>
-      <SecondarySelectionAction :items="outputDetailItems" />
+      <SecondarySelectionAction
+        :items="outputDetailItems"
+        @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
+      />
     </div>
     <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
       <VsCodeTabHeader
@@ -379,6 +423,17 @@ defineExpose({
               </div>
             </div>
             <div v-else class="single">
+              <VsCodeButton
+                v-show="deleteKeyParams.visible"
+                appearance="secondary"
+                class="deleteKey"
+                @click="deleteKey"
+                :disabled="inProgress || !deleteKeyParams.canAction"
+                title="Delete a key"
+              >
+                <span class="codicon codicon-trash"></span>Delete key
+              </VsCodeButton>
+
               <label v-if="tabItem.startTime.visible" for="startTime">{{
                 tabItem.startTime.label
               }}</label
@@ -428,9 +483,9 @@ defineExpose({
               :rdh="tabItem.rdh"
               :width="splitterWidth"
               :height="splitterHeight"
+              :readonly="true"
               @onCellFocus="onCellFocus"
-            >
-            </RDHViewer>
+            />
           </div>
         </section>
       </vscode-panel-view>
@@ -510,6 +565,11 @@ vscode-panel-view {
 .toolbar .multiple .right > .search {
   position: absolute;
   right: 6px;
+  top: -1px;
+}
+.toolbar .single .deleteKey {
+  position: absolute;
+  left: 2px;
   top: -1px;
 }
 </style>

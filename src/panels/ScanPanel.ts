@@ -6,9 +6,8 @@ import {
   DBType,
   DbLogStream,
   DbResource,
-  ResourceType,
+  RedisDriver,
   ResultSetDataHolder,
-  createRdhKey,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { createBookFromRdh } from "../utilities/excelGenerator";
@@ -45,6 +44,7 @@ type TabItem = {
   endTime: ConditionItem;
   multilineKeyword: boolean;
   parentTarget?: string;
+  lastSearchParam?: ScanReqInput;
 };
 
 type ScanReqInput = {
@@ -261,11 +261,51 @@ export class ScanPanel {
           case "openScanPanel":
             this.openLogStreamScanPanel(params);
             return;
+          case "DeleteKey":
+            this.deleteKey(params);
+            return;
         }
       },
       undefined,
       this._disposables
     );
+  }
+
+  private async deleteKey({ tabId, key }: { tabId: string; key: string }) {
+    const tabItem = this.items.find((it) => it.tabId === tabId);
+    if (!tabItem) {
+      return;
+    }
+    const setting = await ScanPanel.stateStorage?.getConnectionSettingByName(tabItem.conName);
+    if (!setting) {
+      return;
+    }
+    const answer = await window.showInformationMessage(
+      `Are you sure to delete key:'${key}'?`,
+      "YES",
+      "NO"
+    );
+    if (answer !== "YES") {
+      return;
+    }
+
+    const { ok, message } = await DBDriverResolver.getInstance().workflow(
+      setting,
+      async (driver) => {
+        if (driver instanceof RedisDriver) {
+          const redisDriver = driver as RedisDriver;
+          await redisDriver.delete(key);
+        }
+      }
+    );
+
+    if (ok) {
+      if (tabItem.lastSearchParam) {
+        this.search(tabItem.lastSearchParam);
+      }
+    } else {
+      vscode.window.showErrorMessage(message);
+    }
   }
 
   private async output(data: OutputParams) {
@@ -298,34 +338,37 @@ export class ScanPanel {
     if (!panelItem) {
       return;
     }
+    panelItem.lastSearchParam = data;
     const setting = await ScanPanel.stateStorage?.getConnectionSettingByName(panelItem.conName);
     if (!setting) {
       return;
     }
     const { rootRes, parentTarget } = panelItem;
-    const driver = DBDriverResolver.getInstance().createDriver(setting);
-    const { ok, message, result } = await driver.flow(async () => {
-      let scannable: any = driver;
-      if (driver instanceof AwsDriver) {
-        const awsDriver = driver as AwsDriver;
-        scannable = awsDriver.getClientByResourceType(rootRes.resourceType);
+
+    const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
+      setting,
+      async (driver) => {
+        let scannable: any = driver;
+        if (driver instanceof AwsDriver) {
+          const awsDriver = driver as AwsDriver;
+          scannable = awsDriver.getClientByResourceType(rootRes.resourceType);
+        }
+
+        var input = {
+          targetResourceType: rootRes.resourceType,
+          parentTarget,
+          target: rootRes?.name ?? "",
+          keyword: keyword,
+          limit,
+          startTime: startTime ? dayjs(startTime).valueOf() : undefined,
+          endTime: endTime ? dayjs(endTime).valueOf() : undefined,
+          withValue: "auto",
+        };
+
+        return await scannable.scan(input);
       }
+    );
 
-      var input = {
-        targetResourceType: rootRes.resourceType,
-        parentTarget,
-        target: rootRes?.name ?? "",
-        keyword: keyword,
-        limit,
-        startTime: startTime ? dayjs(startTime).valueOf() : undefined,
-        endTime: endTime ? dayjs(endTime).valueOf() : undefined,
-        withValue: "auto",
-      };
-
-      return await scannable.scan(input);
-    });
-
-    DBDriverResolver.getInstance().removeDriver(driver);
     if (ok && result) {
       const rdh = result as ResultSetDataHolder;
       panelItem.rdh = rdh;

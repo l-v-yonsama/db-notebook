@@ -1,15 +1,13 @@
 import * as vscode from "vscode";
 import { StateStorage } from "./utilities/StateStorage";
-import { getUri } from "./utilities/getUri";
 import {
   DBDriverResolver,
   DbResource,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ModeType } from "./shared/ModeType";
-import { REFRESH_RESOURCES } from "./extension";
+import { REFRESH_RESOURCES } from "./constant";
 import { ToWebviewMessageEventType } from "./types/ToWebviewMessageEvent";
-import { getNonce } from "./utilities/getNonce";
 import { ActionCommand } from "./shared/ActionParams";
 import { log } from "./utilities/logger";
 import { createWebviewContent } from "./utilities/webviewUtil";
@@ -143,30 +141,4 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
   show() {
     this.webviewView?.show();
   }
-
-  // private getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri) {
-  //   // The CSS file from the Vue build output
-  //   const stylesUri = getUri(webview, extensionUri, ["webview-ui", "build", "assets", "index.css"]);
-  //   // The JS file from the Vue build output
-  //   const scriptUri = getUri(webview, extensionUri, ["webview-ui", "build", "assets", "index.js"]);
-
-  //   const nonce = getNonce();
-
-  //   // Tip: Install the es6-string-html VS Code extension to enable code highlighting below
-  //   return /*html*/ `
-  //     <!DOCTYPE html>
-  //     <html lang="en">
-  //       <head>
-  //         <meta charset="UTF-8" />
-  //         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  //         <link rel="stylesheet" type="text/css" href="${stylesUri}">
-  //         <title>Hello World</title>
-  //       </head>
-  //       <body>
-  //         <div id="app"></div>
-  //         <script type="module" src="${scriptUri}"></script>
-  //       </body>
-  //     </html>
-  //   `;
-  // }
 }

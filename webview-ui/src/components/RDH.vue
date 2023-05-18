@@ -1,17 +1,24 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import * as GC from "@/types/lib/GeneralColumnType";
 import dayjs from "dayjs";
 import type { RdhKey, RdhRow, ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
 import { AnnotationType } from "@/types/lib/ResultSetDataHolder";
-import type { CellAnnotation } from "@/types/lib/ResultSetDataHolder";
 
 type Props = {
   rdh: ResultSetDataHolder;
+  height: number;
+  readonly: boolean;
 };
 
 const props = defineProps<Props>();
+
+const containerHeight = computed((): string => {
+  const n = props.height > 30 ? props.height - 30 : props.height;
+  console.log("containerHeight", n);
+  return `${n}px`;
+});
 
 const emit = defineEmits<{
   (event: "onCellFocus", value: CellFocusParams): void;
@@ -52,7 +59,7 @@ const columns = ref(
         break;
       case GC.GeneralColumnType.DATE:
         width = 95;
-        type = "date";
+        type = "string";
         break;
     }
     return {
@@ -155,6 +162,9 @@ const rowStyle = (p: any): any => {
       :no-paging="true"
       :row-style="rowStyle"
       :cell-style="cellStyle"
+      :height="containerHeight"
+      :no-mouse-scroll="true"
+      :readonly="readonly"
       @cell-focus="onCellFocus"
     >
       <vue-excel-column

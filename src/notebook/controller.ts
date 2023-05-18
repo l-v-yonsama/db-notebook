@@ -175,6 +175,7 @@ export class MainController {
         stderr: "Missing connection " + connectionName,
       };
     }
+
     const { query, binds } = normalizeQuery({
       query: cell.document.getText(),
       bindParams: storedJson,
@@ -182,11 +183,9 @@ export class MainController {
     log(`${PREFIX} query:` + query);
     log(`${PREFIX} binds:` + JSON.stringify(binds));
 
-    const resolver = DBDriverResolver.getInstance();
-    const driver = resolver.createDriver<RDSBaseDriver>(connectionSetting);
-
-    const { ok, message, result } = await driver.flow(
-      async () =>
+    const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+      connectionSetting,
+      async (driver) =>
         await driver.requestSql({
           sql: query,
           conditions: {
@@ -194,7 +193,6 @@ export class MainController {
           },
         })
     );
-    resolver.removeDriver(driver);
 
     let metadata = undefined;
     if (ok && result) {

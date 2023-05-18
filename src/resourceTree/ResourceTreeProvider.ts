@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { StateStorage } from "./utilities/StateStorage";
+import { StateStorage } from "../utilities/StateStorage";
 import {
+  DBType,
   DbColumn,
   DbConnection,
   DbResource,
@@ -16,11 +17,12 @@ import {
   isNumericLike,
   isTextLike,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { mediaDir } from "./constant";
+import { mediaDir } from "../constant";
+import { log } from "../utilities/logger";
 
-const PREFIX = "[DBResourceTreeProvider]";
+const PREFIX = "[ResourceTreeProvider]";
 
-export class DBResourceTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> =
     new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
   readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> =
@@ -39,6 +41,7 @@ export class DBResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tr
   }
 
   async refresh(withSettings = false): Promise<void> {
+    log(`${PREFIX} refresh`);
     if (withSettings) {
       this.conResList.splice(0, this.conResList.length);
       const settings = await this.stateStorage.getConnectionSettingList();
@@ -51,6 +54,7 @@ export class DBResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tr
   }
 
   changeConnectionTreeData(conRes: DbConnection): void {
+    log(`${PREFIX} changeConnectionTreeData conRes.password=` + conRes.password);
     this._onDidChangeTreeData.fire(conRes);
     this._onDidChangeTreeData.fire();
   }
@@ -102,7 +106,7 @@ export class ConnectionListItem extends vscode.TreeItem {
       };
     }
     this.description = `(${conRes.dbType})`;
-    this.contextValue = `${conRes.resourceType},${conRes.isInProgress}`;
+    this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},${conRes.isInProgress}`;
   }
 }
 
@@ -190,9 +194,8 @@ export class DBDatabaseItem extends vscode.TreeItem {
 
     this.description = description;
     let contextValue = resource.resourceType;
-    if (resource.resourceType !== "Connection") {
-      contextValue += ",properties";
-    }
+
+    contextValue += ",properties";
     if (scannable) {
       contextValue += ",scannable";
     }

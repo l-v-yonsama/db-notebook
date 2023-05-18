@@ -58,9 +58,9 @@ const onCellFocus = (params: CellFocusParams): void => {
       :rdh="rdh"
       :width="splitterWidth"
       :height="splitterHeight"
+      :readonly="true"
       @onCellFocus="onCellFocus"
-    >
-    </RDHViewer>
+    />
   </section>
 </template>
 

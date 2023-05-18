@@ -12,22 +12,9 @@ import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
-import * as path from "path";
-
-import { createBookFromList, createBookFromRdh } from "../utilities/excelGenerator";
-import { createHash } from "crypto";
-import {
-  ActionCommand,
-  CompareParams,
-  OutputParams,
-  TabIdParam,
-  WriteToClipboardParams,
-} from "../shared/ActionParams";
-import { SHOW_RDH_DIFF } from "../extension";
-import { DiffTabParam } from "./DiffPanel";
+import { ActionCommand } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
-import { rdhListToText, rdhToText } from "../utilities/rdhToText";
 
 const PREFIX = "[VariablesPanel]";
 

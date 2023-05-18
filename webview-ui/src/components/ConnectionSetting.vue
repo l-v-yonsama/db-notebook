@@ -44,7 +44,14 @@ const visibleHostOrDatabase = computed((): boolean => {
   return false;
 });
 
-const visibleUserAndPassword = computed(
+const visibleUser = computed(
+  (): boolean =>
+    DBTypeConst.DBType.Redis != dbType.value &&
+    (!DBTypeConst.isAws(dbType.value) ||
+      awsCredentialType.value === SupplyCredentials.ExplicitInProperty)
+);
+
+const visiblePassword = computed(
   (): boolean =>
     !DBTypeConst.isAws(dbType.value) ||
     awsCredentialType.value === SupplyCredentials.ExplicitInProperty
@@ -65,6 +72,7 @@ const acceptValues = computed((): boolean => {
     return false;
   }
   if (DBTypeConst.isAws(dbType.value)) {
+    // AWS
     if (awsServiceSelected.value.length === 0) {
       return false;
     }
@@ -79,8 +87,14 @@ const acceptValues = computed((): boolean => {
     }
   } else {
     // RDS or Redis
-    if (user.value === "" || password.value === "" || database.value === "") {
+    if (database.value === "") {
       return false;
+    }
+    // RDS
+    if (DBTypeConst.isRDSType(dbType.value)) {
+      if (user.value === "" || password.value === "") {
+        return false;
+      }
     }
   }
   if (props.mode === "clone" || props.mode === "create") {
@@ -290,19 +304,19 @@ defineExpose({
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="visibleUserAndPassword" for="user">{{ userLabel }}</label>
-    <p v-if="isShowMode && visibleUserAndPassword" id="user">{{ maskedUser }}</p>
+    <label v-show="visibleUser" for="user">{{ userLabel }}</label>
+    <p v-if="isShowMode && visibleUser" id="user">{{ maskedUser }}</p>
     <VsCodeTextField
-      v-if="!isShowMode && visibleUserAndPassword"
+      v-if="!isShowMode && visibleUser"
       id="user"
       v-model="user"
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="visibleUserAndPassword" for="password">{{ passwordLabel }}</label>
-    <p v-if="isShowMode && visibleUserAndPassword" id="password">{{ maskedPassword }}</p>
+    <label v-show="visiblePassword" for="password">{{ passwordLabel }}</label>
+    <p v-if="isShowMode && visiblePassword" id="password">{{ maskedPassword }}</p>
     <VsCodeTextField
-      v-if="!isShowMode && visibleUserAndPassword"
+      v-if="!isShowMode && visiblePassword"
       id="password"
       v-model="password"
       :maxlength="128"

@@ -265,6 +265,7 @@ defineExpose({
                   :rdh="activeInnerRdh1"
                   :width="splitterWidth"
                   :height="splitterHeight"
+                  :readonly="true"
                   @operateItem="operateItem"
                 >
                 </RDHViewer>
@@ -276,6 +277,7 @@ defineExpose({
                   :rdh="activeInnerRdh2"
                   :width="splitterWidth"
                   :height="splitterHeight"
+                  :readonly="true"
                   @operateItem="operateItem"
                 >
                 </RDHViewer>

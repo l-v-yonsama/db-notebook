@@ -10,7 +10,7 @@ import {
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ExtensionContext, SecretStorage } from "vscode";
-import { EXTENSION_NAME } from "../extension";
+import { EXTENSION_NAME } from "../constant";
 import { log } from "./logger";
 
 const uid = new ShortUniqueId();
@@ -65,11 +65,13 @@ export class StateStorage {
       };
       this.resMap.set(connectionName, resInfo);
     }
-    const driver = DBDriverResolver.getInstance().createDriver(conRes);
-    const { ok, message, result } = await driver.flow(async () => {
-      return await driver.getInfomationSchemas();
-    });
-    if (ok && result && result.length > 0) {
+
+    const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
+      conRes,
+      async (driver) => await driver.getInfomationSchemas()
+    );
+
+    if (ok && result) {
       for (const dbRes of result) {
         dbRes.meta = {
           conName: conRes.name,
@@ -148,12 +150,11 @@ export class StateStorage {
   }
 
   async addConnectionSetting(setting: ConnectionSetting): Promise<boolean> {
-    log(`${PREFIX} addConnectionSetting name:[${setting.name}]`);
     const list = await this.getConnectionSettingList();
     if (list.some((it) => it.name === setting.name)) {
       return false;
     }
-    if (setting.id !== undefined || setting.id === "") {
+    if (setting.id === undefined || setting.id === null || setting.id === "") {
       setting.id = uid.randomUUID(8);
     }
     await this.removePasswordAndStoreOnSecret(setting);
@@ -163,14 +164,12 @@ export class StateStorage {
   }
 
   async editConnectionSetting(setting: ConnectionSetting): Promise<boolean> {
-    log(`${PREFIX} editConnectionSetting name:[${setting.name}]`);
     const list = await this.getConnectionSettingList();
     const idx = list.findIndex((it) => it.name === setting.name);
-    log(`${PREFIX} editConnectionSetting idx:[${idx}]`);
     if (idx < 0) {
       return false;
     }
-    if (setting.id === undefined || setting.id === "") {
+    if (setting.id === undefined || setting.id === null || setting.id === "") {
       setting.id = uid.randomUUID(8);
     }
     await this.removePasswordAndStoreOnSecret(setting);

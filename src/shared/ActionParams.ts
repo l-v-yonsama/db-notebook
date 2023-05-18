@@ -10,7 +10,8 @@ export type ActionCommandType =
   | "compare"
   | "closeTab"
   | "testConnectionSetting"
-  | "saveConnectionSetting";
+  | "saveConnectionSetting"
+  | "deleteKey";
 
 export type TabIdParam = {
   tabId: string;
@@ -35,7 +36,8 @@ export type ActionCommand =
   | RefreshPanelActionCommand
   | CloseTabActionCommand
   | TestConnectionSettingActionCommand
-  | SaveConnectionSettingActionCommand;
+  | SaveConnectionSettingActionCommand
+  | DeleteKeyActionCommand;
 
 export type TestConnectionSettingActionCommand = {
   command: "testConnectionSetting";
@@ -53,6 +55,12 @@ export type CompareActionCommand = {
   params: CompareParams;
 };
 
+export type DeleteKeyActionCommand = {
+  command: "DeleteKey";
+  params: TabIdParam & {
+    key: string;
+  };
+};
 export type OutputActionCommand = {
   command: "output";
   params: OutputParams;

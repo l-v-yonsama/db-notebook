@@ -7,6 +7,7 @@ type Props = {
   width: number;
   height: number;
   rdh: ResultSetDataHolder;
+  readonly: boolean;
 };
 
 const props = defineProps<Props>();
@@ -33,7 +34,7 @@ function onCellFocus(params: CellFocusParams) {
       :style="{ 'max-width': `${width}px`, 'height': `${height}px` }"
     >
       <pane min-size="5">
-        <RDH :rdh="rdh" @onCellFocus="onCellFocus" style="overflow: auto; height: 100%"> </RDH>
+        <RDH :rdh="rdh" :height="height" :readonly="readonly" @onCellFocus="onCellFocus"> </RDH>
       </pane>
       <pane v-if="false">
         <div class="right">aaaaaa</div>
