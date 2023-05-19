@@ -38,6 +38,7 @@ const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh = ref(null as any);
 const outputDetailItems = ref(OUTPUT_DETAIL_ITEMS);
 const writeToClipboardDetailItems = ref(WRITE_TO_CLIP_BOARD_DETAIL_ITEMS);
+const noCompareKeys = ref(false);
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
@@ -69,13 +70,9 @@ function isActiveTabId(tabId: string): boolean {
 }
 
 const showTab = (tabId: string) => {
-  console.log("at:showTab tabId", tabId);
   activeTabId.value = `tab-${tabId}`;
-  console.log("at:showTab reset activeTabId.value", activeTabId.value);
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
-  console.log("at:showTab tabItem", tabItem);
   if (!tabItem) {
-    console.log("at:showTab nothing... tabItems", tabItems.value);
     return;
   }
   innerTabItems.value.splice(0, innerTabItems.value.length);
@@ -86,18 +83,20 @@ const showTab = (tabId: string) => {
     innerTabItems.value.push({ value: idx, label });
   });
   innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
-  console.log("showTab activeTabId.value", activeTabId.value);
   resetActiveInnerRdh();
 };
 
 const resetActiveInnerRdh = () => {
+  noCompareKeys.value = true;
   activeInnerRdh.value = null;
   const tabItem = getActiveTabItem();
   if (!tabItem || innerTabIndex.value < 0) {
     return;
   }
+  const newRdh = tabItem.list[innerTabIndex.value];
   nextTick(() => {
-    activeInnerRdh.value = tabItem.list[innerTabIndex.value];
+    noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
+    activeInnerRdh.value = newRdh;
   });
 };
 
@@ -240,11 +239,11 @@ defineExpose({
         :items="innerTabItems"
         style="z-index: 15"
         @change="resetActiveInnerRdh"
-      ></VsCodeDropdown>
+      />
       <button
         @click="actionToolbar('compare', {})"
-        :disabled="inProgress"
-        title="Compare with current content"
+        :disabled="inProgress || noCompareKeys"
+        :title="noCompareKeys ? 'No compare keys(Primary, Unique)' : 'Compare with current content'"
       >
         <fa icon="code-compare" />
       </button>

@@ -2,9 +2,10 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook.",
-  "version": "0.0.1",
-  "publisher": "cmoog",
-  "icon": "media/logo128.png",
+  "version": "0.0.2",
+  "publisher": "l-v-yonsama",
+  "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
+  "icon": "media/logo.png",
   "repository": {
     "url": "https://github.com/l-v-yonsama/db-notebook"
   },
@@ -28,6 +29,24 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "db-notebook",
+        "aliases": [
+          "Database notebook"
+        ],
+        "filenames": [
+          "*.dbn"
+        ],
+        "extensions": [
+          ".dbn"
+        ],
+        "icon": {
+          "dark": "media/dark/database.svg",
+          "light": "media/light/database.svg"
+        }
+      }
+    ],
     "notebooks": [
       {
         "type": "database-notebook-type",
@@ -43,7 +62,7 @@
       "activitybar": [
         {
           "id": "database-notebook",
-          "title": "SQL Notebook",
+          "title": "DB Notebook",
           "icon": "media/dark/database.svg"
         }
       ]
@@ -54,7 +73,7 @@
           "id": "database-notebook-connections",
           "name": "DB Explorer",
           "visibility": "visible",
-          "icon": "media/logo.svg",
+          "icon": "media/logo.png",
           "contextualTitle": "Connections"
         },
         {
@@ -68,7 +87,7 @@
           "id": "database-notebook-helpfeedback",
           "name": "Help and Feedback",
           "visibility": "collapsed",
-          "icon": "media/logo.svg",
+          "icon": "media/logo.png",
           "contextualTitle": "Help and Feedback"
         }
       ]
@@ -341,7 +360,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-0.1.94.tgz",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.95",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

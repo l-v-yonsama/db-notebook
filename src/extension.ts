@@ -28,7 +28,12 @@ export async function activate(context: ExtensionContext) {
 
   connectionSettingViewProvider = activateFormProvider(context, stateStorage);
 
-  registerResourceTreeCommand(context, stateStorage, dbResourceTree, connectionSettingViewProvider);
+  registerResourceTreeCommand({
+    context,
+    stateStorage,
+    dbResourceTree,
+    connectionSettingViewProvider,
+  });
 
   // Notebook
   activateNotebook(context, stateStorage);

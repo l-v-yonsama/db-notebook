@@ -26,15 +26,21 @@ import {
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
 
-export const registerResourceTreeCommand = (
-  context: ExtensionContext,
-  stateStorage: StateStorage,
-  dbResourceTree: ResourceTreeProvider,
-  connectionSettingViewProvider: SQLConfigurationViewProvider
-) => {
-  // -----------------------------------------
-  // for connection-settings
-  // -----------------------------------------
+type ResourceTreeParams = {
+  context: ExtensionContext;
+  stateStorage: StateStorage;
+  dbResourceTree: ResourceTreeProvider;
+  connectionSettingViewProvider: SQLConfigurationViewProvider;
+};
+
+export const registerResourceTreeCommand = (params: ResourceTreeParams) => {
+  registerConnectionSettingCommand(params);
+  registerDbResourceCommand(params);
+};
+
+const registerConnectionSettingCommand = (params: ResourceTreeParams) => {
+  const { context, stateStorage, dbResourceTree, connectionSettingViewProvider } = params;
+
   commands.registerCommand(CREATE_CONNECTION_SETTING, () => {
     connectionSettingViewProvider.setForm("create");
   });
@@ -61,9 +67,11 @@ export const registerResourceTreeCommand = (
   commands.registerCommand(SHOW_RESOURCE_PROPERTIES, async (res: DbResource) => {
     connectionSettingViewProvider.setForm("show", res);
   });
-  // -----------------------------------------
-  // for db-resouce
-  // -----------------------------------------
+};
+
+const registerDbResourceCommand = (params: ResourceTreeParams) => {
+  const { context, stateStorage, dbResourceTree, connectionSettingViewProvider } = params;
+
   commands.registerCommand(REFRESH_RESOURCES, () => {
     dbResourceTree.refresh(true);
   });

@@ -1,5 +1,5 @@
 import { TextDecoder, TextEncoder } from "util";
-import { RawNotebookData } from "../types/NotebookCell";
+import { RawNotebookData } from "../types/Notebook";
 import { CancellationToken, NotebookCellData, NotebookData, NotebookSerializer } from "vscode";
 
 export class DBNotebookSerializer implements NotebookSerializer {

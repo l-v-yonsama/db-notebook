@@ -119,6 +119,7 @@ export class StateStorage {
 
   async getConnectionSettingList(): Promise<ConnectionSetting[]> {
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
+    console.log("L122", list);
     for (const it of list) {
       if (it.id) {
         it.password = await this.getSecret(it.id);

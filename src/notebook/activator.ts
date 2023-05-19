@@ -9,11 +9,10 @@ import {
   NotebookEdit,
   WorkspaceEdit,
   commands,
-  notebooks,
   window,
   workspace,
 } from "vscode";
-import { CellMeta } from "../types/NotebookCell";
+import { CellMeta } from "../types/Notebook";
 import { activateIntellisense } from "./intellisense";
 import { ResultSetDataHolder } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as path from "path";

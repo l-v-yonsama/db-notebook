@@ -1,14 +1,8 @@
 import { NOTEBOOK_TYPE, CELL_OPEN_MDH, CELL_SPECIFY_CONNECTION_TO_USE } from "./activator";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
-import {
-  ConnectionSetting,
-  DBDriverResolver,
-  RDSBaseDriver,
-  ResultSetDataHolder,
-  normalizeQuery,
-} from "@l-v-yonsama/multi-platform-database-drivers";
-import { CellMeta } from "../types/NotebookCell";
+import { ResultSetDataHolder } from "@l-v-yonsama/multi-platform-database-drivers";
+import { CellMeta, RunResult } from "../types/Notebook";
 import { abbr } from "../utilities/stringUtil";
 import { setupDbResource } from "./intellisense";
 import {
@@ -27,6 +21,7 @@ import {
   window,
 } from "vscode";
 import { log } from "../utilities/logger";
+import { sqlKernelRun } from "./sqlKernel";
 
 const PREFIX = "[DBNotebookController]";
 
@@ -142,84 +137,12 @@ export class MainController {
 
   private async run(cell: NotebookCell): Promise<RunResult> {
     if (cell.document.languageId === "sql") {
-      return this.sqlKernelRun(cell);
+      return sqlKernelRun(cell, this.stateStorage, this.kernel!.getStoredJson());
     }
 
     return this.kernel!.run(cell);
   }
-
-  private async sqlKernelRun(cell: NotebookCell): Promise<RunResult> {
-    let stdout = "";
-    let stderr = "";
-    let connectionSetting: ConnectionSetting | undefined = undefined;
-    const storedJson = await this.kernel!.getStoredJson();
-    const { connectionName }: CellMeta = cell.metadata;
-
-    if (storedJson["_skipSql"] === true) {
-      return {
-        stdout,
-        stderr: "Skipped.",
-      };
-    }
-    if (connectionName) {
-      connectionSetting = await this.stateStorage.getConnectionSettingByName(connectionName);
-    } else {
-      return {
-        stdout,
-        stderr: "Specify the connection name to be used.",
-      };
-    }
-    if (!connectionSetting) {
-      return {
-        stdout,
-        stderr: "Missing connection " + connectionName,
-      };
-    }
-
-    const { query, binds } = normalizeQuery({
-      query: cell.document.getText(),
-      bindParams: storedJson,
-    });
-    log(`${PREFIX} query:` + query);
-    log(`${PREFIX} binds:` + JSON.stringify(binds));
-
-    const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
-      connectionSetting,
-      async (driver) =>
-        await driver.requestSql({
-          sql: query,
-          conditions: {
-            binds,
-          },
-        })
-    );
-
-    let metadata = undefined;
-    if (ok && result) {
-      if (!result.meta.tableName) {
-        result.meta.tableName = `CELL${cell.index + 1}`;
-      }
-      metadata = { rdh: result };
-      stdout = result?.toString()!;
-    } else {
-      stderr = message;
-    }
-
-    return {
-      stdout,
-      stderr,
-      metadata,
-    };
-  }
 }
-export type RunResult = {
-  stdout: string;
-  stderr: string;
-  metadata?: {
-    rdh?: ResultSetDataHolder;
-    [key: string]: any;
-  };
-};
 
 // --- status bar
 class CheckActiveContextProvider implements NotebookCellStatusBarItemProvider {

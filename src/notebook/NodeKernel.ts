@@ -3,10 +3,12 @@ import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { RunResult } from "./controller";
+import { NotebookExecutionVariables, RunResult } from "../types/Notebook";
 
 const baseDir = path.join(__filename, "..", "..", "..");
 const nodeModules = path.join(baseDir, "node_modules");
+
+const winToLinuxPath = (s: string) => s.replace(/\\/g, "/");
 
 export class NodeKernel {
   private tmpDirectory: string;
@@ -17,7 +19,7 @@ export class NodeKernel {
   constructor(private connectionSettingNames: string[]) {
     this.time = new Date().getTime();
     this.tmpDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "db-nodebook-"));
-    this.storeFile = path.join(this.tmpDirectory, `store_${this.time}.json`);
+    this.storeFile = winToLinuxPath(path.join(this.tmpDirectory, `store_${this.time}.json`));
   }
 
   async getStoredJSONString(): Promise<string> {
@@ -28,7 +30,7 @@ export class NodeKernel {
     return "{}";
   }
 
-  async getStoredJson(): Promise<{ [key: string]: any }> {
+  async getStoredJson(): Promise<NotebookExecutionVariables> {
     const json = await this.getStoredJSONString();
     return JSON.parse(json);
   }
@@ -60,10 +62,9 @@ export class NodeKernel {
     return `
     (async () => {
       const myfs = require('fs');
-      const store = require('${path.join(nodeModules, "store")}');
-      const driver = require('${path.join(
-        nodeModules,
-        "@l-v-yonsama/multi-platform-database-drivers"
+      const store = require('${winToLinuxPath(path.join(nodeModules, "store"))}');
+      const driver = require('${winToLinuxPath(
+        path.join(nodeModules, "@l-v-yonsama/multi-platform-database-drivers")
       )}');
       const _saveStore = () => {
         const saveMap = {};
@@ -101,7 +102,7 @@ export class NodeKernel {
     this.scriptFile = path.join(this.tmpDirectory, scriptName);
 
     const script = await this.createScript(cell);
-    fs.writeFileSync(this.scriptFile, script);
+    fs.writeFileSync(winToLinuxPath(this.scriptFile), script);
 
     let child: cp.ChildProcess;
     if (ext === "js") {
@@ -120,7 +121,6 @@ export class NodeKernel {
         });
       }
       if (child.stderr) {
-        var reg = new RegExp("private.+" + path.basename(this.scriptFile + ""), "g");
         child.stderr.on("data", (data) => {
           stderr += data.toString();
         });
@@ -132,6 +132,7 @@ export class NodeKernel {
     });
     await promise;
 
+    console.error("at135 Error", stderr);
     const reg = new RegExp(".*" + path.basename(this.scriptFile) + ":[0-9]+\r?\n *");
     stderr = stderr.replace(reg, "");
     stderr = stderr.replace(/ +at +[a-zA-Z0-9()/. :_\[\]-]+/g, "");
@@ -146,6 +147,7 @@ export class NodeKernel {
   }
 
   async dispose() {
+    console.log("remove dir ", this.tmpDirectory);
     await fs.promises.rm(this.tmpDirectory, { recursive: true });
   }
 }
