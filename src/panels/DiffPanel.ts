@@ -16,6 +16,7 @@ import { createHash } from "crypto";
 import { ActionCommand, CompareParams, OutputParams, TabIdParam } from "../shared/ActionParams";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
+import { hideStatusMessage, showStatusMessage } from "../statusBar";
 
 dayjs.extend(utc);
 
@@ -208,9 +209,22 @@ export class DiffPanel {
               }
             }
             break;
-          // case "refresh":
-          //   this.refresh(params);
-          //   return;
+          case "selectTab":
+            {
+              hideStatusMessage();
+            }
+            break;
+          case "selectInnerTab":
+            {
+              const { tabId, innerIndex } = params;
+              const tabItem = this.getTabItemById(tabId);
+              if (!tabItem) {
+                return;
+              }
+              showStatusMessage(tabItem.list[innerIndex].diffResult.message);
+            }
+            break;
+
           case "compare":
             this.compare(params);
             return;
@@ -241,6 +255,7 @@ export class DiffPanel {
     }
     const message = await createBookFromDiffList(tabItem.list, uri.fsPath, {
       outputWithType: data.outputWithType,
+      displayOnlyChanged: data.displayOnlyChanged ?? false,
     });
     if (message) {
       window.showErrorMessage(message);

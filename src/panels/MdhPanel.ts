@@ -24,6 +24,7 @@ import { DiffTabParam } from "./DiffPanel";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { rdhListToText, rdhToText } from "../utilities/rdhToText";
+import { hideStatusMessage, showStatusMessage } from "../statusBar";
 
 const PREFIX = "[MdhPanel]";
 
@@ -165,6 +166,26 @@ export class MdhPanel {
               }
               if (this.items.length === 0) {
                 this.dispose();
+              }
+            }
+            break;
+          case "selectTab":
+            {
+              hideStatusMessage();
+            }
+            break;
+          case "selectInnerTab":
+            {
+              const { tabId, innerIndex } = params;
+              const tabItem = this.getTabItemById(tabId);
+              if (!tabItem) {
+                return;
+              }
+              const count = tabItem.list[innerIndex].rows.length;
+              if (count === 0) {
+                showStatusMessage(`No rows`);
+              } else {
+                showStatusMessage(`Total:${tabItem.list[innerIndex].rows.length} rows`);
               }
             }
             break;

@@ -5,7 +5,9 @@ import { StateStorage } from "../utilities/StateStorage";
 import {
   ExtensionContext,
   NotebookCell,
+  NotebookCellData,
   NotebookCellKind,
+  NotebookData,
   NotebookEdit,
   WorkspaceEdit,
   commands,
@@ -18,13 +20,14 @@ import { ResultSetDataHolder } from "@l-v-yonsama/multi-platform-database-driver
 import * as path from "path";
 import { VariablesPanel } from "../panels/VariablesPanel";
 import { activateStatusBar } from "../statusBar";
-
-const EXTENSION_NAME = "database-notebook";
-export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
-export const CELL_SPECIFY_CONNECTION_TO_USE = `${EXTENSION_NAME}.cell.specify-connection-to-use`;
-export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
-export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
-export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
+import {
+  CELL_OPEN_MDH,
+  CELL_SPECIFY_CONNECTION_TO_USE,
+  CREATE_NEW_NOTEBOOK,
+  NOTEBOOK_TYPE,
+  SHOW_ALL_RDH,
+  SHOW_ALL_VARIABLES,
+} from "../constant";
 
 export function activateNotebook(context: ExtensionContext, stateStorage: StateStorage) {
   let controller: MainController;
@@ -41,6 +44,17 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   context.subscriptions.push(controller);
 
   // Commands
+  context.subscriptions.push(
+    commands.registerCommand(CREATE_NEW_NOTEBOOK, async (cells?: NotebookCellData[]) => {
+      const newNotebook = await workspace.openNotebookDocument(
+        NOTEBOOK_TYPE,
+        // new NotebookData([new NotebookCellData(NotebookCellKind.Code, "", "rest-book")])
+        new NotebookData(cells ?? [])
+      );
+      window.showNotebookDocument(newNotebook);
+    })
+  );
+
   context.subscriptions.push(
     commands.registerCommand(CELL_SPECIFY_CONNECTION_TO_USE, async (cell: NotebookCell) => {
       const conSettings = await stateStorage.getConnectionSettingList();

@@ -9,7 +9,6 @@ import {
   vsCodePanelTab,
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
-import type { ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
 import RDHViewer from "./RDHViewer.vue";
 import type { CloseTabActionCommand, CompareParams, OutputParams } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
@@ -43,8 +42,10 @@ const innerTabIndex = ref(-1);
 const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh1 = ref(null as any);
 const activeInnerRdh2 = ref(null as any);
-const outputDetailItems = ref(OUTPUT_DETAIL_ITEMS);
-const compareDetailItems = ref([
+const displayOnlyChanged = ref(false);
+
+const outputDetailItems = OUTPUT_DETAIL_ITEMS;
+const compareDetailItems = [
   {
     kind: "selection",
     label: "Compare with before content",
@@ -55,7 +56,26 @@ const compareDetailItems = ref([
     label: "Compare with after content",
     value: { base: "after" },
   },
-] as SecondaryItem[]);
+] as SecondaryItem[];
+
+type MoreOption = {
+  displayFilter: "none" | "onlyChanged";
+};
+
+const moreDetailItems = [
+  {
+    kind: "selection",
+    label: "Displays all rows",
+    value: { displayFilter: "none" },
+    when: () => displayOnlyChanged.value,
+  },
+  {
+    kind: "selection",
+    label: "Display only the rows that have changed",
+    value: { displayFilter: "onlyChanged" },
+    when: () => !displayOnlyChanged.value,
+  },
+] as SecondaryItem<MoreOption>[];
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
@@ -87,13 +107,9 @@ function isActiveTabId(tabId: string): boolean {
 }
 
 const showTab = (tabId: string) => {
-  console.log("at:showTab tabId", tabId);
   activeTabId.value = `tab-${tabId}`;
-  console.log("at:showTab reset activeTabId.value", activeTabId.value);
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
-  console.log("at:showTab tabItem", tabItem);
   if (!tabItem) {
-    console.log("at:showTab nothing... tabItems", tabItems.value);
     return;
   }
   innerTabItems.value.splice(0, innerTabItems.value.length);
@@ -104,8 +120,8 @@ const showTab = (tabId: string) => {
     innerTabItems.value.push({ value: idx, label });
   });
   innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
-  console.log("showTab activeTabId.value", activeTabId.value);
   resetActiveInnerRdh();
+  vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
 const resetActiveInnerRdh = () => {
@@ -118,6 +134,10 @@ const resetActiveInnerRdh = () => {
   nextTick(() => {
     activeInnerRdh1.value = tabItem.list[innerTabIndex.value].rdh1;
     activeInnerRdh2.value = tabItem.list[innerTabIndex.value].rdh2;
+    vscode.postCommand({
+      command: "selectInnerTab",
+      params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
+    });
   });
 };
 
@@ -149,8 +169,6 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
 };
 
 const setSearchResult = ({ tabId, value }: { tabId: string; value: DiffTabItem }) => {
-  console.log("tabId", tabId);
-  console.log("value", value);
   const idx = tabItems.value.findIndex((it) => it.tabId === tabId);
   if (idx < 0) {
     return;
@@ -186,9 +204,15 @@ const output = (params: Omit<OutputParams, "tabId">): void => {
     command: "output",
     params: {
       tabId: tabItem.tabId,
+      displayOnlyChanged: displayOnlyChanged.value,
       ...params,
     },
   });
+};
+
+const selectedMoreOptions = (v: MoreOption): void => {
+  displayOnlyChanged.value = v.displayFilter == "onlyChanged";
+  resetActiveInnerRdh();
 };
 
 const operateItem = ({ mode, item }: OperateItemParams): void => {
@@ -225,7 +249,7 @@ defineExpose({
       >
         <fa icon="code-compare" />
       </button>
-      <SecondarySelectionAction :items="compareDetailItems" @onSelect="compare" />
+      <SecondarySelectionAction :items="compareDetailItems" title="Compare" @onSelect="compare" />
       <button
         @click="output({ fileType: 'excel', outputWithType: 'withComment' })"
         :disabled="inProgress"
@@ -235,7 +259,13 @@ defineExpose({
       </button>
       <SecondarySelectionAction
         :items="outputDetailItems"
+        title="Output as Excel"
         @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
+      />
+      <SecondarySelectionAction
+        :items="moreDetailItems"
+        title="more"
+        @onSelect="selectedMoreOptions"
       />
     </div>
     <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
@@ -266,6 +296,7 @@ defineExpose({
                   :width="splitterWidth"
                   :height="splitterHeight"
                   :readonly="true"
+                  :showOnlyChanged="displayOnlyChanged"
                   @operateItem="operateItem"
                 >
                 </RDHViewer>
@@ -278,6 +309,7 @@ defineExpose({
                   :width="splitterWidth"
                   :height="splitterHeight"
                   :readonly="true"
+                  :showOnlyChanged="displayOnlyChanged"
                   @operateItem="operateItem"
                 >
                 </RDHViewer>

@@ -84,6 +84,7 @@ const showTab = (tabId: string) => {
   });
   innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
   resetActiveInnerRdh();
+  vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
 const resetActiveInnerRdh = () => {
@@ -94,9 +95,16 @@ const resetActiveInnerRdh = () => {
     return;
   }
   const newRdh = tabItem.list[innerTabIndex.value];
+  console.log("innerTabIndex.value", innerTabIndex.value);
+  console.log("newRdh", newRdh);
+
   nextTick(() => {
     noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
     activeInnerRdh.value = newRdh;
+    vscode.postCommand({
+      command: "selectInnerTab",
+      params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
+    });
   });
 };
 
@@ -257,7 +265,11 @@ defineExpose({
       >
         <fa icon="clipboard" />
       </button>
-      <SecondarySelectionAction :items="writeToClipboardDetailItems" @onSelect="writeToClipboard" />
+      <SecondarySelectionAction
+        :items="writeToClipboardDetailItems"
+        title="Write to clipboard"
+        @onSelect="writeToClipboard"
+      />
       <button
         @click="output({ fileType: 'excel', outputWithType: 'withComment' })"
         :disabled="inProgress"
@@ -267,6 +279,7 @@ defineExpose({
       </button>
       <SecondarySelectionAction
         :items="outputDetailItems"
+        title="Output as Excel"
         @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
       />
     </div>

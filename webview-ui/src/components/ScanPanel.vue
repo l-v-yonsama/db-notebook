@@ -180,22 +180,18 @@ const toIso8601String = (item: ConditionItem): string | undefined => {
 };
 
 const showTab = (tabId: string) => {
-  console.log("at:showTab tabId", tabId);
   activeTabId.value = `tab-${tabId}`;
-  console.log("at:showTab reset activeTabId.value", activeTabId.value);
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
-  console.log("at:showTab tabItem", tabItem);
   if (!tabItem) {
-    console.log("at:showTab nothing... tabItems", tabItems.value);
     return;
   }
-  console.log("showTab activeTabId.value", activeTabId.value);
   isMultiLineKeyword.value = tabItem.multilineKeyword === true;
   openLogStreamParams.value.visible = isMultiLineKeyword.value;
   deleteKeyParams.value.visible = false;
   if (tabItem.dbType === "Redis") {
     deleteKeyParams.value.visible = true;
   }
+  vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
 const addTabItem = (tabItem: TabItem) => {
@@ -335,6 +331,7 @@ defineExpose({
       </button>
       <SecondarySelectionAction
         :items="outputDetailItems"
+        title="Output as Excel"
         @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
       />
     </div>

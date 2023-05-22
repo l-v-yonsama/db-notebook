@@ -35,8 +35,8 @@ const emit = defineEmits<{
 }>();
 
 function handleOnChange(event: any) {
-  emit("change", event);
   emit("update:modelValue", event.target.value);
+  emit("change", event);
 }
 </script>
 <style></style>

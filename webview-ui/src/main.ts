@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import VMask from "@ssibrahimbas/v-mask";
-import VueExcelEditor from "vue3-excel-editor";
+import VirtualList from "@virtual-list/vue";
 import { Splitpanes, Pane } from "splitpanes";
 import vueClickOutsideElement from "vue-click-outside-element";
 import "splitpanes/dist/splitpanes.css";
@@ -41,5 +41,6 @@ app.component("Pane", Pane);
 app.component("fa", FontAwesomeIcon);
 app.use(VMask);
 app.use(vueClickOutsideElement);
-app.use(VueExcelEditor);
+app.component("VirtualList", VirtualList);
+
 app.mount("#app");

@@ -3,19 +3,20 @@
     <div class="monaco-dropdown">
       <div class="dropdown-label">
         <a
-          class="action-label codicon codicon-chevron-down"
+          class="action-label codicon"
+          :class="{ 'codicon-chevron-down': isChevron, 'codicon-ellipsis': isMore }"
           role="button"
           aria-haspopup="true"
           aria-expanded="false"
-          title="Launch Profile..."
-          aria-label="Launch Profile..."
+          :title="title"
+          :aria-label="title"
           @click="toggle"
         ></a>
       </div>
     </div>
     <section class="dropdown-list" v-click-outside-element="close" v-if="visibleContent">
       <template v-for="(item, idx) of items" :key="idx">
-        <p v-if="item.kind == 'selection'">
+        <p v-if="item.kind == 'selection' && visibleItem(item)">
           <a @click="clickItem(item.value)">{{ item.label }}</a>
         </p>
         <hr class="hr" v-else />
@@ -27,11 +28,15 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import type { SecondaryItem } from "@/types/Components";
+import type { SecondaryItem, SecondaryItemSelection } from "@/types/Components";
 
 const props = defineProps<{
+  title: string;
   items: SecondaryItem[];
 }>();
+
+const isChevron = ref(props.title != "more");
+const isMore = ref(props.title == "more");
 
 const emit = defineEmits<{
   (event: "onSelect", value: any): void;
@@ -51,6 +56,13 @@ const close = () => {
     return;
   }
   visibleContent.value = false;
+};
+
+const visibleItem = (item: SecondaryItemSelection): boolean => {
+  if (item && item.when) {
+    return item.when();
+  }
+  return true;
 };
 
 function clickItem(value: any) {

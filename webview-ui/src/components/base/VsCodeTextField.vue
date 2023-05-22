@@ -1,13 +1,17 @@
 <template>
   <vscode-text-field
+    class="child"
+    :class="{ transparent: isTransparent }"
     :value="modelValue"
     @input="handleOnInput"
+    @focus="handleOnFocus"
     :type="type"
     :placeholder="placeholder"
     :disabled="disabled"
     :maxlength="maxlength"
     :min="min"
     :size="size"
+    :readonly="readonly"
   >
     <slot></slot>
   </vscode-text-field>
@@ -24,52 +28,25 @@ const props = defineProps<{
   placeholder?: string;
   disabled?: boolean;
   maxlength?: number;
+  readonly?: boolean;
+  isTransparent?: boolean;
   min?: number;
   size?: number;
 }>();
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: string | number): void;
+  (event: "onCellFocus", modelValue: string | number): void;
 }>();
 
 function handleOnInput(event: any) {
   emit("update:modelValue", event.target.value);
 }
+function handleOnFocus(event: any) {
+  emit("onCellFocus", event.target.value);
+}
 </script>
-<style scoped>
-div.mask-wrapper {
-  box-sizing: border-box;
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  color: #cccccc;
-  background: #2a2a2a;
-  border-radius: 1px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-div.mask-root {
-  outline: none;
-  user-select: none;
-  display: inline-block;
-  color: inherit;
-  background-color: transparent;
-  border: solid 1px transparent;
-  box-sizing: border-box;
-  font-size: var(--type-ramp-base-font-size);
-  line-height: var(--type-ramp-base-line-height);
-  padding: 2px 4px;
-}
-.mask-control {
-  appearance: none;
-  font-style: inherit;
-  font-variant: inherit;
-  font-weight: inherit;
-  font-stretch: inherit;
-  font-family: inherit;
-  background: transparent;
-  color: inherit;
-  width: 100%;
-  margin-top: auto;
-  margin-bottom: auto;
-  border: none;
+<style>
+vscode-text-field[transparent]::part(root) {
+  background-color: transparent !important;
 }
 </style>

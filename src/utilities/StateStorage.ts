@@ -119,13 +119,16 @@ export class StateStorage {
 
   async getConnectionSettingList(): Promise<ConnectionSetting[]> {
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
-    console.log("L122", list);
     for (const it of list) {
       if (it.id) {
         it.password = await this.getSecret(it.id);
       }
     }
     return list;
+  }
+
+  getPasswordlessConnectionSettingList(): ConnectionSetting[] {
+    return this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
   }
 
   async getConnectionSettingByName(name: string): Promise<ConnectionSetting | undefined> {
@@ -141,7 +144,7 @@ export class StateStorage {
   }
 
   getConnectionSettingNames(): string[] {
-    const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
+    const list = this.getPasswordlessConnectionSettingList();
     return list.map((it) => it.name);
   }
 

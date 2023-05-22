@@ -1,4 +1,11 @@
-import { ExtensionContext, commands, window, workspace } from "vscode";
+import {
+  ExtensionContext,
+  NotebookCellData,
+  NotebookCellKind,
+  commands,
+  window,
+  workspace,
+} from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
 import {
   DBDriverResolver,
@@ -7,6 +14,7 @@ import {
   DbTable,
   RDSBaseDriver,
   RedisDriver,
+  displayGeneralColumnType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResourceTreeProvider } from "./ResourceTreeProvider";
 import { MdhPanel } from "../panels/MdhPanel";
@@ -14,6 +22,8 @@ import { ScanPanel } from "../panels/ScanPanel";
 import {
   CLONE_CONNECTION_SETTING,
   CREATE_CONNECTION_SETTING,
+  CREATE_ER_DIAGRAM,
+  CREATE_NEW_NOTEBOOK,
   DELETE_CONNECTION_SETTING,
   EDIT_CONNECTION_SETTING,
   FLUSH_DB,
@@ -140,4 +150,51 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       ScanPanel.render(context.extensionUri, target);
     })
   );
+
+  // ER diagram
+  commands.registerCommand(CREATE_ER_DIAGRAM, async (tableRes: DbTable) => {
+    try {
+      const content = createErDiagram(tableRes);
+      const cell = new NotebookCellData(NotebookCellKind.Markup, content, "markdown");
+      commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+    } catch (e: any) {
+      window.showErrorMessage(e.message);
+    }
+  });
 };
+
+function createErDiagram(tableRes: DbTable) {
+  let text = "```mermaid\nerDiagram\n\n";
+
+  // users ||--o{ articles: ""
+
+  text += `${tableRes.name} {\n`;
+  tableRes.children.forEach((columnRes) => {
+    let pkOrFk = "";
+    if (columnRes.primaryKey) {
+      pkOrFk = "PK ";
+    } else if (tableRes.foreignKeys?.referenceTo?.[columnRes.name]) {
+      pkOrFk = "FK ";
+    }
+    let comment = "";
+    if (columnRes.comment) {
+      comment = `"${columnRes.comment}"`;
+    }
+    text += `  ${displayGeneralColumnType(columnRes.colType)} ${
+      columnRes.name
+    } ${pkOrFk}${comment}\n`;
+  });
+  text += `}\n`;
+  // users {
+  //   string name
+  //   string email
+  //   integer age
+  // }
+
+  // articles {
+  //   string title
+  //   text text
+  // }
+  text += "```\n";
+  return text;
+}

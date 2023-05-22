@@ -1,4 +1,5 @@
 import * as Excel from "exceljs";
+import * as os from "os";
 import { EnumValues } from "enum-values";
 import {
   AnnotationType,
@@ -9,6 +10,7 @@ import {
   ResultSetDataHolder,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Fill } from "exceljs";
+import dayjs = require("dayjs");
 
 // const FONT_NAME_Arial ='Arial';
 const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";
@@ -23,6 +25,7 @@ export type BookCreateOption = {
   title?: string;
   subTitle?: string;
   outputWithType?: "none" | "withComment" | "withType" | "both";
+  displayOnlyChanged?: boolean;
 };
 
 export { columnToLetter, createBookFromList, createBookFromRdh, createBookFromDiffList };
@@ -37,29 +40,6 @@ function columnToLetter(column: number) {
   }
   return letter;
 }
-
-// function getExcelValues(rdh: ResultSetDataHolder, row: RdhRow, date_key_names: string[], timestamp_key_names: string[], time_key_names: string[]) {
-//   const r = JSON.parse(JSON.stringify(row.values));
-//   date_key_names.forEach(date_key => {
-//     if (r[date_key]) {
-//       r[date_key] = moment(r[date_key]).toDate();
-//     }
-//   });
-//   timestamp_key_names.forEach(date_key => {
-//     if (r[date_key]) {
-//       r[date_key] = moment(r[date_key]).toDate();
-//     }
-//   });
-//   time_key_names.forEach(date_key => {
-//     if (r[date_key]) {
-//       r[date_key] = moment(r[date_key]).toDate();
-//     }
-//   });
-//   if (row.values['date']) {
-//     console.log("row.values['date']=", row.values['date'], typeof(row.values['date']), row.values['date'].getFullYear());
-//   }
-//   return r;
-// }
 
 function stripSheetName(s: string): string {
   return s.replace(/['*\/:\?\[\\\]’＇*／：？［＼］￥]+/g, "");
@@ -248,6 +228,11 @@ async function createBookFromList(
   });
 }
 
+function createCommonHeader(sheet: Excel.Worksheet) {
+  sheet.getCell("A1").value = `Created: ${dayjs().format("YYYY-MM-DD(ddd) HH:mm")}`;
+  sheet.getCell("A2").value = `Creator: ${os.userInfo().username}`;
+}
+
 async function createBookFromDiffList(
   list: {
     title: string;
@@ -260,6 +245,7 @@ async function createBookFromDiffList(
 ): Promise<string> {
   let errorMessage = "";
   var workbook = new Excel.Workbook();
+  const displayOnlyChanged = options?.displayOnlyChanged === true;
 
   try {
     // TOC
@@ -277,7 +263,11 @@ async function createBookFromDiffList(
         },
       },
     });
-    tocSheet.getColumn("F").width = 1;
+    createCommonHeader(tocSheet);
+    tocSheet.getColumn("A").width = 1;
+    tocSheet.getColumn("B").width = 1;
+    tocSheet.getColumn("C").width = 2;
+    tocSheet.getColumn("D").width = 12;
     // const logo_path = path.join(FileUtil.getStaticDir(), 'images/logo/logo_transparent.png');
     // if (logo_path) {
     //   const logo_base64 = <string>FileUtil.syncReadFile(logo_path, 'base64');
@@ -287,12 +277,12 @@ async function createBookFromDiffList(
     //   });
     // }
 
-    let tocRowIndex = 3;
-    let cell = tocSheet.getCell(`G${tocRowIndex}`);
+    let tocRowNo = 3;
+    let cell = tocSheet.getCell(`C${tocRowNo}`);
     cell.value = "Table of contents.";
     cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
 
-    tocRowIndex += 4;
+    tocRowNo += 4;
 
     // RESULTSETS
     const diffList = list;
@@ -304,28 +294,70 @@ async function createBookFromDiffList(
     });
 
     let pairList: {
-      rowIndex: number;
+      rowNo: number;
       rdh: ResultSetDataHolder | undefined;
       sheet: Excel.Worksheet;
+      tableRowNoList: number[];
     }[] = [
-      { rowIndex: 1, rdh: undefined, sheet: beforeSheet },
-      { rowIndex: 1, rdh: undefined, sheet: afterSheet },
+      { rowNo: 1, rdh: undefined, sheet: beforeSheet, tableRowNoList: [] },
+      { rowNo: 1, rdh: undefined, sheet: afterSheet, tableRowNoList: [] },
     ];
 
+    const beforeDate = diffList.map((it) => it.rdh1.created).find((it) => it !== undefined);
+    const afterDate = diffList.map((it) => it.rdh2.created).find((it) => it !== undefined);
+    tocSheet.getCell("H4").value = "Before time:";
+    tocSheet.getCell("H4").alignment = {
+      horizontal: "right",
+    };
+    tocSheet.mergeCells("H4:I4");
+    tocSheet.getCell("H5").value = "After  time:";
+    tocSheet.getCell("H5").alignment = {
+      horizontal: "right",
+    };
+    tocSheet.mergeCells("H5:I5");
+    tocSheet.getCell("J4").value = `${dayjs(beforeDate).format("HH:mm:ss")}`;
+    tocSheet.getCell("J5").value = `${dayjs(afterDate).format("HH:mm:ss")}`;
+
+    // header
+    [
+      "No",
+      "Title(Table)",
+      "comment",
+      "Inserted",
+      "Deleted",
+      "Updated",
+      "Link to",
+      "Link to",
+    ].forEach((title, idx) => {
+      const cell = tocSheet.getCell(tocRowNo, 3 + idx);
+      cell.value = title;
+      setTableHeaderCell(cell);
+    });
+    tocSheet.mergeCells(`I${tocRowNo}:J${tocRowNo}`);
+
+    tocRowNo++;
     diffList.forEach((item, idx) => {
+      const no = idx + 1;
       const { rdh1, rdh2, title, diffResult } = item;
       pairList[0].rdh = rdh1;
       pairList[1].rdh = rdh2;
 
-      tocSheet.getCell(`H${tocRowIndex}`).value = {
-        text: title,
-        hyperlink: `#before!A${pairList[0].rowIndex}`,
+      tocSheet.getCell(`C${tocRowNo}`).value = no;
+      tocSheet.getCell(`D${tocRowNo}`).value = title;
+      tocSheet.getCell(`E${tocRowNo}`).value = rdh1.meta.comment ?? "";
+      tocSheet.getCell(`F${tocRowNo}`).value = diffResult.inserted;
+      tocSheet.getCell(`G${tocRowNo}`).value = diffResult.deleted;
+      tocSheet.getCell(`H${tocRowNo}`).value = diffResult.updated;
+
+      tocSheet.getCell(`I${tocRowNo}`).value = {
+        text: "Before" + no,
+        hyperlink: `#before!A${pairList[0].rowNo}`,
       };
-      tocSheet.getCell(`I${tocRowIndex}`).value = {
-        text: title,
-        hyperlink: `#after!A${pairList[1].rowIndex}`,
+      tocSheet.getCell(`J${tocRowNo}`).value = {
+        text: "After" + no,
+        hyperlink: `#after!A${pairList[1].rowNo}`,
       };
-      tocRowIndex += 1;
+      tocRowNo += 1;
 
       // create a sheet.
       for (const cur of pairList) {
@@ -333,27 +365,22 @@ async function createBookFromDiffList(
         if (!rdh) {
           continue;
         }
-        let diffMessage = "";
-        if (diffResult.ok) {
-          if (diffResult.inserted) {
-            diffMessage = `${diffResult.inserted} rows inserted`;
-          } else if (diffResult.deleted) {
-            diffMessage = `${diffResult.deleted} rows deleted`;
-          } else if (diffResult.updated) {
-            diffMessage = `${diffResult.updated} rows updated`;
-          }
-        }
-        // table name
-        const cellTitle = sheet.getCell(cur.rowIndex, 1);
-        if (diffMessage) {
-          cellTitle.value = `${title} [${diffMessage}]`;
-        } else {
-          cellTitle.value = title;
-        }
-        cur.rowIndex++;
 
-        const startIndex = cur.rowIndex;
-        const cell = sheet.getCell(cur.rowIndex, 1);
+        cur.tableRowNoList.push(cur.rowNo);
+        // table name
+        const cellTitle = sheet.getCell(cur.rowNo, 1);
+        let titleValue = title;
+        if (rdh.meta.comment) {
+          titleValue += ` (${rdh.meta.comment})`;
+        }
+        if (diffResult.message) {
+          titleValue += ` [${diffResult.message}]`;
+        }
+        cellTitle.value = titleValue;
+        cur.rowNo++;
+
+        const startIndex = cur.rowNo;
+        const cell = sheet.getCell(cur.rowNo, 1);
         cell.value = "No";
         setTableHeaderCell(cell);
 
@@ -376,67 +403,91 @@ async function createBookFromDiffList(
           }
         });
 
-        cur.rowIndex++;
+        cur.rowNo++;
         if (options?.outputWithType === "both") {
-          cur.rowIndex += 2;
+          cur.rowNo += 2;
           sheet.mergeCells(`A${startIndex}:A${startIndex + 2}`);
         } else if (
           options?.outputWithType === "withComment" ||
           options?.outputWithType === "withType"
         ) {
-          cur.rowIndex++;
+          cur.rowNo++;
           sheet.mergeCells(`A${startIndex}:A${startIndex + 1}`);
         }
 
-        rdh.rows.forEach((rdhRow, ri) => {
-          const inserted = rdhRow.hasAnnotation(AnnotationType.Add);
-          let removed = false;
-          let updated = false;
-          if (!inserted) {
-            removed = rdhRow.hasAnnotation(AnnotationType.Del);
-          }
-          if (!inserted && !removed) {
-            updated = rdhRow.hasAnnotation(AnnotationType.Upd);
-          }
-          const rowNo = ri + 1;
-          const values = rdhRow.values;
-          let cell = sheet.getCell(cur.rowIndex, 1);
-          cell.value = rowNo;
-          if (inserted) {
-            fillCell(cell, AnnotationType.Add);
-          } else if (removed) {
-            fillCell(cell, AnnotationType.Del);
-          } else if (updated) {
-            fillCell(cell, AnnotationType.Upd);
-          }
-
-          rdh.keys.forEach((column: RdhKey, colIdx: number) => {
-            let annotationMessage: any = undefined;
-            const v = values[column.name];
-            const cell = sheet.getCell(cur.rowIndex, colIdx + 2);
+        rdh.rows
+          .filter(
+            (row) =>
+              !displayOnlyChanged ||
+              row.hasAnnotation(AnnotationType.Add) ||
+              row.hasAnnotation(AnnotationType.Upd) ||
+              row.hasAnnotation(AnnotationType.Del)
+          )
+          .forEach((rdhRow, ri) => {
+            const inserted = rdhRow.hasAnnotation(AnnotationType.Add);
+            let removed = false;
+            let updated = false;
+            if (!inserted) {
+              removed = rdhRow.hasAnnotation(AnnotationType.Del);
+            }
+            if (!inserted && !removed) {
+              updated = rdhRow.hasAnnotation(AnnotationType.Upd);
+            }
+            const rowNo = ri + 1;
+            const values = rdhRow.values;
+            let cell = sheet.getCell(cur.rowNo, 1);
+            cell.value = rowNo;
             if (inserted) {
               fillCell(cell, AnnotationType.Add);
             } else if (removed) {
-              // const annotation = rdhRow.getFirstAnnotationsOf(column.name, AnnotationType.Del);
               fillCell(cell, AnnotationType.Del);
-              // if (annotation) {
-              //   annotationMessage = annotation.options?.result;
-              // }
             } else if (updated) {
-              const annotation = rdhRow.getFirstAnnotationsOf(column.name, AnnotationType.Upd);
-              if (annotation) {
-                fillCell(cell, AnnotationType.Upd);
-                annotationMessage = annotation.options?.result;
-              }
+              fillCell(cell, AnnotationType.Upd);
             }
-            let is_hyper_text = column.meta && column.meta.is_hyperlink === true;
-            setAnyValueByIndex(cell, v, { annotationMessage, is_hyper_text });
-          });
-          cur.rowIndex++;
-        });
 
-        cur.rowIndex += 2;
+            rdh.keys.forEach((column: RdhKey, colIdx: number) => {
+              let annotationMessage: any = undefined;
+              const v = values[column.name];
+              const cell = sheet.getCell(cur.rowNo, colIdx + 2);
+              if (inserted) {
+                fillCell(cell, AnnotationType.Add);
+              } else if (removed) {
+                // const annotation = rdhRow.getFirstAnnotationsOf(column.name, AnnotationType.Del);
+                fillCell(cell, AnnotationType.Del);
+                // if (annotation) {
+                //   annotationMessage = annotation.options?.result;
+                // }
+              } else if (updated) {
+                const annotation = rdhRow.getFirstAnnotationsOf(column.name, AnnotationType.Upd);
+                if (annotation) {
+                  fillCell(cell, AnnotationType.Upd);
+                  annotationMessage = annotation.options?.result;
+                }
+              }
+              let is_hyper_text = column.meta && column.meta.is_hyperlink === true;
+              setAnyValueByIndex(cell, v, { annotationMessage, is_hyper_text });
+            });
+            cur.rowNo++;
+          });
+
+        cur.rowNo += 2;
       }
+    });
+
+    // 相手テーブルへのリンク作成
+    pairList[0].tableRowNoList.forEach((beforeRowNo, idx) => {
+      const afterRowNo = pairList[1].tableRowNoList[idx];
+      beforeSheet.getCell(`H${beforeRowNo}`).value = {
+        text: "Link to after sheet",
+        hyperlink: `#after!A${afterRowNo}`,
+      };
+    });
+    pairList[1].tableRowNoList.forEach((afterRowNo, idx) => {
+      const beforeRowNo = pairList[0].tableRowNoList[idx];
+      afterSheet.getCell(`H${afterRowNo}`).value = {
+        text: "Link to before sheet",
+        hyperlink: `#before!A${beforeRowNo}`,
+      };
     });
 
     await workbook.xlsx.writeFile(targetExcelPath);

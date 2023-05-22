@@ -93,6 +93,12 @@
       ]
     },
     "menus": {
+      "file/newFile": [
+        {
+          "command": "database-notebook.create-blank-notebook",
+          "group": "notebook"
+        }
+      ],
       "view/item/context": [
         {
           "command": "database-notebook.retrieve-resources",
@@ -138,6 +144,16 @@
           "command": "database-notebook.show-resource-properties",
           "when": "view == database-notebook-connections && viewItem =~ /^.+,properties.*/",
           "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.create-er-diagram",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.retrieve-table-records",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "er-diagram@5"
         },
         {
           "command": "database-notebook.retrieve-table-records",
@@ -203,6 +219,21 @@
       ]
     },
     "commands": [
+      {
+        "command": "database-notebook.create-blank-notebook",
+        "title": "Create a new blank Database Notebook",
+        "shortTitle": "Database Notebook",
+        "category": "Database Notebook"
+      },
+      {
+        "command": "database-notebook.create-er-diagram",
+        "title": "Create ER diagram",
+        "icon": {
+          "dark": "media/dark/git-pull-request.svg",
+          "light": "media/light/git-pull-request.svg"
+        },
+        "category": "er-diagram"
+      },
       {
         "command": "database-notebook.create-connection-setting",
         "title": "Create connection setting",
@@ -360,7 +391,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.95",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.97",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

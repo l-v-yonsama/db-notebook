@@ -98,11 +98,12 @@ export class MainController {
     _notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
-    this.kernel = new NodeKernel(this.stateStorage.getConnectionSettingNames());
+    const connectionSettings = await this.stateStorage.getConnectionSettingList();
+    this.kernel = new NodeKernel(connectionSettings);
     for (let cell of cells) {
       await this._doExecution(cell);
     }
-    this.currentVariables = await this.kernel.getStoredJson();
+    this.currentVariables = await this.kernel.getStoredVariables();
     await this.kernel.dispose();
     this.setActiveContext();
   }
@@ -137,7 +138,7 @@ export class MainController {
 
   private async run(cell: NotebookCell): Promise<RunResult> {
     if (cell.document.languageId === "sql") {
-      return sqlKernelRun(cell, this.stateStorage, this.kernel!.getStoredJson());
+      return sqlKernelRun(cell, this.stateStorage, await this.kernel!.getStoredVariables());
     }
 
     return this.kernel!.run(cell);

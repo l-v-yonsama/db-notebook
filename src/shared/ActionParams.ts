@@ -9,6 +9,8 @@ export type ActionCommandType =
   | "refresh"
   | "compare"
   | "closeTab"
+  | "selectTab"
+  | "selectInnerTab"
   | "testConnectionSetting"
   | "saveConnectionSetting"
   | "deleteKey";
@@ -24,6 +26,7 @@ export type CompareParams = TabIdParam & {
 export type OutputParams = TabIdParam & {
   fileType: "excel" | "csv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
+  displayOnlyChanged?: boolean;
 };
 
 export type ActionCommand =
@@ -35,6 +38,8 @@ export type ActionCommand =
   | SearchScanPanelActionCommand
   | RefreshPanelActionCommand
   | CloseTabActionCommand
+  | SelectTabActionCommand
+  | SelectInnerTabActionCommand
   | TestConnectionSettingActionCommand
   | SaveConnectionSettingActionCommand
   | DeleteKeyActionCommand;
@@ -114,4 +119,16 @@ export type RefreshPanelActionCommand = {
 export type CloseTabActionCommand = {
   command: "closeTab";
   params: TabIdParam;
+};
+
+export type SelectTabActionCommand = {
+  command: "selectTab";
+  params: TabIdParam;
+};
+
+export type SelectInnerTabActionCommand = {
+  command: "selectInnerTab";
+  params: TabIdParam & {
+    innerIndex: number;
+  };
 };

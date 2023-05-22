@@ -13,13 +13,12 @@
     "@fortawesome/free-solid-svg-icons": "^6.4.0",
     "@fortawesome/vue-fontawesome": "^3.0.0-5",
     "@ssibrahimbas/v-mask": "^1.0.0",
+    "@virtual-list/vue": "^1.2.0",
     "@vscode/codicons": "^0.0.32",
     "@vscode/webview-ui-toolkit": "^1.2.1",
     "splitpanes": "^3.1.5",
     "vue": "^3.2.33",
-    "vue-click-outside-element": "^3.1.2",
-    "vue-virtual-table": "^0.2.22",
-    "vue3-excel-editor": "^1.0.20"
+    "vue-click-outside-element": "^3.1.2"
   },
   "devDependencies": {
     "@types/node": "^16.11.27",

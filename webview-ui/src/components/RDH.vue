@@ -2,23 +2,46 @@
 import { ref, computed } from "vue";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import * as GC from "@/types/lib/GeneralColumnType";
+import {
+  isNumericLike,
+  isDateTimeOrDateOrTime,
+  isDateTimeOrDate,
+  isArray,
+  isBinaryLike,
+  isBooleanLike,
+  isEnumOrSet,
+  isJsonLike,
+  isTextLike,
+} from "@/utilities/GeneralColumnUtil";
 import dayjs from "dayjs";
 import type { RdhKey, RdhRow, ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
 import { AnnotationType } from "@/types/lib/ResultSetDataHolder";
+import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 type Props = {
   rdh: ResultSetDataHolder;
+  width: number;
   height: number;
   readonly: boolean;
+  withComment: boolean;
+  showOnlyChanged?: boolean;
 };
 
 const props = defineProps<Props>();
 
-const containerHeight = computed((): string => {
-  const n = props.height > 30 ? props.height - 30 : props.height;
-  console.log("containerHeight", n);
-  return `${n}px`;
-});
+type RowValues = {
+  $meta: RdhRow["meta"];
+  [key: string]: any;
+};
+
+type ColKey = {
+  name: string;
+  type: string;
+  typeClass: string;
+  width: number;
+  inputSize: number;
+  comment: string;
+};
 
 const emit = defineEmits<{
   (event: "onCellFocus", value: CellFocusParams): void;
@@ -27,58 +50,69 @@ const emit = defineEmits<{
 const columns = ref(
   props.rdh.keys.map((k) => {
     let type = "string";
+    let typeClass = "codicon-circle-outline";
     let width = k.width ?? 80;
-    switch (k.type) {
-      case GC.GeneralColumnType.BIT:
-        type = "checkTF";
-        break;
-      case GC.GeneralColumnType.BIGINT:
-      case GC.GeneralColumnType.MEDIUMINT:
-      case GC.GeneralColumnType.INTEGER:
-      case GC.GeneralColumnType.SMALLINT:
-      case GC.GeneralColumnType.TINYINT:
-      case GC.GeneralColumnType.FLOAT:
-      case GC.GeneralColumnType.DOUBLE_PRECISION:
-      case GC.GeneralColumnType.NUMERIC:
-      case GC.GeneralColumnType.DECIMAL:
-      case GC.GeneralColumnType.REAL:
-        type = "number";
-        break;
-      case GC.GeneralColumnType.YEAR:
+
+    if (isNumericLike(k.type)) {
+      typeClass = "codicon-symbol-numeric";
+      type = "number";
+      if (k.type == GC.GeneralColumnType.YEAR) {
         width = 55;
-        type = "number";
-        break;
-      case GC.GeneralColumnType.TIME:
-      case GC.GeneralColumnType.TIME_WITH_TIME_ZONE:
-        width = 75;
-        break;
-      case GC.GeneralColumnType.TIMESTAMP:
-      case GC.GeneralColumnType.TIMESTAMP_WITH_TIME_ZONE:
-        type = "datetimesec";
-        width = 160;
-        break;
-      case GC.GeneralColumnType.DATE:
-        width = 95;
-        type = "string";
-        break;
+      }
+    } else if (isDateTimeOrDateOrTime(k.type)) {
+      typeClass = "codicon-calendar";
+      width = 160;
+      if (isDateTimeOrDate(k.type)) {
+        if (k.type == GC.GeneralColumnType.DATE) {
+          width = 96;
+        }
+      } else {
+        // time
+        width = 72;
+      }
+    } else if (isArray(k.type)) {
+      typeClass = "codicon-symbol-array";
+    } else if (isBinaryLike(k.type)) {
+      typeClass = "codicon-file-binary";
+    } else if (isBooleanLike(k.type)) {
+      typeClass = "codicon-symbol-boolean";
+      type = "codicon-checkTF";
+    } else if (isEnumOrSet(k.type)) {
+      typeClass = "codicon-symbol-enum";
+    } else if (isJsonLike(k.type)) {
+      typeClass = "codicon-json";
+    } else if (isTextLike(k.type)) {
+      typeClass = "codicon-symbol-string";
     }
-    return {
-      field: k.name,
-      label: k.name,
+
+    const key: ColKey = {
+      name: k.name,
       type,
+      typeClass,
       width,
+      inputSize: Math.ceil(width / 8),
+      comment: k.comment,
     };
+    return key;
   })
 );
-const jsondata = ref(
-  props.rdh.rows.map((row) => {
-    const item: any = {};
-    item["$meta"] = row.meta;
-    props.rdh.keys.map((k) => {
-      item[k.name] = toValue(k, row.values[k.name]);
-    });
-    return item;
-  })
+const list = ref(
+  props.rdh.rows
+    .filter(
+      (it) =>
+        props.showOnlyChanged == undefined ||
+        props.showOnlyChanged === false ||
+        hasAnyChangedAnnotation(it.meta)
+    )
+    .map((row) => {
+      const item: RowValues = {
+        $meta: row.meta,
+      };
+      props.rdh.keys.map((k) => {
+        item[k.name] = toValue(k, row.values[k.name]);
+      });
+      return item;
+    })
 );
 function toValue(key: RdhKey, value: any): any {
   if (value == undefined) {
@@ -99,25 +133,40 @@ function toValue(key: RdhKey, value: any): any {
 const onCellFocus = ({
   rowPos,
   colPos,
-  cell,
+  key,
+  rowValues,
 }: {
   rowPos: number;
   colPos: number;
-  cell: string;
+  key: string;
+  rowValues: RowValues;
 }): void => {
-  const colKey = columns.value[colPos].field;
-  const rowValues = jsondata.value[rowPos];
-  const value = rowValues[colKey];
+  const value = rowValues[key];
   const params: CellFocusParams = {
     rowPos,
     colPos,
-    cell,
-    colKey,
+    key,
     rowValues,
     value,
   };
   emit("onCellFocus", params);
 };
+
+function hasAnyChangedAnnotation(meta: RdhRow["meta"]): boolean {
+  if (!meta) {
+    return false;
+  }
+  return (
+    Object.values(meta)
+      ?.flat()
+      ?.some(
+        (it) =>
+          it.type == AnnotationType.Add ||
+          it.type == AnnotationType.Del ||
+          it.type == AnnotationType.Upd
+      ) ?? false
+  );
+}
 
 const hasAnnotationsOf = (meta: RdhRow["meta"], type: AnnotationType, key?: string): boolean => {
   if (!meta) {
@@ -133,12 +182,15 @@ const hasAnnotationsOf = (meta: RdhRow["meta"], type: AnnotationType, key?: stri
   );
 };
 
-const cellStyle = (p: any, keyInfo: any): any => {
+const cellStyle = (p: any, keyInfo: ColKey): any => {
+  const styles: any = {
+    width: `${keyInfo.width}px`,
+  };
   const meta: RdhRow["meta"] = p["$meta"];
   if (hasAnnotationsOf(meta, AnnotationType.Upd, keyInfo.name)) {
-    return { "background-color": "rgba(112, 83, 255, 0.29) !important" };
+    styles["background-color"] = "rgba(112, 83, 255, 0.29) !important";
   }
-  return {};
+  return styles;
 };
 
 const rowStyle = (p: any): any => {
@@ -155,60 +207,120 @@ const rowStyle = (p: any): any => {
 </script>
 
 <template>
-  <section>
-    <vue-excel-editor
-      ref="grid"
-      v-model="jsondata"
-      :no-paging="true"
-      :row-style="rowStyle"
-      :cell-style="cellStyle"
-      :height="containerHeight"
-      :no-mouse-scroll="true"
-      :readonly="readonly"
-      @cell-focus="onCellFocus"
-    >
-      <vue-excel-column
-        v-for="(key, idx) of columns"
-        :key="idx"
-        :field="key.field"
-        :label="key.label"
-        :type="key.type"
-        :width="`${key.width}px`"
-      />
-    </vue-excel-editor>
+  <section class="table">
+    <VirtualList :items="list" table class="list-table" :style="{ height: `${height}px` }">
+      <template #prepend>
+        <thead>
+          <tr>
+            <th>ROW</th>
+            <th
+              v-for="(key, idx) of columns"
+              :key="idx"
+              :title="key.name"
+              :style="{ width: `${key.width}px` }"
+            >
+              <span class="codicon" :class="key.typeClass"></span
+              ><span
+                class="label"
+                :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }"
+                >{{ key.name }}</span
+              >
+            </th>
+          </tr>
+          <tr v-if="withComment">
+            <th>&nbsp;</th>
+            <th
+              v-for="(key, idx) of columns"
+              :key="idx"
+              :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }"
+              :title="key.comment"
+            >
+              {{ key.comment }}
+            </th>
+          </tr>
+        </thead>
+      </template>
+      <template #default="{ item, index }">
+        <tr :style="rowStyle(item)">
+          <td>
+            {{ index + 1 }}
+          </td>
+          <td v-for="(key, idx) of columns" :key="idx" :style="cellStyle(item, key)">
+            <VsCodeTextField
+              v-model="item[key.name]"
+              :readonly="true"
+              :transparent="true"
+              :maxlength="1000"
+              :size="key.inputSize"
+              @onCellFocus="
+                onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
+              "
+            ></VsCodeTextField>
+          </td>
+        </tr>
+      </template>
+    </VirtualList>
   </section>
 </template>
 
 <style>
-table.systable tbody tr {
-  background-color: inherit !important;
+.list-table table {
+  border-collapse: collapse;
+  width: 100%;
 }
-table.systable thead th {
-  background-color: var(--background) !important;
+</style>
+<style scoped>
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--vscode-editorPane-background);
 }
-table.systable th.first-col,
-table.systable td.first-col {
-  background-color: var(--background) !important;
+td {
+  text-align: center;
 }
-.vue-excel-editor .footer {
-  background-color: inherit !important;
-  color: inherit !important;
+th {
+  height: 20px;
+  padding: 2px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
-.vue-excel-editor .footer > div,
-.vue-excel-editor .footer > span {
-  background-color: inherit !important;
-  color: inherit !important;
+
+thead th:first-child,
+tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 50px;
+  width: 50px;
+  background-color: var(--vscode-editorPane-background);
 }
-.vue-excel-editor .footer > div.h-scroll {
-  background-color: var(--vscode-dropdown-background) !important;
-  color: var(--vscode-dropdown-foreground) !important;
-  border-color: var(--vscode-dropdown-border) !important;
-  border-radius: 3px;
+tbody td:first-child {
+  text-align: right;
+  padding-right: 5px;
 }
-table.systable tbody tr.inserted {
+
+span.codicon {
+  margin-right: 2px;
+  vertical-align: middle;
+}
+span.label {
+  display: inline-block;
+  vertical-align: middle;
+  height: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.scroller {
+  height: 100%;
+}
+/* tr.inserted {
   background-color: var(--vscode-diffEditor-insertedTextBackground) !important;
 }
-table.systable tbody tr.removed {
+tr.removed {
   background-color: var(--vscode-diffEditor-removedTextBackground) !important;
-}
+} */
 </style>
