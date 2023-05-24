@@ -1,4 +1,4 @@
-import { NOTEBOOK_TYPE, CELL_OPEN_MDH, CELL_SPECIFY_CONNECTION_TO_USE } from "./activator";
+import { NOTEBOOK_TYPE, CELL_OPEN_MDH, CELL_SPECIFY_CONNECTION_TO_USE } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
 import { ResultSetDataHolder } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -6,8 +6,10 @@ import { CellMeta, RunResult } from "../types/Notebook";
 import { abbr } from "../utilities/stringUtil";
 import { setupDbResource } from "./intellisense";
 import {
+  Event,
   ExtensionContext,
   NotebookCell,
+  NotebookCellExecution,
   NotebookCellKind,
   NotebookCellOutput,
   NotebookCellOutputItem,
@@ -15,6 +17,7 @@ import {
   NotebookCellStatusBarItem,
   NotebookCellStatusBarItemProvider,
   NotebookController,
+  NotebookControllerAffinity,
   NotebookDocument,
   commands,
   notebooks,
@@ -43,6 +46,7 @@ export class MainController {
   private _executionOrder = 0;
   private readonly _controller: NotebookController;
   private currentVariables: { [key: string]: any } | undefined;
+  private interrupted: boolean = false;
 
   constructor(private context: ExtensionContext, private stateStorage: StateStorage) {
     this._controller = notebooks.createNotebookController(
@@ -69,6 +73,11 @@ export class MainController {
         new CheckActiveContextProvider(this)
       )
     );
+  }
+
+  interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
+    log(`${PREFIX} interruptHandler`);
+    this.interrupted = true;
   }
 
   setActiveContext() {
@@ -98,9 +107,14 @@ export class MainController {
     _notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
+    this.interrupted = false;
     const connectionSettings = await this.stateStorage.getConnectionSettingList();
     this.kernel = new NodeKernel(connectionSettings);
+
     for (let cell of cells) {
+      if (this.interrupted) {
+        break;
+      }
       await this._doExecution(cell);
     }
     this.currentVariables = await this.kernel.getStoredVariables();

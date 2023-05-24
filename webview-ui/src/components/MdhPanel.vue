@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, defineExpose, onMounted, nextTick } from "vue";
+import CompareKeySettings from "./CompareKeySettings.vue";
 import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
@@ -13,12 +14,14 @@ import type { ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
 import RDHViewer from "./RDHViewer.vue";
 import type {
   CloseTabActionCommand,
+  CompareParams,
   OutputParams,
   WriteToClipboardParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import type { DropdownItem } from "@/types/Components";
+import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS, WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
+import type { CompareKey } from "@/types/lib/CompareKey";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -36,9 +39,32 @@ const splitterHeight = ref(300);
 const innerTabIndex = ref(-1);
 const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh = ref(null as any);
-const outputDetailItems = ref(OUTPUT_DETAIL_ITEMS);
-const writeToClipboardDetailItems = ref(WRITE_TO_CLIP_BOARD_DETAIL_ITEMS);
+const contentMode = ref("tab" as "tab" | "keys");
 const noCompareKeys = ref(false);
+const activeTabRdhList = ref([] as ResultSetDataHolder[]);
+
+// secondarySelections
+const outputDetailItems = OUTPUT_DETAIL_ITEMS;
+const writeToClipboardDetailItems = WRITE_TO_CLIP_BOARD_DETAIL_ITEMS;
+
+type CompareMoreOption = {
+  command: "compare" | "editCompareKeys";
+};
+const compareDetailItems = [
+  {
+    kind: "selection",
+    label: "Compare current contets with these",
+    value: { command: "compare" },
+  },
+  {
+    kind: "divider",
+  },
+  {
+    kind: "selection",
+    label: "Edit compare keys",
+    value: { command: "editCompareKeys" },
+  },
+] as SecondaryItem<CompareMoreOption>[];
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
@@ -76,11 +102,13 @@ const showTab = (tabId: string) => {
     return;
   }
   innerTabItems.value.splice(0, innerTabItems.value.length);
+  activeTabRdhList.value.splice(0, activeTabRdhList.value.length);
   tabItem.list.forEach((rdh: ResultSetDataHolder, idx) => {
     const { tableName, type } = rdh.meta;
     const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
     const label = `${idx + 1}:${sqlType}: ${tableName}`;
     innerTabItems.value.push({ value: idx, label });
+    activeTabRdhList.value.push(rdh);
   });
   innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
   resetActiveInnerRdh();
@@ -171,13 +199,8 @@ function actionToolbar(command: string, inParams?: any) {
   let action = undefined;
   switch (command) {
     case "compare":
-      action = {
-        command,
-        params: {
-          tabId,
-        },
-      };
-      break;
+      compare(inParams);
+      return;
     case "refresh":
       action = {
         command,
@@ -198,12 +221,23 @@ function actionToolbar(command: string, inParams?: any) {
   vscode.postCommand(action);
 }
 
-const output = (params: Omit<OutputParams, "tabId">): void => {
-  console.log("output:", params);
+const compare = (params: Omit<CompareParams, "tabId">): void => {
   const tabItem = getActiveTabItem();
-  console.log("tabItem=", tabItem);
   if (!tabItem) {
-    console.log("No tab Item");
+    return;
+  }
+
+  vscode.postCommand({
+    command: "compare",
+    params: {
+      tabId: tabItem.tabId,
+      ...params,
+    },
+  });
+};
+const output = (params: Omit<OutputParams, "tabId">): void => {
+  const tabItem = getActiveTabItem();
+  if (!tabItem) {
     return;
   }
 
@@ -231,6 +265,44 @@ const writeToClipboard = (params: Omit<WriteToClipboardParams, "tabId">): void =
   });
 };
 
+const selectedCompareMoreOptions = (v: CompareMoreOption): void => {
+  const { command } = v;
+  console.log(v);
+  switch (command) {
+    case "compare": {
+      compare({});
+      return;
+    }
+    case "editCompareKeys": {
+      contentMode.value = "keys";
+      return;
+    }
+  }
+};
+
+const saveCompareKeys = (
+  values: {
+    index: number;
+    compareKeyNames: string[];
+  }[]
+): void => {
+  console.log("called saveCompareKeys");
+  const tabItem = getActiveTabItem();
+  if (!tabItem) {
+    return;
+  }
+  console.log("tabItem tabItem", tabItem);
+
+  vscode.postCommand({
+    command: "saveCompareKeys",
+    params: {
+      tabId: tabItem.tabId,
+      list: values,
+    },
+  });
+  contentMode.value = "tab";
+};
+
 defineExpose({
   addTabItem,
   removeTabItem,
@@ -240,7 +312,7 @@ defineExpose({
 
 <template>
   <section class="MdhPanel">
-    <div class="tab-container-actions">
+    <div v-if="contentMode == 'tab'" class="tab-container-actions">
       <VsCodeDropdown
         v-if="innerTabItems.length > 1"
         v-model="innerTabIndex"
@@ -255,6 +327,11 @@ defineExpose({
       >
         <fa icon="code-compare" />
       </button>
+      <SecondarySelectionAction
+        :items="compareDetailItems"
+        title="Compare"
+        @onSelect="selectedCompareMoreOptions"
+      />
       <button @click="actionToolbar('refresh', {})" :disabled="inProgress" title="Search again">
         <fa icon="rotate" />
       </button>
@@ -283,7 +360,18 @@ defineExpose({
         @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
       />
     </div>
-    <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
+    <CompareKeySettings
+      v-if="contentMode == 'keys'"
+      :rdhList="activeTabRdhList"
+      @cancel="contentMode = 'tab'"
+      @save="saveCompareKeys"
+    />
+    <vscode-panels
+      v-if="contentMode == 'tab'"
+      class="tab-wrapper"
+      :activeid="activeTabId"
+      aria-label="With Active Tab"
+    >
       <VsCodeTabHeader
         v-for="tabItem in tabItems"
         :id="tabItem.tabId"

@@ -195,6 +195,34 @@ export class MdhPanel {
           case "compare":
             this.compare(params);
             return;
+          case "saveCompareKeys":
+            {
+              const { tabId, list } = params;
+              const tabItem = this.getTabItemById(tabId);
+              if (!tabItem) {
+                return;
+              }
+              list.forEach((item) => {
+                const meta = tabItem.list[item.index].meta;
+                if (meta.compareKeys === undefined) {
+                  meta.compareKeys = [];
+                }
+                meta.compareKeys.splice(0, meta.compareKeys.length);
+                meta.compareKeys.push({
+                  kind: "custom",
+                  names: item.compareKeyNames,
+                });
+              });
+              const msg: ToWebviewMessageEventType = {
+                command: componentName + "-set-search-result",
+                value: {
+                  tabId,
+                  value: tabItem.list,
+                },
+              };
+              this._panel.webview.postMessage(msg);
+            }
+            return;
           case "output":
             this.output(params);
             return;

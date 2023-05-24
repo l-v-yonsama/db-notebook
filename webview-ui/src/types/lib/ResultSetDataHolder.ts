@@ -1,5 +1,5 @@
-import type { CompareKey } from "./CompareKey";
 import type { GeneralColumnType } from "./GeneralColumnType";
+import type { RdhMeta } from "./ResultSetHelperMetadata";
 export declare class SampleClassPair {
   clazz_value: any;
   sample_values: any[];
@@ -82,13 +82,7 @@ export type ToStringParam = {
 export declare class ResultSetDataHolder {
   keys: RdhKey[];
   rows: Array<RdhRow>;
-  readonly meta: {
-    connectionName?: string;
-    tableName?: string;
-    compareKeys?: CompareKey[];
-    type?: string;
-    [key: string]: any;
-  };
+  readonly meta: RdhMeta;
   sqlStatement: string | undefined;
   shuffledIndexes?: number[];
   shuffledNextCounter?: number;

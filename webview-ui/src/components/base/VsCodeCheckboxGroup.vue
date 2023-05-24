@@ -23,12 +23,13 @@ provideVSCodeDesignSystem().register(vsCodeCheckbox());
 const selectedValues: string[] = [];
 
 const clickBox = (value: string) => {
-  const idx = selectedValues.findIndex((v) => value === v);
+  const idx = selectedValues.findIndex((v) => value == v);
   if (idx >= 0) {
     selectedValues.splice(idx, 1);
   } else {
     selectedValues.push(value);
   }
+  console.log("idx=", idx, " selectedValues", selectedValues);
   emit("update:modelValue", selectedValues);
 };
 
@@ -58,6 +59,12 @@ const list = ref(
     checked: props.modelValue.includes(it.value),
   }))
 );
+
+props.items
+  .filter((it) => it.checked === true)
+  .forEach((item) => {
+    selectedValues.push(item.value);
+  });
 
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: string[]): void;

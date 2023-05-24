@@ -8,6 +8,9 @@ import {
   GeneralColumnType,
   RdhKey,
   ResultSetDataHolder,
+  isDateTimeOrDate,
+  isDateTimeOrDateOrTime,
+  toDate,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Fill } from "exceljs";
 import dayjs = require("dayjs");
@@ -92,9 +95,10 @@ function createQueryResultSheet(
     sheet.getCell(rowIndex, 1).value = ri + 1;
     rdh.keys.forEach((column: RdhKey, colIdx: number) => {
       const v = values[column.name];
+      let format = getCellFormat(column.type);
       const cell = sheet.getCell(rowIndex, colIdx + 2);
       let is_hyper_text = column.meta && column.meta.is_hyperlink === true;
-      setAnyValueByIndex(cell, v, { is_hyper_text });
+      setAnyValueByIndex(cell, v, { is_hyper_text, format });
 
       let max_len = colLenMap.get(colIdx)!;
       if (max_len < (v || "").length) {
@@ -447,6 +451,7 @@ async function createBookFromDiffList(
 
             rdh.keys.forEach((column: RdhKey, colIdx: number) => {
               let annotationMessage: any = undefined;
+              let format = getCellFormat(column.type);
               const v = values[column.name];
               const cell = sheet.getCell(cur.rowNo, colIdx + 2);
               if (inserted) {
@@ -465,7 +470,7 @@ async function createBookFromDiffList(
                 }
               }
               let is_hyper_text = column.meta && column.meta.is_hyperlink === true;
-              setAnyValueByIndex(cell, v, { annotationMessage, is_hyper_text });
+              setAnyValueByIndex(cell, v, { annotationMessage, is_hyper_text, format });
             });
             cur.rowNo++;
           });
@@ -495,6 +500,16 @@ async function createBookFromDiffList(
     errorMessage = e.message;
   }
   return errorMessage;
+}
+
+function getCellFormat(type: GeneralColumnType): CellFormat | undefined {
+  if (isDateTimeOrDate(type)) {
+    return GeneralColumnType.DATE === type ? CellFormat.date : CellFormat.dateTime;
+  }
+  // if(GeneralColumnType.TIME === type){
+  //   return CellFormat.time;
+  // }
+  return undefined;
 }
 
 async function createFileSheet(workbook: Excel.Workbook, sheetName: string, file: any) {
@@ -631,10 +646,11 @@ function fillCell(cell: Excel.Cell, type: AnnotationType) {
 }
 
 enum CellFormat {
-  MMDDYYYY = "m/d/yyyy",
-  MMDDYYYY_HHMMSS = "m/d/yyyy h:mm:ss",
-  DECIMAL = "#,##0",
-  FLOAT_PERCENT = "0.00%",
+  // time = 'hh:mm:ss',
+  date = "yyyy/mm/dd",
+  dateTime = "yyyy/mm/dd hh:mm:ss",
+  decimal = "#,##0",
+  floatPercent = "0.00%",
 }
 
 function setAnyValueByIndex(
@@ -679,20 +695,34 @@ function setAnyValueByIndex(
         size: options.font_size,
       };
     }
-    if (options.format) {
-      cell.numFmt = options.format;
-      if (options.format === CellFormat.MMDDYYYY || options.format === CellFormat.MMDDYYYY_HHMMSS) {
-        if (typeof text === "string") {
-          cellValue = new Date(text);
+    if (options?.annotationMessage !== undefined) {
+      let me = text ?? "";
+      let you = options?.annotationMessage ?? "";
+      // 比較対象も横並びにする場合は標準型のまま
+      if (options.format) {
+        if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
+          me = toDateString(me, options.format);
+          you = toDateString(you, options.format);
+        }
+      }
+      cellValue = `${me}[${you}]`;
+    } else {
+      if (options.format) {
+        cell.numFmt = options.format;
+        if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
+          cellValue = toDate(text);
         }
       }
     }
   }
-  if (options?.annotationMessage !== undefined) {
-    cell.value = `${text}[${options?.annotationMessage}]`;
-  } else {
-    cell.value = cellValue;
+  cell.value = cellValue;
+}
+
+function toDateString(target: any, format: CellFormat): string {
+  if (target === undefined || target === null || target.length === 0) {
+    return "";
   }
+  return dayjs(target).format(format == CellFormat.date ? "YYYY-MM-DD" : "YYYY-MM-DD HH:mm:ss");
 }
 
 function setAnyValue(

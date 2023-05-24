@@ -23,6 +23,10 @@ export type CompareParams = TabIdParam & {
   base?: "before" | "after";
 };
 
+export type SaveCompareKeysParams = TabIdParam & {
+  list: { index: number; compareKeyNames: string[] }[];
+};
+
 export type OutputParams = TabIdParam & {
   fileType: "excel" | "csv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
@@ -31,6 +35,7 @@ export type OutputParams = TabIdParam & {
 
 export type ActionCommand =
   | CompareActionCommand
+  | SaveCompareKeysActionCommand
   | OutputActionCommand
   | WriteToClipboardActionCommand
   | OpenScanPanelActionCommand
@@ -58,6 +63,11 @@ export type SaveConnectionSettingActionCommand = {
 export type CompareActionCommand = {
   command: "compare";
   params: CompareParams;
+};
+
+export type SaveCompareKeysActionCommand = {
+  command: "saveCompareKeys";
+  params: SaveCompareKeysParams;
 };
 
 export type DeleteKeyActionCommand = {
