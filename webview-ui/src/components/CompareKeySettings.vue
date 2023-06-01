@@ -2,8 +2,8 @@
 import { ref, computed } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckboxGroup from "./base/VsCodeCheckboxGroup.vue";
-import type { CompareKey } from "@/types/lib/CompareKey";
-import type { RdhMeta } from "@/types/lib/ResultSetHelperMetadata";
+
+import type { CompareKey, RdhMeta } from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
   rdhList: any[];
@@ -196,7 +196,7 @@ const save = () => {
 <style scoped>
 .toolbar {
   padding: 3px 4px;
-  margin-bottom: 3px;
+  margin-bottom: 13px;
   text-align: right;
 }
 table {

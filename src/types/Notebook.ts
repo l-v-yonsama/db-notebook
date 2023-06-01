@@ -1,4 +1,4 @@
-import { ResultSetDataHolder } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import { NotebookCellKind } from "vscode";
 
 export type CellMeta = {
@@ -27,7 +27,7 @@ export type RunResult = {
   stdout: string;
   stderr: string;
   metadata?: {
-    rdh?: ResultSetDataHolder;
+    rdh?: ResultSetData;
     [key: string]: any;
   };
 };

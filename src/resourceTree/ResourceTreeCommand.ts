@@ -3,16 +3,20 @@ import {
   NotebookCellData,
   NotebookCellKind,
   commands,
+  env,
   window,
   workspace,
 } from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
 import {
   DBDriverResolver,
+  DbColumn,
   DbConnection,
   DbResource,
+  DbSchema,
   DbTable,
   RDSBaseDriver,
+  RdsDatabase,
   RedisDriver,
   displayGeneralColumnType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -23,6 +27,7 @@ import {
   CLONE_CONNECTION_SETTING,
   CREATE_CONNECTION_SETTING,
   CREATE_ER_DIAGRAM,
+  CREATE_ER_DIAGRAM_WITH_SETTINGS,
   CREATE_NEW_NOTEBOOK,
   DELETE_CONNECTION_SETTING,
   EDIT_CONNECTION_SETTING,
@@ -33,8 +38,12 @@ import {
   SHOW_CONNECTION_SETTING,
   SHOW_RESOURCE_PROPERTIES,
   SHOW_SCAN_PANEL,
+  WRITE_ER_DIAGRAM_TO_CLIPBOARD,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
+import { ERDiagramParams, TableColumn, TableRelation } from "../shared/ERDiagram";
+import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
+import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 
 type ResourceTreeParams = {
   context: ExtensionContext;
@@ -154,47 +163,54 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   // ER diagram
   commands.registerCommand(CREATE_ER_DIAGRAM, async (tableRes: DbTable) => {
     try {
-      const content = createErDiagram(tableRes);
+      const { conName, schemaName } = tableRes.meta;
+      const dbs = stateStorage.getResourceByName(conName);
+      let schema: DbSchema | undefined = undefined;
+      if (dbs && dbs[0] instanceof RdsDatabase) {
+        schema = (dbs[0] as RdsDatabase).getSchema({ name: schemaName });
+      }
+      const params = createSimpleERDiagramParams(schema, tableRes);
+      const content = createErDiagram(params);
       const cell = new NotebookCellData(NotebookCellKind.Markup, content, "markdown");
       commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
     } catch (e: any) {
       window.showErrorMessage(e.message);
     }
   });
-};
-
-function createErDiagram(tableRes: DbTable) {
-  let text = "```mermaid\nerDiagram\n\n";
-
-  // users ||--o{ articles: ""
-
-  text += `${tableRes.name} {\n`;
-  tableRes.children.forEach((columnRes) => {
-    let pkOrFk = "";
-    if (columnRes.primaryKey) {
-      pkOrFk = "PK ";
-    } else if (tableRes.foreignKeys?.referenceTo?.[columnRes.name]) {
-      pkOrFk = "FK ";
+  commands.registerCommand(CREATE_ER_DIAGRAM_WITH_SETTINGS, async (tableRes: DbTable) => {
+    try {
+      const { conName, schemaName } = tableRes.meta;
+      const dbs = stateStorage.getResourceByName(conName);
+      let schema: DbSchema | undefined = undefined;
+      if (dbs && dbs[0] instanceof RdsDatabase) {
+        schema = (dbs[0] as RdsDatabase).getSchema({ name: schemaName });
+      }
+      let title = tableRes.comment ?? "";
+      if (!title) {
+        title = tableRes.name;
+      }
+      ERDiagramSettingsPanel.render(context.extensionUri, {
+        title,
+        tables: schema?.children ?? [],
+        selectedTable: tableRes,
+      });
+    } catch (e: any) {
+      window.showErrorMessage(e.message);
     }
-    let comment = "";
-    if (columnRes.comment) {
-      comment = `"${columnRes.comment}"`;
-    }
-    text += `  ${displayGeneralColumnType(columnRes.colType)} ${
-      columnRes.name
-    } ${pkOrFk}${comment}\n`;
   });
-  text += `}\n`;
-  // users {
-  //   string name
-  //   string email
-  //   integer age
-  // }
-
-  // articles {
-  //   string title
-  //   text text
-  // }
-  text += "```\n";
-  return text;
-}
+  commands.registerCommand(WRITE_ER_DIAGRAM_TO_CLIPBOARD, async (tableRes: DbTable) => {
+    try {
+      const { conName, schemaName } = tableRes.meta;
+      const dbs = stateStorage.getResourceByName(conName);
+      let schema: DbSchema | undefined = undefined;
+      if (dbs && dbs[0] instanceof RdsDatabase) {
+        schema = (dbs[0] as RdsDatabase).getSchema({ name: schemaName });
+      }
+      const params = createSimpleERDiagramParams(schema, tableRes);
+      const content = createErDiagram(params);
+      env.clipboard.writeText(content);
+    } catch (e: any) {
+      window.showErrorMessage(e.message);
+    }
+  });
+};

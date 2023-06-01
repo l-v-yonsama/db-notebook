@@ -1,15 +1,13 @@
 import { NOTEBOOK_TYPE, CELL_OPEN_MDH, CELL_SPECIFY_CONNECTION_TO_USE } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
-import { ResultSetDataHolder } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellMeta, RunResult } from "../types/Notebook";
 import { abbr } from "../utilities/stringUtil";
 import { setupDbResource } from "./intellisense";
 import {
-  Event,
   ExtensionContext,
   NotebookCell,
-  NotebookCellExecution,
   NotebookCellKind,
   NotebookCellOutput,
   NotebookCellOutputItem,
@@ -17,7 +15,6 @@ import {
   NotebookCellStatusBarItem,
   NotebookCellStatusBarItemProvider,
   NotebookController,
-  NotebookControllerAffinity,
   NotebookDocument,
   commands,
   notebooks,
@@ -198,7 +195,7 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
 
 class RdhProvider implements NotebookCellStatusBarItemProvider {
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    const rdh = <ResultSetDataHolder | undefined>cell.outputs[0]?.metadata?.["rdh"];
+    const rdh = <ResultSetData | undefined>cell.outputs[0]?.metadata?.["rdh"];
     if (!rdh) {
       return;
     }

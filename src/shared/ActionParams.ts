@@ -1,19 +1,20 @@
 import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ModeType } from "./ModeType";
+import type { ERDiagramSettingParams } from "./ERDiagram";
 
-export type ActionCommandType =
-  | "openScanPanel"
-  | "closeScanPanel"
-  | "search"
-  | "output"
-  | "refresh"
-  | "compare"
-  | "closeTab"
-  | "selectTab"
-  | "selectInnerTab"
-  | "testConnectionSetting"
-  | "saveConnectionSetting"
-  | "deleteKey";
+// export type ActionCommandType =
+//   | "openScanPanel"
+//   | "closeScanPanel"
+//   | "search"
+//   | "output"
+//   | "refresh"
+//   | "compare"
+//   | "closeTab"
+//   | "selectTab"
+//   | "selectInnerTab"
+//   | "testConnectionSetting"
+//   | "saveConnectionSetting"
+//   | "deleteKey";
 
 export type TabIdParam = {
   tabId: string;
@@ -34,7 +35,9 @@ export type OutputParams = TabIdParam & {
 };
 
 export type ActionCommand =
+  | CancelActionCommand
   | CompareActionCommand
+  | CreateERDiagramActionCommand
   | SaveCompareKeysActionCommand
   | OutputActionCommand
   | WriteToClipboardActionCommand
@@ -49,6 +52,11 @@ export type ActionCommand =
   | SaveConnectionSettingActionCommand
   | DeleteKeyActionCommand;
 
+export type BaseActionCommand<T extends string, U = any> = {
+  command: T;
+  params: U;
+};
+
 export type TestConnectionSettingActionCommand = {
   command: "testConnectionSetting";
   params: ConnectionSetting;
@@ -60,10 +68,17 @@ export type SaveConnectionSettingActionCommand = {
   params: ConnectionSetting;
 };
 
+export type CancelActionCommand = BaseActionCommand<"cancel">;
+
 export type CompareActionCommand = {
   command: "compare";
   params: CompareParams;
 };
+
+export type CreateERDiagramActionCommand = BaseActionCommand<
+  "createERDiagram",
+  ERDiagramSettingParams
+>;
 
 export type SaveCompareKeysActionCommand = {
   command: "saveCompareKeys";
@@ -86,9 +101,10 @@ export type WriteToClipboardActionCommand = {
   params: WriteToClipboardParams;
 };
 
-export type WriteToClipboardParams = TabIdParam & {
+export type WriteToClipboardParams<T = any> = TabIdParam & {
   fileType: "csv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
+  options?: T;
 };
 
 export type OpenScanPanelParams = {

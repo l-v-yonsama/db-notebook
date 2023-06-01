@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, defineExpose, onMounted, nextTick } from "vue";
-import type { ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
+import { ref, onMounted, nextTick } from "vue";
+import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDHViewer from "./RDHViewer.vue";
 import type { CellFocusParams } from "@/types/RdhEvents";
 
 type Props = {
-  rdh: ResultSetDataHolder;
+  rdh: ResultSetData;
 };
 
 const props = defineProps<Props>();

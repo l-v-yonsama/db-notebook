@@ -7,7 +7,7 @@ import {
   DbLogStream,
   DbResource,
   RedisDriver,
-  ResultSetDataHolder,
+  ResultSetData,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { createBookFromRdh } from "../utilities/excelGenerator";
@@ -237,7 +237,6 @@ export class ScanPanel {
     webview.onDidReceiveMessage(
       async (message: ActionCommand) => {
         const { command, params } = message;
-        console.log("ScanPanel.tsL274 message", message);
 
         switch (command) {
           case "closeScanPanel":
@@ -370,7 +369,7 @@ export class ScanPanel {
     );
 
     if (ok && result) {
-      const rdh = result as ResultSetDataHolder;
+      const rdh = result as ResultSetData;
       panelItem.rdh = rdh;
       if (!rdh.meta?.tableName) {
         rdh.meta.tableName = rootRes.name;
@@ -383,7 +382,6 @@ export class ScanPanel {
           value: rdh,
         },
       };
-      console.log(msg);
       this._panel.webview.postMessage(msg);
     } else {
       vscode.window.showErrorMessage(message);

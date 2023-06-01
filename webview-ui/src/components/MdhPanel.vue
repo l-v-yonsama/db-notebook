@@ -10,7 +10,7 @@ import {
   vsCodePanelTab,
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
-import type { ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
+import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDHViewer from "./RDHViewer.vue";
 import type {
   CloseTabActionCommand,
@@ -21,14 +21,13 @@ import type {
 import { vscode } from "@/utilities/vscode";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS, WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
-import type { CompareKey } from "@/types/lib/CompareKey";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
 type RdhTabItem = {
   tabId: string;
   title: string;
-  list: any[]; // ResultSetDataHolder
+  list: ResultSetData[];
 };
 
 const activeTabId = ref("");
@@ -41,7 +40,7 @@ const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh = ref(null as any);
 const contentMode = ref("tab" as "tab" | "keys");
 const noCompareKeys = ref(false);
-const activeTabRdhList = ref([] as ResultSetDataHolder[]);
+const activeTabRdhList = ref([] as ResultSetData[]);
 
 // secondarySelections
 const outputDetailItems = OUTPUT_DETAIL_ITEMS;
@@ -103,7 +102,7 @@ const showTab = (tabId: string) => {
   }
   innerTabItems.value.splice(0, innerTabItems.value.length);
   activeTabRdhList.value.splice(0, activeTabRdhList.value.length);
-  tabItem.list.forEach((rdh: ResultSetDataHolder, idx) => {
+  tabItem.list.forEach((rdh: ResultSetData, idx) => {
     const { tableName, type } = rdh.meta;
     const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
     const label = `${idx + 1}:${sqlType}: ${tableName}`;
@@ -163,7 +162,7 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
   }
 };
 
-const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetDataHolder[] }) => {
+const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData[] }) => {
   console.log("tabId", tabId);
   console.log("value", value);
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
@@ -174,7 +173,7 @@ const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData
   innerTabItems.value.splice(0, innerTabItems.value.length);
   nextTick(() => {
     tabItem.list.push(...value);
-    tabItem.list.forEach((rdh: ResultSetDataHolder, idx) => {
+    tabItem.list.forEach((rdh: ResultSetData, idx) => {
       const { tableName, type } = rdh.meta;
       const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
       const label = `${idx + 1}:${sqlType}: ${tableName}`;

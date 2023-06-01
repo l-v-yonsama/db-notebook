@@ -1,12 +1,5 @@
 import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
-import {
-  DBDriverResolver,
-  GeneralColumnType,
-  RDSBaseDriver,
-  RdhKey,
-  ResultSetDataHolder,
-  createRdhKey,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
@@ -27,7 +20,7 @@ export class VariablesPanel {
   private static stateStorage?: StateStorage;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
-  private variables: ResultSetDataHolder | undefined;
+  private variables: ResultSetData | undefined;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     this._panel = panel;
@@ -61,7 +54,7 @@ export class VariablesPanel {
       });
       VariablesPanel.currentPanel = new VariablesPanel(panel, extensionUri);
     }
-    VariablesPanel.currentPanel.variables = ResultSetDataHolder.from(variables);
+    VariablesPanel.currentPanel.variables = ResultSetDataBuilder.from(variables).build();
     VariablesPanel.currentPanel.renderSub();
   }
 

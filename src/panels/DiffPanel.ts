@@ -1,19 +1,20 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn, commands } from "vscode";
+import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import {
   DBDriverResolver,
   DiffResult,
   RDSBaseDriver,
-  ResultSetDataHolder,
+  RdhHelper,
+  ResultSetData,
+  ResultSetDataBuilder,
   diff,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
-import * as fs from "fs";
 import * as path from "path";
 import { createHash } from "crypto";
-import { ActionCommand, CompareParams, OutputParams, TabIdParam } from "../shared/ActionParams";
+import { ActionCommand, CompareParams, OutputParams } from "../shared/ActionParams";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
@@ -25,8 +26,8 @@ const componentName = "DiffPanel";
 type DiffTabInnerItem = {
   tabId: string;
   title: string;
-  rdh1: ResultSetDataHolder;
-  rdh2: ResultSetDataHolder;
+  rdh1: ResultSetData;
+  rdh2: ResultSetData;
   diffResult: DiffResult;
 };
 
@@ -39,8 +40,8 @@ type DiffTabItem = {
 
 export type DiffTabParam = {
   title: string;
-  list1: ResultSetDataHolder[];
-  list2: ResultSetDataHolder[];
+  list1: ResultSetData[];
+  list2: ResultSetData[];
 };
 
 export class DiffPanel {
@@ -63,7 +64,6 @@ export class DiffPanel {
   }
 
   public static render(extensionUri: Uri, params: DiffTabParam) {
-    console.log("at DiffPanel.vue called render", params);
     if (DiffPanel.currentPanel) {
       // If the webview panel already exists reveal it
       DiffPanel.currentPanel._panel.reveal(ViewColumn.One);
@@ -94,8 +94,8 @@ export class DiffPanel {
 
   private createTabItem(
     title: string,
-    list1: ResultSetDataHolder[],
-    list2: ResultSetDataHolder[]
+    list1: ResultSetData[],
+    list2: ResultSetData[]
   ): DiffTabItem {
     let subTitle = "";
     if (list1.length) {
@@ -107,8 +107,8 @@ export class DiffPanel {
       }
       subTitle = `${before} ⇔ ${after}`;
     }
-    list1.forEach((it) => it.clearAllAnotations());
-    list2.forEach((it) => it.clearAllAnotations());
+    list1.forEach((it) => RdhHelper.clearAllAnotations(it));
+    list2.forEach((it) => RdhHelper.clearAllAnotations(it));
 
     const createTabId = () => createHash("md5").update(title).digest("hex");
     const tabId = createTabId();
@@ -195,7 +195,6 @@ export class DiffPanel {
       async (message: ActionCommand) => {
         const { command, params } = message;
 
-        console.log("⭐️received message from webview ", message);
         switch (command) {
           case "closeTab":
             {
@@ -275,8 +274,8 @@ export class DiffPanel {
         ? tabItem.list.map((it) => it.rdh2)
         : tabItem.list.map((it) => it.rdh1);
     const conNames = [...new Set(baseList.map((it) => it.meta.connectionName + ""))];
-    const beforeList = baseList.map((it) => ResultSetDataHolder.from(it));
-    const afterList = baseList.map((it) => undefined as ResultSetDataHolder | undefined);
+    const beforeList = baseList.map((it) => ResultSetDataBuilder.from(it).build());
+    const afterList = baseList.map((it) => undefined as ResultSetData | undefined);
     for (const conName of conNames) {
       const setting = await DiffPanel.stateStorage?.getConnectionSettingByName(conName);
       if (!setting) {

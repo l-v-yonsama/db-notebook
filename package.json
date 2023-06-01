@@ -151,7 +151,17 @@
           "group": "inline"
         },
         {
-          "command": "database-notebook.retrieve-table-records",
+          "command": "database-notebook.create-er-diagram",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "er-diagram@5"
+        },
+        {
+          "command": "database-notebook.create-er-diagram-with-settings",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "er-diagram@5"
+        },
+        {
+          "command": "database-notebook.write-er-diagram-to-clipboard",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "er-diagram@5"
         },
@@ -218,7 +228,24 @@
         }
       ]
     },
+    "customEditors": [
+      {
+        "viewType": "database-notebook.ruleEditor",
+        "displayName": "DB record rule editor",
+        "selector": [
+          {
+            "filenamePattern": "*.rrule"
+          }
+        ]
+      }
+    ],
     "commands": [
+      {
+        "command": "database-notebook.create-blank-record-rule",
+        "title": "Create a new blank DB record rule",
+        "shortTitle": "Database Record rule",
+        "category": "Database Notebook"
+      },
       {
         "command": "database-notebook.create-blank-notebook",
         "title": "Create a new blank Database Notebook",
@@ -228,6 +255,24 @@
       {
         "command": "database-notebook.create-er-diagram",
         "title": "Create ER diagram",
+        "icon": {
+          "dark": "media/dark/git-pull-request.svg",
+          "light": "media/light/git-pull-request.svg"
+        },
+        "category": "er-diagram"
+      },
+      {
+        "command": "database-notebook.create-er-diagram-with-settings",
+        "title": "Create ER diagram with settings",
+        "icon": {
+          "dark": "media/dark/git-pull-request.svg",
+          "light": "media/light/git-pull-request.svg"
+        },
+        "category": "er-diagram"
+      },
+      {
+        "command": "database-notebook.write-er-diagram-to-clipboard",
+        "title": "Write ER diagram to clipboard",
         "icon": {
           "dark": "media/dark/git-pull-request.svg",
           "light": "media/light/git-pull-request.svg"
@@ -391,7 +436,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.100",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.105",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

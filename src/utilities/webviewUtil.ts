@@ -30,7 +30,7 @@ export const createWebviewContent = (webview: Webview, extensionUri: Uri) => {
             <title>Hello World</title>
           </head>
           <body style="padding:0">
-            <div id="app"></div>
+            <div id="app">Now loading...</div>
             <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
           </body>
         </html>

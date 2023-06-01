@@ -8,7 +8,10 @@ import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ConnectionSettingVue from "./components/ConnectionSetting.vue";
 import ResourceProperties from "./components/ResourceProperties.vue";
-import type { ConnectionSetting } from "./types/lib/DbResource";
+import ERDiagramSettings from "./components/ERDiagramSettings.vue";
+import RecordRuleEditor from "./components/RecordRuleEditor.vue";
+
+import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 
 const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
 
@@ -69,6 +72,20 @@ function messageListener(evt: MessageEvent) {
           visible.variablePanel = true;
         });
         break;
+      case "ERDiagramSettingsPanel":
+        values.value = value;
+        visible.eRDiagramSettingsPanel = false;
+        nextTick(() => {
+          visible.eRDiagramSettingsPanel = true;
+        });
+        break;
+      case "RecordRuleEditor":
+        values.value = value;
+        visible.recordRuleEditor = false;
+        nextTick(() => {
+          visible.recordRuleEditor = true;
+        });
+        break;
     }
     return;
   }
@@ -114,6 +131,8 @@ const visible = reactive<{
   scanPanel: boolean;
   diffPanel: boolean;
   variablePanel: boolean;
+  eRDiagramSettingsPanel: boolean;
+  recordRuleEditor: boolean;
 }>({
   connectionSetting: false,
   resourceProperties: false,
@@ -121,6 +140,8 @@ const visible = reactive<{
   scanPanel: false,
   diffPanel: false,
   variablePanel: false,
+  eRDiagramSettingsPanel: false,
+  recordRuleEditor: false,
 });
 
 const mode = ref<ModeType>("create");
@@ -148,6 +169,13 @@ const resourcePropertiesValues = ref<{ [key: string]: string }>({});
     <DiffPanel v-if="visible.diffPanel" :ref="setDiffPanelRef"></DiffPanel>
     <ScanPanel ref="scanPanelRef" v-show="visible.scanPanel" :opt="scanValues"></ScanPanel>
     <VariablesPanel v-if="visible.variablePanel" :rdh="values" />
+    <ERDiagramSettings
+      v-if="visible.eRDiagramSettingsPanel"
+      :title="values.title"
+      :tables="values.tables"
+      :selectedTable="values.selectedTable"
+    />
+    <RecordRuleEditor v-if="visible.recordRuleEditor" title="test" />
   </main>
 </template>
 

@@ -16,7 +16,7 @@ import {
 } from "vscode";
 import { CellMeta } from "../types/Notebook";
 import { activateIntellisense } from "./intellisense";
-import { ResultSetDataHolder } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as path from "path";
 import { VariablesPanel } from "../panels/VariablesPanel";
 import { activateStatusBar } from "../statusBar";
@@ -82,9 +82,8 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   context.subscriptions.push(
     commands.registerCommand(CELL_OPEN_MDH, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
-      const rdh: ResultSetDataHolder = cell.outputs?.[0].metadata?.rdh;
+      const rdh: ResultSetData = cell.outputs?.[0].metadata?.rdh;
       const title = filePath ? path.basename(filePath) : rdh.meta.tableName ?? "CELL" + cell.index;
-      console.log("called show rdh  cell", cell);
       MdhPanel.render(context.extensionUri, title, [rdh]);
     })
   );

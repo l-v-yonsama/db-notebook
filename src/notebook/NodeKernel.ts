@@ -38,7 +38,6 @@ export class NodeKernel {
 
   private async createScript(cell: vscode.NotebookCell): Promise<string> {
     const variablesJsonString = await this.getStoredVariablesString();
-    console.log(winToLinuxPath(path.join(nodeModules, "store")));
 
     return `
     (async () => {
@@ -128,7 +127,7 @@ export class NodeKernel {
     stderr = stderr.replace(/Node.js v[0-9.:-]+/, "");
     stderr = stderr.replace(/\r\n/g, "\n");
     stderr = stderr.replace(/\n+/g, "\n");
-    console.log(stderr);
+
     return {
       stdout,
       stderr,
@@ -136,7 +135,6 @@ export class NodeKernel {
   }
 
   async dispose() {
-    console.log("remove dir ", this.tmpDirectory);
     await fs.promises.rm(this.tmpDirectory, { recursive: true });
   }
 }

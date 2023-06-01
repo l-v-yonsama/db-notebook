@@ -14,12 +14,16 @@ import {
   isTextLike,
 } from "@/utilities/GeneralColumnUtil";
 import dayjs from "dayjs";
-import type { RdhKey, RdhRow, ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
-import { AnnotationType } from "@/types/lib/ResultSetDataHolder";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
+import type {
+  ResultSetData,
+  RdhRow,
+  RdhKey,
+  AnnotationType,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
-  rdh: ResultSetDataHolder;
+  rdh: ResultSetData;
   width: number;
   height: number;
   readonly: boolean;
@@ -51,7 +55,7 @@ const columns = ref(
   props.rdh.keys.map((k) => {
     let type = "string";
     let typeClass = "codicon-circle-outline";
-    let width = k.width ?? 80;
+    let width = k.width ?? 100;
 
     if (isNumericLike(k.type)) {
       typeClass = "codicon-symbol-numeric";
@@ -159,12 +163,7 @@ function hasAnyChangedAnnotation(meta: RdhRow["meta"]): boolean {
   return (
     Object.values(meta)
       ?.flat()
-      ?.some(
-        (it) =>
-          it.type == AnnotationType.Add ||
-          it.type == AnnotationType.Del ||
-          it.type == AnnotationType.Upd
-      ) ?? false
+      ?.some((it) => it.type == "Add" || it.type == "Del" || it.type == "Upd") ?? false
   );
 }
 
@@ -187,7 +186,7 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
     width: `${keyInfo.width}px`,
   };
   const meta: RdhRow["meta"] = p["$meta"];
-  if (hasAnnotationsOf(meta, AnnotationType.Upd, keyInfo.name)) {
+  if (hasAnnotationsOf(meta, "Upd", keyInfo.name)) {
     styles["background-color"] = "rgba(112, 83, 255, 0.29) !important";
   }
   return styles;
@@ -195,11 +194,11 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
 
 const rowStyle = (p: any): any => {
   const meta: RdhRow["meta"] = p["$meta"];
-  if (hasAnnotationsOf(meta, AnnotationType.Add)) {
+  if (hasAnnotationsOf(meta, "Add")) {
     return { "background-color": "rgba(195, 232, 141, 0.22) !important" };
-  } else if (hasAnnotationsOf(meta, AnnotationType.Del)) {
+  } else if (hasAnnotationsOf(meta, "Del")) {
     return { "background-color": "rgba(255, 83, 112, 0.25) !important" };
-  } else if (hasAnnotationsOf(meta, AnnotationType.Upd)) {
+  } else if (hasAnnotationsOf(meta, "Upd")) {
     return { "background-color": "rgba(112, 83, 255, 0.11) !important" };
   }
   return null;
@@ -225,6 +224,9 @@ const rowStyle = (p: any): any => {
                 :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }"
                 >{{ key.name }}</span
               >
+              <a class="widen" @click="key.width += 100"
+                ><span class="codicon codicon-arrow-both"></span
+              ></a>
             </th>
           </tr>
           <tr v-if="withComment">
@@ -248,10 +250,11 @@ const rowStyle = (p: any): any => {
           <td v-for="(key, idx) of columns" :key="idx" :style="cellStyle(item, key)">
             <VsCodeTextField
               v-model="item[key.name]"
-              :readonly="true"
+              :readonly="false"
               :transparent="true"
               :maxlength="1000"
               :size="key.inputSize"
+              style="width: 99%"
               @onCellFocus="
                 onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
               "
@@ -285,6 +288,18 @@ th {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+  position: relative;
+}
+
+th > a.widen {
+  cursor: pointer;
+  display: none;
+  position: absolute;
+  right: 2px;
+  top: 2px;
+}
+th:hover > a.widen {
+  display: inline-block;
 }
 
 thead th:first-child,

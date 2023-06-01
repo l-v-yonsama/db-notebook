@@ -12,9 +12,8 @@ import {
   vsCodePanelTab,
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
-import type { ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
+import type { DbResource, ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDHViewer from "./RDHViewer.vue";
-import type { DbResource } from "@/types/lib/DbResource";
 import type {
   CloseScanPanelActionCommand,
   DeleteKeyActionCommand,
@@ -220,9 +219,7 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
   }
 };
 
-const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetDataHolder }) => {
-  console.log("tabId", tabId);
-  console.log("value", value);
+const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData }) => {
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;

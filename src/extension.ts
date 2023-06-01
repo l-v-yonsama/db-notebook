@@ -12,6 +12,7 @@ import { DiffPanel } from "./panels/DiffPanel";
 import { DiffTabParam } from "./panels/DiffPanel";
 import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
 import { EXTENSION_NAME, SHOW_RDH_DIFF } from "./constant";
+import { activateRuleEditor } from "./ruleEditor/activator";
 
 let connectionSettingViewProvider: SQLConfigurationViewProvider;
 
@@ -37,6 +38,9 @@ export async function activate(context: ExtensionContext) {
 
   // Notebook
   activateNotebook(context, stateStorage);
+
+  // Record rule editor
+  activateRuleEditor(context, stateStorage);
 
   // DIFF
   commands.registerCommand(SHOW_RDH_DIFF, (params: DiffTabParam) => {

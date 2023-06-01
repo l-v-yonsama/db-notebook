@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { ResultSetDataHolder } from "@/types/lib/ResultSetDataHolder";
+import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDH from "./RDH.vue";
 import type { CellFocusParams } from "@/types/RdhEvents";
 
 type Props = {
   width: number;
   height: number;
-  rdh: ResultSetDataHolder;
+  rdh: ResultSetData;
   readonly: boolean;
   showOnlyChanged?: boolean;
 };
@@ -39,7 +39,7 @@ function onCellFocus(params: CellFocusParams) {
           :rdh="rdh"
           :width="width"
           :height="height"
-          :readonly="readonly"
+          :readonly="false"
           :showOnlyChanged="showOnlyChanged"
           :withComment="rdh.keys.some((it) => it.comment?.length)"
           @onCellFocus="onCellFocus"

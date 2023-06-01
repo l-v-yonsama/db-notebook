@@ -7,8 +7,10 @@ import VsCodeCheckboxGroup from "./base/VsCodeCheckboxGroup.vue";
 import * as DBTypeConst from "@/types/lib/DBType";
 import * as AwsRegionConst from "@/types/lib/AwsRegion";
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
-import type { AwsSetting, ConnectionSetting } from "@/types/lib/DbResource";
 import { AwsServiceType, AwsServiceTypeValues } from "@/types/lib/AwsServiceType";
+
+import type { AwsSetting, ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+
 import { vscode } from "@/utilities/vscode";
 import type { ModeType } from "@/utilities/vscode";
 
@@ -106,8 +108,6 @@ const acceptValues = computed((): boolean => {
 });
 
 const isDuplicateName = computed((): boolean => {
-  console.log("props.prohibitedNames=", props.prohibitedNames);
-  console.log("name.value=", name.value);
   if (props.mode === "clone" || props.mode === "create") {
     return props.prohibitedNames.includes(name.value);
   }
@@ -179,11 +179,8 @@ const awsServiceItems = AwsServiceTypeValues.map((it) => ({
 
 function createItem(): ConnectionSetting {
   let awsSetting: AwsSetting | undefined = undefined;
-  console.log("L205 called createItem");
   const aaa = awsServiceSelected.value.join(",");
-  console.log("aaa=", aaa);
   const arr = aaa.split(",");
-  console.log("arr=", arr);
   if (DBTypeConst.isAws(dbType.value)) {
     awsSetting = {
       services: arr as AwsServiceType[],
@@ -203,7 +200,6 @@ function createItem(): ConnectionSetting {
     url: url.value,
     awsSetting,
   };
-  console.log("L205 a", a);
   return a;
 }
 function save() {
@@ -246,7 +242,6 @@ function setDefault() {
 }
 
 const stopProgress = () => {
-  console.log("called stop progress");
   isInProgress.value = false;
 };
 defineExpose({

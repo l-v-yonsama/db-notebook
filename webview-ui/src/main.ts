@@ -15,6 +15,7 @@ import {
   faFloppyDisk,
   faLeaf,
   faPencil,
+  faPlus,
   faRotate,
   faSearch,
   faTrash,
@@ -30,6 +31,7 @@ library.add(faFileExcel);
 library.add(faFloppyDisk);
 library.add(faLeaf);
 library.add(faPencil);
+library.add(faPlus);
 library.add(faRotate);
 library.add(faSearch);
 library.add(faTrash);

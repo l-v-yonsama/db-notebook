@@ -22,6 +22,8 @@ export const SHOW_SCAN_PANEL = `${EXTENSION_NAME}.show-scan-panel`;
 export const SHOW_METADATA_RDH = `${EXTENSION_NAME}.show-metadata-rdh`;
 export const SHOW_RESOURCE_PROPERTIES = `${EXTENSION_NAME}.show-resource-properties`;
 export const CREATE_ER_DIAGRAM = `${EXTENSION_NAME}.create-er-diagram`;
+export const CREATE_ER_DIAGRAM_WITH_SETTINGS = `${EXTENSION_NAME}.create-er-diagram-with-settings`;
+export const WRITE_ER_DIAGRAM_TO_CLIPBOARD = `${EXTENSION_NAME}.write-er-diagram-to-clipboard`;
 
 //---------------------------------------------------
 // NOTE BOOK
@@ -32,3 +34,9 @@ export const CELL_SPECIFY_CONNECTION_TO_USE = `${EXTENSION_NAME}.cell.specify-co
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
 export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
 export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
+
+//---------------------------------------------------
+// RECORD RULE EDITOR
+//---------------------------------------------------
+export const CREATE_NEW_RECORD_RULE = `${EXTENSION_NAME}.create-blank-record-rule`;
+export const RECORD_RULE_TYPE = `${EXTENSION_NAME}-ruleEditor`;

@@ -3,6 +3,8 @@ import {
   ConnectionSetting,
   DBDriverResolver,
   RDSBaseDriver,
+  ResultSetData,
+  ResultSetDataBuilder,
   normalizeQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellMeta, RunResult, NotebookExecutionVariables } from "../types/Notebook";
@@ -49,7 +51,10 @@ export const sqlKernelRun = async (
   log(`${PREFIX} query:` + query);
   log(`${PREFIX} binds:` + JSON.stringify(binds));
 
-  const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+  const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+    RDSBaseDriver,
+    ResultSetData
+  >(
     connectionSetting,
     async (driver) =>
       await driver.requestSql({
@@ -66,7 +71,11 @@ export const sqlKernelRun = async (
       result.meta.tableName = `CELL${cell.index + 1}`;
     }
     metadata = { rdh: result };
-    stdout = result?.toString()!;
+    const rdb = ResultSetDataBuilder.from(result);
+    const withComment = rdb.rs.keys.some((it) => (it.comment ?? "").length);
+    stdout = rdb.toString({
+      withComment,
+    });
   } else {
     stderr = message;
   }

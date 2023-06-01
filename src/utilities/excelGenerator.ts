@@ -7,7 +7,10 @@ import {
   DiffResult,
   GeneralColumnType,
   RdhKey,
-  ResultSetDataHolder,
+  ResultSetData,
+  ResultSetDataBuilder,
+  RowHelper,
+  UpdateAnnotation,
   isDateTimeOrDate,
   isDateTimeOrDateOrTime,
   toDate,
@@ -51,7 +54,7 @@ function stripSheetName(s: string): string {
 function createQueryResultSheet(
   workbook: Excel.Workbook,
   sheetName: string,
-  rdh: ResultSetDataHolder,
+  rdh: ResultSetData,
   outputWithType?: BookCreateOption["outputWithType"]
 ) {
   var sheet = workbook.addWorksheet(sheetName, {
@@ -113,18 +116,15 @@ function createQueryResultSheet(
   });
 }
 
-function createSheetName(o: ResultSetDataHolder | string, no?: number): string {
-  const title = typeof o === "string" ? o : (o as ResultSetDataHolder).meta?.tableName ?? "";
+function createSheetName(o: ResultSetData | string, no?: number): string {
+  const title = typeof o === "string" ? o : (o as ResultSetData).meta?.tableName ?? "";
   if (no !== undefined) {
     return stripSheetName(`${no}_${title}`);
   }
   return stripSheetName(title);
 }
 
-async function createBookFromRdh(
-  rdh: ResultSetDataHolder,
-  targetExcelPath: string
-): Promise<string> {
+async function createBookFromRdh(rdh: ResultSetData, targetExcelPath: string): Promise<string> {
   let errorMessage = "";
   var workbook = new Excel.Workbook();
 
@@ -141,7 +141,7 @@ async function createBookFromRdh(
   });
 }
 async function createBookFromList(
-  list: ResultSetDataHolder[],
+  list: ResultSetData[],
   targetExcelPath: string,
   options?: BookCreateOption
 ): Promise<string> {
@@ -164,7 +164,12 @@ async function createBookFromList(
         },
       },
     });
-    tocSheet.getColumn("F").width = 1;
+    createCommonHeader(tocSheet);
+    tocSheet.getColumn("A").width = 2;
+    tocSheet.getColumn("B").width = 2;
+    tocSheet.getColumn("C").width = 4;
+    tocSheet.getColumn("D").width = 20;
+    tocSheet.getColumn("E").width = 16;
     // const logo_path = path.join(FileUtil.getStaticDir(), 'images/logo/logo_transparent.png');
     // if (logo_path) {
     //   const logo_base64 = <string>FileUtil.syncReadFile(logo_path, 'base64');
@@ -175,7 +180,7 @@ async function createBookFromList(
     // }
 
     let tocRowIndex = 3;
-    let cell = tocSheet.getCell(`G${tocRowIndex}`);
+    let cell = tocSheet.getCell(`C${tocRowIndex}`);
     cell.value = "Table of contents.";
     cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
 
@@ -187,7 +192,7 @@ async function createBookFromList(
         const file = files[idx];
         const sheetName = `FILE_${idx}`;
         await createFileSheet(workbook, sheetName, file);
-        tocSheet.getCell(`H${tocRowIndex}`).value = {
+        tocSheet.getCell(`D${tocRowIndex}`).value = {
           text: file.name,
           hyperlink: `#${sheetName}!A1`,
         };
@@ -195,24 +200,37 @@ async function createBookFromList(
       }
     }
     // LINT
-    const lintList = list.filter((it) => it.hasAnnotation(AnnotationType.Lnt));
+    const lintList = list.filter((it) => ResultSetDataBuilder.from(it).hasAnyAnnotation(["Lnt"]));
     if (lintList.length) {
       await createLintSheet(workbook, lintList);
-      tocSheet.getCell(`H${tocRowIndex}`).value = {
+      tocSheet.getCell(`D${tocRowIndex}`).value = {
         text: "LINT RESULT",
         hyperlink: `#LINT!A1`,
       };
       tocRowIndex += 2;
     }
     // RESULTSETS
-    const generalList = list.filter((it) => !it.hasAnnotation(AnnotationType.Lnt));
+    const generalList = list.filter(
+      (it) => !ResultSetDataBuilder.from(it).hasAnyAnnotation(["Lnt"])
+    );
+    {
+      ["TITLE(TABLE)", "COMMENT", "TYPE", "ROWS"].forEach((key, idx) => {
+        let cell = tocSheet.getCell(tocRowIndex, 4 + idx);
+        cell.value = key;
+        setTableHeaderCell(cell);
+      });
+    }
+    tocRowIndex += 1;
     generalList.forEach((rdh, idx) => {
       const sheetName = createSheetName(rdh, idx + 1);
-      console.log("createBookFromMdh append sheet_name:", sheetName);
-      tocSheet.getCell(`H${tocRowIndex}`).value = {
+      tocSheet.getCell(`D${tocRowIndex}`).value = {
         text: sheetName,
         hyperlink: `#${sheetName}!A1`,
       };
+      tocSheet.getCell(`E${tocRowIndex}`).value = rdh.meta.comment ?? "";
+      tocSheet.getCell(`F${tocRowIndex}`).value = rdh.meta.type ?? "";
+      tocSheet.getCell(`G${tocRowIndex}`).value =
+        rdh.meta.type === "select" ? rdh.rows.length : "-";
       tocRowIndex += 1;
       // create a sheet.
       createQueryResultSheet(workbook, sheetName, rdh, options?.outputWithType);
@@ -240,8 +258,8 @@ function createCommonHeader(sheet: Excel.Worksheet) {
 async function createBookFromDiffList(
   list: {
     title: string;
-    rdh1: ResultSetDataHolder;
-    rdh2: ResultSetDataHolder;
+    rdh1: ResultSetData;
+    rdh2: ResultSetData;
     diffResult: DiffResult;
   }[],
   targetExcelPath: string,
@@ -268,10 +286,11 @@ async function createBookFromDiffList(
       },
     });
     createCommonHeader(tocSheet);
-    tocSheet.getColumn("A").width = 1;
-    tocSheet.getColumn("B").width = 1;
-    tocSheet.getColumn("C").width = 2;
-    tocSheet.getColumn("D").width = 12;
+    tocSheet.getColumn("A").width = 2;
+    tocSheet.getColumn("B").width = 2;
+    tocSheet.getColumn("C").width = 4;
+    tocSheet.getColumn("D").width = 20;
+    tocSheet.getColumn("E").width = 16;
     // const logo_path = path.join(FileUtil.getStaticDir(), 'images/logo/logo_transparent.png');
     // if (logo_path) {
     //   const logo_base64 = <string>FileUtil.syncReadFile(logo_path, 'base64');
@@ -299,7 +318,7 @@ async function createBookFromDiffList(
 
     let pairList: {
       rowNo: number;
-      rdh: ResultSetDataHolder | undefined;
+      rdh: ResultSetData | undefined;
       sheet: Excel.Worksheet;
       tableRowNoList: number[];
     }[] = [
@@ -421,32 +440,28 @@ async function createBookFromDiffList(
 
         rdh.rows
           .filter(
-            (row) =>
-              !displayOnlyChanged ||
-              row.hasAnnotation(AnnotationType.Add) ||
-              row.hasAnnotation(AnnotationType.Upd) ||
-              row.hasAnnotation(AnnotationType.Del)
+            (row) => !displayOnlyChanged || RowHelper.hasAnyAnnotation(row, ["Add", "Upd", "Del"])
           )
           .forEach((rdhRow, ri) => {
-            const inserted = rdhRow.hasAnnotation(AnnotationType.Add);
+            const inserted = RowHelper.hasAnnotation(rdhRow, "Add");
             let removed = false;
             let updated = false;
             if (!inserted) {
-              removed = rdhRow.hasAnnotation(AnnotationType.Del);
+              removed = RowHelper.hasAnnotation(rdhRow, "Del");
             }
             if (!inserted && !removed) {
-              updated = rdhRow.hasAnnotation(AnnotationType.Upd);
+              updated = RowHelper.hasAnnotation(rdhRow, "Upd");
             }
             const rowNo = ri + 1;
             const values = rdhRow.values;
             let cell = sheet.getCell(cur.rowNo, 1);
             cell.value = rowNo;
             if (inserted) {
-              fillCell(cell, AnnotationType.Add);
+              fillCell(cell, "Add");
             } else if (removed) {
-              fillCell(cell, AnnotationType.Del);
+              fillCell(cell, "Del");
             } else if (updated) {
-              fillCell(cell, AnnotationType.Upd);
+              fillCell(cell, "Upd");
             }
 
             rdh.keys.forEach((column: RdhKey, colIdx: number) => {
@@ -455,22 +470,30 @@ async function createBookFromDiffList(
               const v = values[column.name];
               const cell = sheet.getCell(cur.rowNo, colIdx + 2);
               if (inserted) {
-                fillCell(cell, AnnotationType.Add);
+                fillCell(cell, "Add");
               } else if (removed) {
                 // const annotation = rdhRow.getFirstAnnotationsOf(column.name, AnnotationType.Del);
-                fillCell(cell, AnnotationType.Del);
+                fillCell(cell, "Del");
                 // if (annotation) {
                 //   annotationMessage = annotation.options?.result;
                 // }
               } else if (updated) {
-                const annotation = rdhRow.getFirstAnnotationsOf(column.name, AnnotationType.Upd);
+                const annotation = RowHelper.getFirstAnnotationOf<UpdateAnnotation>(
+                  rdhRow,
+                  column.name,
+                  "Upd"
+                );
                 if (annotation) {
-                  fillCell(cell, AnnotationType.Upd);
-                  annotationMessage = annotation.options?.result;
+                  fillCell(cell, "Upd");
+                  annotationMessage = annotation.values?.otherValue;
                 }
               }
-              let is_hyper_text = column.meta && column.meta.is_hyperlink === true;
-              setAnyValueByIndex(cell, v, { annotationMessage, is_hyper_text, format });
+              const isHyperText = column.meta && column.meta.is_hyperlink === true;
+              setAnyValueByIndex(cell, v, {
+                annotationMessage,
+                is_hyper_text: isHyperText,
+                format,
+              });
             });
             cur.rowNo++;
           });
@@ -533,7 +556,7 @@ async function createFileSheet(workbook: Excel.Workbook, sheetName: string, file
     br: { col: 4, row: 5 },
   } as any);
 }
-async function createLintSheet(workbook: Excel.Workbook, list: ResultSetDataHolder[]) {
+async function createLintSheet(workbook: Excel.Workbook, list: ResultSetData[]) {
   var sheet = workbook.addWorksheet("LINT", {
     views: [{ state: "frozen", ySplit: 3 }],
     pageSetup: { paperSize: 9, orientation: "portrait" },
@@ -568,34 +591,36 @@ async function createLintSheet(workbook: Excel.Workbook, list: ResultSetDataHold
   });
 
   let row_index = 4;
-  list.forEach((rdh) => {
-    rdh.rows.forEach((row, rdh_row_index) => {
-      rdh.keynames().forEach((key_name: string, col_index: number) => {
-        const cell_value: any = row.values[key_name];
-        let annotations: Array<CellAnnotation> = [];
-        if (row.meta && row.meta[key_name]) {
-          annotations = row.meta[key_name].filter(
-            (a: CellAnnotation) => a.type === AnnotationType.Lnt
-          );
-        }
-        annotations.forEach((annotation) => {
-          if (annotation.options && annotation.options.result) {
-            const result: any = annotation.options.result;
-            setAnyValue(sheet, `B${row_index}`, rdh.meta.tableName ?? "");
-            setAnyValue(sheet, `C${row_index}`, {
-              text: `${columnToLetter(col_index + 1)}${rdh_row_index + 1}`,
-              // hyperlink: `#${lr.label}!R${rdh_row_index + 1}C${col_index + 1}`,
-            });
-            setAnyValue(sheet, `D${row_index}`, result.ruleId);
-            setAnyValue(sheet, `E${row_index}`, annotation.options.message);
-            setAnyValue(sheet, `F${row_index}`, cell_value);
-            setAnyValue(sheet, `G${row_index}`, result.fix || "");
-            row_index++;
-          }
-        });
-      });
-    });
-  });
+  // list.forEach((rdh) => {
+  //   rdh.rows.forEach((row, rdh_row_index) => {
+  //     rdh.keys
+  //       .map((it) => it.name)
+  //       .forEach((key_name: string, col_index: number) => {
+  //         const cell_value: any = row.values[key_name];
+  //         let annotations: Array<CellAnnotation> = [];
+  //         if (row.meta && row.meta[key_name]) {
+  //           annotations = row.meta[key_name].filter(
+  //             (a: CellAnnotation) => a.type === 'Lnt'
+  //           );
+  //         }
+  //         annotations.forEach((annotation) => {
+  //           if (annotation.options && annotation.options.result) {
+  //             const result: any = annotation.options.result;
+  //             setAnyValue(sheet, `B${row_index}`, rdh.meta.tableName ?? "");
+  //             setAnyValue(sheet, `C${row_index}`, {
+  //               text: `${columnToLetter(col_index + 1)}${rdh_row_index + 1}`,
+  //               // hyperlink: `#${lr.label}!R${rdh_row_index + 1}C${col_index + 1}`,
+  //             });
+  //             setAnyValue(sheet, `D${row_index}`, result.ruleId);
+  //             setAnyValue(sheet, `E${row_index}`, annotation.options.message);
+  //             setAnyValue(sheet, `F${row_index}`, cell_value);
+  //             setAnyValue(sheet, `G${row_index}`, result.fix || "");
+  //             row_index++;
+  //           }
+  //         });
+  //       });
+  //   });
+  // });
 }
 
 function convertNotNaN(v: number) {
@@ -618,21 +643,21 @@ function setTableHeaderCell(cell: Excel.Cell) {
 function fillCell(cell: Excel.Cell, type: AnnotationType) {
   let fill: Fill | undefined = undefined;
   switch (type) {
-    case AnnotationType.Add:
+    case "Add":
       fill = {
         type: "pattern",
         pattern: "lightGrid",
         fgColor: { argb: "FFc3e88d" },
       };
       break;
-    case AnnotationType.Upd:
+    case "Upd":
       fill = {
         type: "pattern",
         pattern: "gray125",
         fgColor: { argb: "FF7053ff" },
       };
       break;
-    case AnnotationType.Del:
+    case "Del":
       fill = {
         type: "pattern",
         pattern: "lightHorizontal",

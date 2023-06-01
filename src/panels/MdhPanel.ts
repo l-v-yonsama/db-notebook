@@ -2,7 +2,8 @@ import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vsco
 import {
   DBDriverResolver,
   RDSBaseDriver,
-  ResultSetDataHolder,
+  ResultSetData,
+  ResultSetDataBuilder,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
@@ -23,7 +24,7 @@ import { SHOW_RDH_DIFF } from "../constant";
 import { DiffTabParam } from "./DiffPanel";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
-import { rdhListToText, rdhToText } from "../utilities/rdhToText";
+import { rdhListToText } from "../utilities/rdhToText";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 
 const PREFIX = "[MdhPanel]";
@@ -35,7 +36,7 @@ const componentName = "MdhPanel";
 type RdhTabItem = {
   tabId: string;
   title: string;
-  list: ResultSetDataHolder[];
+  list: ResultSetData[];
 };
 
 /**
@@ -64,7 +65,7 @@ export class MdhPanel {
     MdhPanel.stateStorage = storage;
   }
 
-  public static render(extensionUri: Uri, title: string, list: ResultSetDataHolder[]) {
+  public static render(extensionUri: Uri, title: string, list: ResultSetData[]) {
     log(`${PREFIX} render title:[${title}]`);
     if (MdhPanel.currentPanel) {
       MdhPanel.currentPanel._panel.reveal(ViewColumn.One);
@@ -83,11 +84,11 @@ export class MdhPanel {
     //               vscode.window.activeColorTheme.kind===ColorThemeKind.Dark
     MdhPanel.currentPanel.renderSub(
       title,
-      list.map((it) => ResultSetDataHolder.from(it))
+      list.map((it) => ResultSetDataBuilder.from(it).build())
     );
   }
 
-  private createTabItem(title: string, list: ResultSetDataHolder[]): RdhTabItem {
+  private createTabItem(title: string, list: ResultSetData[]): RdhTabItem {
     const tabId = createHash("md5").update(title).digest("hex");
     const item: RdhTabItem = {
       tabId,
@@ -101,7 +102,7 @@ export class MdhPanel {
     return this.items.find((it) => it.title === title);
   }
 
-  async renderSub(title: string, list: ResultSetDataHolder[]): Promise<RdhTabItem | undefined> {
+  async renderSub(title: string, list: ResultSetData[]): Promise<RdhTabItem | undefined> {
     let item = this.getTabByTitle(title);
     if (item) {
       // Reset
@@ -277,8 +278,8 @@ export class MdhPanel {
     }
     const { list } = tabItem;
     const conNames = [...new Set(list.map((it) => it.meta.connectionName + ""))];
-    const beforeList = list.map((it) => ResultSetDataHolder.from(it));
-    const afterList = list.map((it) => undefined as ResultSetDataHolder | undefined);
+    const beforeList = list.map((it) => ResultSetDataBuilder.from(it).build());
+    const afterList = list.map((it) => undefined as ResultSetData | undefined);
     for (const conName of conNames) {
       const setting = await MdhPanel.stateStorage?.getConnectionSettingByName(conName);
       if (!setting) {
