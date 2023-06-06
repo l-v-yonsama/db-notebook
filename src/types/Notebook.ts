@@ -6,8 +6,14 @@ export type CellMeta = {
   readonly [key: string]: any;
 };
 
+export type NotebookMeta = {
+  rulesFolder?: string;
+  readonly [key: string]: any;
+};
+
 export type RawNotebookData = {
   cells: RawNotebookCell[];
+  metadata?: NotebookMeta;
 };
 
 export type RawNotebookCell = {

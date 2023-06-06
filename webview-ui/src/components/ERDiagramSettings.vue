@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import type {
   DbTable,
   ForeignKeyConstraintDetail,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { vscode, type ActionCommand, type ModeType } from "@/utilities/vscode";
+import { vscode, type ActionCommand } from "@/utilities/vscode";
 
 type Props = {
   title: string;
@@ -14,6 +14,8 @@ type Props = {
   selectedTable?: DbTable;
 };
 const props = defineProps<Props>();
+
+const sectionHeight = ref(300);
 
 type TableItem = {
   name: string;
@@ -28,6 +30,19 @@ type TableItem = {
   fkColumns: string[];
 };
 
+window.addEventListener("resize", () => resetSectionHeight());
+
+const resetSectionHeight = () => {
+  const sectionWrapper = window.document.querySelector("section.root");
+  if (sectionWrapper?.clientHeight) {
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 76, 100);
+  }
+};
+
+onMounted(() => {
+  nextTick(resetSectionHeight);
+});
+
 function getReferenceTableNames(references?: {
   [columnName: string]: ForeignKeyConstraintDetail;
 }): string[] {
@@ -38,6 +53,8 @@ function getReferenceTableNames(references?: {
 }
 
 const title = ref(props.title);
+
+const zeroSelection = computed(() => allTableItems.value.every((it) => !it.selected));
 
 const allTableItems = ref(
   props.tables.map((table) => ({
@@ -137,6 +154,7 @@ const action = (command: ActionCommand["command"]): void => {
       tableName: it.name,
       columnNames: [...it.columns],
     }));
+
   if (command === "writeToClipboard") {
     vscode.postCommand({
       command,
@@ -175,17 +193,21 @@ const action = (command: ActionCommand["command"]): void => {
           ><fa icon="times" />Cancel</VsCodeButton
         >
         <VsCodeButton
+          :disabled="zeroSelection"
           @click="action('writeToClipboard')"
           appearance="secondary"
           title="Write ER diagram to clipboard"
           ><fa icon="clipboard" />Write to clipboard</VsCodeButton
         >
-        <VsCodeButton @click="action('createERDiagram')" title="Create ER diagram in a new Notebook"
+        <VsCodeButton
+          :disabled="zeroSelection"
+          @click="action('createERDiagram')"
+          title="Create ER diagram in a new Notebook"
           ><fa icon="plus" />Create in a new Notebook</VsCodeButton
         >
       </div>
     </div>
-    <section>
+    <section class="content">
       <table>
         <thead>
           <tr>
@@ -196,92 +218,96 @@ const action = (command: ActionCommand["command"]): void => {
         <tbody>
           <tr>
             <td>
-              <table>
-                <thead>
-                  <tr class="top">
-                    <th>Table</th>
-                    <th>Comment</th>
-                    <th rowspan="2">Control</th>
-                  </tr>
-                  <tr class="bottom">
-                    <th>referenced from</th>
-                    <th>reference to</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template v-for="(item, idx) of allTableItems" :key="idx">
-                    <tr class="top" v-if="!item.selected">
-                      <td>{{ item.name }}</td>
-                      <td>{{ item.comment }}</td>
-                      <td rowspan="2">
-                        <VsCodeButton :disabled="item.selected" @click="selectTable(item)"
-                          >Select</VsCodeButton
-                        >
-                      </td>
+              <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+                <table>
+                  <thead>
+                    <tr class="top">
+                      <th>Table</th>
+                      <th>Comment</th>
+                      <th rowspan="2">Control</th>
                     </tr>
-                    <tr class="bottom" v-if="!item.selected">
-                      <td>{{ item.referencedFrom.join(",") }}&nbsp;</td>
-                      <td>{{ item.referenceTo.join(",") }}&nbsp;</td>
+                    <tr class="bottom">
+                      <th>referenced from</th>
+                      <th>reference to</th>
                     </tr>
-                  </template>
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    <template v-for="(item, idx) of allTableItems" :key="idx">
+                      <tr class="top" v-if="!item.selected">
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.comment }}</td>
+                        <td rowspan="2">
+                          <VsCodeButton :disabled="item.selected" @click="selectTable(item)"
+                            >Select</VsCodeButton
+                          >
+                        </td>
+                      </tr>
+                      <tr class="bottom" v-if="!item.selected">
+                        <td>{{ item.referencedFrom.join(",") }}&nbsp;</td>
+                        <td>{{ item.referenceTo.join(",") }}&nbsp;</td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
             </td>
             <td class="border-left">
-              <table>
-                <thead>
-                  <tr class="top">
-                    <th>Table</th>
-                    <th>Comment</th>
-                    <th>All</th>
-                    <th>Keys</th>
-                    <th>NotNull</th>
-                    <th>Control</th>
-                  </tr>
-                  <tr class="bottom">
-                    <th colspan="6">Columns</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template v-for="(item, idx) of allTableItems" :key="idx">
-                    <tr class="top" v-if="item.selected">
-                      <td>{{ item.name }}</td>
-                      <td>{{ item.comment }}</td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          :checked="item.isAll"
-                          @change="resetAll(item, !item.isAll)"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          :disabled="item.isAll"
-                          :checked="item.isKeys"
-                          @change="resetKeys(item, !item.isKeys)"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          :disabled="item.isAll"
-                          :checked="item.isNotNull"
-                          @change="resetNotNull(item, !item.isNotNull)"
-                        />
-                      </td>
-                      <td>
-                        <VsCodeButton @click="item.selected = false">Unselect</VsCodeButton>
-                      </td>
+              <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+                <table>
+                  <thead>
+                    <tr class="top">
+                      <th>Table</th>
+                      <th>Comment</th>
+                      <th>All</th>
+                      <th>Keys</th>
+                      <th>NotNull</th>
+                      <th>Control</th>
                     </tr>
-                    <tr class="bottom" v-if="item.selected">
-                      <td style="max-width: 400px">
-                        {{ displaySelectedColumns(item.columns) }}&nbsp;
-                      </td>
+                    <tr class="bottom">
+                      <th colspan="6">Columns</th>
                     </tr>
-                  </template>
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    <template v-for="(item, idx) of allTableItems" :key="idx">
+                      <tr class="top" v-if="item.selected">
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.comment }}</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            :checked="item.isAll"
+                            @change="resetAll(item, !item.isAll)"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            :disabled="item.isAll"
+                            :checked="item.isKeys"
+                            @change="resetKeys(item, !item.isKeys)"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            :disabled="item.isAll"
+                            :checked="item.isNotNull"
+                            @change="resetNotNull(item, !item.isNotNull)"
+                          />
+                        </td>
+                        <td>
+                          <VsCodeButton @click="item.selected = false">Unselect</VsCodeButton>
+                        </td>
+                      </tr>
+                      <tr class="bottom" v-if="item.selected">
+                        <td style="max-width: 400px">
+                          {{ displaySelectedColumns(item.columns) }}&nbsp;
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -293,6 +319,7 @@ const action = (command: ActionCommand["command"]): void => {
 <style scoped>
 .root {
   width: 100%;
+  height: 100%;
   margin: 1px;
   padding: 1px;
 }
@@ -341,5 +368,8 @@ td {
 .control {
   width: 110px;
   max-width: 110px;
+}
+div.scroll-wrapper {
+  overflow: auto;
 }
 </style>

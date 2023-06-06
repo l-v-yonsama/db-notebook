@@ -34,9 +34,12 @@ export const CELL_SPECIFY_CONNECTION_TO_USE = `${EXTENSION_NAME}.cell.specify-co
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
 export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
 export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
+export const SPECIFY_CONNECTION_ALL = `${EXTENSION_NAME}.specify-connection-all`;
+export const SPECIFY_RULES_TO_APPLY = `${EXTENSION_NAME}.specify-rules-to-apply`;
+export const USE_RULES = `${EXTENSION_NAME}.use-rules`;
 
 //---------------------------------------------------
 // RECORD RULE EDITOR
 //---------------------------------------------------
 export const CREATE_NEW_RECORD_RULE = `${EXTENSION_NAME}.create-blank-record-rule`;
-export const RECORD_RULE_TYPE = `${EXTENSION_NAME}-ruleEditor`;
+export const RECORD_RULE_TYPE = `${EXTENSION_NAME}.ruleEditor`;

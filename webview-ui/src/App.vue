@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { vscode } from "./utilities/vscode";
 import type { ModeType } from "./utilities/vscode";
 import { ref, onMounted, nextTick, reactive } from "vue";
 import MdhPanel from "./components/MdhPanel.vue";
@@ -175,7 +174,13 @@ const resourcePropertiesValues = ref<{ [key: string]: string }>({});
       :tables="values.tables"
       :selectedTable="values.selectedTable"
     />
-    <RecordRuleEditor v-if="visible.recordRuleEditor" title="test" />
+    <RecordRuleEditor
+      v-if="visible.recordRuleEditor"
+      :connectionSettingNames="values.connectionSettingNames"
+      :schema="values.schema"
+      :recordRule="values.recordRule"
+      :scrollPos="values.scrollPos"
+    />
   </main>
 </template>
 
@@ -205,5 +210,16 @@ button[disabled] {
 
 .splitpanes.default-theme .splitpanes__pane {
   background-color: inherit !important;
+}
+legend {
+  display: flex;
+  align-items: center;
+}
+.verr {
+  background-color: var(--vscode-diffEditor-removedTextBackground) !important;
+}
+fieldset.no-elements {
+  border-color: var(--vscode-diffEditor-removedTextBackground) !important;
+  background-color: var(--vscode-diffEditor-removedTextBackground) !important;
 }
 </style>

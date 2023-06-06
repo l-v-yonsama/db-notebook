@@ -1,7 +1,7 @@
 <template>
   <vscode-text-field
     class="child"
-    :class="{ transparent: isTransparent }"
+    :class="{ transparent: isTransparent, verr: isError }"
     :value="modelValue"
     @input="handleOnInput"
     @focus="handleOnFocus"
@@ -13,12 +13,13 @@
     :size="size"
     :readonly="readonly"
   >
-    <slot></slot>
+    <span v-if="isError" slot="end" class="codicon codicon-error"></span>
   </vscode-text-field>
 </template>
 
 <script setup lang="ts">
 import { vsCodeTextField, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { ref, watch } from "vue";
 
 provideVSCodeDesignSystem().register(vsCodeTextField());
 
@@ -32,7 +33,21 @@ const props = defineProps<{
   isTransparent?: boolean;
   min?: number;
   size?: number;
+  required?: boolean;
 }>();
+
+const isError = ref(false);
+
+watch(
+  () => props.modelValue,
+  () => {
+    isError.value = props.required === true && (props.modelValue ?? "").toString().length === 0;
+  },
+  {
+    immediate: true,
+  }
+);
+
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: string | number): void;
   (event: "onCellFocus", modelValue: string | number): void;

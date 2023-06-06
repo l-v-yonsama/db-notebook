@@ -10,6 +10,7 @@ import {
   ResultSetData,
   ResultSetDataBuilder,
   RowHelper,
+  RuleAnnotation,
   UpdateAnnotation,
   isDateTimeOrDate,
   isDateTimeOrDateOrTime,
@@ -93,18 +94,25 @@ function createQueryResultSheet(
     rowIndex = 3;
   }
 
-  rdh.rows.forEach((rdhRow: any, ri: number) => {
+  rdh.rows.forEach((rdhRow, ri: number) => {
     const values = rdhRow.values;
     sheet.getCell(rowIndex, 1).value = ri + 1;
     rdh.keys.forEach((column: RdhKey, colIdx: number) => {
+      let ruleMessage: string | undefined = undefined;
       const v = values[column.name];
+      const ruleAnnonations = (rdhRow.meta[column.name]?.filter((it) => it.type === "Rul") ??
+        []) as RuleAnnotation[];
       let format = getCellFormat(column.type);
       const cell = sheet.getCell(rowIndex, colIdx + 2);
-      let is_hyper_text = column.meta && column.meta.is_hyperlink === true;
-      setAnyValueByIndex(cell, v, { is_hyper_text, format });
+      let isHyperText = column.meta && column.meta.is_hyperlink === true;
+      if (ruleAnnonations.length) {
+        ruleMessage = ruleAnnonations.map((it) => it.values?.message ?? "").join("\n");
+        fillCell(cell, "Rul");
+      }
+      setAnyValueByIndex(cell, v, { isHyperText, format, ruleMessage });
 
-      let max_len = colLenMap.get(colIdx)!;
-      if (max_len < (v || "").length) {
+      const maxLen = colLenMap.get(colIdx)!;
+      if (maxLen < (v || "").length) {
         colLenMap.set(colIdx, v.length);
       }
     });
@@ -199,13 +207,13 @@ async function createBookFromList(
         tocRowIndex += 2;
       }
     }
-    // LINT
-    const lintList = list.filter((it) => ResultSetDataBuilder.from(it).hasAnyAnnotation(["Lnt"]));
-    if (lintList.length) {
-      await createLintSheet(workbook, lintList);
+    // Record rules
+    const ruleList = list.filter((it) => ResultSetDataBuilder.from(it).hasAnyAnnotation(["Rul"]));
+    if (ruleList.length) {
+      await createRecordRulesSheet(workbook, ruleList);
       tocSheet.getCell(`D${tocRowIndex}`).value = {
-        text: "LINT RESULT",
-        hyperlink: `#LINT!A1`,
+        text: "Record rules",
+        hyperlink: `#RULES!A1`,
       };
       tocRowIndex += 2;
     }
@@ -491,7 +499,7 @@ async function createBookFromDiffList(
               const isHyperText = column.meta && column.meta.is_hyperlink === true;
               setAnyValueByIndex(cell, v, {
                 annotationMessage,
-                is_hyper_text: isHyperText,
+                isHyperText,
                 format,
               });
             });
@@ -556,31 +564,28 @@ async function createFileSheet(workbook: Excel.Workbook, sheetName: string, file
     br: { col: 4, row: 5 },
   } as any);
 }
-async function createLintSheet(workbook: Excel.Workbook, list: ResultSetData[]) {
-  var sheet = workbook.addWorksheet("LINT", {
+
+async function createRecordRulesSheet(workbook: Excel.Workbook, list: ResultSetData[]) {
+  var sheet = workbook.addWorksheet("RULES", {
     views: [{ state: "frozen", ySplit: 3 }],
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
   sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
   sheet.mergeCells("A1:C1");
   sheet.autoFilter = "B3:D3";
-  sheet.getColumn("A").width = 1;
-  sheet.getColumn("B").width = 10;
-  sheet.getColumn("C").width = 9;
-  sheet.getColumn("D").width = 20;
+  sheet.getColumn("A").width = 2;
+  sheet.getColumn("B").width = 15;
+  sheet.getColumn("C").width = 18;
+  sheet.getColumn("D").width = 32;
   sheet.getColumn("E").width = 70;
-  sheet.getColumn("F").width = 70;
-  sheet.getColumn("G").width = 30;
   let cell: any;
 
-  const column_map = new Map<string, string>();
-  column_map.set("B3", "SHEET");
-  column_map.set("C3", "POSITION");
-  column_map.set("D3", "RULE");
-  column_map.set("E3", "MESSAGE");
-  column_map.set("F3", "TARGET");
-  column_map.set("G3", "FIX");
-  column_map.forEach((v, k) => {
+  const columnMap = new Map<string, string>();
+  columnMap.set("B3", "SHEET");
+  columnMap.set("C3", "COLUMN");
+  columnMap.set("D3", "RULE");
+  columnMap.set("E3", "MESSAGE");
+  columnMap.forEach((v, k) => {
     // typescript loop [value, key]
     cell = sheet.getCell(k);
     if (cell === null || cell === undefined) {
@@ -590,37 +595,25 @@ async function createLintSheet(workbook: Excel.Workbook, list: ResultSetData[]) 
     setTableHeaderCell(cell);
   });
 
-  let row_index = 4;
-  // list.forEach((rdh) => {
-  //   rdh.rows.forEach((row, rdh_row_index) => {
-  //     rdh.keys
-  //       .map((it) => it.name)
-  //       .forEach((key_name: string, col_index: number) => {
-  //         const cell_value: any = row.values[key_name];
-  //         let annotations: Array<CellAnnotation> = [];
-  //         if (row.meta && row.meta[key_name]) {
-  //           annotations = row.meta[key_name].filter(
-  //             (a: CellAnnotation) => a.type === 'Lnt'
-  //           );
-  //         }
-  //         annotations.forEach((annotation) => {
-  //           if (annotation.options && annotation.options.result) {
-  //             const result: any = annotation.options.result;
-  //             setAnyValue(sheet, `B${row_index}`, rdh.meta.tableName ?? "");
-  //             setAnyValue(sheet, `C${row_index}`, {
-  //               text: `${columnToLetter(col_index + 1)}${rdh_row_index + 1}`,
-  //               // hyperlink: `#${lr.label}!R${rdh_row_index + 1}C${col_index + 1}`,
-  //             });
-  //             setAnyValue(sheet, `D${row_index}`, result.ruleId);
-  //             setAnyValue(sheet, `E${row_index}`, annotation.options.message);
-  //             setAnyValue(sheet, `F${row_index}`, cell_value);
-  //             setAnyValue(sheet, `G${row_index}`, result.fix || "");
-  //             row_index++;
-  //           }
-  //         });
-  //       });
-  //   });
-  // });
+  let rowIndex = 4;
+  list.forEach((rdh) => {
+    rdh.rows
+      .filter((it) => RowHelper.hasAnnotation(it, "Rul"))
+      .forEach((row) => {
+        const ruleAnnonations = RowHelper.filterAnnotationOf<RuleAnnotation>(row, "Rul");
+        for (const [k, v] of Object.entries(ruleAnnonations)) {
+          v.forEach((annotation) => {
+            if (annotation.values) {
+              setAnyValue(sheet, `B${rowIndex}`, rdh.meta.tableName ?? "");
+              setAnyValue(sheet, `C${rowIndex}`, k);
+              setAnyValue(sheet, `D${rowIndex}`, annotation.values.name);
+              setAnyValue(sheet, `E${rowIndex}`, annotation.values.message);
+              rowIndex++;
+            }
+          });
+        }
+      });
+  });
 }
 
 function convertNotNaN(v: number) {
@@ -647,21 +640,28 @@ function fillCell(cell: Excel.Cell, type: AnnotationType) {
       fill = {
         type: "pattern",
         pattern: "lightGrid",
-        fgColor: { argb: "FFc3e88d" },
+        fgColor: { argb: "40c3e88d" },
       };
       break;
     case "Upd":
       fill = {
         type: "pattern",
         pattern: "gray125",
-        fgColor: { argb: "FF7053ff" },
+        fgColor: { argb: "407053ff" },
       };
       break;
     case "Del":
       fill = {
         type: "pattern",
         pattern: "lightHorizontal",
-        fgColor: { argb: "FFff5370" },
+        fgColor: { argb: "40ff5370" },
+      };
+      break;
+    case "Rul":
+      fill = {
+        type: "pattern",
+        pattern: "lightTrellis",
+        fgColor: { argb: "30e8e853" },
       };
       break;
   }
@@ -683,7 +683,8 @@ function setAnyValueByIndex(
   text: any,
   options?: {
     annotationMessage?: any;
-    is_hyper_text?: boolean;
+    ruleMessage?: string;
+    isHyperText?: boolean;
     wrap?: boolean;
     horizontal?:
       | "fill"
@@ -699,7 +700,7 @@ function setAnyValueByIndex(
 ) {
   let cellValue = text;
   if (options) {
-    if (options.is_hyper_text === true) {
+    if (options.isHyperText === true) {
       cellValue = {
         text: text,
         hyperlink: text,
@@ -720,17 +721,25 @@ function setAnyValueByIndex(
         size: options.font_size,
       };
     }
-    if (options?.annotationMessage !== undefined) {
+    if (options.annotationMessage !== undefined || options.ruleMessage !== undefined) {
       let me = text ?? "";
-      let you = options?.annotationMessage ?? "";
+      let you = options.annotationMessage ?? "";
+      let rule = options.ruleMessage ?? "";
       // 比較対象も横並びにする場合は標準型のまま
       if (options.format) {
         if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
           me = toDateString(me, options.format);
-          you = toDateString(you, options.format);
+          if (options.annotationMessage) {
+            you = toDateString(you, options.format);
+          }
         }
       }
-      cellValue = `${me}[${you}]`;
+      if (options.annotationMessage !== undefined) {
+        cellValue = `${me}\n[${you}]`;
+      }
+      if (options.ruleMessage) {
+        cellValue = `${cellValue}\n{${rule}}`;
+      }
     } else {
       if (options.format) {
         cell.numFmt = options.format;
@@ -747,7 +756,7 @@ function toDateString(target: any, format: CellFormat): string {
   if (target === undefined || target === null || target.length === 0) {
     return "";
   }
-  return dayjs(target).format(format == CellFormat.date ? "YYYY-MM-DD" : "YYYY-MM-DD HH:mm:ss");
+  return dayjs(target).format(format === CellFormat.date ? "YYYY-MM-DD" : "YYYY-MM-DD HH:mm:ss");
 }
 
 function setAnyValue(
@@ -755,7 +764,7 @@ function setAnyValue(
   c: string,
   text: any,
   options?: {
-    is_hyper_text?: boolean;
+    isHyperText?: boolean;
     wrap?: boolean;
     horizontal?:
       | "fill"

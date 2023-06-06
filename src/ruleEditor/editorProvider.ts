@@ -3,9 +3,10 @@ import {
   CustomTextEditorProvider,
   Disposable,
   ExtensionContext,
+  Range,
   TextDocument,
-  Webview,
   WebviewPanel,
+  WorkspaceEdit,
   window,
   workspace,
 } from "vscode";
@@ -13,17 +14,25 @@ import {
 import { RECORD_RULE_TYPE } from "../constant";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
+import { ConditionOperator, RecordRule } from "../shared/RecordRule";
+import { ActionCommand, UpdateTextDocumentActionCommand } from "../shared/ActionParams";
+import { log } from "../utilities/logger";
+import { StateStorage } from "../utilities/StateStorage";
+import { DbSchema, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
 
+const PREFIX = "[RecordRuleEditorProvider]";
 const componentName = "RecordRuleEditor";
 
 export class RecordRuleEditorProvider implements CustomTextEditorProvider {
-  public static register(context: ExtensionContext): Disposable {
-    const provider = new RecordRuleEditorProvider(context);
+  private scrollPos: number = 0;
+
+  public static register(context: ExtensionContext, stateStorage: StateStorage): Disposable {
+    const provider = new RecordRuleEditorProvider(context, stateStorage);
     const providerRegistration = window.registerCustomEditorProvider(RECORD_RULE_TYPE, provider);
     return providerRegistration;
   }
 
-  constructor(private readonly context: ExtensionContext) {}
+  constructor(private readonly context: ExtensionContext, private stateStorage: StateStorage) {}
 
   public async resolveCustomTextEditor(
     document: TextDocument,
@@ -40,22 +49,31 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
       this.context.extensionUri
     );
 
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
-      value: null,
+    const updateWebview = async () => {
+      const recordRule = this.parseDoc(document);
+      const connectionSettingNames = this.stateStorage.getConnectionSettingNames();
+      let schema: DbSchema | undefined = undefined;
+      if (recordRule.connectionName) {
+        let dbs = this.stateStorage.getResourceByName(recordRule.connectionName);
+        if (dbs === undefined) {
+          dbs = await this.stateStorage.loadResource(recordRule.connectionName, false, true);
+        }
+        if (dbs && dbs[0] instanceof RdsDatabase) {
+          schema = (dbs[0] as RdsDatabase).getSchema({ name: recordRule.schemaName });
+        }
+      }
+      const msg: ToWebviewMessageEventType = {
+        command: "create",
+        componentName,
+        value: {
+          connectionSettingNames,
+          schema,
+          recordRule,
+          scrollPos: this.scrollPos,
+        },
+      };
+      webviewPanel.webview.postMessage(msg);
     };
-
-    webviewPanel.webview.postMessage(msg);
-
-    function updateWebview() {
-      console.log("!!!!!!updateWebview");
-      //   webviewPanel.webview.postMessage({
-      //     type: "update",
-      //     text: document.getText(),
-      //   });
-    }
-
     // Hook up event handlers so that we can synchronize the webview with the text document.
     //
     // The text document acts as our model, so we have to sync change in the document to our
@@ -71,146 +89,92 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
 
     // Make sure we get rid of the listener when our editor is closed.
     webviewPanel.onDidDispose(() => {
+      this.scrollPos = 0;
       changeDocumentSubscription.dispose();
     });
 
     // Receive message from the webview.
-    // webviewPanel.webview.onDidReceiveMessage((e) => {
-    //   switch (e.type) {
-    //     case "add":
-    //       this.addNewScratch(document);
-    //       return;
-
-    //     case "delete":
-    //       this.deleteScratch(document, e.id);
-    //       return;
-    //   }
-    // });
+    webviewPanel.webview.onDidReceiveMessage(async (message: ActionCommand) => {
+      const { command, params } = message;
+      log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
+      switch (command) {
+        case "cancel":
+          webviewPanel.dispose();
+          return;
+        case "updateTextDocument":
+          await this.updateTextDocument(document, params);
+          // updateWebview();
+          break;
+      }
+    });
 
     updateWebview();
   }
 
-  //   /**
-  //    * Get the static html used for the editor webviews.
-  //    */
-  //   private getHtmlForWebview(webview:  Webview): string {
-  //     // Local path to script and css for the webview
-  //     const scriptUri = webview.asWebviewUri(
-  //       vscode.Uri.joinPath(this.context.extensionUri, "media", "catScratch.js")
-  //     );
+  private async updateTextDocument(
+    document: TextDocument,
+    params: UpdateTextDocumentActionCommand["params"]
+  ) {
+    const { newText, values, scrollPos } = params;
+    this.scrollPos = scrollPos;
+    const edit = new WorkspaceEdit();
 
-  //     const styleResetUri = webview.asWebviewUri(
-  //       vscode.Uri.joinPath(this.context.extensionUri, "media", "reset.css")
-  //     );
+    const recordRule = JSON.parse(newText) as RecordRule;
+    if (values) {
+      switch (values.name) {
+        case "add-rule":
+          {
+            recordRule.tableRule.details.push({
+              ruleName: "",
+              error: {
+                column: "",
+                message: "",
+                limit: 100,
+              },
+              conditions: {
+                any: [],
+              },
+            });
+          }
+          break;
+        case "change":
+          {
+            if (values.detail === "connectionName") {
+              let dbs = this.stateStorage.getResourceByName(recordRule.connectionName);
+              if (dbs === undefined) {
+                dbs = await this.stateStorage.loadResource(recordRule.connectionName, false, true);
+              }
+              if (dbs && dbs[0] instanceof RdsDatabase) {
+                recordRule.schemaName = dbs[0].getSchema({ isDefault: true }).name;
+              }
+            }
+          }
+          break;
+      }
+    }
+    // Just replace the entire document every time for this example extension.
+    // A more complete extension should compute minimal edits instead.
+    edit.replace(
+      document.uri,
+      new Range(0, 0, document.lineCount, 0),
+      JSON.stringify(recordRule, null, 1)
+    );
+    console.log("applyEdit forSave ", recordRule);
+    return workspace.applyEdit(edit);
+  }
 
-  //     const styleVSCodeUri = webview.asWebviewUri(
-  //       vscode.Uri.joinPath(this.context.extensionUri, "media", "vscode.css")
-  //     );
-
-  //     const styleMainUri = webview.asWebviewUri(
-  //       vscode.Uri.joinPath(this.context.extensionUri, "media", "catScratch.css")
-  //     );
-
-  //     // Use a nonce to whitelist which scripts can be run
-  //     const nonce = getNonce();
-
-  //     return /* html */ `
-  // 			<!DOCTYPE html>
-  // 			<html lang="en">
-  // 			<head>
-  // 				<meta charset="UTF-8">
-
-  // 				<!--
-  // 				Use a content security policy to only allow loading images from https or from our extension directory,
-  // 				and only allow scripts that have a specific nonce.
-  // 				-->
-  // 				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-
-  // 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  // 				<link href="${styleResetUri}" rel="stylesheet" />
-  // 				<link href="${styleVSCodeUri}" rel="stylesheet" />
-  // 				<link href="${styleMainUri}" rel="stylesheet" />
-
-  // 				<title>Cat Scratch</title>
-  // 			</head>
-  // 			<body>
-  // 				<div class="notes">
-  // 					<div class="add-button">
-  // 						<button>Scratch!</button>
-  // 					</div>
-  // 				</div>
-
-  // 				<script nonce="${nonce}" src="${scriptUri}"></script>
-  // 			</body>
-  // 			</html>`;
-  //   }
-
-  //   /**
-  //    * Add a new scratch to the current document.
-  //    */
-  //   private addNewScratch(document: vscode.TextDocument) {
-  //     const json = this.getDocumentAsJson(document);
-  //     const character =
-  //       CatScratchEditorProvider.scratchCharacters[
-  //         Math.floor(Math.random() * CatScratchEditorProvider.scratchCharacters.length)
-  //       ];
-  //     json.scratches = [
-  //       ...(Array.isArray(json.scratches) ? json.scratches : []),
-  //       {
-  //         id: getNonce(),
-  //         text: character,
-  //         created: Date.now(),
-  //       },
-  //     ];
-
-  //     return this.updateTextDocument(document, json);
-  //   }
-
-  //   /**
-  //    * Delete an existing scratch from a document.
-  //    */
-  //   private deleteScratch(document: vscode.TextDocument, id: string) {
-  //     const json = this.getDocumentAsJson(document);
-  //     if (!Array.isArray(json.scratches)) {
-  //       return;
-  //     }
-
-  //     json.scratches = json.scratches.filter((note: any) => note.id !== id);
-
-  //     return this.updateTextDocument(document, json);
-  //   }
-
-  //   /**
-  //    * Try to get a current document as json text.
-  //    */
-  //   private getDocumentAsJson(document: vscode.TextDocument): any {
-  //     const text = document.getText();
-  //     if (text.trim().length === 0) {
-  //       return {};
-  //     }
-
-  //     try {
-  //       return JSON.parse(text);
-  //     } catch {
-  //       throw new Error("Could not get document as json. Content is not valid json");
-  //     }
-  //   }
-
-  //   /**
-  //    * Write out the json to a given document.
-  //    */
-  //   private updateTextDocument(document: vscode.TextDocument, json: any) {
-  //     const edit = new vscode.WorkspaceEdit();
-
-  //     // Just replace the entire document every time for this example extension.
-  //     // A more complete extension should compute minimal edits instead.
-  //     edit.replace(
-  //       document.uri,
-  //       new vscode.Range(0, 0, document.lineCount, 0),
-  //       JSON.stringify(json, null, 2)
-  //     );
-
-  //     return vscode.workspace.applyEdit(edit);
-  //   }
+  private parseDoc(doc: TextDocument): RecordRule {
+    const text = doc.getText();
+    if (text.length) {
+      return JSON.parse(text) as RecordRule;
+    }
+    return {
+      connectionName: "",
+      schemaName: "",
+      tableRule: {
+        table: "",
+        details: [],
+      },
+    };
+  }
 }

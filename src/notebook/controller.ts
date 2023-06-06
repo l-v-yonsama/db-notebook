@@ -1,8 +1,12 @@
 import { NOTEBOOK_TYPE, CELL_OPEN_MDH, CELL_SPECIFY_CONNECTION_TO_USE } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
-import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
-import { CellMeta, RunResult } from "../types/Notebook";
+import {
+  ResultSetData,
+  ResultSetDataBuilder,
+  runRuleEngine,
+} from "@l-v-yonsama/multi-platform-database-drivers";
+import { CellMeta, NotebookMeta, RunResult } from "../types/Notebook";
 import { abbr } from "../utilities/stringUtil";
 import { setupDbResource } from "./intellisense";
 import {
@@ -16,12 +20,16 @@ import {
   NotebookCellStatusBarItemProvider,
   NotebookController,
   NotebookDocument,
+  Uri,
   commands,
   notebooks,
   window,
+  workspace,
 } from "vscode";
 import { log } from "../utilities/logger";
 import { sqlKernelRun } from "./sqlKernel";
+import path = require("path");
+import { RecordRule } from "../shared/RecordRule";
 
 const PREFIX = "[DBNotebookController]";
 
@@ -55,6 +63,17 @@ export class MainController {
     this._controller.supportedLanguages = this.supportedLanguages;
     this._controller.supportsExecutionOrder = true;
     this._controller.executeHandler = this._executeAll.bind(this);
+
+    context.subscriptions.push(
+      workspace.onDidChangeNotebookDocument((e) => {
+        this.setActiveContext(e.notebook);
+      })
+    );
+    context.subscriptions.push(
+      workspace.onDidOpenNotebookDocument((notebook) => {
+        this.setActiveContext(notebook);
+      })
+    );
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
@@ -64,12 +83,12 @@ export class MainController {
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RdhProvider())
     );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new CheckActiveContextProvider(this)
-      )
-    );
+    // context.subscriptions.push(
+    //   notebooks.registerNotebookCellStatusBarItemProvider(
+    //     NOTEBOOK_TYPE,
+    //     new CheckActiveContextProvider(this)
+    //   )
+    // );
   }
 
   interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
@@ -77,8 +96,8 @@ export class MainController {
     this.interrupted = true;
   }
 
-  setActiveContext() {
-    const cells = window.activeNotebookEditor?.notebook?.getCells() ?? [];
+  setActiveContext(notebook: NotebookDocument) {
+    const cells = notebook?.getCells() ?? [];
     const visibleVariables = cells.some((cell) => cell.outputs.length > 0);
     const visibleRdh = cells.some(
       (cell) =>
@@ -87,8 +106,17 @@ export class MainController {
         cell.outputs.length > 0 &&
         cell.outputs[0].metadata?.rdh !== undefined
     );
+    const hasSql = cells.some(
+      (cell) => cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql"
+    );
+    let noRules = true;
+    if (notebook?.metadata?.rulesFolder) {
+      noRules = false;
+    }
     commands.executeCommand("setContext", "visibleVariables", visibleVariables);
     commands.executeCommand("setContext", "visibleRdh", visibleRdh);
+    commands.executeCommand("setContext", "hasSql", hasSql);
+    commands.executeCommand("setContext", "noRules", noRules);
   }
 
   getVariables() {
@@ -101,7 +129,7 @@ export class MainController {
 
   private async _executeAll(
     cells: NotebookCell[],
-    _notebook: NotebookDocument,
+    notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
     this.interrupted = false;
@@ -112,14 +140,14 @@ export class MainController {
       if (this.interrupted) {
         break;
       }
-      await this._doExecution(cell);
+      await this._doExecution(notebook, cell);
     }
     this.currentVariables = await this.kernel.getStoredVariables();
     await this.kernel.dispose();
-    this.setActiveContext();
+    // this.setActiveContext();
   }
 
-  private async _doExecution(cell: NotebookCell): Promise<void> {
+  private async _doExecution(notebook: NotebookDocument, cell: NotebookCell): Promise<void> {
     const execution = this._controller.createNotebookCellExecution(cell);
 
     execution.executionOrder = ++this._executionOrder;
@@ -128,11 +156,29 @@ export class MainController {
     const outputs: NotebookCellOutput[] = [];
     let success = true;
     try {
-      const { stdout, stderr, metadata } = await this.run(cell);
-      outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
+      const { stdout, stderr, metadata } = await this.run(notebook, cell);
+      if (stdout.length) {
+        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
+      }
       if (stderr) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stdout(stderr)]));
         success = false;
+      }
+      if (metadata?.rdh) {
+        const withComment = metadata.rdh.keys.some((it) => (it.comment ?? "").length);
+        outputs.push(
+          new NotebookCellOutput(
+            [
+              NotebookCellOutputItem.text(
+                ResultSetDataBuilder.from(metadata.rdh).toMarkdown({
+                  withComment,
+                }),
+                "text/markdown"
+              ),
+            ],
+            metadata
+          )
+        );
       }
     } catch (err: any) {
       console.error(err);
@@ -147,9 +193,30 @@ export class MainController {
     execution.end(success, Date.now());
   }
 
-  private async run(cell: NotebookCell): Promise<RunResult> {
+  private async run(notebook: NotebookDocument, cell: NotebookCell): Promise<RunResult> {
     if (cell.document.languageId === "sql") {
-      return sqlKernelRun(cell, this.stateStorage, await this.kernel!.getStoredVariables());
+      const r = await sqlKernelRun(
+        cell,
+        this.stateStorage,
+        await this.kernel!.getStoredVariables()
+      );
+      if (r.metadata?.rdh?.meta?.type === "select" && notebook.metadata?.rulesFolder) {
+        const { tableName } = r.metadata.rdh.meta;
+        let wsfolder = workspace.workspaceFolders?.[0].uri?.fsPath ?? "";
+        const ruleFile = path.join(wsfolder, notebook.metadata?.rulesFolder, `${tableName}.rrule`);
+        log(`${PREFIX} ruleFile:${ruleFile}`);
+        try {
+          const statResult = await workspace.fs.stat(Uri.file(ruleFile));
+          log(`${PREFIX} statResult:${JSON.stringify(statResult)}`);
+          if (statResult.size > 0) {
+            const readData = await workspace.fs.readFile(Uri.file(ruleFile));
+            const rrule = JSON.parse(Buffer.from(readData).toString("utf8")) as RecordRule;
+            const runRuleEngineResult = await runRuleEngine(r.metadata.rdh, rrule.tableRule);
+            log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
+          }
+        } catch (_) {}
+      }
+      return r;
     }
 
     return this.kernel!.run(cell);
@@ -157,14 +224,14 @@ export class MainController {
 }
 
 // --- status bar
-class CheckActiveContextProvider implements NotebookCellStatusBarItemProvider {
-  constructor(private controller: MainController) {}
+// class CheckActiveContextProvider implements NotebookCellStatusBarItemProvider {
+//   constructor(private controller: MainController) {}
 
-  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    this.controller.setActiveContext();
-    return undefined;
-  }
-}
+//   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+//     this.controller.setActiveContext();
+//     return undefined;
+//   }
+// }
 
 class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}

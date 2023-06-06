@@ -3,6 +3,7 @@ import type { ActionCommand } from "../../../src/shared/ActionParams";
 
 export * from "../../../src/shared/ActionParams";
 export * from "../../../src/shared/ModeType";
+export * from "../../../src/shared/RecordRule";
 
 /**
  * A utility wrapper around the acquireVsCodeApi() function, which enables

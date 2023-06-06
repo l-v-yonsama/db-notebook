@@ -31,6 +31,22 @@
   "contributes": {
     "languages": [
       {
+        "id": "rrule",
+        "filenames": [
+          "*.rrule"
+        ],
+        "extensions": [
+          ".rrule"
+        ],
+        "aliases": [
+          "Record rule"
+        ],
+        "icon": {
+          "dark": "media/dark/checklist.svg",
+          "light": "media/light/checklist.svg"
+        }
+      },
+      {
         "id": "db-notebook",
         "aliases": [
           "Database notebook"
@@ -176,6 +192,16 @@
           "group": "db-resourc@2"
         },
         {
+          "command": "database-notebook.create-blank-record-rule",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.create-blank-record-rule",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "record-rule@6"
+        },
+        {
           "command": "database-notebook.show-scan-panel",
           "when": "view == database-notebook-connections && viewItem =~ /^.+scannable$/",
           "group": "inline"
@@ -225,6 +251,21 @@
           "command": "database-notebook.show-all-rdh",
           "group": "navigation/execute@1",
           "when": "notebookType == 'database-notebook-type' && visibleRdh"
+        },
+        {
+          "command": "database-notebook.specify-connection-all",
+          "group": "navigation/execute@1",
+          "when": "notebookType == 'database-notebook-type' && hasSql"
+        },
+        {
+          "command": "database-notebook.specify-rules-to-apply",
+          "group": "navigation/execute@1",
+          "when": "notebookType == 'database-notebook-type' && hasSql && noRules"
+        },
+        {
+          "command": "database-notebook.use-rules",
+          "group": "navigation/execute@1",
+          "when": "notebookType == 'database-notebook-type' && hasSql && !noRules"
         }
       ]
     },
@@ -244,7 +285,11 @@
         "command": "database-notebook.create-blank-record-rule",
         "title": "Create a new blank DB record rule",
         "shortTitle": "Database Record rule",
-        "category": "Database Notebook"
+        "category": "Database Notebook",
+        "icon": {
+          "dark": "media/dark/checklist.svg",
+          "light": "media/light/checklist.svg"
+        }
       },
       {
         "command": "database-notebook.create-blank-notebook",
@@ -409,6 +454,21 @@
         "command": "database-notebook.show-all-rdh",
         "title": "All query results",
         "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.specify-connection-all",
+        "title": "Specify connection in all SQL Cells",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "database-notebook.specify-rules-to-apply",
+        "title": "Specify rules to apply",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "database-notebook.use-rules",
+        "title": "Use record rules",
+        "icon": "$(check)"
       }
     ]
   },
@@ -436,7 +496,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.105",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.108",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

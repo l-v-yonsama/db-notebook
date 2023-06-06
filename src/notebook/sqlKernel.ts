@@ -71,11 +71,6 @@ export const sqlKernelRun = async (
       result.meta.tableName = `CELL${cell.index + 1}`;
     }
     metadata = { rdh: result };
-    const rdb = ResultSetDataBuilder.from(result);
-    const withComment = rdb.rs.keys.some((it) => (it.comment ?? "").length);
-    stdout = rdb.toString({
-      withComment,
-    });
   } else {
     stderr = message;
   }

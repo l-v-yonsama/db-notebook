@@ -47,6 +47,7 @@ export function isBinaryLike(type: GC.GeneralColumnType): boolean {
     case GC.GeneralColumnType.MEDIUMBLOB:
     case GC.GeneralColumnType.LONGBLOB:
     case GC.GeneralColumnType.BINARY:
+    case GC.GeneralColumnType.TINYBLOB:
       return true;
   }
   return false;

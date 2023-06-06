@@ -1,41 +1,51 @@
 import { StateStorage } from "../utilities/StateStorage";
-import {
-  ExtensionContext,
-  NotebookCell,
-  NotebookCellData,
-  NotebookCellKind,
-  NotebookData,
-  NotebookEdit,
-  WorkspaceEdit,
-  commands,
-  window,
-  workspace,
-} from "vscode";
-import { CellMeta } from "../types/Notebook";
+import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
 import * as path from "path";
-import { activateStatusBar } from "../statusBar";
-import {
-  CELL_OPEN_MDH,
-  CELL_SPECIFY_CONNECTION_TO_USE,
-  CREATE_NEW_NOTEBOOK,
-  CREATE_NEW_RECORD_RULE,
-  NOTEBOOK_TYPE,
-  SHOW_ALL_RDH,
-  SHOW_ALL_VARIABLES,
-} from "../constant";
+import { CREATE_NEW_RECORD_RULE } from "../constant";
 import { RecordRuleEditorProvider } from "./editorProvider";
+import { DbSchema, DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
+import { RecordRule } from "../shared/RecordRule";
 
 export function activateRuleEditor(context: ExtensionContext, stateStorage: StateStorage) {
-  context.subscriptions.push(RecordRuleEditorProvider.register(context));
+  context.subscriptions.push(RecordRuleEditorProvider.register(context, stateStorage));
 
   // Commands
   context.subscriptions.push(
-    commands.registerCommand(CREATE_NEW_RECORD_RULE, async (tableName?: any) => {
-      const doc = await workspace.openTextDocument({
-        language: "rrule",
-        content: "",
-      });
-      window.showTextDocument(doc);
+    commands.registerCommand(CREATE_NEW_RECORD_RULE, async (tableRes: DbTable) => {
+      try {
+        const fileFilters = {
+          "Record Rule": ["rrule"],
+        };
+        let wsfolder = workspace.workspaceFolders?.[0].uri?.fsPath ?? "";
+
+        const uri = await window.showSaveDialog({
+          defaultUri: Uri.file(path.join(wsfolder, `${tableRes.name}.rrule`)),
+          filters: fileFilters,
+          title: "Save Record Rule file",
+        });
+
+        if (!uri) {
+          return;
+        }
+        const { conName, schemaName } = tableRes.meta;
+        const recordRule: RecordRule = {
+          connectionName: conName,
+          schemaName,
+          tableRule: {
+            table: tableRes.name,
+            details: [],
+          },
+        };
+        await writeToResource(uri, JSON.stringify(recordRule, null, 1));
+        window.showInformationMessage(`Successfully saved, please open it.\n${uri.fsPath}`);
+      } catch (e: any) {
+        window.showErrorMessage(e.message);
+      }
     })
   );
+}
+
+async function writeToResource(targetResource: Uri, jsonString: string) {
+  const fileContents = Buffer.from(jsonString, "utf8");
+  await workspace.fs.writeFile(targetResource, fileContents);
 }

@@ -30,11 +30,17 @@ function createERDiagramParams(
         tableRes,
         columnNames: item.columnNames,
       });
+    }
+  });
+  params.items.forEach((item) => {
+    const tableRes = allTables.find((it) => it.name === item.tableName);
+    if (tableRes) {
       if (tableRes.foreignKeys?.referenceTo) {
         for (const [columnName, v] of Object.entries(tableRes.foreignKeys.referenceTo)) {
           if (relations.some((it) => it.name === v.constraintName)) {
             continue;
           }
+
           if (params.items.some((it) => it.tableName === v.tableName)) {
             let dotted = true;
             if (
@@ -85,37 +91,33 @@ function createERDiagramParams(
           if (!fromTable) {
             continue;
           }
-          if (tableItems.every((it) => it.tableRes.name !== fromTable.name)) {
-            tableItems.push({
-              tableRes: fromTable,
-              columnNames: fromTable.children.map((it) => it.name),
+          if (params.items.some((it) => it.tableName === v.tableName)) {
+            const toColumn = tableRes.getChildByName(columnName);
+            if (!toColumn) {
+              continue;
+            }
+            let dotted = true;
+            if (
+              fromTable.getPrimaryColumnNames().length > 1 &&
+              fromTable.getPrimaryColumnNames().includes(v.columnName)
+            ) {
+              dotted = false;
+            }
+            relations.push({
+              name: v.constraintName,
+              dotted,
+              referencedFrom: {
+                tableName: fromTable.name,
+                columnName: v.columnName,
+                cardinality: makeCardinality(fromTable, fromColumn),
+              },
+              referenceTo: {
+                tableName: tableRes.name,
+                columnName: columnName,
+                cardinality: makeCardinality(tableRes, toColumn),
+              },
             });
           }
-          const toColumn = tableRes.getChildByName(columnName);
-          if (!toColumn) {
-            continue;
-          }
-          let dotted = true;
-          if (
-            fromTable.getPrimaryColumnNames().length > 1 &&
-            fromTable.getPrimaryColumnNames().includes(v.columnName)
-          ) {
-            dotted = false;
-          }
-          relations.push({
-            name: v.constraintName,
-            dotted,
-            referencedFrom: {
-              tableName: fromTable.name,
-              columnName: v.columnName,
-              cardinality: makeCardinality(fromTable, fromColumn),
-            },
-            referenceTo: {
-              tableName: tableRes.name,
-              columnName: columnName,
-              cardinality: makeCardinality(tableRes, toColumn),
-            },
-          });
         }
       }
     }
@@ -255,17 +257,20 @@ function createErDiagram(params: ERDiagramParams): string {
       .forEach((columnRes) => {
         let pkOrFk = "";
         if (columnRes.primaryKey) {
-          pkOrFk = "PK ";
+          pkOrFk = "PK";
         } else if (tableRes.foreignKeys?.referenceTo?.[columnRes.name]) {
-          pkOrFk = "FK ";
+          pkOrFk = "FK";
         }
-        let comment = "";
+
         if (columnRes.comment) {
-          comment = `"${escapeQuot(columnRes.comment)}"`;
+          text += `  ${displayGeneralColumnType(columnRes.colType)} ${escapeQuot(
+            columnRes.name
+          )} ${pkOrFk} "${escapeQuot(columnRes.comment)}"\n`;
+        } else {
+          text += `  ${displayGeneralColumnType(columnRes.colType)} ${escapeQuot(
+            columnRes.name
+          )} ${pkOrFk}\n`;
         }
-        text += `  ${displayGeneralColumnType(columnRes.colType)} ${escapeQuot(
-          columnRes.name
-        )} ${pkOrFk}${escapeQuot(comment)}\n`;
       });
     text += `}\n\n`;
   });

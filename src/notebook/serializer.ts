@@ -16,7 +16,7 @@ export class DBNotebookSerializer implements NotebookSerializer {
     try {
       raw = <RawNotebookData>JSON.parse(contents);
     } catch {
-      raw = { cells: [] };
+      raw = { cells: [], metadata: {} };
     }
 
     // Create array of Notebook cells for the VS Code API from file contents
@@ -27,7 +27,11 @@ export class DBNotebookSerializer implements NotebookSerializer {
     });
 
     // Pass read and formatted Notebook Data to VS Code to display Notebook with saved cells
-    return new NotebookData(cells);
+    const bookData = new NotebookData(cells);
+    bookData.metadata = {
+      ...(raw.metadata ?? {}),
+    };
+    return bookData;
   }
 
   public async serializeNotebook(
@@ -35,7 +39,12 @@ export class DBNotebookSerializer implements NotebookSerializer {
     token: CancellationToken
   ): Promise<Uint8Array> {
     // Map the Notebook data into the format we want to save the Notebook data as
-    let contents: RawNotebookData = { cells: [] };
+    let contents: RawNotebookData = {
+      cells: [],
+      metadata: {
+        ...(data.metadata ?? {}),
+      },
+    };
 
     for (const cell of data.cells) {
       contents.cells.push({
@@ -47,6 +56,6 @@ export class DBNotebookSerializer implements NotebookSerializer {
     }
 
     // Give a string of all the data to save and VS Code will handle the rest
-    return new TextEncoder().encode(JSON.stringify(contents));
+    return new TextEncoder().encode(JSON.stringify(contents, null, 1));
   }
 }

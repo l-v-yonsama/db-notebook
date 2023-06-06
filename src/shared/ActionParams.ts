@@ -50,7 +50,8 @@ export type ActionCommand =
   | SelectInnerTabActionCommand
   | TestConnectionSettingActionCommand
   | SaveConnectionSettingActionCommand
-  | DeleteKeyActionCommand;
+  | DeleteKeyActionCommand
+  | UpdateTextDocumentActionCommand;
 
 export type BaseActionCommand<T extends string, U = any> = {
   command: T;
@@ -69,6 +70,18 @@ export type SaveConnectionSettingActionCommand = {
 };
 
 export type CancelActionCommand = BaseActionCommand<"cancel">;
+
+export type UpdateTextDocumentActionCommand = BaseActionCommand<
+  "updateTextDocument",
+  {
+    newText: string;
+    values?: {
+      name: "change" | "add-rule";
+      detail?: any;
+    };
+    scrollPos: number;
+  }
+>;
 
 export type CompareActionCommand = {
   command: "compare";

@@ -5,12 +5,10 @@ import {
   commands,
   env,
   window,
-  workspace,
 } from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
 import {
   DBDriverResolver,
-  DbColumn,
   DbConnection,
   DbResource,
   DbSchema,
@@ -18,7 +16,6 @@ import {
   RDSBaseDriver,
   RdsDatabase,
   RedisDriver,
-  displayGeneralColumnType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResourceTreeProvider } from "./ResourceTreeProvider";
 import { MdhPanel } from "../panels/MdhPanel";

@@ -20,6 +20,7 @@ import type {
   RdhRow,
   RdhKey,
   AnnotationType,
+  RuleAnnotation,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
@@ -189,6 +190,9 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
   if (hasAnnotationsOf(meta, "Upd", keyInfo.name)) {
     styles["background-color"] = "rgba(112, 83, 255, 0.29) !important";
   }
+  if (hasAnnotationsOf(meta, "Rul", keyInfo.name)) {
+    styles["background-color"] = "rgba(232, 232, 83, 0.21) !important";
+  }
   return styles;
 };
 
@@ -200,8 +204,19 @@ const rowStyle = (p: any): any => {
     return { "background-color": "rgba(255, 83, 112, 0.25) !important" };
   } else if (hasAnnotationsOf(meta, "Upd")) {
     return { "background-color": "rgba(112, 83, 255, 0.11) !important" };
+  } else if (hasAnnotationsOf(meta, "Rul")) {
+    return { "background-color": "rgba(232, 232, 83, 0.09) !important" };
   }
   return null;
+};
+
+const toTitle = (item: RowValues, key: string): string => {
+  const meta: RdhRow["meta"] = item["$meta"];
+  const rule = meta[key]?.find((it) => it.type === "Rul");
+  if (rule && rule.values && rule.values?.message) {
+    return rule.values.message;
+  }
+  return item[key];
 };
 </script>
 
@@ -254,6 +269,7 @@ const rowStyle = (p: any): any => {
               :transparent="true"
               :maxlength="1000"
               :size="key.inputSize"
+              :title="toTitle(item, key.name)"
               style="width: 99%"
               @onCellFocus="
                 onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
