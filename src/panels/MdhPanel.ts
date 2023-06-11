@@ -253,7 +253,13 @@ export class MdhPanel {
       return;
     }
     const message = await createBookFromList(tabItem.list, uri.fsPath, {
-      outputWithType: data.outputWithType,
+      rdh: {
+        outputAllOnOneSheet: true,
+        outputWithType: data.outputWithType,
+      },
+      rule: {
+        withRecordRule: true,
+      },
     });
     if (message) {
       vscode.window.showErrorMessage(message);
@@ -280,44 +286,72 @@ export class MdhPanel {
     const conNames = [...new Set(list.map((it) => it.meta.connectionName + ""))];
     const beforeList = list.map((it) => ResultSetDataBuilder.from(it).build());
     const afterList = list.map((it) => undefined as ResultSetData | undefined);
-    for (const conName of conNames) {
-      const setting = await MdhPanel.stateStorage?.getConnectionSettingByName(conName);
-      if (!setting) {
-        continue;
-      }
 
-      const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
-        setting,
-        async (driver) => {
-          for (let i = 0; i < beforeList.length; i++) {
-            if (beforeList[i].meta.connectionName !== conName) {
-              continue;
+    await window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        for (const conName of conNames) {
+          const setting = await MdhPanel.stateStorage?.getConnectionSettingByName(conName);
+          if (!setting) {
+            continue;
+          }
+
+          const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+            setting,
+            async (driver) => {
+              for (let i = 0; i < beforeList.length; i++) {
+                if (beforeList[i].meta.connectionName !== conName) {
+                  continue;
+                }
+                const rdh = beforeList[i];
+                const sql = rdh.sqlStatement!;
+
+                progress.report({
+                  message: `Select current content of ${rdh.meta.tableName}`,
+                });
+                if (token.isCancellationRequested) {
+                  return;
+                }
+                console.log("do query ", i);
+
+                const afterRdh = await driver.requestSql({
+                  sql,
+                  conditions: rdh.queryConditions,
+                  meta: rdh.meta,
+                });
+                if (rdh.meta.tableRule) {
+                  afterRdh.meta.tableRule = rdh.meta.tableRule;
+                }
+                afterList[i] = afterRdh;
+              }
             }
-            const rdh = beforeList[i];
-            const sql = rdh.sqlStatement!;
-            const afterRdh = await driver.requestSql({
-              sql,
-              conditions: rdh.queryConditions,
-              meta: rdh.meta,
-            });
-            afterList[i] = afterRdh;
+          );
+
+          if (!ok) {
+            vscode.window.showErrorMessage(message);
           }
         }
-      );
 
-      if (!ok) {
-        vscode.window.showErrorMessage(message);
+        console.log("progress regport 100!!!");
+        progress.report({
+          increment: 100,
+        });
+        console.log("progress regport after 100!!!");
       }
-    }
-    if (afterList.some((it) => it === undefined)) {
-      return;
-    }
-
+    );
+    console.log("done progress?? L348");
     const diffParams: DiffTabParam = {
       title: tabItem.title,
       list1: beforeList,
       list2: afterList.map((it) => it!),
     };
+    if (afterList.some((it) => it === undefined)) {
+      console.log("L353 no after list");
+      return;
+    }
     vscode.commands.executeCommand(SHOW_RDH_DIFF, diffParams);
   }
 

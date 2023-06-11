@@ -3,17 +3,17 @@ import * as os from "os";
 import { EnumValues } from "enum-values";
 import {
   AnnotationType,
-  CellAnnotation,
   DiffResult,
   GeneralColumnType,
+  RdhHelper,
   RdhKey,
+  RecordRuleValidationResult,
   ResultSetData,
   ResultSetDataBuilder,
   RowHelper,
   RuleAnnotation,
   UpdateAnnotation,
   isDateTimeOrDate,
-  isDateTimeOrDateOrTime,
   toDate,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Fill } from "exceljs";
@@ -22,17 +22,37 @@ import dayjs = require("dayjs");
 // const FONT_NAME_Arial ='Arial';
 const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";
 
+const RECORD_RULE_SHEET_NAME = "RECORD_RULES";
+
 interface IHyperLink {
   title: string;
   address: string;
 }
 
+type TocHeaderCol = {
+  label: string;
+  key: string;
+};
+
+type TocRecords = {
+  headers: TocHeaderCol[];
+  records: { [key: string]: Excel.CellValue }[];
+};
+
 export type BookCreateOption = {
+  rdh: {
+    outputAllOnOneSheet: boolean;
+    outputWithType?: "none" | "withComment" | "withType" | "both";
+  };
+  diff?: {
+    displayOnlyChanged: boolean;
+  };
+  rule?: {
+    withRecordRule: boolean;
+  };
   files?: any[];
   title?: string;
   subTitle?: string;
-  outputWithType?: "none" | "withComment" | "withType" | "both";
-  displayOnlyChanged?: boolean;
 };
 
 export { columnToLetter, createBookFromList, createBookFromRdh, createBookFromDiffList };
@@ -52,76 +72,137 @@ function stripSheetName(s: string): string {
   return s.replace(/['*\/:\?\[\\\]’＇*／：？［＼］￥]+/g, "");
 }
 
-function createQueryResultSheet(
+function createQueryResultListSheet(
   workbook: Excel.Workbook,
-  sheetName: string,
+  list: ResultSetData[],
+  options?: BookCreateOption
+): TocRecords {
+  const tocRecords: TocRecords = {
+    headers: [
+      { label: "TITLE(TABLE)", key: "tableName" },
+      { label: "COMMENT", key: "comment" },
+      { label: "TYPE", key: "type" },
+      { label: "ROWS", key: "rows" },
+    ],
+    records: [],
+  };
+
+  if (options?.rdh.outputAllOnOneSheet) {
+    let baseRowNo = 3;
+    const sheetName = createSheetName("RESULT_SETS");
+    var sheet = workbook.addWorksheet(sheetName, {
+      pageSetup: { paperSize: 9, orientation: "portrait" },
+    });
+    sheet.getColumn("A").width = 2;
+    list.forEach((rdh, idx) => {
+      tocRecords.records.push({
+        tableName: {
+          text: sheetName,
+          hyperlink: `#${sheetName}!A${baseRowNo}`,
+        },
+        comment: rdh.meta.comment,
+        type: rdh.meta.type,
+        rows: rdh.meta.type === "select" ? rdh.rows.length : "-",
+      });
+      const plusRows = createQueryResultSheet(sheet, rdh, baseRowNo, options.rdh.outputWithType);
+      baseRowNo += plusRows + 2;
+    });
+  } else {
+    list.forEach((rdh, idx) => {
+      const baseRowNo = 3;
+      const sheetName = createSheetName(rdh, idx + 1);
+      tocRecords.records.push({
+        tableName: {
+          text: sheetName,
+          hyperlink: `#${sheetName}!A${baseRowNo}`,
+        },
+        comment: rdh.meta.comment,
+        type: rdh.meta.type,
+        rows: rdh.meta.type === "select" ? rdh.rows.length : "-",
+      });
+
+      var sheet = workbook.addWorksheet(sheetName, {
+        views: [{ state: "frozen", xSplit: 1, ySplit: 3 }],
+        pageSetup: { paperSize: 9, orientation: "portrait" },
+      });
+      sheet.getColumn("A").width = 2;
+      createQueryResultSheet(sheet, rdh, baseRowNo, options?.rdh.outputWithType);
+    });
+  }
+
+  return tocRecords;
+}
+
+function createQueryResultSheet(
+  sheet: Excel.Worksheet,
   rdh: ResultSetData,
-  outputWithType?: BookCreateOption["outputWithType"]
-) {
-  var sheet = workbook.addWorksheet(sheetName, {
-    views: [{ state: "frozen", xSplit: 1, ySplit: 3 }],
-    pageSetup: { paperSize: 9, orientation: "portrait" },
-  });
+  baseRowNo: number,
+  outputWithType?: BookCreateOption["rdh"]["outputWithType"]
+): number {
+  let plusNo = 0;
 
-  const colLenMap = new Map<number, number>();
+  let cell = sheet.getCell(baseRowNo, 2);
+  let titleValue = rdh.meta.tableName;
+  if (rdh.meta.comment) {
+    titleValue += ` (${rdh.meta.comment})`;
+  }
+  cell.value = titleValue;
+  plusNo++;
 
-  const cell = sheet.getCell(1, 1);
+  cell = sheet.getCell(baseRowNo + plusNo, 2);
   cell.value = "No";
   setTableHeaderCell(cell);
 
   rdh.keys.forEach((column: RdhKey, idx: number) => {
-    const cell_phy = sheet.getCell(1, idx + 2);
+    const cell_phy = sheet.getCell(baseRowNo + plusNo, idx + 3);
     cell_phy.value = column.name;
     setTableHeaderCell(cell_phy);
-    colLenMap.set(idx, column.name.length);
+
     if (outputWithType === "both" || outputWithType === "withComment") {
-      const cellLog = sheet.getCell(2, idx + 2);
+      const cellLog = sheet.getCell(baseRowNo + plusNo + 1, idx + 3);
       cellLog.value = column.comment;
       setTableHeaderCell(cellLog);
     }
     if (outputWithType === "both" || outputWithType === "withType") {
-      const cellType = sheet.getCell(3, idx + 2);
+      const cellType = sheet.getCell(
+        baseRowNo + plusNo + (outputWithType === "both" ? 2 : 1),
+        idx + 3
+      );
       cellType.value = EnumValues.getNameFromValue(GeneralColumnType, column.type);
       setTableHeaderCell(cellType);
     }
   });
-  let rowIndex = 2;
   if (outputWithType === "both") {
-    sheet.mergeCells("A1:A3");
-    rowIndex = 4;
+    sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 2}`);
+    plusNo += 3;
   } else if (outputWithType === "withComment" || outputWithType === "withType") {
-    sheet.mergeCells("A1:A2");
-    rowIndex = 3;
+    sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 1}`);
+    plusNo += 2;
+  } else {
+    plusNo += 1;
   }
 
   rdh.rows.forEach((rdhRow, ri: number) => {
     const values = rdhRow.values;
-    sheet.getCell(rowIndex, 1).value = ri + 1;
+    sheet.getCell(baseRowNo + plusNo, 2).value = ri + 1;
     rdh.keys.forEach((column: RdhKey, colIdx: number) => {
       let ruleMessage: string | undefined = undefined;
       const v = values[column.name];
       const ruleAnnonations = (rdhRow.meta[column.name]?.filter((it) => it.type === "Rul") ??
         []) as RuleAnnotation[];
       let format = getCellFormat(column.type);
-      const cell = sheet.getCell(rowIndex, colIdx + 2);
+      const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
       let isHyperText = column.meta && column.meta.is_hyperlink === true;
       if (ruleAnnonations.length) {
         ruleMessage = ruleAnnonations.map((it) => it.values?.message ?? "").join("\n");
         fillCell(cell, "Rul");
       }
       setAnyValueByIndex(cell, v, { isHyperText, format, ruleMessage });
-
-      const maxLen = colLenMap.get(colIdx)!;
-      if (maxLen < (v || "").length) {
-        colLenMap.set(colIdx, v.length);
-      }
     });
-    rowIndex++;
+    plusNo++;
   });
-  Array.from(colLenMap.entries()).forEach((entry) => {
-    const col = sheet.getColumn(entry[0] + 2);
-    col.width = entry[1] > 50 ? 50 : entry[1] + 2;
-  });
+
+  return plusNo;
 }
 
 function createSheetName(o: ResultSetData | string, no?: number): string {
@@ -135,8 +216,11 @@ function createSheetName(o: ResultSetData | string, no?: number): string {
 async function createBookFromRdh(rdh: ResultSetData, targetExcelPath: string): Promise<string> {
   let errorMessage = "";
   var workbook = new Excel.Workbook();
-
-  createQueryResultSheet(workbook, createSheetName(rdh), rdh);
+  const sheetName = createSheetName("RESULT_SETS");
+  var sheet = workbook.addWorksheet(sheetName, {
+    pageSetup: { paperSize: 9, orientation: "portrait" },
+  });
+  createQueryResultSheet(sheet, rdh, 1, "withType");
 
   return new Promise<string>((resolve, reject) => {
     try {
@@ -193,56 +277,26 @@ async function createBookFromList(
     cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
 
     tocRowIndex += 4;
-    // FILES PREVIEW
-    if (options && options.files && options.files.length > 0) {
-      const files = options.files as any[];
-      for (let idx = 0; idx < files.length; idx++) {
-        const file = files[idx];
-        const sheetName = `FILE_${idx}`;
-        await createFileSheet(workbook, sheetName, file);
-        tocSheet.getCell(`D${tocRowIndex}`).value = {
-          text: file.name,
-          hyperlink: `#${sheetName}!A1`,
-        };
-        tocRowIndex += 2;
-      }
-    }
-    // Record rules
-    const ruleList = list.filter((it) => ResultSetDataBuilder.from(it).hasAnyAnnotation(["Rul"]));
-    if (ruleList.length) {
-      await createRecordRulesSheet(workbook, ruleList);
-      tocSheet.getCell(`D${tocRowIndex}`).value = {
-        text: "Record rules",
-        hyperlink: `#RULES!A1`,
-      };
-      tocRowIndex += 2;
-    }
-    // RESULTSETS
+
     const generalList = list.filter(
       (it) => !ResultSetDataBuilder.from(it).hasAnyAnnotation(["Lnt"])
     );
-    {
-      ["TITLE(TABLE)", "COMMENT", "TYPE", "ROWS"].forEach((key, idx) => {
-        let cell = tocSheet.getCell(tocRowIndex, 4 + idx);
-        cell.value = key;
-        setTableHeaderCell(cell);
-      });
-    }
+    // RESULTSETS
+    const tocRecords = createQueryResultListSheet(workbook, generalList, options);
+    tocRowIndex += writeTocRecords(tocSheet, tocRecords, tocRowIndex);
+
+    tocRowIndex += 2;
+
+    // RECORD RULES
     tocRowIndex += 1;
-    generalList.forEach((rdh, idx) => {
-      const sheetName = createSheetName(rdh, idx + 1);
-      tocSheet.getCell(`D${tocRowIndex}`).value = {
-        text: sheetName,
-        hyperlink: `#${sheetName}!A1`,
-      };
-      tocSheet.getCell(`E${tocRowIndex}`).value = rdh.meta.comment ?? "";
-      tocSheet.getCell(`F${tocRowIndex}`).value = rdh.meta.type ?? "";
-      tocSheet.getCell(`G${tocRowIndex}`).value =
-        rdh.meta.type === "select" ? rdh.rows.length : "-";
-      tocRowIndex += 1;
+    const ruleResultList = generalList
+      .map((rdh) => RdhHelper.getRecordRuleResults(rdh))
+      .filter((it) => it !== undefined) as RecordRuleValidationResult[];
+    if (ruleResultList.length) {
       // create a sheet.
-      createQueryResultSheet(workbook, sheetName, rdh, options?.outputWithType);
-    });
+      const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
+      tocRowIndex += writeTocRecords(tocSheet, tocRecords, tocRowIndex);
+    }
   } catch (e) {
     console.error(e);
   }
@@ -263,6 +317,9 @@ function createCommonHeader(sheet: Excel.Worksheet) {
   sheet.getCell("A2").value = `Creator: ${os.userInfo().username}`;
 }
 
+/**
+ *  DIFF
+ */
 async function createBookFromDiffList(
   list: {
     title: string;
@@ -275,7 +332,7 @@ async function createBookFromDiffList(
 ): Promise<string> {
   let errorMessage = "";
   var workbook = new Excel.Workbook();
-  const displayOnlyChanged = options?.displayOnlyChanged === true;
+  const displayOnlyChanged = options?.diff?.displayOnlyChanged === true;
 
   try {
     // TOC
@@ -420,14 +477,21 @@ async function createBookFromDiffList(
           cell_phy.value = column.name;
           setTableHeaderCell(cell_phy);
 
-          if (options?.outputWithType === "both" || options?.outputWithType === "withComment") {
+          if (
+            options?.rdh?.outputWithType === "both" ||
+            options?.rdh?.outputWithType === "withComment"
+          ) {
             const cellLog = sheet.getCell(startIndex + 1, idx + 2);
             cellLog.value = column.comment;
             setTableHeaderCell(cellLog);
           }
 
-          if (options?.outputWithType === "both" || options?.outputWithType === "withType") {
-            const rowIdx = options?.outputWithType === "both" ? startIndex + 2 : startIndex + 1;
+          if (
+            options?.rdh?.outputWithType === "both" ||
+            options?.rdh?.outputWithType === "withType"
+          ) {
+            const rowIdx =
+              options?.rdh?.outputWithType === "both" ? startIndex + 2 : startIndex + 1;
             const cellType = sheet.getCell(rowIdx, idx + 2);
             cellType.value = EnumValues.getNameFromValue(GeneralColumnType, column.type);
             setTableHeaderCell(cellType);
@@ -435,12 +499,12 @@ async function createBookFromDiffList(
         });
 
         cur.rowNo++;
-        if (options?.outputWithType === "both") {
+        if (options?.rdh?.outputWithType === "both") {
           cur.rowNo += 2;
           sheet.mergeCells(`A${startIndex}:A${startIndex + 2}`);
         } else if (
-          options?.outputWithType === "withComment" ||
-          options?.outputWithType === "withType"
+          options?.rdh?.outputWithType === "withComment" ||
+          options?.rdh?.outputWithType === "withType"
         ) {
           cur.rowNo++;
           sheet.mergeCells(`A${startIndex}:A${startIndex + 1}`);
@@ -526,6 +590,19 @@ async function createBookFromDiffList(
       };
     });
 
+    // RECORD RULES
+    if (options?.rule?.withRecordRule === true) {
+      tocRowNo += 1;
+      const ruleResultList = list
+        .map((it) => RdhHelper.getRecordRuleResults(it.rdh2))
+        .filter((it) => it !== undefined) as RecordRuleValidationResult[];
+      if (ruleResultList.length) {
+        // create a sheet.
+        const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
+        tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+      }
+    }
+
     await workbook.xlsx.writeFile(targetExcelPath);
   } catch (e: any) {
     errorMessage = e.message;
@@ -565,8 +642,19 @@ async function createFileSheet(workbook: Excel.Workbook, sheetName: string, file
   } as any);
 }
 
-async function createRecordRulesSheet(workbook: Excel.Workbook, list: ResultSetData[]) {
-  var sheet = workbook.addWorksheet("RULES", {
+function createRecordRulesSheet(
+  workbook: Excel.Workbook,
+  list: RecordRuleValidationResult[]
+): TocRecords {
+  const tocRecords: TocRecords = {
+    headers: [
+      { label: "TABLE NAME", key: "tableName" },
+      { label: "RULE NAME", key: "ruleName" },
+      { label: "ERRORS", key: "errors" },
+    ],
+    records: [],
+  };
+  var sheet = workbook.addWorksheet(RECORD_RULE_SHEET_NAME, {
     views: [{ state: "frozen", ySplit: 3 }],
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
@@ -574,46 +662,77 @@ async function createRecordRulesSheet(workbook: Excel.Workbook, list: ResultSetD
   sheet.mergeCells("A1:C1");
   sheet.autoFilter = "B3:D3";
   sheet.getColumn("A").width = 2;
-  sheet.getColumn("B").width = 15;
-  sheet.getColumn("C").width = 18;
-  sheet.getColumn("D").width = 32;
-  sheet.getColumn("E").width = 70;
+  sheet.getColumn("B").width = 12;
+  sheet.getColumn("C").width = 6;
+  sheet.getColumn("D").width = 8;
+  sheet.getColumn("E").width = 50;
+
   let cell: any;
+  let rowNo = 3;
+  list.forEach((result) => {
+    result.details.forEach((detail) => {
+      // Table name
+      cell = sheet.getCell(`B${rowNo}`);
+      setTableHeaderCell(cell);
+      cell.value = "Table name";
+      cell = sheet.getCell(`C${rowNo}`);
+      cell.value = result.tableName;
+      rowNo++;
+      // Rule name
+      cell = sheet.getCell(`B${rowNo}`);
+      setTableHeaderCell(cell);
+      cell.value = "Rule name";
+      cell = sheet.getCell(`C${rowNo}`);
+      cell.value = detail.ruleDetail.ruleName;
 
-  const columnMap = new Map<string, string>();
-  columnMap.set("B3", "SHEET");
-  columnMap.set("C3", "COLUMN");
-  columnMap.set("D3", "RULE");
-  columnMap.set("E3", "MESSAGE");
-  columnMap.forEach((v, k) => {
-    // typescript loop [value, key]
-    cell = sheet.getCell(k);
-    if (cell === null || cell === undefined) {
-      console.trace("☆Error cell is null");
-    }
-    cell.value = v;
-    setTableHeaderCell(cell);
-  });
-
-  let rowIndex = 4;
-  list.forEach((rdh) => {
-    rdh.rows
-      .filter((it) => RowHelper.hasAnnotation(it, "Rul"))
-      .forEach((row) => {
-        const ruleAnnonations = RowHelper.filterAnnotationOf<RuleAnnotation>(row, "Rul");
-        for (const [k, v] of Object.entries(ruleAnnonations)) {
-          v.forEach((annotation) => {
-            if (annotation.values) {
-              setAnyValue(sheet, `B${rowIndex}`, rdh.meta.tableName ?? "");
-              setAnyValue(sheet, `C${rowIndex}`, k);
-              setAnyValue(sheet, `D${rowIndex}`, annotation.values.name);
-              setAnyValue(sheet, `E${rowIndex}`, annotation.values.message);
-              rowIndex++;
-            }
-          });
-        }
+      tocRecords.records.push({
+        tableName: result.tableName,
+        ruleName: {
+          text: detail.ruleDetail.ruleName,
+          hyperlink: `#${sheet.name}!B${rowNo}`,
+        },
+        errors: detail.errorRows.length,
       });
+
+      rowNo++;
+
+      // Conditions
+      cell = sheet.getCell(`B${rowNo}`);
+      setTableHeaderCell(cell);
+      cell.value = "Rule conditions";
+      const texts = detail.conditionText.trim().split("\n");
+      sheet.mergeCells(`B${rowNo}:B${rowNo + texts.length}`);
+
+      texts.forEach((text) => {
+        cell = sheet.getCell(`C${rowNo}`);
+        cell.value = text;
+        rowNo++;
+      });
+
+      rowNo += 2;
+
+      // error headers
+      cell = sheet.getCell(`C${rowNo}`);
+      cell.value = "No";
+      setTableHeaderCell(cell);
+      cell = sheet.getCell(`D${rowNo}`);
+      cell.value = "RowNo";
+      setTableHeaderCell(cell);
+      cell = sheet.getCell(`E${rowNo}`);
+      cell.value = "Condition values";
+      setTableHeaderCell(cell);
+      rowNo++;
+      detail.errorRows.forEach((errorRow, idx) => {
+        cell = sheet.getCell(`C${rowNo}`).value = idx + 1;
+        cell = sheet.getCell(`D${rowNo}`).value = errorRow.rowNo;
+        cell = sheet.getCell(`E${rowNo}`).value = JSON.stringify(errorRow.conditionValues);
+        rowNo++;
+      });
+      rowNo += 2;
+    });
+    rowNo += 3;
   });
+  return tocRecords;
 }
 
 function convertNotNaN(v: number) {
@@ -816,4 +935,24 @@ function nvl(s: string | undefined, rep: string) {
     return rep;
   }
   return s;
+}
+
+function writeTocRecords(tocSheet: Excel.Worksheet, tocRecords: TocRecords, rowNo: number): number {
+  let plusNo = 0;
+  tocRecords.headers.forEach((header, idx) => {
+    const cell = tocSheet.getCell(rowNo + plusNo, 4 + idx);
+    setTableHeaderCell(cell);
+    cell.value = header.label;
+  });
+  plusNo++;
+
+  tocRecords.records.forEach((record) => {
+    tocRecords.headers.forEach((header, idx) => {
+      const cell = tocSheet.getCell(rowNo + plusNo, 4 + idx);
+      cell.value = record[header.key];
+    });
+    plusNo++;
+  });
+
+  return plusNo;
 }

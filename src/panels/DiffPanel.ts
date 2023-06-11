@@ -1,4 +1,12 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
+import {
+  Disposable,
+  Webview,
+  WebviewPanel,
+  window,
+  Uri,
+  ViewColumn,
+  ProgressLocation,
+} from "vscode";
 import {
   DBDriverResolver,
   DiffResult,
@@ -7,6 +15,7 @@ import {
   ResultSetData,
   ResultSetDataBuilder,
   diff,
+  runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
@@ -18,6 +27,7 @@ import { ActionCommand, CompareParams, OutputParams } from "../shared/ActionPara
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
+import { existsRuleFile } from "../utilities/notebookUtil";
 
 dayjs.extend(utc);
 
@@ -92,12 +102,13 @@ export class DiffPanel {
     DiffPanel.currentPanel.renderSub(params);
   }
 
-  private createTabItem(
+  private async createTabItem(
     title: string,
     list1: ResultSetData[],
     list2: ResultSetData[]
-  ): DiffTabItem {
+  ): Promise<DiffTabItem> {
     let subTitle = "";
+    console.log("DiffPanel createTabItem");
     if (list1.length) {
       let before = dayjs(list1[0].created).format("HH:mm");
       let after = dayjs(list2[0].created).format("HH:mm");
@@ -112,22 +123,54 @@ export class DiffPanel {
 
     const createTabId = () => createHash("md5").update(title).digest("hex");
     const tabId = createTabId();
+
     const item: DiffTabItem = {
       tabId,
       title,
       subTitle,
-      list: list1.map((rdh1, idx) => {
-        const rdh2 = list2[idx];
-        const diffResult = diff(rdh1, rdh2);
-        return {
-          tabId: createTabId(),
-          title: rdh1.meta.tableName ?? "",
-          diffResult,
-          rdh1,
-          rdh2,
-        } as DiffTabInnerItem;
-      }),
+      list: [],
     };
+
+    await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        const increment = list1.length === 0 ? 1 : Math.floor(100 / list1.length);
+        for (let i = 0; i < list1.length; i++) {
+          const rdh1 = list1[i];
+          const rdh2 = list2[i];
+
+          console.log("diff", i);
+          progress.report({
+            message: `Comparing [${i + 1}/${list1.length}] ${rdh2.meta.tableName}`,
+            increment,
+          });
+          if (token.isCancellationRequested) {
+            return;
+          }
+
+          const diffResult = diff(rdh1, rdh2);
+          if (rdh2.meta.tableRule) {
+            await runRuleEngine(rdh2);
+          }
+
+          item.list.push({
+            tabId: createTabId(),
+            title: rdh1.meta.tableName ?? "",
+            diffResult,
+            rdh1,
+            rdh2,
+          });
+        }
+        progress.report({
+          increment: 100,
+        });
+      }
+    );
+    console.log("done DiffPanel createTabItem", item);
+
     return item;
   }
 
@@ -144,7 +187,7 @@ export class DiffPanel {
     let item = this.getTabByTitle(title);
     if (item) {
       // Reset
-      const tmpItem = this.createTabItem("tmp", list1, list2);
+      const tmpItem = await this.createTabItem("tmp", list1, list2);
       item.list = tmpItem.list;
       item.subTitle = tmpItem.subTitle;
 
@@ -159,7 +202,7 @@ export class DiffPanel {
       return item;
     }
 
-    item = this.createTabItem(title, list1, list2);
+    item = await this.createTabItem(title, list1, list2);
     this.items.push(item);
 
     // send to webview
@@ -253,8 +296,16 @@ export class DiffPanel {
       return;
     }
     const message = await createBookFromDiffList(tabItem.list, uri.fsPath, {
-      outputWithType: data.outputWithType,
-      displayOnlyChanged: data.displayOnlyChanged ?? false,
+      rdh: {
+        outputAllOnOneSheet: false,
+        outputWithType: data.outputWithType,
+      },
+      diff: {
+        displayOnlyChanged: data.displayOnlyChanged ?? false,
+      },
+      rule: {
+        withRecordRule: true,
+      },
     });
     if (message) {
       window.showErrorMessage(message);
@@ -276,44 +327,65 @@ export class DiffPanel {
     const conNames = [...new Set(baseList.map((it) => it.meta.connectionName + ""))];
     const beforeList = baseList.map((it) => ResultSetDataBuilder.from(it).build());
     const afterList = baseList.map((it) => undefined as ResultSetData | undefined);
-    for (const conName of conNames) {
-      const setting = await DiffPanel.stateStorage?.getConnectionSettingByName(conName);
-      if (!setting) {
-        continue;
-      }
 
-      const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
-        setting,
-        async (driver) => {
-          for (let i = 0; i < beforeList.length; i++) {
-            if (beforeList[i].meta.connectionName !== conName) {
-              continue;
+    await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        for (const conName of conNames) {
+          const setting = await DiffPanel.stateStorage?.getConnectionSettingByName(conName);
+          if (!setting) {
+            continue;
+          }
+
+          const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+            setting,
+            async (driver) => {
+              for (let i = 0; i < beforeList.length; i++) {
+                if (beforeList[i].meta.connectionName !== conName) {
+                  continue;
+                }
+                const rdh = beforeList[i];
+                const sql = rdh.sqlStatement!;
+
+                progress.report({
+                  message: `Select current content of ${rdh.meta.tableName}`,
+                });
+                if (token.isCancellationRequested) {
+                  return;
+                }
+
+                const afterRdh = await driver.requestSql({
+                  sql,
+                  conditions: rdh.queryConditions,
+                  meta: rdh.meta,
+                });
+                if (rdh.meta.tableRule) {
+                  afterRdh.meta.tableRule = rdh.meta.tableRule;
+                }
+                afterList[i] = afterRdh;
+              }
             }
-            const rdh = beforeList[i];
-            const sql = rdh.sqlStatement!;
-            const afterRdh = await driver.requestSql({
-              sql,
-              conditions: rdh.queryConditions,
-              meta: rdh.meta,
-            });
-            afterList[i] = afterRdh;
+          );
+
+          if (!ok) {
+            window.showErrorMessage(message);
           }
         }
-      );
-
-      if (!ok) {
-        window.showErrorMessage(message);
+        progress.report({ increment: 100 });
       }
-    }
-    if (afterList.some((it) => it === undefined)) {
-      return;
-    }
+    );
 
     const diffParams: DiffTabParam = {
       title: tabItem.title,
       list1: beforeList,
       list2: afterList.map((it) => it!),
     };
-    this.renderSub(diffParams);
+    if (afterList.some((it) => it === undefined)) {
+      return;
+    }
+    await this.renderSub(diffParams);
   }
 }

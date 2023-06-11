@@ -3,11 +3,12 @@ import { NotebookCellKind } from "vscode";
 
 export type CellMeta = {
   connectionName?: string;
+  ruleFile?: string;
+  showComment?: boolean;
   readonly [key: string]: any;
 };
 
 export type NotebookMeta = {
-  rulesFolder?: string;
   readonly [key: string]: any;
 };
 

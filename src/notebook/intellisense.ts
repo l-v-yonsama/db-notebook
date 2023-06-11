@@ -3,15 +3,23 @@ import {
   CompletionContext,
   CompletionItem,
   CompletionItemKind,
+  DecorationOptions,
   ExtensionContext,
   MarkdownString,
+  NotebookCell,
   NotebookCellKind,
+  NotebookDocument,
+  OverviewRulerLane,
   Position,
+  Range,
   SnippetString,
   TextDocument,
+  TextEditor,
+  ThemeColor,
   Uri,
   languages,
   window,
+  workspace,
 } from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
@@ -19,9 +27,13 @@ import {
   ProposalKind,
   RdsDatabase,
   getProposals,
+  getResourcePositions,
   tolines,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { throttle } from "throttle-debounce";
+import { NOTEBOOK_TYPE } from "../constant";
+import { abbr } from "../utilities/stringUtil";
+import { isSqlCell } from "../utilities/notebookUtil";
 
 const PREFIX = "[intellisense]";
 
@@ -47,6 +59,109 @@ export function activateIntellisense(context: ExtensionContext, stateStorage: St
 
   context.subscriptions.push(createJsIntellisense());
   context.subscriptions.push(createSQLIntellisense());
+  setActivateDecorator(context);
+}
+
+const smallNumberDecorationType = window.createTextEditorDecorationType({
+  after: {
+    border: "0.5px dotted gray",
+    color: new ThemeColor("tab.unfocusedActiveForeground"),
+    backgroundColor: new ThemeColor("tab.inactiveBackground"),
+    margin: "1em",
+  },
+});
+
+function setActivateDecorator(context: ExtensionContext) {
+  let activeEditor = window.activeTextEditor;
+  // let activeNotebook = window.activeNotebookEditor?.notebook;
+  let cell: NotebookCell | undefined;
+  let timeout: NodeJS.Timer | undefined = undefined;
+
+  const triggerUpdateDecorations = (throttle = false) => {
+    if (timeout) {
+      clearTimeout(timeout);
+      timeout = undefined;
+    }
+    if (activeEditor && cell) {
+      if (throttle) {
+        timeout = setTimeout(() => updateDecorations(activeEditor, cell), 500);
+      } else {
+        updateDecorations(activeEditor, cell);
+      }
+    }
+  };
+
+  context.subscriptions.push(
+    workspace.onDidChangeNotebookDocument((ev) => {
+      if (
+        !ev.notebook ||
+        ev.notebook.notebookType !== NOTEBOOK_TYPE ||
+        !window.activeTextEditor ||
+        ev.cellChanges.length === 0
+      ) {
+        return;
+      }
+
+      const changedCell = ev.cellChanges.find((it) => isSqlCell(it.cell))?.cell;
+      if (changedCell) {
+        activeEditor = window.visibleTextEditors.find((it) => it.document === changedCell.document);
+        cell = changedCell;
+        triggerUpdateDecorations(true);
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    window.onDidChangeActiveTextEditor((e) => {
+      activeEditor = undefined;
+      if (!e) {
+        return;
+      }
+      const { document } = e;
+      if (document.languageId === "sql" && document.uri.scheme === "vscode-notebook-cell") {
+        activeEditor = e;
+        cell = window.activeNotebookEditor?.notebook
+          .getCells()
+          .find((it) => it.document === document);
+        triggerUpdateDecorations();
+      }
+    })
+  );
+}
+
+function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookCell | undefined) {
+  if (cell === undefined || rdsDatabase === undefined || activeEditor === undefined) {
+    return;
+  }
+
+  activeEditor.setDecorations(smallNumberDecorationType, []);
+
+  const { document } = activeEditor;
+
+  if (cell === undefined || cell.metadata?.showComment !== true) {
+    return;
+  }
+  const sql = document.getText();
+  const smallNumbers: DecorationOptions[] = [];
+  const resList = getResourcePositions({ sql, db: rdsDatabase });
+  resList
+    .filter((it) => it.comment)
+    .forEach((res) => {
+      const startPos = document.positionAt(res.offset);
+      const endPos = document.positionAt(res.offset + res.length);
+
+      const decoration: DecorationOptions = {
+        range: new Range(startPos, endPos),
+        hoverMessage: res.comment,
+        renderOptions: {
+          after: {
+            contentText: abbr(res.comment, 20),
+          },
+        },
+      };
+      smallNumbers.push(decoration);
+    });
+  activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
 }
 
 function getStoreKeys(): string[] {
@@ -70,101 +185,104 @@ function getStoreKeys(): string[] {
 }
 
 function createJsIntellisense() {
-  return languages.registerCompletionItemProvider([{ language: "javascript" }], {
-    provideCompletionItems(
-      document: TextDocument,
-      position: Position,
-      token: CancellationToken,
-      context: CompletionContext
-    ) {
-      const storeKeys = getStoreKeys();
-      const storeKeyNames = storeKeys.join(",");
-      const text = document.getText();
-      const list: CompletionItem[] = [];
-      const linePrefix = document.lineAt(position).text.substr(0, position.character);
-      const lastChar = linePrefix.length > 0 ? linePrefix.substring(linePrefix.length - 1) : "";
+  return languages.registerCompletionItemProvider(
+    [{ language: "javascript", notebookType: NOTEBOOK_TYPE }],
+    {
+      provideCompletionItems(
+        document: TextDocument,
+        position: Position,
+        token: CancellationToken,
+        context: CompletionContext
+      ) {
+        const storeKeys = getStoreKeys();
+        const storeKeyNames = storeKeys.join(",");
+        const text = document.getText();
+        const list: CompletionItem[] = [];
+        const linePrefix = document.lineAt(position).text.substr(0, position.character);
+        const lastChar = linePrefix.length > 0 ? linePrefix.substring(linePrefix.length - 1) : "";
 
-      let item = new CompletionItem("variables");
-      item.kind = CompletionItemKind.Variable;
-      item.detail = "variables";
-      list.push(item);
-
-      item = new CompletionItem("variables.set(key, value)");
-      item.insertText = new SnippetString("variables.set('${1}', ${2});");
-      item.kind = CompletionItemKind.Function;
-      item.detail = "Store value";
-      list.push(item);
-
-      item = new CompletionItem("variables.get(key)");
-      item.insertText = new SnippetString("variables.get('${1|" + storeKeyNames + "|}');");
-      item.kind = CompletionItemKind.Function;
-      item.detail = "Get value";
-      list.push(item);
-
-      item = new CompletionItem("variables.each(function)");
-      item.insertText = new SnippetString("variables.each((val, key) => console.log(key, val));");
-      item.kind = CompletionItemKind.Function;
-      item.detail = "Loop over all stored values";
-      list.push(item);
-
-      storeKeys.forEach((key) => {
-        item = new CompletionItem(key);
+        let item = new CompletionItem("variables");
         item.kind = CompletionItemKind.Variable;
-        item.detail = "Stored key";
+        item.detail = "variables";
         list.push(item);
-      });
 
-      const conSettings = storage.getPasswordlessConnectionSettingList();
-      const conNamesString = conSettings.map((it) => it.name).join(",");
-      conSettings.forEach((it) => {
-        item = new CompletionItem(it.name);
-        item.kind = CompletionItemKind.Variable;
-        item.detail = "Connection setting name";
-        item.documentation = `DB type:${it.dbType}`;
+        item = new CompletionItem("variables.set(key, value)");
+        item.insertText = new SnippetString("variables.set('${1}', ${2});");
+        item.kind = CompletionItemKind.Function;
+        item.detail = "Store value";
         list.push(item);
-      });
 
-      // driverResolver
-      item = createDriverResolverCompletionItem(
-        "workflow",
-        conNamesString,
-        "  // return await driver.xxx;\n",
-        "Execute workflow",
-        DOCUMENT_OF_WORKFLOW
-      );
-      list.push(item);
+        item = new CompletionItem("variables.get(key)");
+        item.insertText = new SnippetString("variables.get('${1|" + storeKeyNames + "|}');");
+        item.kind = CompletionItemKind.Function;
+        item.detail = "Get value";
+        list.push(item);
 
-      item = createDriverResolverCompletionItem(
-        "viewData",
-        conNamesString,
-        "  return await driver.viewData('${2}'); -- tableName \n",
-        "Get table records",
-        DOCUMENT_OF_VIEW_DATA
-      );
-      list.push(item);
+        item = new CompletionItem("variables.each(function)");
+        item.insertText = new SnippetString("variables.each((val, key) => console.log(key, val));");
+        item.kind = CompletionItemKind.Function;
+        item.detail = "Loop over all stored values";
+        list.push(item);
 
-      item = createDriverResolverCompletionItem(
-        "scanLogGroup",
-        conNamesString,
-        "  const now = new Date();\n" +
-          "  const startTime = now.getTime() - 1 * 60 * 60 * 1000;\n" +
-          "  const endTime = now.getTime();\n" +
-          "\n" +
-          "  const logService = driver.getClientByServiceType('Cloudwatch');\n" +
-          "  return await logService.scanLogGroup({\n" +
-          "    target: 'test',\n" +
-          "    keyword: 'ERROR',\n" +
-          "    startTime,\n" +
-          "    endTime,\n" +
-          "    limit: 1000,\n" +
-          "  });",
-        "Search log-records in log-group",
-        DOCUMENT_OF_SCAN_LOG_GROUP
-      );
-      list.push(item);
-      return list;
-    },
-  });
+        storeKeys.forEach((key) => {
+          item = new CompletionItem(key);
+          item.kind = CompletionItemKind.Variable;
+          item.detail = "Stored key";
+          list.push(item);
+        });
+
+        const conSettings = storage.getPasswordlessConnectionSettingList();
+        const conNamesString = conSettings.map((it) => it.name).join(",");
+        conSettings.forEach((it) => {
+          item = new CompletionItem(it.name);
+          item.kind = CompletionItemKind.Variable;
+          item.detail = "Connection setting name";
+          item.documentation = `DB type:${it.dbType}`;
+          list.push(item);
+        });
+
+        // driverResolver
+        item = createDriverResolverCompletionItem(
+          "workflow",
+          conNamesString,
+          "  // return await driver.xxx;\n",
+          "Execute workflow",
+          DOCUMENT_OF_WORKFLOW
+        );
+        list.push(item);
+
+        item = createDriverResolverCompletionItem(
+          "viewData",
+          conNamesString,
+          "  return await driver.viewData('${2}'); -- tableName \n",
+          "Get table records",
+          DOCUMENT_OF_VIEW_DATA
+        );
+        list.push(item);
+
+        item = createDriverResolverCompletionItem(
+          "scanLogGroup",
+          conNamesString,
+          "  const now = new Date();\n" +
+            "  const startTime = now.getTime() - 1 * 60 * 60 * 1000;\n" +
+            "  const endTime = now.getTime();\n" +
+            "\n" +
+            "  const logService = driver.getClientByServiceType('Cloudwatch');\n" +
+            "  return await logService.scanLogGroup({\n" +
+            "    target: 'test',\n" +
+            "    keyword: 'ERROR',\n" +
+            "    startTime,\n" +
+            "    endTime,\n" +
+            "    limit: 1000,\n" +
+            "  });",
+          "Search log-records in log-group",
+          DOCUMENT_OF_SCAN_LOG_GROUP
+        );
+        list.push(item);
+        return list;
+      },
+    }
+  );
 }
 
 function createDriverResolverCompletionItem(
@@ -202,78 +320,64 @@ function createDocumentation({ script, ext, uri }: { script: string; ext: string
 }
 
 function createSQLIntellisense() {
-  return languages.registerCompletionItemProvider("sql", {
-    provideCompletionItems(
-      document: TextDocument,
-      position: Position,
-      token: CancellationToken,
-      context: CompletionContext
-    ) {
-      //   const snippetCompletion = new CompletionItem("Good part of the day");
-      //   snippetCompletion.insertText = new SnippetString(
-      //     "Good ${1|morning,afternoon,evening|}. It is ${1}, right?"
-      //   );
-      //   const commitCharacterCompletion = new CompletionItem("console");
-      //   commitCharacterCompletion.commitCharacters = ["."];
-      //   commitCharacterCompletion.documentation = new MarkdownString("Press `.` to get `console.`");
-      //   // a completion item that retriggers IntelliSense when being accepted,
-      //   // the `command`-property is set which the editor will execute after
-      //   // completion has been inserted. Also, the `insertText` is set so that
-      //   // a space is inserted after `new`
-      //   const commandCompletion = new CompletionItem("new");
-      //   commandCompletion.kind = CompletionItemKind.Keyword;
-      //   commandCompletion.insertText = "new ";
-      //   commandCompletion.command = {
-      //     command: "editor.action.triggerSuggest",
-      //     title: "Re-trigger completions...",
-      //   };
-
-      const sql = document.getText();
-      const list: CompletionItem[] = [];
-      const linePrefix = document.lineAt(position).text.substr(0, position.character);
-      const lastChar = linePrefix.length > 0 ? linePrefix.substring(linePrefix.length - 1) : "";
-      const m = linePrefix.match(/[ \t]*([ \t".0-9a-zA-Z_$-]+)$/);
-      log(
-        `${PREFIX} linePrefix:[${linePrefix}] position:${JSON.stringify(
-          position
-        )} lastChar:[${lastChar}] match:[${m}]`
-      );
-      if (m) {
-        let parentWord = "";
-        let keyword = "";
-        const target = m[1].trim();
-        log(`${PREFIX} target:[${target}]`);
-        if (lastChar === ".") {
-          const m2 = target.match(/("?[.0-9a-zA-Z_$-]+"?)\.$/);
-          if (m2) {
-            parentWord = m2[1];
+  return languages.registerCompletionItemProvider(
+    [{ language: "sql", notebookType: NOTEBOOK_TYPE }],
+    {
+      provideCompletionItems(
+        document: TextDocument,
+        position: Position,
+        token: CancellationToken,
+        context: CompletionContext
+      ) {
+        const sql = document.getText();
+        const list: CompletionItem[] = [];
+        const linePrefix = document.lineAt(position).text.substr(0, position.character);
+        const lastChar = linePrefix.length > 0 ? linePrefix.substring(linePrefix.length - 1) : "";
+        const m = linePrefix.match(/[ \t]*([ \t".0-9a-zA-Z_$-]+)$/);
+        log(
+          `${PREFIX} linePrefix:[${linePrefix}] position:${JSON.stringify(
+            position
+          )} lastChar:[${lastChar}] match:[${m}]`
+        );
+        if (m) {
+          let parentWord = "";
+          let keyword = "";
+          const target = m[1].trim();
+          log(`${PREFIX} target:[${target}]`);
+          if (lastChar === ".") {
+            const m2 = target.match(/("?[.0-9a-zA-Z_$-]+"?)\.$/);
+            if (m2) {
+              parentWord = m2[1];
+            }
+          } else {
+            const m2 = target.match(/(("?[.0-9a-zA-Z_$-]+"?)\.)?("?[.0-9a-zA-Z_$-]+"?)$/);
+            log(`${PREFIX} m2:[${m2}]`);
+            if (m2) {
+              parentWord = m2[2];
+              keyword = m2[3];
+            }
           }
-        } else {
-          const m2 = target.match(/(("?[.0-9a-zA-Z_$-]+"?)\.)?("?[.0-9a-zA-Z_$-]+"?)$/);
-          log(`${PREFIX} m2:[${m2}]`);
-          if (m2) {
-            parentWord = m2[2];
-            keyword = m2[3];
+          log(
+            `${PREFIX} linePrefix:[${linePrefix}] keyword:[${keyword}] parentWord:[${parentWord}]`
+          );
+
+          if (rdsDatabase) {
+            getProposals({ db: rdsDatabase, sql, keyword, lastChar, parentWord }).forEach((s) => {
+              const item = new CompletionItem(s.label);
+              item.kind =
+                s.kind === ProposalKind.ReservedWord
+                  ? CompletionItemKind.Keyword
+                  : CompletionItemKind.Variable;
+              item.detail = s.detail;
+              list.push(item);
+            });
           }
         }
-        log(`${PREFIX} linePrefix:[${linePrefix}] keyword:[${keyword}] parentWord:[${parentWord}]`);
 
-        if (rdsDatabase) {
-          getProposals({ db: rdsDatabase, sql, keyword, lastChar, parentWord }).forEach((s) => {
-            const item = new CompletionItem(s.label);
-            item.kind =
-              s.kind === ProposalKind.ReservedWord
-                ? CompletionItemKind.Keyword
-                : CompletionItemKind.Variable;
-            item.detail = s.detail;
-            list.push(item);
-          });
-        }
-      }
-
-      return list;
-    },
-  });
+        return list;
+      },
+    }
+  );
 }
 
 const DOCUMENT_OF_WORKFLOW = `workflow<T extends BaseDriver, U = any>(setting: ConnectionSetting, f: (driver: T) => Promise<U>): Promise<GeneralResult<U>>;`;

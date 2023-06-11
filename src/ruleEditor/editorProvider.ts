@@ -128,12 +128,27 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
               ruleName: "",
               error: {
                 column: "",
-                message: "",
                 limit: 100,
               },
               conditions: {
                 any: [],
               },
+            });
+          }
+          break;
+        case "delete-rule":
+          {
+            const index = (values.detail as number) ?? 0;
+            recordRule.tableRule.details.splice(index, 1);
+          }
+          break;
+        case "duplicate-rule":
+          {
+            const index = (values.detail as number) ?? 0;
+            const original = recordRule.tableRule.details[index];
+            recordRule.tableRule.details.splice(index + 1, 0, {
+              ...original,
+              ruleName: original.ruleName + " copy",
             });
           }
           break;

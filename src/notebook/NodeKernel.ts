@@ -16,6 +16,7 @@ export class NodeKernel {
   private variablesFile: string;
   private scriptFile?: string;
   private time: number;
+  private child: cp.ChildProcess | undefined;
 
   constructor(private connectionSettings: ConnectionSetting[]) {
     this.time = new Date().getTime();
@@ -93,31 +94,36 @@ export class NodeKernel {
     const script = await this.createScript(cell);
     fs.writeFileSync(winToLinuxPath(this.scriptFile), script);
 
-    let child: cp.ChildProcess;
-    if (ext === "js") {
-      child = cp.spawn("node", [this.scriptFile]);
-    } else {
-      // const command = path.join(nodeModules, ".bin", "ts-node");
-      // const args = ["-P", configFile, this.scriptFile];
-      // child = cp.spawn(command, args);
-    }
+    // if (ext === "js") {
+    this.child = cp.spawn("node", [this.scriptFile]);
+
+    // } else {
+    // const command = path.join(nodeModules, ".bin", "ts-node");
+    // const args = ["-P", configFile, this.scriptFile];
+    // child = cp.spawn(command, args);
+    // }
     let stdout = "";
     let stderr = "";
+
     const promise = new Promise((resolve, reject) => {
-      if (child.stdout) {
-        child.stdout.on("data", (data: Buffer) => {
-          stdout += data.toString();
+      if (this.child) {
+        if (this.child.stdout) {
+          this.child.stdout.on("data", (data: Buffer) => {
+            stdout += data.toString();
+          });
+        }
+        if (this.child.stderr) {
+          this.child.stderr.on("data", (data) => {
+            stderr += data.toString();
+          });
+        }
+        this.child.on("error", reject);
+        this.child.on("close", (code) => {
+          resolve(code);
         });
+      } else {
+        reject();
       }
-      if (child.stderr) {
-        child.stderr.on("data", (data) => {
-          stderr += data.toString();
-        });
-      }
-      child.on("error", reject);
-      child.on("close", (code) => {
-        resolve(code);
-      });
     });
     await promise;
 
@@ -134,7 +140,15 @@ export class NodeKernel {
     };
   }
 
+  interrupt() {
+    if (this.child) {
+      process.kill(this.child.pid);
+      this.child = undefined;
+    }
+  }
+
   async dispose() {
+    this.child = undefined;
     await fs.promises.rm(this.tmpDirectory, { recursive: true });
   }
 }

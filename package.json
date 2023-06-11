@@ -132,11 +132,6 @@
           "group": "connection-setting@1"
         },
         {
-          "command": "database-notebook.show-connection-setting",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+$/",
-          "group": "inline"
-        },
-        {
           "command": "database-notebook.edit-connection-setting",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "connection-setting@1"
@@ -150,11 +145,6 @@
           "command": "database-notebook.delete-connection-setting",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "connection-setting@1"
-        },
-        {
-          "command": "database-notebook.show-resource-properties",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+,properties.*/",
-          "group": "inline"
         },
         {
           "command": "database-notebook.show-resource-properties",
@@ -256,16 +246,6 @@
           "command": "database-notebook.specify-connection-all",
           "group": "navigation/execute@1",
           "when": "notebookType == 'database-notebook-type' && hasSql"
-        },
-        {
-          "command": "database-notebook.specify-rules-to-apply",
-          "group": "navigation/execute@1",
-          "when": "notebookType == 'database-notebook-type' && hasSql && noRules"
-        },
-        {
-          "command": "database-notebook.use-rules",
-          "group": "navigation/execute@1",
-          "when": "notebookType == 'database-notebook-type' && hasSql && !noRules"
         }
       ]
     },
@@ -441,6 +421,16 @@
         "icon": "$(debug-disconnect)"
       },
       {
+        "command": "database-notebook.cell.specify-rules-to-use",
+        "title": "Specify record rule to use",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "database-notebook.cell.toggle-show-comment",
+        "title": "Toggle show comment",
+        "icon": "$(info)"
+      },
+      {
         "command": "database-notebook.show-rdh-diff",
         "title": "Open Resultset Diff",
         "icon": "$(git-compare)"
@@ -459,16 +449,6 @@
         "command": "database-notebook.specify-connection-all",
         "title": "Specify connection in all SQL Cells",
         "icon": "$(debug-disconnect)"
-      },
-      {
-        "command": "database-notebook.specify-rules-to-apply",
-        "title": "Specify rules to apply",
-        "icon": "$(checklist)"
-      },
-      {
-        "command": "database-notebook.use-rules",
-        "title": "Use record rules",
-        "icon": "$(check)"
       }
     ]
   },
@@ -496,7 +476,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.108",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.116",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

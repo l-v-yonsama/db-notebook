@@ -1,4 +1,10 @@
-import { NOTEBOOK_TYPE, CELL_OPEN_MDH, CELL_SPECIFY_CONNECTION_TO_USE } from "../constant";
+import {
+  NOTEBOOK_TYPE,
+  CELL_OPEN_MDH,
+  CELL_SPECIFY_CONNECTION_TO_USE,
+  CELL_SPECIFY_RULES_TO_USE,
+  CELL_TOGGLE_SHOW_COMMENT,
+} from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
 import {
@@ -6,13 +12,12 @@ import {
   ResultSetDataBuilder,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { CellMeta, NotebookMeta, RunResult } from "../types/Notebook";
+import { CellMeta, RunResult } from "../types/Notebook";
 import { abbr } from "../utilities/stringUtil";
 import { setupDbResource } from "./intellisense";
 import {
   ExtensionContext,
   NotebookCell,
-  NotebookCellKind,
   NotebookCellOutput,
   NotebookCellOutputItem,
   NotebookCellStatusBarAlignment,
@@ -23,13 +28,12 @@ import {
   Uri,
   commands,
   notebooks,
-  window,
   workspace,
 } from "vscode";
 import { log } from "../utilities/logger";
 import { sqlKernelRun } from "./sqlKernel";
 import path = require("path");
-import { RecordRule } from "../shared/RecordRule";
+import { existsRuleFile, isSqlCell, readRuleFile } from "../utilities/notebookUtil";
 
 const PREFIX = "[DBNotebookController]";
 
@@ -63,6 +67,7 @@ export class MainController {
     this._controller.supportedLanguages = this.supportedLanguages;
     this._controller.supportsExecutionOrder = true;
     this._controller.executeHandler = this._executeAll.bind(this);
+    this._controller.interruptHandler = this._interruptHandler.bind(this);
 
     context.subscriptions.push(
       workspace.onDidChangeNotebookDocument((e) => {
@@ -81,19 +86,18 @@ export class MainController {
       )
     );
     context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new CommentProvider())
+    );
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new RecordRuleProvider(stateStorage)
+      )
+    );
+
+    context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RdhProvider())
     );
-    // context.subscriptions.push(
-    //   notebooks.registerNotebookCellStatusBarItemProvider(
-    //     NOTEBOOK_TYPE,
-    //     new CheckActiveContextProvider(this)
-    //   )
-    // );
-  }
-
-  interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
-    log(`${PREFIX} interruptHandler`);
-    this.interrupted = true;
   }
 
   setActiveContext(notebook: NotebookDocument) {
@@ -101,22 +105,12 @@ export class MainController {
     const visibleVariables = cells.some((cell) => cell.outputs.length > 0);
     const visibleRdh = cells.some(
       (cell) =>
-        cell.kind === NotebookCellKind.Code &&
-        cell.document.languageId === "sql" &&
-        cell.outputs.length > 0 &&
-        cell.outputs[0].metadata?.rdh !== undefined
+        isSqlCell(cell) && cell.outputs.length > 0 && cell.outputs[0].metadata?.rdh !== undefined
     );
-    const hasSql = cells.some(
-      (cell) => cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql"
-    );
-    let noRules = true;
-    if (notebook?.metadata?.rulesFolder) {
-      noRules = false;
-    }
+    const hasSql = cells.some((cell) => isSqlCell(cell));
     commands.executeCommand("setContext", "visibleVariables", visibleVariables);
     commands.executeCommand("setContext", "visibleRdh", visibleRdh);
     commands.executeCommand("setContext", "hasSql", hasSql);
-    commands.executeCommand("setContext", "noRules", noRules);
   }
 
   getVariables() {
@@ -125,6 +119,14 @@ export class MainController {
 
   dispose(): void {
     this._controller.dispose();
+  }
+
+  private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
+    log(`${PREFIX} interruptHandler`);
+    this.interrupted = true;
+    if (this.kernel) {
+      this.kernel.interrupt();
+    }
   }
 
   private async _executeAll(
@@ -144,6 +146,7 @@ export class MainController {
     }
     this.currentVariables = await this.kernel.getStoredVariables();
     await this.kernel.dispose();
+    this.kernel = undefined;
     // this.setActiveContext();
   }
 
@@ -194,27 +197,24 @@ export class MainController {
   }
 
   private async run(notebook: NotebookDocument, cell: NotebookCell): Promise<RunResult> {
-    if (cell.document.languageId === "sql") {
+    if (isSqlCell(cell)) {
       const r = await sqlKernelRun(
         cell,
         this.stateStorage,
         await this.kernel!.getStoredVariables()
       );
-      if (r.metadata?.rdh?.meta?.type === "select" && notebook.metadata?.rulesFolder) {
-        const { tableName } = r.metadata.rdh.meta;
-        let wsfolder = workspace.workspaceFolders?.[0].uri?.fsPath ?? "";
-        const ruleFile = path.join(wsfolder, notebook.metadata?.rulesFolder, `${tableName}.rrule`);
-        log(`${PREFIX} ruleFile:${ruleFile}`);
-        try {
-          const statResult = await workspace.fs.stat(Uri.file(ruleFile));
-          log(`${PREFIX} statResult:${JSON.stringify(statResult)}`);
-          if (statResult.size > 0) {
-            const readData = await workspace.fs.readFile(Uri.file(ruleFile));
-            const rrule = JSON.parse(Buffer.from(readData).toString("utf8")) as RecordRule;
-            const runRuleEngineResult = await runRuleEngine(r.metadata.rdh, rrule.tableRule);
-            log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
-          }
-        } catch (_) {}
+      const metadata: CellMeta = cell.metadata;
+      if (
+        r.metadata?.rdh?.meta?.type === "select" &&
+        metadata.ruleFile &&
+        (await existsRuleFile(metadata.ruleFile))
+      ) {
+        const rrule = await readRuleFile(cell);
+        if (rrule) {
+          r.metadata.rdh.meta.tableRule = rrule.tableRule;
+          const runRuleEngineResult = await runRuleEngine(r.metadata.rdh);
+          log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
+        }
       }
       return r;
     }
@@ -224,20 +224,70 @@ export class MainController {
 }
 
 // --- status bar
-// class CheckActiveContextProvider implements NotebookCellStatusBarItemProvider {
-//   constructor(private controller: MainController) {}
+class RecordRuleProvider implements NotebookCellStatusBarItemProvider {
+  constructor(private stateStorage: StateStorage) {}
 
-//   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-//     this.controller.setActiveContext();
-//     return undefined;
-//   }
-// }
+  async provideCellStatusBarItems(
+    cell: NotebookCell
+  ): Promise<NotebookCellStatusBarItem | undefined> {
+    if (!isSqlCell(cell)) {
+      return undefined;
+    }
+    if (!cell.document.getText().toLocaleLowerCase().includes("select")) {
+      return undefined;
+    }
+
+    const { ruleFile }: CellMeta = cell.metadata;
+    let tooltip = "";
+    if (ruleFile) {
+      let displayFileName = ruleFile;
+      if (displayFileName.endsWith(".rrule")) {
+        displayFileName = displayFileName.substring(0, displayFileName.length - 6);
+      }
+      if (await existsRuleFile(ruleFile)) {
+        tooltip = "$(checklist) Use " + abbr(displayFileName, 18);
+      } else {
+        tooltip = "$(warning) Missing Rule " + abbr(displayFileName, 18);
+      }
+    } else {
+      tooltip = "$(info) Specify Rule";
+    }
+    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_RULES_TO_USE;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class CommentProvider implements NotebookCellStatusBarItemProvider {
+  constructor() {}
+
+  async provideCellStatusBarItems(
+    cell: NotebookCell
+  ): Promise<NotebookCellStatusBarItem | undefined> {
+    if (!isSqlCell(cell)) {
+      return undefined;
+    }
+
+    const { showComment }: CellMeta = cell.metadata;
+    let tooltip = "";
+    if (showComment === true) {
+      tooltip = "$(eye-closed) Hide comment";
+    } else {
+      tooltip = "$(eye) Show comment";
+    }
+    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_TOGGLE_SHOW_COMMENT;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
 
 class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
 
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    if (cell.document.languageId !== "sql") {
+    if (!isSqlCell(cell)) {
       return undefined;
     }
 

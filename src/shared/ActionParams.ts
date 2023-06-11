@@ -76,7 +76,7 @@ export type UpdateTextDocumentActionCommand = BaseActionCommand<
   {
     newText: string;
     values?: {
-      name: "change" | "add-rule";
+      name: "change" | "add-rule" | "delete-rule" | "duplicate-rule";
       detail?: any;
     };
     scrollPos: number;

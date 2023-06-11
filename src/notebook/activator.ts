@@ -4,19 +4,16 @@ import { MdhPanel } from "../panels/MdhPanel";
 import { StateStorage } from "../utilities/StateStorage";
 import {
   ExtensionContext,
-  FileType,
   NotebookCell,
   NotebookCellData,
-  NotebookCellKind,
   NotebookData,
   NotebookEdit,
-  Uri,
   WorkspaceEdit,
   commands,
   window,
   workspace,
 } from "vscode";
-import { CellMeta, NotebookMeta } from "../types/Notebook";
+import { CellMeta } from "../types/Notebook";
 import { activateIntellisense } from "./intellisense";
 import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as path from "path";
@@ -25,92 +22,20 @@ import { activateStatusBar } from "../statusBar";
 import {
   CELL_OPEN_MDH,
   CELL_SPECIFY_CONNECTION_TO_USE,
+  CELL_SPECIFY_RULES_TO_USE,
+  CELL_TOGGLE_SHOW_COMMENT,
   CREATE_NEW_NOTEBOOK,
   NOTEBOOK_TYPE,
   SHOW_ALL_RDH,
   SHOW_ALL_VARIABLES,
   SPECIFY_CONNECTION_ALL,
-  SPECIFY_RULES_TO_APPLY,
-  USE_RULES,
 } from "../constant";
+import { isSqlCell } from "../utilities/notebookUtil";
 
 export function activateNotebook(context: ExtensionContext, stateStorage: StateStorage) {
   let controller: MainController;
   activateStatusBar(context);
   activateIntellisense(context, stateStorage);
-
-  const createSpecifyToUseRuleCommand = async () => {
-    const notebook = window.activeNotebookEditor?.notebook;
-    if (!notebook) {
-      return;
-    }
-    const metadata: NotebookMeta = {
-      ...notebook.metadata,
-    };
-    let wsfolder = workspace.workspaceFolders?.[0].uri;
-    if (!wsfolder) {
-      return;
-    }
-    const rootPath = wsfolder.fsPath;
-
-    const toRuleFileInfo = async (dir: Uri) => {
-      const allFiles = await workspace.fs.readDirectory(dir);
-      const ruleFiles = allFiles
-        .filter((it) => it[1] === FileType.File && it[0].endsWith(".rrule"))
-        .map((it) => it[0]);
-      const ruleDirs = allFiles
-        .filter(
-          (it) => it[1] === FileType.Directory && it[0].toLocaleLowerCase().indexOf("rule") >= 0
-        )
-        .map((it) => it[0]);
-      return {
-        relativePath: path.relative(rootPath, dir.fsPath),
-        fsPath: dir.fsPath,
-        ruleFiles,
-        ruleDirs,
-      };
-    };
-
-    const ruleFileInfoList = [];
-    const currentDirInfo = await toRuleFileInfo(wsfolder);
-    ruleFileInfoList.push(currentDirInfo);
-    for (const ruleDir of currentDirInfo.ruleDirs) {
-      ruleFileInfoList.push(
-        await toRuleFileInfo(Uri.file(path.join(currentDirInfo.fsPath, ruleDir)))
-      );
-    }
-
-    const hasRuleFile = ruleFileInfoList.some((it) => it.ruleFiles.length > 0);
-    if (hasRuleFile) {
-      const items = ruleFileInfoList.map((it) => ({
-        label: it.relativePath,
-        description: `${it.ruleFiles.length} file${it.ruleFiles.length === 1 ? "" : "s"}`,
-      }));
-      items.unshift({
-        label: "No use",
-        description: "No use of Record rules",
-      });
-      const result = await window.showQuickPick(items);
-      if (result) {
-        if (metadata.rulesFolder === result.label) {
-          return;
-        }
-        if (result.label === "No use") {
-          metadata.rulesFolder = undefined;
-        } else {
-          metadata.rulesFolder = result.label;
-        }
-        const edit = new WorkspaceEdit();
-        const nbEdit = NotebookEdit.updateNotebookMetadata(metadata);
-        edit.set(notebook.uri, [nbEdit]);
-        await workspace.applyEdit(edit);
-      }
-    } else {
-      await window.showInformationMessage(
-        `First create a rules file in your workspace or in a folder directly under it`
-      );
-    }
-  };
 
   context.subscriptions.push(
     workspace.registerNotebookSerializer(NOTEBOOK_TYPE, new DBNotebookSerializer(), {
@@ -187,13 +112,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         return;
       }
       const rdhList = cells
-        .filter(
-          (it) =>
-            it.kind === NotebookCellKind.Code &&
-            it.document.languageId === "sql" &&
-            it.outputs.length > 0 &&
-            it.outputs[0].metadata?.rdh
-        )
+        .filter((it) => isSqlCell(it) && it.outputs.length > 0 && it.outputs[0].metadata?.rdh)
         .map((it) => it.outputs[0].metadata?.rdh);
       const title = path.basename(filePath);
       MdhPanel.render(context.extensionUri, title, rdhList);
@@ -205,7 +124,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       if (!cells) {
         return;
       }
-      if (cells.every((it) => it.document.languageId !== "sql")) {
+      if (cells.every((it) => !isSqlCell(it))) {
         return;
       }
       const conSettings = await stateStorage.getConnectionSettingList();
@@ -216,7 +135,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       const result = await window.showQuickPick(items);
       if (result) {
         for (const cell of cells) {
-          if (cell.document.languageId !== "sql") {
+          if (!isSqlCell(cell)) {
             continue;
           }
           if (cell.metadata?.connectionName === result.label) {
@@ -236,7 +155,61 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
     })
   );
   context.subscriptions.push(
-    commands.registerCommand(SPECIFY_RULES_TO_APPLY, createSpecifyToUseRuleCommand)
+    commands.registerCommand(CELL_SPECIFY_RULES_TO_USE, async (cell: NotebookCell) => {
+      let wsfolder = workspace.workspaceFolders?.[0].uri;
+      if (!wsfolder) {
+        return;
+      }
+      const rootPath = wsfolder.fsPath;
+
+      const files = await workspace.findFiles("**/*.rrule", "**/node_modules/**");
+      if (files.length === 0) {
+        window.showErrorMessage('No "Reocrd rule files" on your workspace');
+        return;
+      }
+
+      const items: { label: string; description: string | undefined }[] = files.map((it) => ({
+        label: path.relative(rootPath, it.fsPath),
+        description: undefined,
+      }));
+      const NO_USE = "No use";
+      items.unshift({
+        label: NO_USE,
+        description: "Stop using rules",
+      });
+      const result = await window.showQuickPick(items);
+      if (result) {
+        if (cell.metadata?.ruleFile === result.label) {
+          return;
+        }
+        const metadata: CellMeta = {
+          ...cell.metadata,
+        };
+        if (result.label === NO_USE) {
+          metadata.ruleFile = "";
+        } else {
+          metadata.ruleFile = result.label;
+        }
+        const edit = new WorkspaceEdit();
+        const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+        edit.set(cell.notebook.uri, [nbEdit]);
+
+        await workspace.applyEdit(edit);
+      }
+    })
   );
-  context.subscriptions.push(commands.registerCommand(USE_RULES, createSpecifyToUseRuleCommand));
+  context.subscriptions.push(
+    commands.registerCommand(CELL_TOGGLE_SHOW_COMMENT, async (cell: NotebookCell) => {
+      const showComment = cell?.metadata?.showComment === true;
+      const metadata: CellMeta = {
+        ...cell.metadata,
+        showComment: !showComment,
+      };
+      const edit = new WorkspaceEdit();
+      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+      edit.set(cell.notebook.uri, [nbEdit]);
+
+      await workspace.applyEdit(edit);
+    })
+  );
 }

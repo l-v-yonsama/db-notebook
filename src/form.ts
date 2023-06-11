@@ -6,7 +6,7 @@ import {
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ModeType } from "./shared/ModeType";
-import { REFRESH_RESOURCES } from "./constant";
+import { CONNECTION_SETTING_FORM_VIEWID, REFRESH_RESOURCES } from "./constant";
 import { ToWebviewMessageEventType } from "./types/ToWebviewMessageEvent";
 import { ActionCommand } from "./shared/ActionParams";
 import { log } from "./utilities/logger";
@@ -21,7 +21,7 @@ export function activateFormProvider(
   stateStorage: StateStorage
 ): SQLConfigurationViewProvider {
   provider = new SQLConfigurationViewProvider(
-    "database-notebook.connectionForm",
+    CONNECTION_SETTING_FORM_VIEWID,
     context,
     stateStorage
   );
@@ -108,6 +108,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
         mode,
         res,
       };
+      return;
     } else {
       this.cacheForm = undefined;
     }

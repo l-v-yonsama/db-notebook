@@ -124,6 +124,7 @@ onMounted(() => {
 });
 
 const visible = reactive<{
+  nowLoading: boolean;
   connectionSetting: boolean;
   resourceProperties: boolean;
   mdhPanel: boolean;
@@ -133,6 +134,7 @@ const visible = reactive<{
   eRDiagramSettingsPanel: boolean;
   recordRuleEditor: boolean;
 }>({
+  nowLoading: false,
   connectionSetting: false,
   resourceProperties: false,
   mdhPanel: false,
@@ -153,6 +155,10 @@ const resourcePropertiesValues = ref<{ [key: string]: string }>({});
 
 <template>
   <main>
+    <div v-if="visible.nowLoading" class="loading-container">
+      <span class="codicon codicon-loading codicon-modifier-spin" style="margin-right: 4px"></span
+      >Loading...
+    </div>
     <ConnectionSettingVue
       v-if="visible.connectionSetting"
       :ref="setConnectionSettingRef"
@@ -221,5 +227,13 @@ legend {
 fieldset.no-elements {
   border-color: var(--vscode-diffEditor-removedTextBackground) !important;
   background-color: var(--vscode-diffEditor-removedTextBackground) !important;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
 }
 </style>

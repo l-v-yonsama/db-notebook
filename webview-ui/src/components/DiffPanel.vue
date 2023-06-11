@@ -12,7 +12,6 @@ import {
 import RDHViewer from "./RDHViewer.vue";
 import type { CloseTabActionCommand, CompareParams, OutputParams } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import type { OperateItemParams } from "@/types/RdhActions";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS } from "@/constants";
 
@@ -39,6 +38,7 @@ const inProgress = ref(false);
 const splitterWidth = ref(300);
 const splitterHeight = ref(300);
 const innerTabIndex = ref(-1);
+const innerTabVisible = ref(false);
 const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh1 = ref(null as any);
 const activeInnerRdh2 = ref(null as any);
@@ -96,7 +96,6 @@ onMounted(() => {
 });
 
 function getActiveTabItem(): DiffTabItem | undefined {
-  console.log("getActiveTabItem:", activeTabId.value);
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as DiffTabItem;
 }
@@ -113,6 +112,7 @@ const showTab = (tabId: string) => {
     return;
   }
   innerTabItems.value.splice(0, innerTabItems.value.length);
+  innerTabVisible.value = false;
   tabItem.list.forEach((item: DiffTabInnerItem, idx) => {
     const { type } = item.rdh1.meta;
     const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
@@ -120,7 +120,10 @@ const showTab = (tabId: string) => {
     innerTabItems.value.push({ value: idx, label });
   });
   innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
-  resetActiveInnerRdh();
+  nextTick(() => {
+    innerTabVisible.value = tabItem.list.length > 0;
+    resetActiveInnerRdh();
+  });
   vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
@@ -143,7 +146,6 @@ const resetActiveInnerRdh = () => {
 
 const addTabItem = (tabItem: DiffTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
-  console.log("addTabItem ", tabItem, idx);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
   }
@@ -215,16 +217,6 @@ const selectedMoreOptions = (v: MoreOption): void => {
   resetActiveInnerRdh();
 };
 
-const operateItem = ({ mode, item }: OperateItemParams): void => {
-  console.log("operateItem:", mode, item);
-  const tabItem = getActiveTabItem();
-  console.log("tabItem=", tabItem);
-  if (!tabItem) {
-    console.log("No tab Item");
-    return;
-  }
-};
-
 defineExpose({
   addTabItem,
   removeTabItem,
@@ -236,7 +228,7 @@ defineExpose({
   <section class="MdhPanel">
     <div class="tab-container-actions">
       <VsCodeDropdown
-        v-if="innerTabItems.length > 1"
+        v-if="innerTabVisible"
         v-model="innerTabIndex"
         :items="innerTabItems"
         style="z-index: 15"
@@ -297,7 +289,6 @@ defineExpose({
                   :height="splitterHeight"
                   :readonly="true"
                   :showOnlyChanged="displayOnlyChanged"
-                  @operateItem="operateItem"
                 >
                 </RDHViewer>
               </div>
@@ -310,7 +301,6 @@ defineExpose({
                   :height="splitterHeight"
                   :readonly="true"
                   :showOnlyChanged="displayOnlyChanged"
-                  @operateItem="operateItem"
                 >
                 </RDHViewer>
               </div>

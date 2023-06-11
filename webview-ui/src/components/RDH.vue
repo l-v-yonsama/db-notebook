@@ -212,7 +212,7 @@ const rowStyle = (p: any): any => {
 
 const toTitle = (item: RowValues, key: string): string => {
   const meta: RdhRow["meta"] = item["$meta"];
-  const rule = meta[key]?.find((it) => it.type === "Rul");
+  const rule = meta[key]?.find((it) => it.type === "Rul") as RuleAnnotation;
   if (rule && rule.values && rule.values?.message) {
     return rule.values.message;
   }

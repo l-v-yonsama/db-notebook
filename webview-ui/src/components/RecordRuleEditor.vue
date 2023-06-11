@@ -149,9 +149,20 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
               :maxlength="128"
               :transparent="true"
               :required="true"
-              style="width: 350px"
+              style="flex-grow: 1"
               @change="updateTextDocument()"
             />
+            <VsCodeButton
+              @click="updateTextDocument({ name: 'delete-rule', detail: idx })"
+              title="Delete rule"
+              appearance="secondary"
+              ><fa icon="trash" />Delete rule</VsCodeButton
+            >
+            <VsCodeButton
+              @click="updateTextDocument({ name: 'duplicate-rule', detail: idx })"
+              title="Duplicate rule"
+              ><fa icon="plus" />Duplicate rule</VsCodeButton
+            >
           </div>
           <fieldset class="errors">
             <legend>Error information</legend>
@@ -162,19 +173,9 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
               :items="columnItems"
               :transparent="true"
               :required="true"
-              style="width: 185px"
+              style="width: 420px"
               @change="updateTextDocument()"
             ></VsCodeDropdown>
-            <label :for="`errorMessage${idx}`" style="margin-left: 10px">Message</label>
-            <VsCodeTextField
-              :id="`errorMessage${idx}`"
-              v-model="detail.error.message"
-              :maxlength="128"
-              :transparent="true"
-              :required="true"
-              style="width: 40%"
-              @change="updateTextDocument()"
-            ></VsCodeTextField>
             <label :for="`errorLimit${idx}`" style="margin-left: 10px">Detection limit</label>
             <VsCodeTextField
               :id="`errorLimit${idx}`"
@@ -226,6 +227,7 @@ section.detail {
 div.rule-name {
   display: flex;
   align-items: center;
+  column-gap: 5px;
 }
 fieldset.errors {
   display: flex;

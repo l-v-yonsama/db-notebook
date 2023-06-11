@@ -17,7 +17,7 @@ import {
   isNumericLike,
   isTextLike,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { mediaDir } from "../constant";
+import { SHOW_CONNECTION_SETTING, SHOW_RESOURCE_PROPERTIES, mediaDir } from "../constant";
 import { log } from "../utilities/logger";
 
 const PREFIX = "[ResourceTreeProvider]";
@@ -107,6 +107,12 @@ export class ConnectionListItem extends vscode.TreeItem {
     }
     this.description = `(${conRes.dbType})`;
     this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},${conRes.isInProgress}`;
+
+    this.command = {
+      title: "Show resource property",
+      command: SHOW_CONNECTION_SETTING,
+      arguments: [conRes],
+    };
   }
 }
 
@@ -203,6 +209,11 @@ export class DBDatabaseItem extends vscode.TreeItem {
       this.tooltip = tooltip;
     }
     this.contextValue = contextValue;
+    this.command = {
+      title: "Show resource property",
+      command: SHOW_RESOURCE_PROPERTIES,
+      arguments: [resource],
+    };
   }
 }
 

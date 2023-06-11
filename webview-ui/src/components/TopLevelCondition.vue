@@ -55,7 +55,7 @@
                 :transparent="true"
                 :required="true"
                 @change="changeCondition"
-                style="width: 180px"
+                style="width: 320px"
               ></VsCodeDropdown>
             </td>
             <td class="ope">
@@ -68,56 +68,57 @@
               ></VsCodeDropdown>
             </td>
             <td class="val">
-              <VsCodeDropdown
-                v-show="
-                  conditionList[idx].operator !== 'isNull' &&
-                  conditionList[idx].operator !== 'isNotNull' &&
-                  conditionList[idx].operator !== 'isNil' &&
-                  conditionList[idx].operator !== 'isNotNil'
-                "
-                v-model="conditionList[idx].params!.valType"
-                :items="valTypeItems"
-                :transparent="true"
-                :required="true"
-                style="margin-right: 3px"
-                @change="changeCondition({ name: 'valType', condition })"
-              ></VsCodeDropdown>
-              <VsCodeTextField
-                v-if="
+              <div style="display: flex; column-gap: 5px">
+                <VsCodeDropdown
+                  v-show="
+                    conditionList[idx].operator !== 'isNull' &&
+                    conditionList[idx].operator !== 'isNotNull' &&
+                    conditionList[idx].operator !== 'isNil' &&
+                    conditionList[idx].operator !== 'isNotNil'
+                  "
+                  v-model="conditionList[idx].params!.valType"
+                  :items="valTypeItems"
+                  :transparent="true"
+                  :required="true"
+                  style="margin-right: 3px"
+                  @change="changeCondition({ name: 'valType', condition })"
+                ></VsCodeDropdown>
+                <VsCodeTextField
+                  v-if="
                   conditionList[idx].params!.valType === 'static' &&
                   conditionList[idx].operator !== 'isNull' &&
                   conditionList[idx].operator !== 'isNotNull' &&
                   conditionList[idx].operator !== 'isNil' &&
                   conditionList[idx].operator !== 'isNotNil'
                 "
-                v-model="conditionList[idx].value"
-                :maxlength="256"
-                :transparent="true"
-                :required="true"
-                style="width: 70%"
-                @change="changeCondition()"
-              ></VsCodeTextField>
-              <VsCodeDropdown
-                v-if="
+                  v-model="conditionList[idx].value"
+                  :maxlength="256"
+                  :transparent="true"
+                  :required="true"
+                  style="flex-grow: 1"
+                  @change="changeCondition()"
+                ></VsCodeTextField>
+                <VsCodeDropdown
+                  v-if="
                   conditionList[idx].params!.valType === 'column' &&
                   conditionList[idx].operator !== 'isNull' &&
                   conditionList[idx].operator !== 'isNotNull' &&
                   conditionList[idx].operator !== 'isNil' &&
                   conditionList[idx].operator !== 'isNotNil'
                 "
-                v-model="conditionList[idx].params!.valColumn"
-                :items="columnItems"
-                :transparent="true"
-                :required="true"
-                @change="changeCondition({ name: 'valColumn', condition })"
-                style="width: calc(100% - 112px)"
-              ></VsCodeDropdown>
+                  v-model="conditionList[idx].params!.valColumn"
+                  :items="columnItems"
+                  :transparent="true"
+                  :required="true"
+                  @change="changeCondition({ name: 'valColumn', condition })"
+                  style="flex-grow: 1"
+                ></VsCodeDropdown>
+              </div>
             </td>
             <td class="com">
               <VsCodeTextField
                 v-model="conditionList[idx].params!.comment"
                 :maxlength="256"
-                style="width: 99%"
                 @change="changeCondition()"
               ></VsCodeTextField>
             </td>
@@ -363,8 +364,10 @@ table {
   max-width: 80px;
 }
 .col {
-  width: 185px;
-  max-width: 185px;
+  width: 320px;
+}
+.com {
+  width: 110px;
   text-align: center;
 }
 .ope {

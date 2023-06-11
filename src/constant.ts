@@ -6,6 +6,11 @@ export const EXTENSION_NAME = "database-notebook";
 export const SHOW_RDH_DIFF = `${EXTENSION_NAME}.show-rdh-diff`;
 
 //---------------------------------------------------
+// CONNECTION SETTING FORM
+//---------------------------------------------------
+export const CONNECTION_SETTING_FORM_VIEWID = `${EXTENSION_NAME}.connectionForm`;
+
+//---------------------------------------------------
 // RESOURCE TREE
 //---------------------------------------------------
 export const REFRESH_RESOURCES = `${EXTENSION_NAME}.refresh-resources`;
@@ -35,8 +40,8 @@ export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
 export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
 export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
 export const SPECIFY_CONNECTION_ALL = `${EXTENSION_NAME}.specify-connection-all`;
-export const SPECIFY_RULES_TO_APPLY = `${EXTENSION_NAME}.specify-rules-to-apply`;
-export const USE_RULES = `${EXTENSION_NAME}.use-rules`;
+export const CELL_SPECIFY_RULES_TO_USE = `${EXTENSION_NAME}.cell.specify-rules-to-use`;
+export const CELL_TOGGLE_SHOW_COMMENT = `${EXTENSION_NAME}.cell.toggle-show-comment`;
 
 //---------------------------------------------------
 // RECORD RULE EDITOR
