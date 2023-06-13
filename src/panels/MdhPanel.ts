@@ -26,6 +26,7 @@ import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { rdhListToText } from "../utilities/rdhToText";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
+import { WriteToClipboardParamsPanel } from "./WriteToClipboardParamsPanel";
 
 const PREFIX = "[MdhPanel]";
 
@@ -49,11 +50,11 @@ export class MdhPanel {
   private _disposables: Disposable[] = [];
   private items: RdhTabItem[] = [];
 
-  private constructor(panel: WebviewPanel, extensionUri: Uri) {
+  private constructor(panel: WebviewPanel, private extensionUri: Uri) {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, extensionUri);
+    this._panel.webview.html = createWebviewContent(this._panel.webview, this.extensionUri);
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -274,7 +275,11 @@ export class MdhPanel {
     if (!tabItem) {
       return;
     }
-    await vscode.env.clipboard.writeText(rdhListToText(tabItem.list, params));
+    if (params.specifyDetail === true) {
+      WriteToClipboardParamsPanel.render(this.extensionUri, tabItem.list, params);
+    } else {
+      await vscode.env.clipboard.writeText(rdhListToText(tabItem.list, params));
+    }
   }
 
   private async compare(params: CompareParams) {
@@ -335,14 +340,11 @@ export class MdhPanel {
           }
         }
 
-        console.log("progress regport 100!!!");
         progress.report({
           increment: 100,
         });
-        console.log("progress regport after 100!!!");
       }
     );
-    console.log("done progress?? L348");
     const diffParams: DiffTabParam = {
       title: tabItem.title,
       list1: beforeList,

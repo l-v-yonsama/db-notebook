@@ -7,6 +7,10 @@ export const isSqlCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql";
 };
 
+export const isJsonCell = (cell: NotebookCell): boolean => {
+  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "json";
+};
+
 export const existsRuleFile = async (ruleFile: string): Promise<boolean> => {
   if (ruleFile) {
     let wsfolder = workspace.workspaceFolders?.[0].uri;

@@ -27,7 +27,7 @@ const OUTPUT_WITH_TYPES = ["none", "withComment", "withType", "both"];
 
 export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem[] = [];
 
-["text", "markdown", "csv"].forEach((fileType, idx) => {
+["text", "markdown", "csv", "tsv"].forEach((fileType, idx) => {
   if (idx > 0) {
     WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
       kind: "divider",
@@ -35,26 +35,10 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem[] = [];
   }
   WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
     kind: "selection",
-    label: `Write to clipboard in "${fileType}" (no type, comment)`,
+    label: `Write to clipboard in "${fileType}" Limit 10 rows (no type, comment)`,
     value: {
       fileType,
       outputWithType: "none",
-    },
-  });
-  WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
-    kind: "selection",
-    label: `same as above (with type)`,
-    value: {
-      fileType,
-      outputWithType: "withType",
-    },
-  });
-  WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
-    kind: "selection",
-    label: `same as above (with comment)`,
-    value: {
-      fileType,
-      outputWithType: "withComment",
     },
   });
   WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
@@ -65,4 +49,16 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem[] = [];
       outputWithType: "both",
     },
   });
+});
+WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
+  kind: "divider",
+});
+WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
+  kind: "selection",
+  label: "Specify details",
+  value: {
+    fileType: "text",
+    outputWithType: "withComment",
+    specifyDetail: true,
+  },
 });

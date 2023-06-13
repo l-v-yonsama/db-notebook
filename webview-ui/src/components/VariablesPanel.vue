@@ -15,7 +15,7 @@ const splitterHeight = ref(300);
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
 const resetSpPaneWrapperHeight = () => {
-  const sectionWrapper = window.document.querySelector("section.ScanPanel");
+  const sectionWrapper = window.document.querySelector("section.VariablesPanel");
   if (sectionWrapper?.clientHeight) {
     splitterHeight.value = sectionWrapper?.clientHeight - 3;
   }

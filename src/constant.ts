@@ -37,6 +37,7 @@ export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;
 export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
 export const CELL_SPECIFY_CONNECTION_TO_USE = `${EXTENSION_NAME}.cell.specify-connection-to-use`;
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
+export const CELL_WRITE_TO_CLIPBOARD = `${EXTENSION_NAME}.cell.write-to-clipboard`;
 export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
 export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
 export const SPECIFY_CONNECTION_ALL = `${EXTENSION_NAME}.specify-connection-all`;

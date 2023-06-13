@@ -17,28 +17,25 @@ export class NodeKernel {
   private scriptFile?: string;
   private time: number;
   private child: cp.ChildProcess | undefined;
+  private variables: NotebookExecutionVariables;
 
   constructor(private connectionSettings: ConnectionSetting[]) {
     this.time = new Date().getTime();
     this.tmpDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "db-nodebook-"));
     this.variablesFile = winToLinuxPath(path.join(this.tmpDirectory, `store_${this.time}.json`));
+    this.variables = {};
   }
 
-  async getStoredVariablesString(): Promise<string> {
-    try {
-      await fs.promises.stat(this.variablesFile);
-      return await fs.promises.readFile(this.variablesFile, { encoding: "utf8" });
-    } catch (_) {}
-    return "{}";
+  getStoredVariables(): NotebookExecutionVariables {
+    return this.variables;
   }
 
-  async getStoredVariables(): Promise<NotebookExecutionVariables> {
-    const json = await this.getStoredVariablesString();
-    return JSON.parse(json);
+  updateVariable(key: string, val: any) {
+    this.variables[key] = val;
   }
 
   private async createScript(cell: vscode.NotebookCell): Promise<string> {
-    const variablesJsonString = await this.getStoredVariablesString();
+    const variablesJsonString = JSON.stringify(this.variables);
 
     return `
     (async () => {
@@ -97,11 +94,9 @@ export class NodeKernel {
     // if (ext === "js") {
     this.child = cp.spawn("node", [this.scriptFile]);
 
-    // } else {
-    // const command = path.join(nodeModules, ".bin", "ts-node");
-    // const args = ["-P", configFile, this.scriptFile];
-    // child = cp.spawn(command, args);
-    // }
+    this.variables = JSON.parse(
+      await fs.promises.readFile(this.variablesFile, { encoding: "utf8" })
+    );
     let stdout = "";
     let stderr = "";
 

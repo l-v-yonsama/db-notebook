@@ -24,6 +24,7 @@ import {
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SPECIFY_RULES_TO_USE,
   CELL_TOGGLE_SHOW_COMMENT,
+  CELL_WRITE_TO_CLIPBOARD,
   CREATE_NEW_NOTEBOOK,
   NOTEBOOK_TYPE,
   SHOW_ALL_RDH,
@@ -31,6 +32,7 @@ import {
   SPECIFY_CONNECTION_ALL,
 } from "../constant";
 import { isSqlCell } from "../utilities/notebookUtil";
+import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 
 export function activateNotebook(context: ExtensionContext, stateStorage: StateStorage) {
   let controller: MainController;
@@ -80,6 +82,19 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
         await workspace.applyEdit(edit);
       }
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(CELL_WRITE_TO_CLIPBOARD, async (cell: NotebookCell) => {
+      const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
+      const rdh: ResultSetData = cell.outputs?.[0].metadata?.rdh;
+      WriteToClipboardParamsPanel.render(context.extensionUri, [rdh], {
+        tabId: "",
+        fileType: "markdown",
+        outputWithType: "withComment",
+        specifyDetail: true,
+        limit: 10,
+      });
     })
   );
   context.subscriptions.push(

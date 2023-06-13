@@ -4,7 +4,6 @@ import {
   DBDriverResolver,
   RDSBaseDriver,
   ResultSetData,
-  ResultSetDataBuilder,
   normalizeQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellMeta, RunResult, NotebookExecutionVariables } from "../types/Notebook";

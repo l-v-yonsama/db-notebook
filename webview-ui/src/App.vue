@@ -5,6 +5,7 @@ import MdhPanel from "./components/MdhPanel.vue";
 import DiffPanel from "./components/DiffPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
+import WriteToClipboardParamsPanel from "./components/WriteToClipboardParamsPanel.vue";
 import ConnectionSettingVue from "./components/ConnectionSetting.vue";
 import ResourceProperties from "./components/ResourceProperties.vue";
 import ERDiagramSettings from "./components/ERDiagramSettings.vue";
@@ -71,6 +72,13 @@ function messageListener(evt: MessageEvent) {
           visible.variablePanel = true;
         });
         break;
+      case "WriteToClipboardParamsPanel":
+        values.value = value;
+        visible.writeToClipboardParamsPanel = false;
+        nextTick(() => {
+          visible.writeToClipboardParamsPanel = true;
+        });
+        break;
       case "ERDiagramSettingsPanel":
         values.value = value;
         visible.eRDiagramSettingsPanel = false;
@@ -131,6 +139,7 @@ const visible = reactive<{
   scanPanel: boolean;
   diffPanel: boolean;
   variablePanel: boolean;
+  writeToClipboardParamsPanel: boolean;
   eRDiagramSettingsPanel: boolean;
   recordRuleEditor: boolean;
 }>({
@@ -141,6 +150,7 @@ const visible = reactive<{
   scanPanel: false,
   diffPanel: false,
   variablePanel: false,
+  writeToClipboardParamsPanel: false,
   eRDiagramSettingsPanel: false,
   recordRuleEditor: false,
 });
@@ -174,6 +184,7 @@ const resourcePropertiesValues = ref<{ [key: string]: string }>({});
     <DiffPanel v-if="visible.diffPanel" :ref="setDiffPanelRef"></DiffPanel>
     <ScanPanel ref="scanPanelRef" v-show="visible.scanPanel" :opt="scanValues"></ScanPanel>
     <VariablesPanel v-if="visible.variablePanel" :rdh="values" />
+    <WriteToClipboardParamsPanel v-if="visible.writeToClipboardParamsPanel" :params="values" />
     <ERDiagramSettings
       v-if="visible.eRDiagramSettingsPanel"
       :title="values.title"

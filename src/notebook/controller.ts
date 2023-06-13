@@ -4,6 +4,7 @@ import {
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SPECIFY_RULES_TO_USE,
   CELL_TOGGLE_SHOW_COMMENT,
+  CELL_WRITE_TO_CLIPBOARD,
 } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
@@ -33,7 +34,8 @@ import {
 import { log } from "../utilities/logger";
 import { sqlKernelRun } from "./sqlKernel";
 import path = require("path");
-import { existsRuleFile, isSqlCell, readRuleFile } from "../utilities/notebookUtil";
+import { existsRuleFile, isJsonCell, isSqlCell, readRuleFile } from "../utilities/notebookUtil";
+import { jsonKernelRun } from "./jsonKernel";
 
 const PREFIX = "[DBNotebookController]";
 
@@ -96,6 +98,13 @@ export class MainController {
     );
 
     context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new WriteToClipboardProvider()
+      )
+    );
+
+    context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RdhProvider())
     );
   }
@@ -144,7 +153,7 @@ export class MainController {
       }
       await this._doExecution(notebook, cell);
     }
-    this.currentVariables = await this.kernel.getStoredVariables();
+    this.currentVariables = this.kernel.getStoredVariables();
     await this.kernel.dispose();
     this.kernel = undefined;
     // this.setActiveContext();
@@ -197,12 +206,11 @@ export class MainController {
   }
 
   private async run(notebook: NotebookDocument, cell: NotebookCell): Promise<RunResult> {
+    if (!this.kernel) {
+      throw new Error("Missing kernel");
+    }
     if (isSqlCell(cell)) {
-      const r = await sqlKernelRun(
-        cell,
-        this.stateStorage,
-        await this.kernel!.getStoredVariables()
-      );
+      const r = await sqlKernelRun(cell, this.stateStorage, this.kernel.getStoredVariables());
       const metadata: CellMeta = cell.metadata;
       if (
         r.metadata?.rdh?.meta?.type === "select" &&
@@ -217,6 +225,8 @@ export class MainController {
         }
       }
       return r;
+    } else if (isJsonCell(cell)) {
+      return await jsonKernelRun(cell, this.kernel);
     }
 
     return this.kernel!.run(cell);
@@ -306,6 +316,22 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_SPECIFY_CONNECTION_TO_USE;
     item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class WriteToClipboardProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    const rdh = <ResultSetData | undefined>cell.outputs[0]?.metadata?.["rdh"];
+    if (!rdh) {
+      return;
+    }
+    const item = new NotebookCellStatusBarItem(
+      "$(clippy) Write to clipbaord",
+      NotebookCellStatusBarAlignment.Right
+    );
+    item.command = CELL_WRITE_TO_CLIPBOARD;
+    item.tooltip = "Write to clipbaord";
     return item;
   }
 }

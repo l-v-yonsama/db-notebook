@@ -3,10 +3,11 @@
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook.",
   "version": "0.0.2",
-  "publisher": "l-v-yonsama",
+  "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
-  "icon": "media/logo.png",
+  "icon": "media/logo128.png",
   "repository": {
+    "type": "git",
     "url": "https://github.com/l-v-yonsama/db-notebook"
   },
   "preview": false,
@@ -416,6 +417,11 @@
         "icon": "$(table)"
       },
       {
+        "command": "database-notebook.cell.write-to-clipboard",
+        "title": "Write to clipboard",
+        "icon": "$(clippy)"
+      },
+      {
         "command": "database-notebook.cell.specify-connection-to-use",
         "title": "Specify connection to use",
         "icon": "$(debug-disconnect)"
@@ -448,6 +454,7 @@
       {
         "command": "database-notebook.specify-connection-all",
         "title": "Specify connection in all SQL Cells",
+        "shortTitle": "Specify connection in all",
         "icon": "$(debug-disconnect)"
       }
     ]
@@ -456,7 +463,7 @@
     "install:all": "npm install && cd webview-ui && npm install",
     "start:webview": "cd webview-ui && npm run start",
     "build:webview": "cd webview-ui && yarn build",
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:webview && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
@@ -476,7 +483,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.116",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.118",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

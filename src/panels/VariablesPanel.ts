@@ -2,22 +2,16 @@ import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vsco
 import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
-import { StateStorage } from "../utilities/StateStorage";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
 import { ActionCommand } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
 
 const PREFIX = "[VariablesPanel]";
 
-dayjs.extend(utc);
-
 const componentName = "VariablesPanel";
 
 export class VariablesPanel {
   public static currentPanel: VariablesPanel | undefined;
-  private static stateStorage?: StateStorage;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
   private variables: ResultSetData | undefined;
@@ -34,17 +28,13 @@ export class VariablesPanel {
     VariablesPanel.currentPanel = new VariablesPanel(panel, extensionUri);
   }
 
-  static setStateStorage(storage: StateStorage) {
-    VariablesPanel.stateStorage = storage;
-  }
-
   public static render(extensionUri: Uri, variables: { [key: string]: any }) {
     log(`${PREFIX} render`);
     if (VariablesPanel.currentPanel) {
       VariablesPanel.currentPanel._panel.reveal(ViewColumn.Two);
     } else {
       // If a webview panel does not already exist create and show a new one
-      const panel = window.createWebviewPanel("ResultSetsType", "Resultsets", ViewColumn.Two, {
+      const panel = window.createWebviewPanel("VariablesType", "Variables", ViewColumn.Two, {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [

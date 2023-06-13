@@ -67,7 +67,7 @@ const smallNumberDecorationType = window.createTextEditorDecorationType({
     border: "0.5px dotted gray",
     color: new ThemeColor("tab.unfocusedActiveForeground"),
     backgroundColor: new ThemeColor("tab.inactiveBackground"),
-    margin: "1em",
+    margin: "0 3px",
   },
 });
 

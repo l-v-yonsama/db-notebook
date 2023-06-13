@@ -19,17 +19,21 @@ export const rdhListToText = (list: ResultSetData[], params: WriteToClipboardPar
 };
 
 const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): string => {
-  const outputDetail = createOutputDetail(params.outputWithType);
+  const maxPrintLines = params.limit ?? 10;
+  const outputDetail = { maxPrintLines, ...createOutputDetail(params.outputWithType) };
   let ret = "";
   switch (params.fileType) {
     case "csv":
       ret = rdb.toCsv(outputDetail);
       break;
+    case "tsv":
+      ret = rdb.toCsv({ delimiter: "\t", ...outputDetail });
+      break;
     case "markdown":
       ret = rdb.toMarkdown(outputDetail);
       break;
     case "text":
-      ret = rdb.toString({ maxPrintLines: 1000, ...outputDetail });
+      ret = rdb.toString(outputDetail);
       break;
     default:
       throw new Error("Not supported file type.");

@@ -115,8 +115,10 @@ export type WriteToClipboardActionCommand = {
 };
 
 export type WriteToClipboardParams<T = any> = TabIdParam & {
-  fileType: "csv" | "markdown" | "text";
+  fileType: "csv" | "tsv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
+  limit?: number; // default:10
+  specifyDetail?: boolean;
   options?: T;
 };
 
