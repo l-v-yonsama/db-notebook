@@ -5,6 +5,7 @@ import { CREATE_NEW_RECORD_RULE } from "../constant";
 import { RecordRuleEditorProvider } from "./editorProvider";
 import { DbSchema, DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
 import { RecordRule } from "../shared/RecordRule";
+import { writeToResource } from "../utilities/fsUtil";
 
 export function activateRuleEditor(context: ExtensionContext, stateStorage: StateStorage) {
   context.subscriptions.push(RecordRuleEditorProvider.register(context, stateStorage));
@@ -43,9 +44,4 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
       }
     })
   );
-}
-
-async function writeToResource(targetResource: Uri, jsonString: string) {
-  const fileContents = Buffer.from(jsonString, "utf8");
-  await workspace.fs.writeFile(targetResource, fileContents);
 }

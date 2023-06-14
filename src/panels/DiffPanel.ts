@@ -27,7 +27,9 @@ import { ActionCommand, CompareParams, OutputParams } from "../shared/ActionPara
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
-import { existsRuleFile } from "../utilities/notebookUtil";
+import { log } from "../utilities/logger";
+
+const PREFIX = "[DiffPanel]";
 
 dayjs.extend(utc);
 
@@ -222,6 +224,7 @@ export class DiffPanel {
   }
 
   public dispose() {
+    log(`${PREFIX} dispose`);
     DiffPanel.currentPanel = undefined;
     this._panel.dispose();
 

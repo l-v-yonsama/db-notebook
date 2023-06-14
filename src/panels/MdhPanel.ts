@@ -142,6 +142,8 @@ export class MdhPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
+    log(`${PREFIX} dispose`);
+
     MdhPanel.currentPanel = undefined;
     this._panel.dispose();
 

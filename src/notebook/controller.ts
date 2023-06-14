@@ -26,18 +26,17 @@ import {
   NotebookCellStatusBarItemProvider,
   NotebookController,
   NotebookDocument,
-  Uri,
   commands,
   notebooks,
   workspace,
 } from "vscode";
 import { log } from "../utilities/logger";
 import { sqlKernelRun } from "./sqlKernel";
-import path = require("path");
-import { existsRuleFile, isJsonCell, isSqlCell, readRuleFile } from "../utilities/notebookUtil";
-import { jsonKernelRun } from "./jsonKernel";
+import { isJsonCell, isSqlCell, readRuleFile } from "../utilities/notebookUtil";
+import { jsonKernelRun } from "./JsonKernel";
+import { existsFileOnStorage } from "../utilities/fsUtil";
 
-const PREFIX = "[DBNotebookController]";
+const PREFIX = "[notebook/Controller]";
 
 const hasMessageField = (error: any): error is { message: string } => {
   if ("message" in error && typeof error.message === "string") {
@@ -127,7 +126,9 @@ export class MainController {
   }
 
   dispose(): void {
+    log(`${PREFIX} dispose`);
     this._controller.dispose();
+    log(`${PREFIX} disposed`);
   }
 
   private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
@@ -145,7 +146,7 @@ export class MainController {
   ): Promise<void> {
     this.interrupted = false;
     const connectionSettings = await this.stateStorage.getConnectionSettingList();
-    this.kernel = new NodeKernel(connectionSettings);
+    this.kernel = await NodeKernel.create(connectionSettings);
 
     for (let cell of cells) {
       if (this.interrupted) {
@@ -215,7 +216,7 @@ export class MainController {
       if (
         r.metadata?.rdh?.meta?.type === "select" &&
         metadata.ruleFile &&
-        (await existsRuleFile(metadata.ruleFile))
+        (await existsFileOnStorage(metadata.ruleFile))
       ) {
         const rrule = await readRuleFile(cell);
         if (rrule) {
@@ -254,7 +255,7 @@ class RecordRuleProvider implements NotebookCellStatusBarItemProvider {
       if (displayFileName.endsWith(".rrule")) {
         displayFileName = displayFileName.substring(0, displayFileName.length - 6);
       }
-      if (await existsRuleFile(ruleFile)) {
+      if (await existsFileOnStorage(ruleFile)) {
         tooltip = "$(checklist) Use " + abbr(displayFileName, 18);
       } else {
         tooltip = "$(warning) Missing Rule " + abbr(displayFileName, 18);

@@ -33,8 +33,12 @@ import {
 } from "../constant";
 import { isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
+import { log } from "../utilities/logger";
+
+const PREFIX = "[notebook/activator]";
 
 export function activateNotebook(context: ExtensionContext, stateStorage: StateStorage) {
+  log(`${PREFIX} start activateNotebook.`);
   let controller: MainController;
   activateStatusBar(context);
   activateIntellisense(context, stateStorage);
@@ -227,4 +231,5 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       await workspace.applyEdit(edit);
     })
   );
+  log(`${PREFIX} end activateNotebook.`);
 }

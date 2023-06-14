@@ -1,10 +1,18 @@
-import * as vscode from "vscode";
 import * as cp from "child_process";
-import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 import { NotebookExecutionVariables, RunResult } from "../types/Notebook";
 import { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+import { log } from "../utilities/logger";
+import { NotebookCell, Uri } from "vscode";
+import {
+  createDirectoryOnStorage,
+  deleteResource,
+  existsUri,
+  readResource,
+  writeToResource,
+} from "../utilities/fsUtil";
+
+const PREFIX = "[notebook/NodeKernel]";
 
 const baseDir = path.join(__filename, "..", "..", "..");
 const nodeModules = path.join(baseDir, "node_modules");
@@ -12,18 +20,19 @@ const nodeModules = path.join(baseDir, "node_modules");
 const winToLinuxPath = (s: string) => s.replace(/\\/g, "/");
 
 export class NodeKernel {
-  private tmpDirectory: string;
-  private variablesFile: string;
-  private scriptFile?: string;
-  private time: number;
+  private variablesFile: Uri;
+  private scriptFile?: Uri;
   private child: cp.ChildProcess | undefined;
   private variables: NotebookExecutionVariables;
 
-  constructor(private connectionSettings: ConnectionSetting[]) {
-    this.time = new Date().getTime();
-    this.tmpDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "db-nodebook-"));
-    this.variablesFile = winToLinuxPath(path.join(this.tmpDirectory, `store_${this.time}.json`));
+  private constructor(private connectionSettings: ConnectionSetting[], private tmpDirectory: Uri) {
+    this.variablesFile = Uri.joinPath(this.tmpDirectory, "storedVariables.json");
     this.variables = {};
+  }
+
+  static async create(connectionSettings: ConnectionSetting[]): Promise<NodeKernel> {
+    const tmpDir = await createDirectoryOnStorage("tmp", `${new Date().getTime()}`);
+    return new NodeKernel(connectionSettings, tmpDir);
   }
 
   getStoredVariables(): NotebookExecutionVariables {
@@ -34,7 +43,7 @@ export class NodeKernel {
     this.variables[key] = val;
   }
 
-  private async createScript(cell: vscode.NotebookCell): Promise<string> {
+  private async createScript(cell: NotebookCell): Promise<string> {
     const variablesJsonString = JSON.stringify(this.variables);
 
     return `
@@ -60,7 +69,9 @@ export class NodeKernel {
         variables.each(function(value, key) {
           saveMap[key] = value;
         });
-        myfs.writeFileSync('${this.variablesFile}', JSON.stringify(saveMap), {encoding:'utf8'});
+        myfs.writeFileSync('${
+          this.variablesFile.fsPath
+        }', JSON.stringify(saveMap), {encoding:'utf8'});
       };
       const _skipSql = (b) => { variables.set('_skipSql', b); };
       try {
@@ -83,20 +94,16 @@ export class NodeKernel {
     `;
   }
 
-  public async run(cell: vscode.NotebookCell): Promise<RunResult> {
+  public async run(cell: NotebookCell): Promise<RunResult> {
     const ext = cell.document.languageId === "javascript" ? "js" : "ts";
-    const scriptName = `script_${this.time}.${ext}`;
-    this.scriptFile = path.join(this.tmpDirectory, scriptName);
+    const scriptName = `script.${ext}`;
+    this.scriptFile = Uri.joinPath(this.tmpDirectory, scriptName);
 
     const script = await this.createScript(cell);
-    fs.writeFileSync(winToLinuxPath(this.scriptFile), script);
+    await writeToResource(this.scriptFile, script);
 
-    // if (ext === "js") {
-    this.child = cp.spawn("node", [this.scriptFile]);
+    this.child = cp.spawn("node", [this.scriptFile.fsPath]);
 
-    this.variables = JSON.parse(
-      await fs.promises.readFile(this.variablesFile, { encoding: "utf8" })
-    );
     let stdout = "";
     let stderr = "";
 
@@ -122,12 +129,20 @@ export class NodeKernel {
     });
     await promise;
 
-    const reg = new RegExp(".*" + path.basename(this.scriptFile) + ":[0-9]+\r?\n *");
+    const reg = new RegExp(".*" + path.basename(this.scriptFile.fsPath) + ":[0-9]+\r?\n *");
     stderr = stderr.replace(reg, "");
     stderr = stderr.replace(/ +at +[a-zA-Z0-9()/. :_\[\]-]+/g, "");
     stderr = stderr.replace(/Node.js v[0-9.:-]+/, "");
     stderr = stderr.replace(/\r\n/g, "\n");
     stderr = stderr.replace(/\n+/g, "\n");
+
+    try {
+      if (await existsUri(this.variablesFile)) {
+        this.variables = JSON.parse(await readResource(this.variablesFile));
+      }
+    } catch (e: any) {
+      log(`${PREFIX} ⭐️ERROR: retrieve variables [${e.message}]`);
+    }
 
     return {
       stdout,
@@ -136,6 +151,7 @@ export class NodeKernel {
   }
 
   interrupt() {
+    log(`${PREFIX} interrupt`);
     if (this.child) {
       process.kill(this.child.pid);
       this.child = undefined;
@@ -143,7 +159,8 @@ export class NodeKernel {
   }
 
   async dispose() {
+    log(`${PREFIX} dispose`);
     this.child = undefined;
-    await fs.promises.rm(this.tmpDirectory, { recursive: true });
+    await deleteResource(this.tmpDirectory, { recursive: true });
   }
 }

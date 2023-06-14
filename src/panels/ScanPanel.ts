@@ -19,6 +19,9 @@ import { createHash } from "crypto";
 import { ActionCommand } from "../shared/ActionParams";
 import { OutputParams } from "../shared/ActionParams";
 import { createWebviewContent } from "../utilities/webviewUtil";
+import { log } from "../utilities/logger";
+
+const PREFIX = "[ScanPanel]";
 
 dayjs.extend(utc);
 
@@ -215,6 +218,8 @@ export class ScanPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
+    log(`${PREFIX} dispose`);
+
     ScanPanel.currentPanel = undefined;
     this._panel.dispose();
 

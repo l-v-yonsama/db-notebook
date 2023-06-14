@@ -30,3 +30,7 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+
+misc/**
+todo.md
+docs/**

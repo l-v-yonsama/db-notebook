@@ -8,8 +8,6 @@ import {
   MarkdownString,
   NotebookCell,
   NotebookCellKind,
-  NotebookDocument,
-  OverviewRulerLane,
   Position,
   Range,
   SnippetString,
@@ -35,9 +33,10 @@ import { NOTEBOOK_TYPE } from "../constant";
 import { abbr } from "../utilities/stringUtil";
 import { isSqlCell } from "../utilities/notebookUtil";
 
-const PREFIX = "[intellisense]";
+const PREFIX = "[notebook/intellisense]";
 
-const throttleFunc = throttle(300, async (connectionName: string) => {
+const throttleFunc = throttle(300, async (connectionName: string): Promise<void> => {
+  log(`${PREFIX} throttleFunc`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
     return;
   }
@@ -48,6 +47,7 @@ const throttleFunc = throttle(300, async (connectionName: string) => {
 });
 
 export async function setupDbResource(connectionName: string) {
+  log(`${PREFIX} setupDbResource`);
   throttleFunc(connectionName);
 }
 
@@ -55,11 +55,13 @@ let storage: StateStorage;
 let rdsDatabase: RdsDatabase | undefined;
 
 export function activateIntellisense(context: ExtensionContext, stateStorage: StateStorage) {
+  log(`${PREFIX} start activateIntellisense`);
   storage = stateStorage;
 
   context.subscriptions.push(createJsIntellisense());
   context.subscriptions.push(createSQLIntellisense());
   setActivateDecorator(context);
+  log(`${PREFIX} end activateIntellisense`);
 }
 
 const smallNumberDecorationType = window.createTextEditorDecorationType({
@@ -130,6 +132,7 @@ function setActivateDecorator(context: ExtensionContext) {
 }
 
 function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookCell | undefined) {
+  log(`${PREFIX} updateDecorations`);
   if (cell === undefined || rdsDatabase === undefined || activeEditor === undefined) {
     return;
   }
@@ -165,6 +168,10 @@ function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookC
 }
 
 function getStoreKeys(): string[] {
+  log(`${PREFIX} getStoreKeys`);
+  if (window.activeNotebookEditor?.notebook === undefined) {
+    return [];
+  }
   const cells = window.activeNotebookEditor?.notebook?.getCells() ?? [];
   const texts = cells
     .filter((it) => it.kind === NotebookCellKind.Code && it.document.languageId === "javascript")
@@ -185,6 +192,7 @@ function getStoreKeys(): string[] {
 }
 
 function createJsIntellisense() {
+  log(`${PREFIX} createJsIntellisense`);
   return languages.registerCompletionItemProvider(
     [{ language: "javascript", notebookType: NOTEBOOK_TYPE }],
     {
@@ -292,6 +300,7 @@ function createDriverResolverCompletionItem(
   detail: string,
   docString: string
 ) {
+  log(`${PREFIX} createDriverResolverCompletionItem`);
   const item = new CompletionItem("driverResolver." + label);
   item.insertText = new SnippetString(
     "const { ok, message, result } = await driverResolver\n" +
@@ -320,6 +329,8 @@ function createDocumentation({ script, ext, uri }: { script: string; ext: string
 }
 
 function createSQLIntellisense() {
+  log(`${PREFIX} createSQLIntellisense`);
+
   return languages.registerCompletionItemProvider(
     [{ language: "sql", notebookType: NOTEBOOK_TYPE }],
     {
