@@ -162,6 +162,7 @@ const action = (command: ActionCommand["command"]): void => {
         tabId: "",
         fileType: "markdown",
         outputWithType: "none",
+        withRowNo: false,
         options: {
           title: title.value,
           items,

@@ -20,7 +20,11 @@ export const rdhListToText = (list: ResultSetData[], params: WriteToClipboardPar
 
 const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): string => {
   const maxPrintLines = params.limit ?? 10;
-  const outputDetail = { maxPrintLines, ...createOutputDetail(params.outputWithType) };
+  const outputDetail = {
+    maxPrintLines,
+    withRowNo: params.withRowNo,
+    ...createOutputDetail(params.outputWithType),
+  };
   let ret = "";
   switch (params.fileType) {
     case "csv":

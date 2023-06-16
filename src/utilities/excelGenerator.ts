@@ -97,8 +97,8 @@ function createQueryResultListSheet(
     list.forEach((rdh, idx) => {
       tocRecords.records.push({
         tableName: {
-          text: sheetName,
-          hyperlink: `#${sheetName}!A${baseRowNo}`,
+          text: rdh.meta.tableName ?? "-",
+          hyperlink: `#${sheetName}!B${baseRowNo}`,
         },
         comment: rdh.meta.comment,
         type: rdh.meta.type,

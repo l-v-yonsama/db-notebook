@@ -13,14 +13,14 @@ import { DiffTabParam } from "./panels/DiffPanel";
 import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
 import { EXTENSION_NAME, SHOW_RDH_DIFF } from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
-import { setStoragePath } from "./utilities/fsUtil";
+import { initializePath } from "./utilities/fsUtil";
 
 const PREFIX = "[extension]";
 
 let connectionSettingViewProvider: SQLConfigurationViewProvider;
 
 export async function activate(context: ExtensionContext) {
-  setStoragePath(context.globalStorageUri);
+  initializePath(context);
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
 
@@ -52,10 +52,25 @@ export async function activate(context: ExtensionContext) {
     DiffPanel.render(context.extensionUri, params);
   });
   log(`${PREFIX} end activation.`);
+
+  process.on("uncaughtException", function (err) {
+    console.log("⭐️⭐️ [uncaughtException]----------------------------------");
+    console.log(err.name);
+    console.log(err.message);
+    console.log(err.toString());
+    console.log(err.stack);
+    log("⭐️⭐️uncaughtException:" + err);
+  });
+  process.on("unhandledRejection", (err, promise) => {
+    console.log("⭐️⭐️ [unhandledRejection]----------------------------------");
+    console.log(err);
+    console.log(promise);
+    log("unhandledRejection:" + err);
+  });
 }
 
 export async function deactivate() {
-  log(`${PREFIX} deactivate`);
+  log(`⭐️⭐️${PREFIX} deactivate`);
   try {
     await DBDriverResolver.getInstance().closeAll();
   } catch (e) {

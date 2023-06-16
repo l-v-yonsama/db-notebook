@@ -1,4 +1,5 @@
 import type { SecondaryItem } from "./types/Components";
+import type { WriteToClipboardParams } from "./utilities/vscode";
 
 export const OUTPUT_DETAIL_ITEMS: SecondaryItem<string>[] = [
   {
@@ -25,7 +26,9 @@ export const OUTPUT_DETAIL_ITEMS: SecondaryItem<string>[] = [
 
 const OUTPUT_WITH_TYPES = ["none", "withComment", "withType", "both"];
 
-export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem[] = [];
+export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem<
+  Omit<WriteToClipboardParams, "tabId">
+>[] = [];
 
 ["text", "markdown", "csv", "tsv"].forEach((fileType, idx) => {
   if (idx > 0) {
@@ -37,16 +40,18 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem[] = [];
     kind: "selection",
     label: `Write to clipboard in "${fileType}" Limit 10 rows (no type, comment)`,
     value: {
-      fileType,
+      fileType: fileType as WriteToClipboardParams["fileType"],
       outputWithType: "none",
+      withRowNo: true,
     },
   });
   WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
     kind: "selection",
     label: `same as above (with type, comment)`,
     value: {
-      fileType,
+      fileType: fileType as WriteToClipboardParams["fileType"],
       outputWithType: "both",
+      withRowNo: true,
     },
   });
 });
@@ -59,6 +64,7 @@ WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
   value: {
     fileType: "text",
     outputWithType: "withComment",
+    withRowNo: true,
     specifyDetail: true,
   },
 });

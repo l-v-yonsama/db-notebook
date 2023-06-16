@@ -335,7 +335,9 @@ defineExpose({
         <fa icon="rotate" />
       </button>
       <button
-        @click="writeToClipboard({ fileType: 'text', outputWithType: 'withComment' })"
+        @click="
+          writeToClipboard({ fileType: 'text', outputWithType: 'withComment', withRowNo: true })
+        "
         :disabled="inProgress"
         title="Write to clipboard"
       >

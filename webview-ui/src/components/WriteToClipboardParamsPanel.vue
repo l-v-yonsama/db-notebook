@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { vscode, type CancelActionCommand, type WriteToClipboardParams } from "@/utilities/vscode";
 import type { DropdownItem } from "@/types/Components";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
-import VsCodeRadioGroup from "./base/VsCodeRadioGroup.vue";
+import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
@@ -39,6 +39,7 @@ const fileType = ref(props.params.params.fileType);
 const withType = ref(false);
 const withComment = ref(false);
 const limit = ref(props.params.params.limit ?? 10);
+const withRowNo = ref(props.params.params.withRowNo);
 
 const { outputWithType } = props.params.params;
 switch (outputWithType) {
@@ -64,6 +65,11 @@ const handleChangeComment = (checked: boolean) => {
   handleChange();
 };
 
+const handleChangeRowNo = (checked: boolean) => {
+  withRowNo.value = checked;
+  handleChange();
+};
+
 const handleChange = (refresh = true) => {
   let outputWithType: WriteToClipboardParams["outputWithType"] = "none";
   if (withType.value) {
@@ -73,10 +79,11 @@ const handleChange = (refresh = true) => {
       outputWithType = "withType";
     }
   } else {
-    if (withComment) {
+    if (withComment.value) {
       outputWithType = "withComment";
     }
   }
+  console.log("L94 ;", outputWithType);
 
   vscode.postCommand({
     command: "writeToClipboard",
@@ -86,6 +93,7 @@ const handleChange = (refresh = true) => {
       outputWithType,
       limit: limit.value,
       specifyDetail: refresh,
+      withRowNo: withRowNo.value,
     },
   });
 };
@@ -104,17 +112,19 @@ const cancel = () => {
     <table>
       <tr>
         <th>Format</th>
-        <td colspan="4">
-          <VsCodeRadioGroup
-            v-model="fileType"
-            :items="fileTypeItems"
-            @change="handleChange(true)"
-          />
-        </td>
         <td>
-          <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">Cancel</VsCodeButton>
+          <VsCodeDropdown v-model="fileType" :items="fileTypeItems" @change="handleChange(true)" />
+        </td>
+        <td colspan="2" style="text-align: right">
+          <VsCodeButton
+            @click="cancel"
+            appearance="secondary"
+            title="Cancel"
+            style="margin-right: 3px"
+            >Cancel</VsCodeButton
+          >
           <VsCodeButton @click="handleChange(false)" title="Copy to clipboard"
-            >Copy to clipboard</VsCodeButton
+            ><span class="codicon codicon-clippy"></span>Copy to clipboard</VsCodeButton
           >
         </td>
       </tr>
@@ -135,6 +145,17 @@ const cancel = () => {
             :checked="withComment === true"
             @change="($e:any) => handleChangeComment($e.target.checked)"
             >with comment</vscode-checkbox
+          >
+        </td>
+      </tr>
+      <tr>
+        <th>Row no</th>
+        <td>
+          <vscode-checkbox
+            v-model="withRowNo"
+            :checked="withRowNo === true"
+            @change="($e:any) => handleChangeRowNo($e.target.checked)"
+            >with row no</vscode-checkbox
           >
         </td>
         <th>Limit rows</th>

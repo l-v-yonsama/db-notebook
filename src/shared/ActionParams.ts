@@ -31,6 +31,7 @@ export type SaveCompareKeysParams = TabIdParam & {
 export type OutputParams = TabIdParam & {
   fileType: "excel" | "csv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
+  withRowNo?: boolean;
   displayOnlyChanged?: boolean;
 };
 
@@ -117,6 +118,7 @@ export type WriteToClipboardActionCommand = {
 export type WriteToClipboardParams<T = any> = TabIdParam & {
   fileType: "csv" | "tsv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
+  withRowNo: boolean;
   limit?: number; // default:10
   specifyDetail?: boolean;
   options?: T;

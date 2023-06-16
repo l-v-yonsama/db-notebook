@@ -9,7 +9,11 @@ export function activateLogger(context: ExtensionContext, name: string) {
 
 export function log(value: string) {
   if (channel) {
-    channel.appendLine(value);
+    try {
+      channel.appendLine(value);
+    } catch (e) {
+      console.error("Error:logger.ts", e);
+    }
   } else {
     console.log(value);
   }

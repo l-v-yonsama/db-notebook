@@ -36,14 +36,16 @@ import { isSqlCell } from "../utilities/notebookUtil";
 const PREFIX = "[notebook/intellisense]";
 
 const throttleFunc = throttle(300, async (connectionName: string): Promise<void> => {
-  log(`${PREFIX} throttleFunc`);
+  log(`  ${PREFIX} start throttleFunc`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
+    log(`  ${PREFIX} end throttleFunc`);
     return;
   }
   const db = await storage.loadResource(connectionName, false, false);
   if (db && db[0] instanceof RdsDatabase) {
     rdsDatabase = db[0];
   }
+  log(`  ${PREFIX} end throttleFunc with rdsDatabase`);
 });
 
 export async function setupDbResource(connectionName: string) {
@@ -74,12 +76,14 @@ const smallNumberDecorationType = window.createTextEditorDecorationType({
 });
 
 function setActivateDecorator(context: ExtensionContext) {
+  log(`${PREFIX} start setActivateDecorator`);
   let activeEditor = window.activeTextEditor;
   // let activeNotebook = window.activeNotebookEditor?.notebook;
   let cell: NotebookCell | undefined;
   let timeout: NodeJS.Timer | undefined = undefined;
 
   const triggerUpdateDecorations = (throttle = false) => {
+    log(`${PREFIX} triggerUpdateDecorations`);
     if (timeout) {
       clearTimeout(timeout);
       timeout = undefined;
@@ -129,42 +133,50 @@ function setActivateDecorator(context: ExtensionContext) {
       }
     })
   );
+  log(`${PREFIX} end setActivateDecorator`);
 }
 
 function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookCell | undefined) {
-  log(`${PREFIX} updateDecorations`);
+  log(`${PREFIX} start updateDecorations`);
   if (cell === undefined || rdsDatabase === undefined || activeEditor === undefined) {
+    log(`${PREFIX} end updateDecorations`);
     return;
   }
 
-  activeEditor.setDecorations(smallNumberDecorationType, []);
+  try {
+    activeEditor.setDecorations(smallNumberDecorationType, []);
 
-  const { document } = activeEditor;
+    const { document } = activeEditor;
 
-  if (cell === undefined || cell.metadata?.showComment !== true) {
-    return;
-  }
-  const sql = document.getText();
-  const smallNumbers: DecorationOptions[] = [];
-  const resList = getResourcePositions({ sql, db: rdsDatabase });
-  resList
-    .filter((it) => it.comment)
-    .forEach((res) => {
-      const startPos = document.positionAt(res.offset);
-      const endPos = document.positionAt(res.offset + res.length);
+    if (cell === undefined || cell.metadata?.showComment !== true) {
+      return;
+    }
+    const sql = document.getText();
+    const smallNumbers: DecorationOptions[] = [];
+    const resList = getResourcePositions({ sql, db: rdsDatabase });
+    resList
+      .filter((it) => it.comment)
+      .forEach((res) => {
+        const startPos = document.positionAt(res.offset);
+        const endPos = document.positionAt(res.offset + res.length);
 
-      const decoration: DecorationOptions = {
-        range: new Range(startPos, endPos),
-        hoverMessage: res.comment,
-        renderOptions: {
-          after: {
-            contentText: abbr(res.comment, 20),
+        const decoration: DecorationOptions = {
+          range: new Range(startPos, endPos),
+          hoverMessage: res.comment,
+          renderOptions: {
+            after: {
+              contentText: abbr(res.comment, 20),
+            },
           },
-        },
-      };
-      smallNumbers.push(decoration);
-    });
-  activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
+        };
+        smallNumbers.push(decoration);
+      });
+    activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
+  } catch (e: any) {
+    log(`${PREFIX} Error:${e.message}`);
+  }
+
+  log(`${PREFIX} end updateDecorations`);
 }
 
 function getStoreKeys(): string[] {

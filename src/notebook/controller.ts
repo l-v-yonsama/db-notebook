@@ -185,6 +185,7 @@ export class MainController {
               NotebookCellOutputItem.text(
                 ResultSetDataBuilder.from(metadata.rdh).toMarkdown({
                   withComment,
+                  withRowNo: true,
                 }),
                 "text/markdown"
               ),

@@ -96,6 +96,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         tabId: "",
         fileType: "markdown",
         outputWithType: "withComment",
+        withRowNo: true,
         specifyDetail: true,
         limit: 10,
       });

@@ -1,14 +1,18 @@
 import { TextDecoder, TextEncoder } from "util";
 import { RawNotebookData } from "../types/Notebook";
 import { CancellationToken, NotebookCellData, NotebookData, NotebookSerializer } from "vscode";
+import { log } from "../utilities/logger";
+
+const PREFIX = "[notebook/serializer]";
 
 export class DBNotebookSerializer implements NotebookSerializer {
-  public readonly label: string = "DB Contents Serializer";
+  // public readonly label: string = "DB Contents Serializer";
 
   public async deserializeNotebook(
     data: Uint8Array,
     token: CancellationToken
   ): Promise<NotebookData> {
+    log(`${PREFIX} start deserializeNotebook`);
     var contents = new TextDecoder().decode(data); // convert to String to make JSON object
 
     // Read file contents
@@ -31,6 +35,7 @@ export class DBNotebookSerializer implements NotebookSerializer {
     bookData.metadata = {
       ...(raw.metadata ?? {}),
     };
+    log(`${PREFIX} end deserializeNotebook`);
     return bookData;
   }
 
@@ -38,6 +43,7 @@ export class DBNotebookSerializer implements NotebookSerializer {
     data: NotebookData,
     token: CancellationToken
   ): Promise<Uint8Array> {
+    log(`${PREFIX} start serializeNotebook`);
     // Map the Notebook data into the format we want to save the Notebook data as
     let contents: RawNotebookData = {
       cells: [],
@@ -55,6 +61,7 @@ export class DBNotebookSerializer implements NotebookSerializer {
       });
     }
 
+    log(`${PREFIX} end serializeNotebook`);
     // Give a string of all the data to save and VS Code will handle the rest
     return new TextEncoder().encode(JSON.stringify(contents, null, 1));
   }

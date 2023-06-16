@@ -9,6 +9,7 @@ import {
   deleteResource,
   existsUri,
   readResource,
+  winToLinuxPath,
   writeToResource,
 } from "../utilities/fsUtil";
 
@@ -16,8 +17,6 @@ const PREFIX = "[notebook/NodeKernel]";
 
 const baseDir = path.join(__filename, "..", "..", "..");
 const nodeModules = path.join(baseDir, "node_modules");
-
-const winToLinuxPath = (s: string) => s.replace(/\\/g, "/");
 
 export class NodeKernel {
   private variablesFile: Uri;

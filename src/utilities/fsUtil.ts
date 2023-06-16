@@ -1,13 +1,22 @@
-import { Uri, workspace } from "vscode";
+import { ExtensionContext, Uri, workspace } from "vscode";
 import { log } from "./logger";
 
 let storagePath: Uri;
+let nodeModulesPath: Uri;
 
 const PREFIX = "  [fsUtil]";
 
-export const setStoragePath = (s: Uri): void => {
-  storagePath = s;
+export const initializePath = (context: ExtensionContext): void => {
+  storagePath = context.globalStorageUri;
+  nodeModulesPath = Uri.file(context.asAbsolutePath("node_modules"));
 };
+
+export const getNodeModulePath = (name: string): string => {
+  const moduleUri = Uri.joinPath(nodeModulesPath, name);
+  return winToLinuxPath(moduleUri.fsPath);
+};
+
+export const winToLinuxPath = (s: string) => s.replace(/\\/g, "/");
 
 export const existsUri = async (uri: Uri): Promise<boolean> => {
   try {
