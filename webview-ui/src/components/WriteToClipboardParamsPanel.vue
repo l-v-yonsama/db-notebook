@@ -40,6 +40,7 @@ const withType = ref(false);
 const withComment = ref(false);
 const limit = ref(props.params.params.limit ?? 10);
 const withRowNo = ref(props.params.params.withRowNo);
+const withCodeLabel = ref(props.params.params.withCodeLabel);
 
 const { outputWithType } = props.params.params;
 switch (outputWithType) {
@@ -70,6 +71,11 @@ const handleChangeRowNo = (checked: boolean) => {
   handleChange();
 };
 
+const handleChangeResolvedLabel = (checked: boolean) => {
+  withCodeLabel.value = checked;
+  handleChange();
+};
+
 const handleChange = (refresh = true) => {
   let outputWithType: WriteToClipboardParams["outputWithType"] = "none";
   if (withType.value) {
@@ -83,7 +89,6 @@ const handleChange = (refresh = true) => {
       outputWithType = "withComment";
     }
   }
-  console.log("L94 ;", outputWithType);
 
   vscode.postCommand({
     command: "writeToClipboard",
@@ -94,6 +99,7 @@ const handleChange = (refresh = true) => {
       limit: limit.value,
       specifyDetail: refresh,
       withRowNo: withRowNo.value,
+      withCodeLabel: withCodeLabel.value,
     },
   });
 };
@@ -129,37 +135,42 @@ const cancel = () => {
         </td>
       </tr>
       <tr>
-        <th>Type</th>
         <td>
           <vscode-checkbox
             v-model="withType"
             :checked="withType === true"
             @change="($e:any) => handleChangeType($e.target.checked)"
-            >with type</vscode-checkbox
+            >Type</vscode-checkbox
           >
         </td>
-        <th>Comment</th>
         <td>
           <vscode-checkbox
             v-model="withComment"
             :checked="withComment === true"
             @change="($e:any) => handleChangeComment($e.target.checked)"
-            >with comment</vscode-checkbox
+            >Comment</vscode-checkbox
           >
         </td>
-      </tr>
-      <tr>
-        <th>Row no</th>
         <td>
           <vscode-checkbox
             v-model="withRowNo"
             :checked="withRowNo === true"
             @change="($e:any) => handleChangeRowNo($e.target.checked)"
-            >with row no</vscode-checkbox
+            >Row no</vscode-checkbox
           >
         </td>
-        <th>Limit rows</th>
         <td>
+          <vscode-checkbox
+            v-model="withCodeLabel"
+            :checked="withCodeLabel === true"
+            @change="($e:any) => handleChangeResolvedLabel($e.target.checked)"
+            >Resolved Label</vscode-checkbox
+          >
+        </td>
+      </tr>
+      <tr>
+        <th>Limit rows</th>
+        <td colspan="3">
           <VsCodeTextField
             v-model="limit"
             type="number"

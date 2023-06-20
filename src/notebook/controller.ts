@@ -5,6 +5,8 @@ import {
   CELL_SPECIFY_RULES_TO_USE,
   CELL_TOGGLE_SHOW_COMMENT,
   CELL_WRITE_TO_CLIPBOARD,
+  CELL_SPECIFY_CODE_RESOLVER_TO_USE,
+  CELL_MARK_CELL_AS_SKIP,
 } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
@@ -12,6 +14,7 @@ import {
   ResultSetData,
   ResultSetDataBuilder,
   runRuleEngine,
+  resolveCodeLabel,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellMeta, RunResult } from "../types/Notebook";
 import { abbr } from "../utilities/stringUtil";
@@ -19,6 +22,7 @@ import { setupDbResource } from "./intellisense";
 import {
   ExtensionContext,
   NotebookCell,
+  NotebookCellKind,
   NotebookCellOutput,
   NotebookCellOutputItem,
   NotebookCellStatusBarAlignment,
@@ -32,7 +36,12 @@ import {
 } from "vscode";
 import { log } from "../utilities/logger";
 import { sqlKernelRun } from "./sqlKernel";
-import { isJsonCell, isSqlCell, readRuleFile } from "../utilities/notebookUtil";
+import {
+  isJsonCell,
+  isSqlCell,
+  readCodeResolverFile,
+  readRuleFile,
+} from "../utilities/notebookUtil";
 import { jsonKernelRun } from "./JsonKernel";
 import { existsFileOnStorage } from "../utilities/fsUtil";
 
@@ -93,6 +102,18 @@ export class MainController {
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
         new RecordRuleProvider(stateStorage)
+      )
+    );
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new CodeLabelResolverProvider()
+      )
+    );
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new MarkCellAsSkipProvider()
       )
     );
 
@@ -178,6 +199,7 @@ export class MainController {
         success = false;
       }
       if (metadata?.rdh) {
+        const cellMeta: CellMeta = cell.metadata;
         const withComment = metadata.rdh.keys.some((it) => (it.comment ?? "").length);
         outputs.push(
           new NotebookCellOutput(
@@ -186,6 +208,7 @@ export class MainController {
                 ResultSetDataBuilder.from(metadata.rdh).toMarkdown({
                   withComment,
                   withRowNo: true,
+                  withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
                 }),
                 "text/markdown"
               ),
@@ -208,22 +231,34 @@ export class MainController {
   }
 
   private async run(notebook: NotebookDocument, cell: NotebookCell): Promise<RunResult> {
+    if ((cell.metadata as CellMeta)?.markAsSkip === true) {
+      return {
+        stdout: "SKIPPED",
+        stderr: "",
+      };
+    }
     if (!this.kernel) {
       throw new Error("Missing kernel");
     }
     if (isSqlCell(cell)) {
       const r = await sqlKernelRun(cell, this.stateStorage, this.kernel.getStoredVariables());
-      const metadata: CellMeta = cell.metadata;
-      if (
-        r.metadata?.rdh?.meta?.type === "select" &&
-        metadata.ruleFile &&
-        (await existsFileOnStorage(metadata.ruleFile))
-      ) {
-        const rrule = await readRuleFile(cell);
-        if (rrule) {
-          r.metadata.rdh.meta.tableRule = rrule.tableRule;
-          const runRuleEngineResult = await runRuleEngine(r.metadata.rdh);
-          log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
+      if (r.metadata?.rdh?.meta?.type === "select") {
+        const metadata: CellMeta = cell.metadata;
+        if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
+          const rrule = await readRuleFile(cell);
+          if (rrule) {
+            r.metadata.rdh.meta.tableRule = rrule.tableRule;
+            const runRuleEngineResult = await runRuleEngine(r.metadata.rdh);
+            log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
+          }
+        }
+        if (metadata.codeResolverFile && (await existsFileOnStorage(metadata.codeResolverFile))) {
+          const codeResolver = await readCodeResolverFile(cell);
+          if (codeResolver) {
+            r.metadata.rdh.meta.codeItems = codeResolver.items;
+            const resolveCodeLabelResult = await resolveCodeLabel(r.metadata.rdh);
+            log(`${PREFIX} resolveCodeLabel:${resolveCodeLabelResult}`);
+          }
         }
       }
       return r;
@@ -266,6 +301,68 @@ class RecordRuleProvider implements NotebookCellStatusBarItemProvider {
     }
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_SPECIFY_RULES_TO_USE;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class CodeLabelResolverProvider implements NotebookCellStatusBarItemProvider {
+  constructor() {}
+
+  async provideCellStatusBarItems(
+    cell: NotebookCell
+  ): Promise<NotebookCellStatusBarItem | undefined> {
+    if (!isSqlCell(cell)) {
+      return undefined;
+    }
+    if (!cell.document.getText().toLocaleLowerCase().includes("select")) {
+      return undefined;
+    }
+
+    const { codeResolverFile }: CellMeta = cell.metadata;
+    let tooltip = "";
+    if (codeResolverFile) {
+      let displayFileName = codeResolverFile;
+      if (displayFileName.endsWith(".cresolver")) {
+        displayFileName = displayFileName.substring(0, displayFileName.length - 10);
+      }
+      if (await existsFileOnStorage(codeResolverFile)) {
+        tooltip = "$(replace) Use " + abbr(displayFileName, 18);
+      } else {
+        tooltip = "$(warning) Missing Code resolver " + abbr(displayFileName, 18);
+      }
+    } else {
+      tooltip = "$(info) Specify Code resolver";
+    }
+    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_CODE_RESOLVER_TO_USE;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class MarkCellAsSkipProvider implements NotebookCellStatusBarItemProvider {
+  constructor() {}
+
+  async provideCellStatusBarItems(
+    cell: NotebookCell
+  ): Promise<NotebookCellStatusBarItem | undefined> {
+    if (cell.kind === NotebookCellKind.Markup) {
+      return undefined;
+    }
+
+    const { markAsSkip }: CellMeta = cell.metadata;
+    let tooltip = "";
+    let text = "";
+    if (markAsSkip === true) {
+      tooltip = "Mark cell as enabled";
+      text = "$(debug-step-over) Enabled";
+    } else {
+      tooltip = "Mark cell as skip";
+      text = "$(debug-step-over) Skip";
+    }
+    const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_MARK_CELL_AS_SKIP;
     item.tooltip = tooltip;
     return item;
   }

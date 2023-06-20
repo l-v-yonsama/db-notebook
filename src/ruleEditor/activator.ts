@@ -1,9 +1,9 @@
 import { StateStorage } from "../utilities/StateStorage";
 import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
 import * as path from "path";
-import { CREATE_NEW_RECORD_RULE } from "../constant";
+import { CREATE_NEW_RECORD_RULE, RECORD_RULE_TYPE } from "../constant";
 import { RecordRuleEditorProvider } from "./editorProvider";
-import { DbSchema, DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
+import { DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
 import { RecordRule } from "../shared/RecordRule";
 import { writeToResource } from "../utilities/fsUtil";
 
@@ -38,7 +38,9 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
           },
         };
         await writeToResource(uri, JSON.stringify(recordRule, null, 1));
-        window.showInformationMessage(`Successfully saved, please open it.\n${uri.fsPath}`);
+        // window.showInformationMessage(`Successfully saved, please open it.\n${uri.fsPath}`);
+
+        commands.executeCommand("vscode.openWith", uri, RECORD_RULE_TYPE);
       } catch (e: any) {
         window.showErrorMessage(e.message);
       }

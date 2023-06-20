@@ -16,6 +16,7 @@ import {
 import dayjs from "dayjs";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import type {
+  CodeResolvedAnnotation,
   ResultSetData,
   RdhRow,
   RdhKey,
@@ -37,6 +38,9 @@ const props = defineProps<Props>();
 type RowValues = {
   $meta: RdhRow["meta"];
   [key: string]: any;
+  $resolvedLabels: {
+    [key: string]: any;
+  };
 };
 
 type ColKey = {
@@ -112,9 +116,15 @@ const list = ref(
     .map((row) => {
       const item: RowValues = {
         $meta: row.meta,
+        $resolvedLabels: {},
       };
       props.rdh.keys.map((k) => {
         item[k.name] = toValue(k, row.values[k.name]);
+        if (props.rdh.meta?.codeItems) {
+          const meta = row.meta;
+          const code = meta[k.name]?.find((it) => it.type === "Cod") as CodeResolvedAnnotation;
+          item.$resolvedLabels[k.name] = code?.values?.label;
+        }
       });
       return item;
     })
@@ -262,7 +272,7 @@ const toTitle = (item: RowValues, key: string): string => {
           <td>
             {{ index + 1 }}
           </td>
-          <td v-for="(key, idx) of columns" :key="idx" :style="cellStyle(item, key)">
+          <td class="vcell" v-for="(key, idx) of columns" :key="idx" :style="cellStyle(item, key)">
             <VsCodeTextField
               v-model="item[key.name]"
               :readonly="false"
@@ -275,6 +285,9 @@ const toTitle = (item: RowValues, key: string): string => {
                 onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
               "
             ></VsCodeTextField>
+            <span v-if="item.$resolvedLabels[key.name]" class="code-label">{{
+              item.$resolvedLabels[key.name]
+            }}</span>
           </td>
         </tr>
       </template>
@@ -297,6 +310,22 @@ thead {
 }
 td {
   text-align: center;
+}
+td.vcell {
+  position: relative;
+}
+td.vcell > .code-label {
+  display: inline-block;
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  background-color: var(--vscode-editorPane-background);
+  border: 1px solid var(--vscode-diffEditor-removedTextBackground);
+  border-radius: 3px;
+  padding: 1px;
+}
+td.vcell:hover > .code-label {
+  display: none;
 }
 th {
   height: 20px;

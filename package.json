@@ -48,6 +48,22 @@
         }
       },
       {
+        "id": "cresolver",
+        "filenames": [
+          "*.cresolver"
+        ],
+        "extensions": [
+          ".cresolver"
+        ],
+        "aliases": [
+          "Code resolver"
+        ],
+        "icon": {
+          "dark": "media/dark/replace.svg",
+          "light": "media/light/replace.svg"
+        }
+      },
+      {
         "id": "db-notebook",
         "aliases": [
           "Database notebook"
@@ -113,6 +129,10 @@
       "file/newFile": [
         {
           "command": "database-notebook.create-blank-notebook",
+          "group": "notebook"
+        },
+        {
+          "command": "database-notebook.create-blank-code-resolver",
           "group": "notebook"
         }
       ],
@@ -259,6 +279,15 @@
             "filenamePattern": "*.rrule"
           }
         ]
+      },
+      {
+        "viewType": "database-notebook.codeResolverEditor",
+        "displayName": "code label resolver editor",
+        "selector": [
+          {
+            "filenamePattern": "*.cresolver"
+          }
+        ]
       }
     ],
     "commands": [
@@ -266,6 +295,16 @@
         "command": "database-notebook.create-blank-record-rule",
         "title": "Create a new blank DB record rule",
         "shortTitle": "Database Record rule",
+        "category": "Database Notebook",
+        "icon": {
+          "dark": "media/dark/checklist.svg",
+          "light": "media/light/checklist.svg"
+        }
+      },
+      {
+        "command": "database-notebook.create-blank-code-resolver",
+        "title": "Create a new blank Code label resolver",
+        "shortTitle": "Code label resolver",
         "category": "Database Notebook",
         "icon": {
           "dark": "media/dark/checklist.svg",
@@ -432,6 +471,16 @@
         "icon": "$(checklist)"
       },
       {
+        "command": "database-notebook.cell.specify-code-resolver-to-use",
+        "title": "Specify code resolver to use",
+        "icon": "$(replace)"
+      },
+      {
+        "command": "database-notebook.cell.mark-cell-as-skip",
+        "title": "Mark cell as skip",
+        "icon": "$(debug-step-over)"
+      },
+      {
         "command": "database-notebook.cell.toggle-show-comment",
         "title": "Toggle show comment",
         "icon": "$(info)"
@@ -483,7 +532,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.121",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.127",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

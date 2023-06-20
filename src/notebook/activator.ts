@@ -23,6 +23,7 @@ import {
   CELL_OPEN_MDH,
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SPECIFY_RULES_TO_USE,
+  CELL_SPECIFY_CODE_RESOLVER_TO_USE,
   CELL_TOGGLE_SHOW_COMMENT,
   CELL_WRITE_TO_CLIPBOARD,
   CREATE_NEW_NOTEBOOK,
@@ -30,6 +31,7 @@ import {
   SHOW_ALL_RDH,
   SHOW_ALL_VARIABLES,
   SPECIFY_CONNECTION_ALL,
+  CELL_MARK_CELL_AS_SKIP,
 } from "../constant";
 import { isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
@@ -97,6 +99,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         fileType: "markdown",
         outputWithType: "withComment",
         withRowNo: true,
+        withCodeLabel: true,
         specifyDetail: true,
         limit: 10,
       });
@@ -218,6 +221,68 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       }
     })
   );
+  context.subscriptions.push(
+    commands.registerCommand(CELL_SPECIFY_CODE_RESOLVER_TO_USE, async (cell: NotebookCell) => {
+      let wsfolder = workspace.workspaceFolders?.[0].uri;
+      if (!wsfolder) {
+        return;
+      }
+      const rootPath = wsfolder.fsPath;
+
+      const files = await workspace.findFiles("**/*.cresolver", "**/node_modules/**");
+      if (files.length === 0) {
+        window.showErrorMessage('No "Code resolver files" on your workspace');
+        return;
+      }
+
+      const items: { label: string; description: string | undefined }[] = files.map((it) => ({
+        label: path.relative(rootPath, it.fsPath),
+        description: undefined,
+      }));
+      const NO_USE = "No use";
+      items.unshift({
+        label: NO_USE,
+        description: "Stop using code resolver",
+      });
+      const result = await window.showQuickPick(items);
+      if (result) {
+        if (cell.metadata?.ruleFile === result.label) {
+          return;
+        }
+        const metadata: CellMeta = {
+          ...cell.metadata,
+        };
+        if (result.label === NO_USE) {
+          metadata.codeResolverFile = "";
+        } else {
+          metadata.codeResolverFile = result.label;
+        }
+        const edit = new WorkspaceEdit();
+        const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+        edit.set(cell.notebook.uri, [nbEdit]);
+
+        await workspace.applyEdit(edit);
+      }
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(CELL_MARK_CELL_AS_SKIP, async (cell: NotebookCell) => {
+      const metadata: CellMeta = {
+        ...cell.metadata,
+      };
+      if (metadata.markAsSkip === true) {
+        metadata.markAsSkip = false;
+      } else {
+        metadata.markAsSkip = true;
+      }
+      const edit = new WorkspaceEdit();
+      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+      edit.set(cell.notebook.uri, [nbEdit]);
+
+      await workspace.applyEdit(edit);
+    })
+  );
+
   context.subscriptions.push(
     commands.registerCommand(CELL_TOGGLE_SHOW_COMMENT, async (cell: NotebookCell) => {
       const showComment = cell?.metadata?.showComment === true;

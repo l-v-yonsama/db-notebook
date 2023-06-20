@@ -348,9 +348,19 @@ const updateSuperTextDocument = () => {
 .fillBackGround {
   background: var(--dropdown-background);
 }
+fieldset {
+  background-color: rgba(10, 10, 10, 0.3);
+}
 section.condition {
   margin-top: 17px;
 }
+.condition fieldset legend {
+  width: -webkit-fill-available;
+}
+.condition fieldset legend > vscode-dropdown:first-of-type {
+  margin-right: auto;
+}
+
 table {
   width: 100%;
 }

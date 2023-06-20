@@ -10,6 +10,7 @@ import ConnectionSettingVue from "./components/ConnectionSetting.vue";
 import ResourceProperties from "./components/ResourceProperties.vue";
 import ERDiagramSettings from "./components/ERDiagramSettings.vue";
 import RecordRuleEditor from "./components/RecordRuleEditor.vue";
+import CodeResolverEditor from "./components/CodeResolverEditor.vue";
 
 import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 
@@ -93,6 +94,13 @@ function messageListener(evt: MessageEvent) {
           visible.recordRuleEditor = true;
         });
         break;
+      case "CodeResolverEditor":
+        values.value = value;
+        visible.codeResolverEditor = false;
+        nextTick(() => {
+          visible.codeResolverEditor = true;
+        });
+        break;
     }
     return;
   }
@@ -142,6 +150,7 @@ const visible = reactive<{
   writeToClipboardParamsPanel: boolean;
   eRDiagramSettingsPanel: boolean;
   recordRuleEditor: boolean;
+  codeResolverEditor: boolean;
 }>({
   nowLoading: false,
   connectionSetting: false,
@@ -153,6 +162,7 @@ const visible = reactive<{
   writeToClipboardParamsPanel: false,
   eRDiagramSettingsPanel: false,
   recordRuleEditor: false,
+  codeResolverEditor: false,
 });
 
 const mode = ref<ModeType>("create");
@@ -196,6 +206,14 @@ const resourcePropertiesValues = ref<{ [key: string]: string }>({});
       :connectionSettingNames="values.connectionSettingNames"
       :schema="values.schema"
       :recordRule="values.recordRule"
+      :scrollPos="values.scrollPos"
+    />
+    <CodeResolverEditor
+      v-if="visible.codeResolverEditor"
+      :connectionSettingNames="values.connectionSettingNames"
+      :tableNameList="values.tableNameList"
+      :columnNameList="values.columnNameList"
+      :resolver="values.resolver"
       :scrollPos="values.scrollPos"
     />
   </main>

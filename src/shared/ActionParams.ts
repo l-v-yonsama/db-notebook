@@ -1,6 +1,7 @@
-import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ConnectionSetting, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ModeType } from "./ModeType";
 import type { ERDiagramSettingParams } from "./ERDiagram";
+import type { CodeResolver } from "./CodeResolver";
 
 // export type ActionCommandType =
 //   | "openScanPanel"
@@ -39,6 +40,7 @@ export type ActionCommand =
   | CancelActionCommand
   | CompareActionCommand
   | CreateERDiagramActionCommand
+  | CreateCodeResolverEditorActionCommand
   | SaveCompareKeysActionCommand
   | OutputActionCommand
   | WriteToClipboardActionCommand
@@ -52,7 +54,13 @@ export type ActionCommand =
   | TestConnectionSettingActionCommand
   | SaveConnectionSettingActionCommand
   | DeleteKeyActionCommand
-  | UpdateTextDocumentActionCommand;
+  | UpdateTextDocumentActionCommand
+  | UpdateCodeResolverTextDocumentActionCommand;
+
+export type NameWithComment = {
+  name: string;
+  comment?: string;
+};
 
 export type BaseActionCommand<T extends string, U = any> = {
   command: T;
@@ -84,6 +92,18 @@ export type UpdateTextDocumentActionCommand = BaseActionCommand<
   }
 >;
 
+export type UpdateCodeResolverTextDocumentActionCommand = BaseActionCommand<
+  "updateCodeResolverTextDocument",
+  {
+    newText: string;
+    values?: {
+      name: "change" | "add-code-item" | "delete-code-item" | "duplicate-code-item";
+      detail?: any;
+    };
+    scrollPos: number;
+  }
+>;
+
 export type CompareActionCommand = {
   command: "compare";
   params: CompareParams;
@@ -92,6 +112,17 @@ export type CompareActionCommand = {
 export type CreateERDiagramActionCommand = BaseActionCommand<
   "createERDiagram",
   ERDiagramSettingParams
+>;
+
+export type CreateCodeResolverEditorActionCommand = BaseActionCommand<
+  "createCodeResolverEditor",
+  {
+    connectionSettingNames: string[];
+    tableNameList: NameWithComment[];
+    columnNameList: NameWithComment[];
+    resolver: CodeResolver;
+    scrollPos: number;
+  }
 >;
 
 export type SaveCompareKeysActionCommand = {
@@ -119,6 +150,7 @@ export type WriteToClipboardParams<T = any> = TabIdParam & {
   fileType: "csv" | "tsv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
   withRowNo: boolean;
+  withCodeLabel: boolean;
   limit?: number; // default:10
   specifyDetail?: boolean;
   options?: T;

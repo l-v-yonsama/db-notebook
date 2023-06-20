@@ -43,6 +43,7 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem<
       fileType: fileType as WriteToClipboardParams["fileType"],
       outputWithType: "none",
       withRowNo: true,
+      withCodeLabel: true,
     },
   });
   WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
@@ -52,6 +53,7 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem<
       fileType: fileType as WriteToClipboardParams["fileType"],
       outputWithType: "both",
       withRowNo: true,
+      withCodeLabel: true,
     },
   });
 });
@@ -65,6 +67,7 @@ WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
     fileType: "text",
     outputWithType: "withComment",
     withRowNo: true,
+    withCodeLabel: true,
     specifyDetail: true,
   },
 });

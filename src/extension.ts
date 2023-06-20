@@ -2,18 +2,24 @@ import { ExtensionContext, commands, window, workspace } from "vscode";
 import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { StateStorage } from "./utilities/StateStorage";
-import { DBDriverResolver } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  AwsDriver,
+  DBDriverResolver,
+  DBType,
+  DbColumn,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 
 import { ScanPanel } from "./panels/ScanPanel";
 import { MdhPanel } from "./panels/MdhPanel";
 import { activateNotebook } from "./notebook/activator";
-import { activateLogger, log } from "./utilities/logger";
+import { activateLogger, log, setupDisposeLogger } from "./utilities/logger";
 import { DiffPanel } from "./panels/DiffPanel";
 import { DiffTabParam } from "./panels/DiffPanel";
 import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
 import { EXTENSION_NAME, SHOW_RDH_DIFF } from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
 import { initializePath } from "./utilities/fsUtil";
+import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 
 const PREFIX = "[extension]";
 
@@ -46,12 +52,15 @@ export async function activate(context: ExtensionContext) {
 
   // Record rule editor
   activateRuleEditor(context, stateStorage);
+  // Code resolver editor
+  activateCodeResolverEditor(context, stateStorage);
 
   // DIFF
   commands.registerCommand(SHOW_RDH_DIFF, (params: DiffTabParam) => {
     DiffPanel.render(context.extensionUri, params);
   });
   log(`${PREFIX} end activation.`);
+  setupDisposeLogger(context);
 
   process.on("uncaughtException", function (err) {
     console.log("⭐️⭐️ [uncaughtException]----------------------------------");
@@ -61,10 +70,13 @@ export async function activate(context: ExtensionContext) {
     console.log(err.stack);
     log("⭐️⭐️uncaughtException:" + err);
   });
-  process.on("unhandledRejection", (err, promise) => {
+  process.on("unhandledRejection", (err: any, promise) => {
+    if (err.toString().indexOf("typescript-language-fe")) {
+      return;
+    }
     console.log("⭐️⭐️ [unhandledRejection]----------------------------------");
     console.log(err);
-    console.log(promise);
+    // console.log(promise);
     log("unhandledRejection:" + err);
   });
 }

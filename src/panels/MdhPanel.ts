@@ -322,7 +322,6 @@ export class MdhPanel {
                 if (token.isCancellationRequested) {
                   return;
                 }
-                console.log("do query ", i);
 
                 const afterRdh = await driver.requestSql({
                   sql,
@@ -331,6 +330,9 @@ export class MdhPanel {
                 });
                 if (rdh.meta.tableRule) {
                   afterRdh.meta.tableRule = rdh.meta.tableRule;
+                }
+                if (rdh.meta.codeItems) {
+                  afterRdh.meta.codeItems = rdh.meta.codeItems;
                 }
                 afterList[i] = afterRdh;
               }

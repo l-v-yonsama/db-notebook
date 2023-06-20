@@ -22,6 +22,7 @@ import {
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
 import {
+  DbSchema,
   ProposalKind,
   RdsDatabase,
   getProposals,

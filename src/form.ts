@@ -135,7 +135,6 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
         value: res?.getProperties() ?? {},
       };
     }
-    log(`${PREFIX} setForm postMessage:[${JSON.stringify(msg)}]`);
     this.webviewView?.webview.postMessage(msg);
   }
 

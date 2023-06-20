@@ -3,6 +3,7 @@ import * as os from "os";
 import { EnumValues } from "enum-values";
 import {
   AnnotationType,
+  CodeResolvedAnnotation,
   DiffResult,
   GeneralColumnType,
   RdhHelper,
@@ -79,6 +80,7 @@ function createQueryResultListSheet(
 ): TocRecords {
   const tocRecords: TocRecords = {
     headers: [
+      { label: "No", key: "no" },
       { label: "TITLE(TABLE)", key: "tableName" },
       { label: "COMMENT", key: "comment" },
       { label: "TYPE", key: "type" },
@@ -96,6 +98,7 @@ function createQueryResultListSheet(
     sheet.getColumn("A").width = 2;
     list.forEach((rdh, idx) => {
       tocRecords.records.push({
+        no: idx + 1,
         tableName: {
           text: rdh.meta.tableName ?? "-",
           hyperlink: `#${sheetName}!B${baseRowNo}`,
@@ -112,6 +115,7 @@ function createQueryResultListSheet(
       const baseRowNo = 3;
       const sheetName = createSheetName(rdh, idx + 1);
       tocRecords.records.push({
+        no: idx + 1,
         tableName: {
           text: sheetName,
           hyperlink: `#${sheetName}!A${baseRowNo}`,
@@ -141,14 +145,56 @@ function createQueryResultSheet(
 ): number {
   let plusNo = 0;
 
+  // table name / comment
   let cell = sheet.getCell(baseRowNo, 2);
   let titleValue = rdh.meta.tableName;
   if (rdh.meta.comment) {
     titleValue += ` (${rdh.meta.comment})`;
   }
-  cell.value = titleValue;
+  cell.value = "■ " + titleValue;
   plusNo++;
 
+  // sql statement
+  if (rdh.sqlStatement) {
+    plusNo++;
+    const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
+    cell = sheet.getCell(baseRowNo + plusNo, 2);
+    cell.value = "SQL";
+    setTableHeaderCell(cell);
+    sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + lines.length - 1}`);
+    lines.forEach((line) => {
+      cell = sheet.getCell(baseRowNo + plusNo, 3);
+      cell.value = line;
+      plusNo++;
+    });
+    if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
+      cell = sheet.getCell(baseRowNo + plusNo, 2);
+      cell.value = "BINDS";
+      setTableHeaderCell(cell);
+      // テーブル見出しの行分もマージするので -1 は不要
+      sheet.mergeCells(
+        `B${baseRowNo + plusNo}:B${baseRowNo + plusNo + rdh.queryConditions?.binds.length}`
+      );
+
+      cell = sheet.getCell(baseRowNo + plusNo, 3);
+      cell.value = "Position";
+      setTableHeaderCell(cell);
+      cell = sheet.getCell(baseRowNo + plusNo, 4);
+      cell.value = "Value";
+      setTableHeaderCell(cell);
+      plusNo++;
+      rdh.queryConditions?.binds.forEach((v, idx) => {
+        cell = sheet.getCell(baseRowNo + plusNo, 3);
+        cell.value = `$${idx + 1}`;
+        cell = sheet.getCell(baseRowNo + plusNo, 4);
+        cell.value = v;
+        plusNo++;
+      });
+    }
+    plusNo++;
+  }
+
+  // resulet set
   cell = sheet.getCell(baseRowNo + plusNo, 2);
   cell.value = "No";
   setTableHeaderCell(cell);
@@ -182,25 +228,39 @@ function createQueryResultSheet(
     plusNo += 1;
   }
 
-  rdh.rows.forEach((rdhRow, ri: number) => {
-    const values = rdhRow.values;
-    sheet.getCell(baseRowNo + plusNo, 2).value = ri + 1;
-    rdh.keys.forEach((column: RdhKey, colIdx: number) => {
-      let ruleMessage: string | undefined = undefined;
-      const v = values[column.name];
-      const ruleAnnonations = (rdhRow.meta[column.name]?.filter((it) => it.type === "Rul") ??
-        []) as RuleAnnotation[];
-      let format = getCellFormat(column.type);
-      const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
-      let isHyperText = column.meta && column.meta.is_hyperlink === true;
-      if (ruleAnnonations.length) {
-        ruleMessage = ruleAnnonations.map((it) => it.values?.message ?? "").join("\n");
-        fillCell(cell, "Rul");
-      }
-      setAnyValueByIndex(cell, v, { isHyperText, format, ruleMessage });
+  if (rdh.rows.length > 0) {
+    rdh.rows.forEach((rdhRow, ri: number) => {
+      const values = rdhRow.values;
+      sheet.getCell(baseRowNo + plusNo, 2).value = ri + 1;
+      rdh.keys.forEach((column: RdhKey, colIdx: number) => {
+        let ruleMessage: string | undefined = undefined;
+        let resolvedLabel: string | undefined = undefined;
+
+        const v = values[column.name];
+        const ruleAnnonations = (rdhRow.meta[column.name]?.filter((it) => it.type === "Rul") ??
+          []) as RuleAnnotation[];
+        let format = getCellFormat(column.type);
+        const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
+        let isHyperText = column.meta && column.meta.is_hyperlink === true;
+        if (ruleAnnonations.length) {
+          ruleMessage = ruleAnnonations.map((it) => it.values?.message ?? "").join("\n");
+          fillCell(cell, "Rul");
+        }
+        if (rdh.meta.codeItems) {
+          resolvedLabel = RowHelper.getFirstAnnotationOf<CodeResolvedAnnotation>(
+            rdhRow,
+            column.name,
+            "Cod"
+          )?.values?.label;
+        }
+        setAnyValueByIndex(cell, v, { isHyperText, format, ruleMessage, resolvedLabel });
+      });
+      plusNo++;
     });
+  } else {
+    sheet.getCell(baseRowNo + plusNo, 2).value = "No records.";
     plusNo++;
-  });
+  }
 
   return plusNo;
 }
@@ -271,31 +331,36 @@ async function createBookFromList(
     //   });
     // }
 
-    let tocRowIndex = 3;
-    let cell = tocSheet.getCell(`C${tocRowIndex}`);
+    let tocRowNo = 3;
+    let cell = tocSheet.getCell(`C${tocRowNo}`);
     cell.value = "Table of contents.";
     cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
 
-    tocRowIndex += 4;
+    tocRowNo += 4;
 
     const generalList = list.filter(
       (it) => !ResultSetDataBuilder.from(it).hasAnyAnnotation(["Lnt"])
     );
     // RESULTSETS
+    cell = tocSheet.getCell(`C${tocRowNo}`);
+    cell.value = "■ Resultsets";
+    tocRowNo++;
     const tocRecords = createQueryResultListSheet(workbook, generalList, options);
-    tocRowIndex += writeTocRecords(tocSheet, tocRecords, tocRowIndex);
+    tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
 
-    tocRowIndex += 2;
+    tocRowNo += 2;
 
     // RECORD RULES
-    tocRowIndex += 1;
     const ruleResultList = generalList
       .map((rdh) => RdhHelper.getRecordRuleResults(rdh))
       .filter((it) => it !== undefined) as RecordRuleValidationResult[];
     if (ruleResultList.length) {
+      cell = tocSheet.getCell(`C${tocRowNo}`);
+      cell.value = "■ Record Rules";
+      tocRowNo++;
       // create a sheet.
       const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
-      tocRowIndex += writeTocRecords(tocSheet, tocRecords, tocRowIndex);
+      tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
     }
   } catch (e) {
     console.error(e);
@@ -406,6 +471,10 @@ async function createBookFromDiffList(
     tocSheet.getCell("J4").value = `${dayjs(beforeDate).format("HH:mm:ss")}`;
     tocSheet.getCell("J5").value = `${dayjs(afterDate).format("HH:mm:ss")}`;
 
+    // RESULTSETS
+    cell = tocSheet.getCell(`C${tocRowNo}`);
+    cell.value = "■ Resultsets";
+    tocRowNo++;
     // header
     [
       "No",
@@ -424,6 +493,7 @@ async function createBookFromDiffList(
     tocSheet.mergeCells(`I${tocRowNo}:J${tocRowNo}`);
 
     tocRowNo++;
+
     diffList.forEach((item, idx) => {
       const no = idx + 1;
       const { rdh1, rdh2, title, diffResult } = item;
@@ -464,11 +534,49 @@ async function createBookFromDiffList(
         if (diffResult.message) {
           titleValue += ` [${diffResult.message}]`;
         }
-        cellTitle.value = titleValue;
+        cellTitle.value = "■ " + titleValue;
         cur.rowNo++;
 
+        // sql statement
+        if (rdh.sqlStatement) {
+          cur.rowNo++;
+          const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
+          cell = sheet.getCell(cur.rowNo, 1);
+          cell.value = "SQL";
+          setTableHeaderCell(cell);
+          sheet.mergeCells(`A${cur.rowNo}:A${cur.rowNo + lines.length - 1}`);
+          lines.forEach((line) => {
+            cell = sheet.getCell(cur.rowNo, 2);
+            cell.value = line;
+            cur.rowNo++;
+          });
+          if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
+            cell = sheet.getCell(cur.rowNo, 1);
+            cell.value = "BINDS";
+            setTableHeaderCell(cell);
+            // テーブル見出しの行分もマージするので -1 は不要
+            sheet.mergeCells(`A${cur.rowNo}:A${cur.rowNo + rdh.queryConditions?.binds.length}`);
+
+            cell = sheet.getCell(cur.rowNo, 2);
+            cell.value = "Position";
+            setTableHeaderCell(cell);
+            cell = sheet.getCell(cur.rowNo, 3);
+            cell.value = "Value";
+            setTableHeaderCell(cell);
+            cur.rowNo++;
+            rdh.queryConditions?.binds.forEach((v, idx) => {
+              cell = sheet.getCell(cur.rowNo, 2);
+              cell.value = `$${idx + 1}`;
+              cell = sheet.getCell(cur.rowNo, 3);
+              cell.value = v;
+              cur.rowNo++;
+            });
+          }
+          cur.rowNo++;
+        }
+
         const startIndex = cur.rowNo;
-        const cell = sheet.getCell(cur.rowNo, 1);
+        cell = sheet.getCell(cur.rowNo, 1);
         cell.value = "No";
         setTableHeaderCell(cell);
 
@@ -538,6 +646,8 @@ async function createBookFromDiffList(
 
             rdh.keys.forEach((column: RdhKey, colIdx: number) => {
               let annotationMessage: any = undefined;
+              let ruleMessage: string | undefined = undefined;
+              let resolvedLabel: string | undefined = undefined;
               let format = getCellFormat(column.type);
               const v = values[column.name];
               const cell = sheet.getCell(cur.rowNo, colIdx + 2);
@@ -561,10 +671,25 @@ async function createBookFromDiffList(
                 }
               }
               const isHyperText = column.meta && column.meta.is_hyperlink === true;
+              const ruleAnnonations = (rdhRow.meta[column.name]?.filter(
+                (it) => it.type === "Rul"
+              ) ?? []) as RuleAnnotation[];
+              if (ruleAnnonations.length) {
+                ruleMessage = ruleAnnonations.map((it) => it.values?.message ?? "").join("\n");
+              }
+              if (rdh.meta.codeItems) {
+                resolvedLabel = RowHelper.getFirstAnnotationOf<CodeResolvedAnnotation>(
+                  rdhRow,
+                  column.name,
+                  "Cod"
+                )?.values?.label;
+              }
               setAnyValueByIndex(cell, v, {
                 annotationMessage,
                 isHyperText,
                 format,
+                ruleMessage,
+                resolvedLabel,
               });
             });
             cur.rowNo++;
@@ -592,7 +717,10 @@ async function createBookFromDiffList(
 
     // RECORD RULES
     if (options?.rule?.withRecordRule === true) {
-      tocRowNo += 1;
+      tocRowNo += 2;
+      cell = tocSheet.getCell(`C${tocRowNo}`);
+      cell.value = "■ Record Rules";
+      tocRowNo++;
       const ruleResultList = list
         .map((it) => RdhHelper.getRecordRuleResults(it.rdh2))
         .filter((it) => it !== undefined) as RecordRuleValidationResult[];
@@ -648,6 +776,7 @@ function createRecordRulesSheet(
 ): TocRecords {
   const tocRecords: TocRecords = {
     headers: [
+      { label: "No", key: "no" },
       { label: "TABLE NAME", key: "tableName" },
       { label: "RULE NAME", key: "ruleName" },
       { label: "ERRORS", key: "errors" },
@@ -669,6 +798,7 @@ function createRecordRulesSheet(
 
   let cell: any;
   let rowNo = 3;
+  let tocRecordNo = 1;
   list.forEach((result) => {
     result.details.forEach((detail) => {
       // Table name
@@ -686,6 +816,7 @@ function createRecordRulesSheet(
       cell.value = detail.ruleDetail.ruleName;
 
       tocRecords.records.push({
+        no: tocRecordNo++,
         tableName: result.tableName,
         ruleName: {
           text: detail.ruleDetail.ruleName,
@@ -748,7 +879,7 @@ function setTableHeaderCell(cell: Excel.Cell) {
   cell.fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FF4472C4" },
+    fgColor: { argb: "FF444444" },
   };
 }
 
@@ -773,7 +904,7 @@ function fillCell(cell: Excel.Cell, type: AnnotationType) {
       fill = {
         type: "pattern",
         pattern: "lightHorizontal",
-        fgColor: { argb: "40ff5370" },
+        fgColor: { argb: "e0ff5370" },
       };
       break;
     case "Rul":
@@ -803,6 +934,7 @@ function setAnyValueByIndex(
   options?: {
     annotationMessage?: any;
     ruleMessage?: string;
+    resolvedLabel?: string;
     isHyperText?: boolean;
     wrap?: boolean;
     horizontal?:
@@ -817,7 +949,7 @@ function setAnyValueByIndex(
     format?: CellFormat;
   }
 ) {
-  let cellValue = text;
+  let cellValue: Excel.CellValue = text;
   if (options) {
     if (options.isHyperText === true) {
       cellValue = {
@@ -840,7 +972,15 @@ function setAnyValueByIndex(
         size: options.font_size,
       };
     }
-    if (options.annotationMessage !== undefined || options.ruleMessage !== undefined) {
+    let useFormat = !!options.format;
+    if (
+      options.annotationMessage !== undefined ||
+      options.ruleMessage !== undefined ||
+      options.resolvedLabel !== undefined
+    ) {
+      cellValue = {
+        richText: [],
+      };
       let me = text ?? "";
       let you = options.annotationMessage ?? "";
       let rule = options.ruleMessage ?? "";
@@ -853,18 +993,45 @@ function setAnyValueByIndex(
           }
         }
       }
+      cellValue.richText.push({
+        text: me,
+      });
       if (options.annotationMessage !== undefined) {
-        cellValue = `${me}\n[${you}]`;
+        cellValue.richText.push({
+          text: `\n[${you}]`,
+          font: {
+            color: {
+              argb: "66333366",
+            },
+          },
+        });
       }
       if (options.ruleMessage) {
-        cellValue = `${cellValue}\n{${rule}}`;
+        cellValue.richText.push({
+          text: `\n{${rule}}`,
+          font: {
+            color: {
+              argb: "33663366",
+            },
+          },
+        });
       }
-    } else {
-      if (options.format) {
-        cell.numFmt = options.format;
-        if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
-          cellValue = toDate(text);
-        }
+      if (options.resolvedLabel) {
+        cellValue.richText.push({
+          text: `\n<${options.resolvedLabel}>`,
+          font: {
+            color: {
+              argb: "33336666",
+            },
+          },
+        });
+      }
+      useFormat = false;
+    }
+    if (useFormat && options.format) {
+      cell.numFmt = options.format;
+      if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
+        cellValue = toDate(text);
       }
     }
   }
@@ -940,7 +1107,7 @@ function nvl(s: string | undefined, rep: string) {
 function writeTocRecords(tocSheet: Excel.Worksheet, tocRecords: TocRecords, rowNo: number): number {
   let plusNo = 0;
   tocRecords.headers.forEach((header, idx) => {
-    const cell = tocSheet.getCell(rowNo + plusNo, 4 + idx);
+    const cell = tocSheet.getCell(rowNo + plusNo, 3 + idx);
     setTableHeaderCell(cell);
     cell.value = header.label;
   });
@@ -948,7 +1115,7 @@ function writeTocRecords(tocSheet: Excel.Worksheet, tocRecords: TocRecords, rowN
 
   tocRecords.records.forEach((record) => {
     tocRecords.headers.forEach((header, idx) => {
-      const cell = tocSheet.getCell(rowNo + plusNo, 4 + idx);
+      const cell = tocSheet.getCell(rowNo + plusNo, 3 + idx);
       cell.value = record[header.key];
     });
     plusNo++;

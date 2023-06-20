@@ -4,7 +4,9 @@ import { NotebookCellKind } from "vscode";
 export type CellMeta = {
   connectionName?: string;
   ruleFile?: string;
+  codeResolverFile?: string;
   showComment?: boolean;
+  markAsSkip?: boolean;
   readonly [key: string]: any;
 };
 

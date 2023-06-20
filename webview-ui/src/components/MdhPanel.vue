@@ -336,7 +336,12 @@ defineExpose({
       </button>
       <button
         @click="
-          writeToClipboard({ fileType: 'text', outputWithType: 'withComment', withRowNo: true })
+          writeToClipboard({
+            fileType: 'text',
+            outputWithType: 'withComment',
+            withRowNo: true,
+            withCodeLabel: true,
+          })
         "
         :disabled="inProgress"
         title="Write to clipboard"

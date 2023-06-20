@@ -10,26 +10,32 @@ import {
   window,
   workspace,
 } from "vscode";
-import { throttle } from "throttle-debounce";
 
-import { RECORD_RULE_TYPE } from "../constant";
+import { CODE_RESOLVER_TYPE } from "../constant";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
-import { RecordRule } from "../shared/RecordRule";
-import { ActionCommand, UpdateTextDocumentActionCommand } from "../shared/ActionParams";
+import {
+  ActionCommand,
+  CreateCodeResolverEditorActionCommand,
+  NameWithComment,
+  UpdateCodeResolverTextDocumentActionCommand,
+} from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { DbSchema, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
+import { CodeResolver } from "../shared/CodeResolver";
 
-const PREFIX = "[RecordRuleEditorProvider]";
-const componentName = "RecordRuleEditor";
+const PREFIX = "[CodeResolverEditorProvider]";
+const componentName = "CodeResolverEditor";
 
-export class RecordRuleEditorProvider implements CustomTextEditorProvider {
+export class CodeResolverEditorProvider implements CustomTextEditorProvider {
   private scrollPos: number = 0;
+  private tableNameList: NameWithComment[] = [];
+  private columnNameList: NameWithComment[] = [];
 
   public static register(context: ExtensionContext, stateStorage: StateStorage): Disposable {
-    const provider = new RecordRuleEditorProvider(context, stateStorage);
-    const providerRegistration = window.registerCustomEditorProvider(RECORD_RULE_TYPE, provider);
+    const provider = new CodeResolverEditorProvider(context, stateStorage);
+    const providerRegistration = window.registerCustomEditorProvider(CODE_RESOLVER_TYPE, provider);
     return providerRegistration;
   }
 
@@ -44,7 +50,6 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
     webviewPanel.webview.options = {
       enableScripts: true,
     };
-    //    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
     webviewPanel.webview.html = createWebviewContent(
       webviewPanel.webview,
       this.context.extensionUri
@@ -53,37 +58,25 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
     const updateWebview = async () => {
       log(`${PREFIX} updateWebview`);
 
-      const recordRule = this.parseDoc(document);
+      const resolver = this.parseDoc(document);
+
+      this.initDbResourceParams(resolver.connectionName);
+
       const connectionSettingNames = this.stateStorage.getConnectionSettingNames();
-      let schema: DbSchema | undefined = undefined;
-      if (recordRule.connectionName) {
-        let dbs = this.stateStorage.getResourceByName(recordRule.connectionName);
-        if (dbs === undefined) {
-          dbs = await this.stateStorage.loadResource(recordRule.connectionName, false, true);
-        }
-        if (dbs && dbs[0] instanceof RdsDatabase) {
-          schema = (dbs[0] as RdsDatabase).getSchema({ name: recordRule.schemaName });
-        }
-      }
-      const msg: ToWebviewMessageEventType = {
+      const msg: ToWebviewMessageEventType<CreateCodeResolverEditorActionCommand["params"]> = {
         command: "create",
         componentName,
         value: {
-          connectionSettingNames,
-          schema,
-          recordRule,
+          connectionSettingNames: ["", ...connectionSettingNames],
+          tableNameList: this.tableNameList,
+          columnNameList: this.columnNameList,
+          resolver,
           scrollPos: this.scrollPos,
         },
       };
       webviewPanel.webview.postMessage(msg);
     };
-    // Hook up event handlers so that we can synchronize the webview with the text document.
-    //
-    // The text document acts as our model, so we have to sync change in the document to our
-    // editor and sync changes in the editor back to the document.
-    //
-    // Remember that a single text document can also be shared between multiple custom
-    // editors (this happens for example when you split a custom editor)
+
     const changeDocumentSubscription = workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.toString() === document.uri.toString()) {
         updateWebview();
@@ -114,9 +107,8 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
         case "cancel":
           webviewPanel.dispose();
           return;
-        case "updateTextDocument":
+        case "updateCodeResolverTextDocument":
           await this.updateTextDocument(document, params);
-          // updateWebview();
           break;
       }
     });
@@ -126,55 +118,49 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
 
   private async updateTextDocument(
     document: TextDocument,
-    params: UpdateTextDocumentActionCommand["params"]
+    params: UpdateCodeResolverTextDocumentActionCommand["params"]
   ) {
     const { newText, values, scrollPos } = params;
     this.scrollPos = scrollPos;
     const edit = new WorkspaceEdit();
 
-    const recordRule = JSON.parse(newText) as RecordRule;
+    const codeResolver = JSON.parse(newText) as CodeResolver;
     if (values) {
       switch (values.name) {
-        case "add-rule":
+        case "add-code-item":
           {
-            recordRule.tableRule.details.push({
-              ruleName: "",
-              error: {
-                column: "",
-                limit: 100,
+            codeResolver.items.push({
+              title: "",
+              description: "",
+              resource: {
+                column: {
+                  regex: false,
+                  pattern: "",
+                },
               },
-              conditions: {
-                any: [],
-              },
+              details: [],
             });
           }
           break;
-        case "delete-rule":
+        case "delete-code-item":
           {
             const index = (values.detail as number) ?? 0;
-            recordRule.tableRule.details.splice(index, 1);
+            codeResolver.items.splice(index, 1);
           }
           break;
-        case "duplicate-rule":
+        case "duplicate-code-item":
           {
             const index = (values.detail as number) ?? 0;
-            const original = recordRule.tableRule.details[index];
-            recordRule.tableRule.details.splice(index + 1, 0, {
+            const original = codeResolver.items[index];
+            codeResolver.items.splice(index + 1, 0, {
               ...original,
-              ruleName: original.ruleName + " copy",
+              title: original.title + " copy",
             });
           }
           break;
         case "change":
           {
             if (values.detail === "connectionName") {
-              let dbs = this.stateStorage.getResourceByName(recordRule.connectionName);
-              if (dbs === undefined) {
-                dbs = await this.stateStorage.loadResource(recordRule.connectionName, false, true);
-              }
-              if (dbs && dbs[0] instanceof RdsDatabase) {
-                recordRule.schemaName = dbs[0].getSchema({ isDefault: true }).name;
-              }
             }
           }
           break;
@@ -185,24 +171,41 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
     edit.replace(
       document.uri,
       new Range(0, 0, document.lineCount, 0),
-      JSON.stringify(recordRule, null, 1)
+      JSON.stringify(codeResolver, null, 1)
     );
-    console.log("applyEdit forSave ", recordRule);
+    log(`${PREFIX} applyEdit forSave`);
     return workspace.applyEdit(edit);
   }
 
-  private parseDoc(doc: TextDocument): RecordRule {
+  private async initDbResourceParams(connectionName?: string) {
+    this.tableNameList = [];
+    this.columnNameList = [];
+    if (connectionName) {
+      let dbs = this.stateStorage.getResourceByName(connectionName);
+      if (dbs === undefined) {
+        dbs = await this.stateStorage.loadResource(connectionName, false, true);
+      }
+      if (dbs && dbs[0] instanceof RdsDatabase) {
+        const schema = dbs[0].getSchema({ isDefault: true });
+        schema.children.forEach((table) => {
+          this.tableNameList.push({
+            name: table.name,
+            comment: table.comment,
+          });
+        });
+        this.columnNameList = schema.getUniqColumnNameWithComments();
+      }
+    }
+  }
+
+  private parseDoc(doc: TextDocument): CodeResolver {
     const text = doc.getText();
     if (text.length) {
-      return JSON.parse(text) as RecordRule;
+      return JSON.parse(text) as CodeResolver;
     }
     return {
       connectionName: "",
-      schemaName: "",
-      tableRule: {
-        table: "",
-        details: [],
-      },
+      items: [],
     };
   }
 }

@@ -68,9 +68,9 @@ export class NodeKernel {
         variables.each(function(value, key) {
           saveMap[key] = value;
         });
-        myfs.writeFileSync('${
+        myfs.writeFileSync('${winToLinuxPath(
           this.variablesFile.fsPath
-        }', JSON.stringify(saveMap), {encoding:'utf8'});
+        )}', JSON.stringify(saveMap), {encoding:'utf8'});
       };
       const _skipSql = (b) => { variables.set('_skipSql', b); };
       try {

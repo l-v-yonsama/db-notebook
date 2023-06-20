@@ -1,4 +1,8 @@
-import { ResultSetDataBuilder, ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  ResultSetDataBuilder,
+  ResultSetData,
+  ToStringParam,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { WriteToClipboardParams } from "../shared/ActionParams";
 import * as os from "os";
 
@@ -20,9 +24,10 @@ export const rdhListToText = (list: ResultSetData[], params: WriteToClipboardPar
 
 const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): string => {
   const maxPrintLines = params.limit ?? 10;
-  const outputDetail = {
+  const outputDetail: ToStringParam = {
     maxPrintLines,
     withRowNo: params.withRowNo,
+    withCodeLabel: params.withCodeLabel,
     ...createOutputDetail(params.outputWithType),
   };
   let ret = "";

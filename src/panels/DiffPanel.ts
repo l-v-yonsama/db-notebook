@@ -15,10 +15,11 @@ import {
   ResultSetData,
   ResultSetDataBuilder,
   diff,
+  resolveCodeLabel,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
-import { StateStorage } from "../utilities/StateStorage";
+import { StateStorage, sleep } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
 import * as path from "path";
@@ -28,6 +29,7 @@ import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { log } from "../utilities/logger";
+import { nextTick } from "process";
 
 const PREFIX = "[DiffPanel]";
 
@@ -144,7 +146,6 @@ export class DiffPanel {
           const rdh1 = list1[i];
           const rdh2 = list2[i];
 
-          console.log("diff", i);
           progress.report({
             message: `Comparing [${i + 1}/${list1.length}] ${rdh2.meta.tableName}`,
             increment,
@@ -153,9 +154,13 @@ export class DiffPanel {
             return;
           }
 
+          await sleep(10);
           const diffResult = diff(rdh1, rdh2);
           if (rdh2.meta.tableRule) {
             await runRuleEngine(rdh2);
+          }
+          if (rdh2.meta.codeItems) {
+            await resolveCodeLabel(rdh2);
           }
 
           item.list.push({
@@ -171,7 +176,6 @@ export class DiffPanel {
         });
       }
     );
-    console.log("done DiffPanel createTabItem", item);
 
     return item;
   }

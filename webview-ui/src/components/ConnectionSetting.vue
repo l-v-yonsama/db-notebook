@@ -4,6 +4,7 @@ import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeCheckboxGroup from "./base/VsCodeCheckboxGroup.vue";
+import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import * as DBTypeConst from "@/types/lib/DBType";
 import * as AwsRegionConst from "@/types/lib/AwsRegion";
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
@@ -13,6 +14,18 @@ import type { AwsSetting, ConnectionSetting } from "@l-v-yonsama/multi-platform-
 
 import { vscode } from "@/utilities/vscode";
 import type { ModeType } from "@/utilities/vscode";
+import type { DropdownItem } from "@/types/Components";
+
+const supplyCredentialItems: DropdownItem[] = [
+  {
+    label: "Credentials files at ~/.aws/",
+    value: "Shared credentials file",
+  },
+  {
+    label: "Explicit in property",
+    value: "Explicit in property",
+  },
+];
 
 type Props = {
   mode: ModeType;
@@ -21,7 +34,10 @@ type Props = {
 };
 
 const isAwsSelected = computed((): boolean => DBTypeConst.isAws(dbType.value));
-const visibleUrl = computed((): boolean => DBTypeConst.isAws(dbType.value));
+const isAwsWithExplicitCredentials = computed(
+  (): boolean =>
+    DBTypeConst.isAws(dbType.value) && awsCredentialType.value == "Explicit in property"
+);
 const databasePlaceholder = computed((): string => {
   return dbType.value === DBTypeConst.DBType.Redis ? "Index to use" : "Database name";
 });
@@ -45,6 +61,12 @@ const visibleHostOrDatabase = computed((): boolean => {
   }
   return false;
 });
+
+const visibleProfile = computed(
+  (): boolean =>
+    DBTypeConst.isAws(dbType.value) &&
+    awsCredentialType.value === SupplyCredentials.sharedCredentialsFile
+);
 
 const visibleUser = computed(
   (): boolean =>
@@ -185,7 +207,7 @@ function createItem(): ConnectionSetting {
     awsSetting = {
       services: arr as AwsServiceType[],
       profile: awsProfile.value,
-      supplyCredentialType: SupplyCredentials.ExplicitInProperty,
+      supplyCredentialType: awsCredentialType.value,
       region: region.value,
     };
   }
@@ -299,6 +321,24 @@ defineExpose({
       :maxlength="128"
     ></VsCodeTextField>
 
+    <label v-show="isAwsSelected" for="awsCredentialType">Aws credential type</label>
+    <p v-if="isShowMode && isAwsSelected" id="awsCredentialType">{{ awsCredentialType }}</p>
+    <VsCodeRadioGroupVue
+      v-if="!isShowMode && isAwsSelected"
+      id="awsCredentialType"
+      v-model="awsCredentialType"
+      :items="supplyCredentialItems"
+    ></VsCodeRadioGroupVue>
+
+    <label v-show="visibleProfile" for="profile">Profile name</label>
+    <p v-if="isShowMode && visibleProfile" id="profile">{{ awsProfile }}</p>
+    <VsCodeTextField
+      v-show="!isShowMode && visibleProfile"
+      id="profile"
+      v-model="awsProfile"
+      :maxlength="128"
+    ></VsCodeTextField>
+
     <label v-show="visibleUser" for="user">{{ userLabel }}</label>
     <p v-if="isShowMode && visibleUser" id="user">{{ maskedUser }}</p>
     <VsCodeTextField
@@ -317,22 +357,22 @@ defineExpose({
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="visibleUrl" for="url">{{ urlLabel }}</label>
-    <p v-if="isShowMode" id="url">{{ url }}</p>
+    <label v-show="isAwsWithExplicitCredentials" for="url">{{ urlLabel }}</label>
+    <p v-if="isShowMode && isAwsWithExplicitCredentials" id="url">{{ url }}</p>
     <VsCodeTextField
       v-else
-      v-show="visibleUrl"
+      v-show="isAwsWithExplicitCredentials"
       id="url"
       v-model="url"
       :type="'url'"
       :maxlength="256"
     ></VsCodeTextField>
 
-    <label v-show="isAwsSelected" for="region">Region</label>
-    <p v-if="isShowMode" id="region">{{ region }}</p>
+    <label v-show="isAwsWithExplicitCredentials" for="region">(Region)</label>
+    <p v-if="isShowMode && isAwsWithExplicitCredentials" id="region">{{ region }}</p>
     <VsCodeDropdown
       v-else
-      v-show="isAwsSelected"
+      v-show="isAwsWithExplicitCredentials"
       id="region"
       v-model="region"
       :items="regionItems"

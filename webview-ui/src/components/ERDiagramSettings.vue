@@ -163,6 +163,7 @@ const action = (command: ActionCommand["command"]): void => {
         fileType: "markdown",
         outputWithType: "none",
         withRowNo: false,
+        withCodeLabel: false,
         options: {
           title: title.value,
           items,
