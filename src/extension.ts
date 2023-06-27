@@ -1,13 +1,8 @@
-import { ExtensionContext, commands, window, workspace } from "vscode";
+import { ExtensionContext, commands, window } from "vscode";
 import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { StateStorage } from "./utilities/StateStorage";
-import {
-  AwsDriver,
-  DBDriverResolver,
-  DBType,
-  DbColumn,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import { DBDriverResolver } from "@l-v-yonsama/multi-platform-database-drivers";
 
 import { ScanPanel } from "./panels/ScanPanel";
 import { MdhPanel } from "./panels/MdhPanel";
@@ -69,15 +64,6 @@ export async function activate(context: ExtensionContext) {
     console.log(err.toString());
     console.log(err.stack);
     log("⭐️⭐️uncaughtException:" + err);
-  });
-  process.on("unhandledRejection", (err: any, promise) => {
-    if (err.toString().indexOf("typescript-language-fe")) {
-      return;
-    }
-    console.log("⭐️⭐️ [unhandledRejection]----------------------------------");
-    console.log(err);
-    // console.log(promise);
-    log("unhandledRejection:" + err);
   });
 }
 

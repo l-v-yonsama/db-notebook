@@ -15,9 +15,9 @@ import {
   ResultSetDataBuilder,
   runRuleEngine,
   resolveCodeLabel,
+  abbr,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellMeta, RunResult } from "../types/Notebook";
-import { abbr } from "../utilities/stringUtil";
 import { setupDbResource } from "./intellisense";
 import {
   ExtensionContext,

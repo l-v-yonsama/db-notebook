@@ -5,6 +5,7 @@
     :value="modelValue"
     @input="handleOnInput"
     @focus="handleOnFocus"
+    @mouseout="handleOnMouseOut"
     :type="type"
     :placeholder="placeholder"
     :disabled="disabled"
@@ -19,7 +20,7 @@
 
 <script setup lang="ts">
 import { vsCodeTextField, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
-import { ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 
 provideVSCodeDesignSystem().register(vsCodeTextField());
 
@@ -34,9 +35,11 @@ const props = defineProps<{
   min?: number;
   size?: number;
   required?: boolean;
+  changeOnMouseout?: boolean;
 }>();
 
 const isError = ref(false);
+const initialValue = props.modelValue ?? "";
 
 watch(
   () => props.modelValue,
@@ -58,6 +61,11 @@ function handleOnInput(event: any) {
 }
 function handleOnFocus(event: any) {
   emit("onCellFocus", event.target.value);
+}
+function handleOnMouseOut(event: any) {
+  if (props.changeOnMouseout === true && initialValue != event.target.value) {
+    nextTick(() => event.target.blur());
+  }
 }
 </script>
 <style>

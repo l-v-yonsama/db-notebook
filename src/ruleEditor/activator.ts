@@ -30,11 +30,15 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
         }
         const { conName, schemaName } = tableRes.meta;
         const recordRule: RecordRule = {
-          connectionName: conName,
-          schemaName,
           tableRule: {
             table: tableRes.name,
             details: [],
+          },
+          editor: {
+            connectionName: conName,
+            schemaName,
+            tableName: tableRes.name,
+            visible: true,
           },
         };
         await writeToResource(uri, JSON.stringify(recordRule, null, 1));

@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref, nextTick } from "vue";
+import { onMounted, ref, nextTick, computed } from "vue";
 import {
   vscode,
   type UpdateCodeResolverTextDocumentActionCommand,
-  type CodeResolver,
+  type CodeResolverParams,
   type NameWithComment,
-  type CodeItem,
-  type CodeItemDetail,
 } from "@/utilities/vscode";
-import type { DropdownItem } from "@/types/Components";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
-import type { DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { CodeItem, CodeItemDetail } from "@l-v-yonsama/multi-platform-database-drivers";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
@@ -21,7 +18,7 @@ type Props = {
   connectionSettingNames: string[];
   tableNameList: NameWithComment[];
   columnNameList: NameWithComment[];
-  resolver: CodeResolver;
+  resolver: CodeResolverParams;
   scrollPos: number;
 };
 const props = defineProps<Props>();
@@ -32,8 +29,10 @@ window.addEventListener("resize", () => resetSectionHeight());
 
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector("section.cr-root");
+  const editorPart = window.document.querySelector("section.cr-root div.editor");
   if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 53, 100);
+    const epHeight = editorPart?.clientHeight ?? 0;
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - epHeight - 53, 100);
   }
 };
 
@@ -45,8 +44,23 @@ onMounted(() => {
   }
 });
 
-const connectionName = ref(props.resolver.connectionName);
+const keyword = ref("");
+const visibleEditor = ref(props.resolver.editor.visible);
+const connectionName = ref(props.resolver.editor.connectionName);
 const connectionItems = props.connectionSettingNames.map((it) => ({ label: it, value: it }));
+const editorItem = ref(
+  props.resolver.editor.item ?? {
+    title: "",
+    description: "",
+    resource: {
+      column: {
+        regex: false,
+        pattern: "",
+      },
+    },
+    details: [],
+  }
+);
 
 const tableItems = props.tableNameList.map((it) => ({
   label: `${it.name}${it.comment ? " (" + it.comment + ")" : ""}`,
@@ -63,18 +77,67 @@ const columnItems = props.columnNameList.map((it) => ({
 
 const items = ref(props.resolver.items);
 
-const cancel = () => {
-  vscode.postCommand({
-    command: "cancel",
-    params: {},
-  });
+type ComputedItem = {
+  title: string;
+  description: string;
+  resource: string;
+  details: {
+    code: string;
+    label: string;
+  }[];
+};
+
+const computedItems = computed((): ComputedItem[] => {
+  const list: ComputedItem[] = [];
+
+  items.value
+    .filter((it) => {
+      if (keyword.value.length === 0) {
+        return true;
+      }
+      const k = keyword.value;
+      if (
+        it.title.indexOf(k) >= 0 ||
+        (it.description && it.description.indexOf(k) >= 0) ||
+        it.details.some((detail) => detail.code.indexOf(k) >= 0 || detail.label.indexOf(k) >= 0)
+      ) {
+        return true;
+      }
+      return false;
+    })
+    .forEach((item) => {
+      let resource = "";
+      if (item.resource?.table) {
+        const { regex, pattern } = item.resource.table;
+        resource += `TABLE PATTERN: ${regex ? "(REGEX)" : ""} ${pattern}`;
+      }
+      {
+        const { regex, pattern } = item.resource.column;
+        resource += `COLUMN PATTERN: ${regex ? "(REGEX)" : ""} ${pattern}`;
+      }
+      list.push({
+        title: item.title,
+        description: item.description ?? "",
+        resource,
+        details: item.details,
+      });
+    });
+  return list;
+});
+
+const createEditorParams = (): CodeResolverParams["editor"] => {
+  return {
+    visible: visibleEditor.value,
+    connectionName: connectionName.value,
+    item: editorItem.value,
+  };
 };
 
 const updateTextDocument = (
   values?: UpdateCodeResolverTextDocumentActionCommand["params"]["values"]
 ) => {
-  const obj: CodeResolver = {
-    connectionName: connectionName.value,
+  const obj: CodeResolverParams = {
+    editor: createEditorParams(),
     items: items.value,
   };
   const lastKnownScrollPosition = document.querySelector(".cr-scroll-wrapper")?.scrollTop ?? 0;
@@ -89,29 +152,29 @@ const updateTextDocument = (
   });
 };
 
-const handleChangeSpecifyResourceTable = (item: CodeItem, specify: boolean) => {
+const handleChangeSpecifyResourceTable = (specify: boolean) => {
   if (specify) {
-    item.resource.table = {
+    editorItem.value.resource.table = {
       pattern: "",
       regex: false,
     };
   } else {
-    item.resource.table = undefined;
+    editorItem.value.resource.table = undefined;
   }
   updateTextDocument();
 };
 
-const handleChangeRegexResource = (target: CodeItem, key: string, checked: boolean) => {
+const handleChangeRegexResource = (key: string, checked: boolean) => {
   if (key === "table") {
-    target.resource.table!.regex = checked;
+    editorItem.value.resource.table!.regex = checked;
   } else {
-    target.resource.column.regex = checked;
+    editorItem.value.resource.column.regex = checked;
   }
   updateTextDocument();
 };
 
-const addDetail = (item: CodeItem) => {
-  item.details.push({
+const addDetail = () => {
+  editorItem.value.details.push({
     code: "",
     label: "",
   });
@@ -127,15 +190,15 @@ const changeDetail = (detail: CodeItemDetail) => {
   }
 };
 
-const deleteDetail = (item: CodeItem, index: number) => {
-  item.details.splice(index, 1);
+const deleteDetail = (index: number) => {
+  editorItem.value.details.splice(index, 1);
   updateTextDocument();
 };
 </script>
 
 <template>
   <section class="cr-root">
-    <div class="toolbar">
+    <div v-if="visibleEditor" class="toolbar">
       <div class="tool-left">
         <label for="connectionName">Connection setting</label>
         <VsCodeDropdown
@@ -146,191 +209,293 @@ const deleteDetail = (item: CodeItem, index: number) => {
         />
       </div>
       <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cansel"
+        <VsCodeButton
+          @click="updateTextDocument({ name: 'cancel' })"
+          appearance="secondary"
+          title="Cansel"
           ><fa icon="times" />Cancel</VsCodeButton
         >
+        <VsCodeButton @click="updateTextDocument({ name: 'save-code-item' })" title="Save"
+          ><fa icon="check" />Ok</VsCodeButton
+        >
+      </div>
+    </div>
+    <div v-else class="toolbar">
+      <div class="tool-left">
+        <label for="keyword"> <fa icon="search" style="margin-right: 3px" />Search </label>
+        <VsCodeTextField
+          id="keyword"
+          v-model="keyword"
+          :maxlength="128"
+          title="keyword"
+          placeholder="Enter a keyword"
+        >
+        </VsCodeTextField>
+      </div>
+      <div class="tool-right">
         <VsCodeButton @click="updateTextDocument({ name: 'add-code-item' })" title="Add code item"
           ><fa icon="plus" />Add code item</VsCodeButton
         >
       </div>
     </div>
+    <div v-if="visibleEditor" class="editor">
+      <div class="code-name">
+        <label :for="`codeName`">Code name</label>
+        <VsCodeTextField
+          :id="`codeName`"
+          v-model="editorItem.title"
+          :maxlength="128"
+          :transparent="true"
+          :required="true"
+          :change-on-mouseout="true"
+          style="flex-grow: 1"
+          @change="updateTextDocument()"
+        />
+      </div>
+      <div class="description">
+        <label :for="`description`">Description</label>
+        <VsCodeTextField
+          :id="`description`"
+          v-model="editorItem.description"
+          :maxlength="256"
+          :transparent="true"
+          :change-on-mouseout="true"
+          style="flex-grow: 1"
+          @change="updateTextDocument()"
+        />
+      </div>
+      <fieldset class="resource">
+        <legend>Applicable Resources</legend>
+        <table>
+          <tbody>
+            <tr>
+              <td style="width: 130px">
+                <vscode-checkbox
+                  :checked="editorItem.resource.table !== undefined"
+                  @change="($e:any) => handleChangeSpecifyResourceTable($e.target.checked)"
+                  style="margin-right: auto"
+                  >Specify table</vscode-checkbox
+                >
+              </td>
+              <td style="width: 170px">
+                <template v-if="editorItem.resource.table !== undefined">
+                  <vscode-checkbox
+                    :checked="editorItem.resource.table.regex"
+                    @change="($e:any) => handleChangeRegexResource('table', $e.target.checked)"
+                    >Regular expression</vscode-checkbox
+                  >
+                </template>
+              </td>
+              <td>
+                <template v-if="editorItem.resource.table !== undefined">
+                  <VsCodeDropdown
+                    v-if="!editorItem.resource.table.regex"
+                    :id="`resourceTable`"
+                    v-model="editorItem.resource.table.pattern"
+                    :items="tableItems"
+                    :transparent="true"
+                    :required="true"
+                    style="z-index: 11"
+                    @change="updateTextDocument()"
+                  ></VsCodeDropdown>
+
+                  <VsCodeTextField
+                    v-if="editorItem.resource.table.regex"
+                    :id="`resourceTable`"
+                    v-model="editorItem.resource.table.pattern"
+                    :maxlength="256"
+                    :transparent="true"
+                    :required="true"
+                    :change-on-mouseout="true"
+                    @change="updateTextDocument()"
+                  ></VsCodeTextField>
+                </template>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label :for="`resourceColumn`">Column</label>
+              </td>
+              <td>
+                <vscode-checkbox
+                  :checked="editorItem.resource.column.regex"
+                  @change="($e:any) => handleChangeRegexResource(  'column', $e.target.checked)"
+                  >Regular expression</vscode-checkbox
+                >
+              </td>
+              <td>
+                <VsCodeDropdown
+                  v-if="!editorItem.resource.column.regex"
+                  :id="`resourceColumn`"
+                  v-model="editorItem.resource.column.pattern"
+                  :items="columnItems"
+                  :transparent="true"
+                  :required="true"
+                  @change="updateTextDocument()"
+                ></VsCodeDropdown>
+
+                <VsCodeTextField
+                  v-if="editorItem.resource.column.regex"
+                  :id="`resourceColumn`"
+                  v-model="editorItem.resource.column.pattern"
+                  :maxlength="256"
+                  :transparent="true"
+                  :required="true"
+                  :change-on-mouseout="true"
+                  @change="updateTextDocument()"
+                ></VsCodeTextField>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </fieldset>
+      <fieldset class="details">
+        <legend>
+          <span>Details</span>
+
+          <VsCodeButton
+            class="fillBackGround"
+            @click="addDetail"
+            title="Add detail"
+            appearance="secondary"
+            style="margin-left: 2px"
+            ><fa icon="plus" />Add detail</VsCodeButton
+          >
+        </legend>
+        <table v-if="editorItem.details.length > 0">
+          <thead>
+            <tr>
+              <th class="no">No</th>
+              <th class="code">Code</th>
+              <th class="label">Label</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(detail, idx2) of editorItem.details">
+              <td class="no" style="text-align: right">{{ idx2 + 1 }}</td>
+              <td class="code">
+                <VsCodeTextField
+                  v-model="editorItem.details[idx2].code"
+                  :maxlength="256"
+                  :transparent="true"
+                  :required="true"
+                  :change-on-mouseout="true"
+                  @change="changeDetail(detail)"
+                ></VsCodeTextField>
+              </td>
+              <td class="label">
+                <VsCodeTextField
+                  v-model="editorItem.details[idx2].label"
+                  :maxlength="256"
+                  :transparent="true"
+                  :required="true"
+                  :change-on-mouseout="true"
+                  style="flex-grow: 1"
+                  @change="changeDetail(detail)"
+                ></VsCodeTextField>
+              </td>
+              <td style="width: 85px">
+                <VsCodeButton
+                  class="fillBackGround"
+                  @click="deleteDetail(idx2)"
+                  title="Delete detail"
+                  appearance="secondary"
+                  style="margin-left: 2px"
+                  ><fa icon="trash" />Delete</VsCodeButton
+                >
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </fieldset>
+    </div>
+
     <section class="items">
       <div class="cr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
-        <section class="item" v-for="(item, idx) of items" :key="idx">
-          <div class="code-name">
-            <label :for="`codeName${idx}`">Code name</label>
-            <VsCodeTextField
-              :id="`codeName${idx}`"
-              v-model="item.title"
-              :maxlength="128"
-              :transparent="true"
-              :required="true"
-              style="flex-grow: 1"
-              @change="updateTextDocument()"
-            />
-            <VsCodeButton
-              @click="updateTextDocument({ name: 'delete-code-item', detail: idx })"
-              title="Delete code"
-              appearance="secondary"
-              ><fa icon="trash" />Delete code</VsCodeButton
-            >
-            <VsCodeButton
-              @click="updateTextDocument({ name: 'duplicate-code-item', detail: idx })"
-              title="Duplicate code"
-              ><fa icon="plus" />Duplicate code</VsCodeButton
-            >
-          </div>
-          <div class="description">
-            <label :for="`description${idx}`">Description</label>
-            <VsCodeTextField
-              :id="`description${idx}`"
-              v-model="item.description"
-              :maxlength="256"
-              :transparent="true"
-              style="flex-grow: 1"
-              @change="updateTextDocument()"
-            />
-          </div>
-          <fieldset class="resource">
-            <legend>Applicable Resources</legend>
-            <table>
-              <tbody>
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2" class="code-name">Code name</th>
+              <th rowspan="2">Description</th>
+              <th rowspan="2" class="w150">Applicable Resources</th>
+              <th colspan="2">Code detail</th>
+            </tr>
+            <tr>
+              <th class="w100">Value</th>
+              <th class="w150">Label</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="(item, idx) of computedItems" :key="idx">
+              <template v-if="item.details.length === 0">
                 <tr>
-                  <td style="width: 130px">
-                    <vscode-checkbox
-                      :checked="item.resource.table !== undefined"
-                      @change="($e:any) => handleChangeSpecifyResourceTable(item, $e.target.checked)"
-                      style="margin-right: auto"
-                      >Specify table</vscode-checkbox
-                    >
-                  </td>
-                  <td style="width: 170px">
-                    <template v-if="item.resource.table !== undefined">
-                      <vscode-checkbox
-                        :checked="item.resource.table.regex"
-                        @change="($e:any) => handleChangeRegexResource(item,'table', $e.target.checked)"
-                        >Regular expression</vscode-checkbox
+                  <td class="code-name">
+                    <p>{{ item.title }}</p>
+                    <div class="controller">
+                      <VsCodeButton
+                        @click="updateTextDocument({ name: 'edit-code-item', detail: idx })"
+                        title="Edit code"
+                        appearance="secondary"
+                        ><fa icon="pencil" />Edit</VsCodeButton
                       >
-                    </template>
+                      <VsCodeButton
+                        @click="updateTextDocument({ name: 'duplicate-code-item', detail: idx })"
+                        title="Duplicate code"
+                        appearance="secondary"
+                        ><fa icon="plus" />Duplicate</VsCodeButton
+                      >
+                      <VsCodeButton
+                        @click="updateTextDocument({ name: 'delete-code-item', detail: idx })"
+                        title="Delete code"
+                        appearance="secondary"
+                        ><fa icon="trash" />Delete</VsCodeButton
+                      >
+                    </div>
                   </td>
-                  <td>
-                    <template v-if="item.resource.table !== undefined">
-                      <VsCodeDropdown
-                        v-if="!item.resource.table.regex"
-                        :id="`resourceTable${idx}`"
-                        v-model="item.resource.table.pattern"
-                        :items="tableItems"
-                        :transparent="true"
-                        :required="true"
-                        @change="updateTextDocument()"
-                      ></VsCodeDropdown>
-
-                      <VsCodeTextField
-                        v-if="item.resource.table.regex"
-                        :id="`resourceTable${idx}`"
-                        v-model="item.resource.table.pattern"
-                        :maxlength="256"
-                        :transparent="true"
-                        :required="true"
-                        @change="updateTextDocument()"
-                      ></VsCodeTextField>
-                    </template>
+                  <td>{{ item.description }}</td>
+                  <td class="w150">
+                    {{ item.resource }}
                   </td>
+                  <td class="w100">-</td>
+                  <td class="w150">-</td>
                 </tr>
-                <tr>
-                  <td>
-                    <label :for="`resourceColumn${idx}`">Column</label>
+              </template>
+              <template v-else>
+                <tr v-for="(detail, idx2) of item.details" :key="`${idx}-${idx2}`">
+                  <td v-if="idx2 === 0" :rowspan="item.details.length" class="code-name">
+                    <p>{{ item.title }}</p>
+                    <div class="controller">
+                      <VsCodeButton
+                        @click="updateTextDocument({ name: 'edit-code-item', detail: idx })"
+                        title="Edit code"
+                        appearance="secondary"
+                        ><fa icon="pencil" />Edit</VsCodeButton
+                      >
+                      <VsCodeButton
+                        @click="updateTextDocument({ name: 'duplicate-code-item', detail: idx })"
+                        title="Duplicate code"
+                        appearance="secondary"
+                        ><fa icon="plus" />Duplicate</VsCodeButton
+                      >
+                      <VsCodeButton
+                        @click="updateTextDocument({ name: 'delete-code-item', detail: idx })"
+                        title="Delete code"
+                        appearance="secondary"
+                        ><fa icon="trash" />Delete</VsCodeButton
+                      >
+                    </div>
                   </td>
-                  <td>
-                    <vscode-checkbox
-                      :checked="item.resource.column.regex"
-                      @change="($e:any) => handleChangeRegexResource(item, 'column', $e.target.checked)"
-                      >Regular expression</vscode-checkbox
-                    >
+                  <td v-if="idx2 === 0" :rowspan="item.details.length">{{ item.description }}</td>
+                  <td v-if="idx2 === 0" :rowspan="item.details.length" class="w150">
+                    {{ item.resource }}
                   </td>
-                  <td>
-                    <VsCodeDropdown
-                      v-if="!item.resource.column.regex"
-                      :id="`resourceColumn${idx}`"
-                      v-model="item.resource.column.pattern"
-                      :items="columnItems"
-                      :transparent="true"
-                      :required="true"
-                      @change="updateTextDocument()"
-                    ></VsCodeDropdown>
-
-                    <VsCodeTextField
-                      v-if="item.resource.column.regex"
-                      :id="`resourceColumn${idx}`"
-                      v-model="item.resource.column.pattern"
-                      :maxlength="256"
-                      :transparent="true"
-                      :required="true"
-                      @change="updateTextDocument()"
-                    ></VsCodeTextField>
-                  </td>
+                  <td class="w100">{{ detail.code }}</td>
+                  <td class="w150">{{ detail.label }}</td>
                 </tr>
-              </tbody>
-            </table>
-          </fieldset>
-          <fieldset class="details">
-            <legend>
-              <span>Details</span>
-
-              <VsCodeButton
-                class="fillBackGround"
-                @click="addDetail(item)"
-                title="Add detail"
-                appearance="secondary"
-                style="margin-left: 2px"
-                ><fa icon="plus" />Add detail</VsCodeButton
-              >
-            </legend>
-            <table v-if="item.details.length > 0">
-              <thead>
-                <tr>
-                  <th class="no">No</th>
-                  <th class="code">Code</th>
-                  <th class="label">Label</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(detail, idx2) of item.details">
-                  <td class="no" style="text-align: right">{{ idx2 + 1 }}</td>
-                  <td class="code">
-                    <VsCodeTextField
-                      v-model="item.details[idx2].code"
-                      :maxlength="256"
-                      :transparent="true"
-                      :required="true"
-                      @change="changeDetail(detail)"
-                    ></VsCodeTextField>
-                  </td>
-                  <td class="label">
-                    <VsCodeTextField
-                      v-model="item.details[idx2].label"
-                      :maxlength="256"
-                      :transparent="true"
-                      :required="true"
-                      style="flex-grow: 1"
-                      @change="changeDetail(detail)"
-                    ></VsCodeTextField>
-                  </td>
-                  <td style="width: 85px">
-                    <VsCodeButton
-                      class="fillBackGround"
-                      @click="deleteDetail(item, idx2)"
-                      title="Delete detail"
-                      appearance="secondary"
-                      style="margin-left: 2px"
-                      ><fa icon="trash" />Delete</VsCodeButton
-                    >
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </fieldset>
-        </section>
+              </template>
+            </template>
+          </tbody>
+        </table>
       </div>
     </section>
   </section>
@@ -340,8 +505,14 @@ const deleteDetail = (item: CodeItem, index: number) => {
 .cr-root {
   width: 100%;
   height: 100%;
-  margin: 3px;
-  padding: 1px;
+  display: flex;
+  flex-direction: column;
+}
+div.editor vscode-dropdown {
+  z-index: 5;
+}
+div.editor {
+  padding: 5px;
 }
 div.description {
   display: flex;
@@ -406,7 +577,73 @@ fieldset.resource > table vscode-text-field {
 label {
   margin-right: 4px;
 }
+section.items {
+  padding: 5px;
+  flex-grow: 1;
+  display: flex;
+}
 .cr-scroll-wrapper {
   overflow: auto;
+  flex-grow: 1;
+}
+section.items table {
+  border-collapse: collapse;
+  width: 100%;
+}
+section.items table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--vscode-editorPane-background);
+}
+section.items table th {
+  height: 20px;
+  padding: 2px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+}
+
+td.code-name > .controller {
+  display: flex;
+  justify-content: space-between;
+  visibility: hidden;
+}
+td.code-name:hover > .controller {
+  visibility: visible;
+}
+
+section.items thead th.code-name,
+section.items tbody td.code-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 255px;
+  width: 255px;
+  background-color: var(--vscode-editorPane-background);
+}
+
+section.items table th,
+section.items table td {
+  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  padding: 2px;
+}
+
+section.items span.label {
+  display: inline-block;
+  vertical-align: middle;
+  height: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.w100 {
+  width: 100px;
+  max-width: 100px;
+}
+.w150 {
+  width: 150px;
+  max-width: 150px;
 }
 </style>

@@ -1,7 +1,7 @@
-import type { ConnectionSetting, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ModeType } from "./ModeType";
 import type { ERDiagramSettingParams } from "./ERDiagram";
-import type { CodeResolver } from "./CodeResolver";
+import type { CodeResolverParams } from "./CodeResolverParams";
 
 // export type ActionCommandType =
 //   | "openScanPanel"
@@ -85,7 +85,14 @@ export type UpdateTextDocumentActionCommand = BaseActionCommand<
   {
     newText: string;
     values?: {
-      name: "change" | "add-rule" | "delete-rule" | "duplicate-rule";
+      name:
+        | "cancel"
+        | "change"
+        | "add-rule"
+        | "edit-rule"
+        | "delete-rule"
+        | "save-rule"
+        | "duplicate-rule";
       detail?: any;
     };
     scrollPos: number;
@@ -97,7 +104,14 @@ export type UpdateCodeResolverTextDocumentActionCommand = BaseActionCommand<
   {
     newText: string;
     values?: {
-      name: "change" | "add-code-item" | "delete-code-item" | "duplicate-code-item";
+      name:
+        | "cancel"
+        | "change"
+        | "add-code-item"
+        | "edit-code-item"
+        | "save-code-item"
+        | "delete-code-item"
+        | "duplicate-code-item";
       detail?: any;
     };
     scrollPos: number;
@@ -120,7 +134,7 @@ export type CreateCodeResolverEditorActionCommand = BaseActionCommand<
     connectionSettingNames: string[];
     tableNameList: NameWithComment[];
     columnNameList: NameWithComment[];
-    resolver: CodeResolver;
+    resolver: CodeResolverParams;
     scrollPos: number;
   }
 >;

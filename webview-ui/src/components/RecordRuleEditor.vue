@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
@@ -7,7 +7,8 @@ import type { DbColumn, DbSchema } from "@l-v-yonsama/multi-platform-database-dr
 import { vscode, type RecordRule, type UpdateTextDocumentActionCommand } from "@/utilities/vscode";
 
 import type { DropdownItem } from "@/types/Components";
-import TopLevelCondition from "./TopLevelCondition.vue";
+import TopLevelConditionVue from "./TopLevelCondition.vue";
+import { conditionsToString, hasKeywordInConditions } from "@/utilities/RRuleUtil";
 
 type Props = {
   connectionSettingNames: string[];
@@ -22,22 +23,36 @@ const sectionHeight = ref(300);
 window.addEventListener("resize", () => resetSectionHeight());
 
 const resetSectionHeight = () => {
-  const sectionWrapper = window.document.querySelector("section.root");
+  const sectionWrapper = window.document.querySelector("section.rr-root");
+  const editorPart = window.document.querySelector("section.rr-root div.editor");
   if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 53, 100);
+    const epHeight = editorPart?.clientHeight ?? 0;
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - epHeight - 53, 100);
   }
 };
 
 onMounted(() => {
   nextTick(resetSectionHeight);
-  const wrapper = document.querySelector(".scroll-wrapper");
+  const wrapper = document.querySelector(".rr-scroll-wrapper");
   if (wrapper) {
     wrapper.scrollTop = props.scrollPos ?? 0;
   }
 });
 
-const connectionName = ref(props.recordRule.connectionName);
+const keyword = ref("");
+const visibleEditor = ref(props.recordRule.editor.visible);
+const connectionName = ref(props.recordRule.editor.connectionName);
 const connectionItems = props.connectionSettingNames.map((it) => ({ label: it, value: it }));
+const editorItem = ref(
+  props.recordRule.editor.item ?? {
+    ruleName: "",
+    conditions: { all: [] },
+    error: {
+      column: "",
+      limit: 100,
+    },
+  }
+);
 
 const tableName = ref(props.recordRule.tableRule.table);
 const tableItems =
@@ -49,6 +64,43 @@ const tableItems =
       }));
 
 const details = ref(props.recordRule.tableRule.details);
+
+type ComputedDetail = {
+  ruleName: string;
+  errorColumn: string;
+  errorLimit: number;
+  conditions: string;
+};
+
+const computedDetails = computed((): ComputedDetail[] => {
+  const list: ComputedDetail[] = [];
+
+  details.value
+    .filter((it) => {
+      if (keyword.value.length === 0) {
+        return true;
+      }
+      const k = keyword.value;
+      if (
+        it.ruleName.indexOf(k) >= 0 ||
+        it.error.column.indexOf(k) >= 0 ||
+        hasKeywordInConditions(it.conditions as any, columns.value as any, k)
+      ) {
+        return true;
+      }
+      return false;
+    })
+    .forEach((item) => {
+      list.push({
+        ruleName: item.ruleName,
+        errorColumn: item.error.column,
+        errorLimit: item.error.limit,
+        conditions: conditionsToString(item.conditions as any, columns.value as any, ""),
+      });
+    });
+  return list;
+});
+
 const columns = ref([] as DbColumn[]);
 const columnItems = ref([] as DropdownItem[]);
 
@@ -88,14 +140,23 @@ const cancel = () => {
   });
 };
 
+const createEditorParams = (): RecordRule["editor"] => {
+  return {
+    ...props.recordRule.editor,
+    visible: visibleEditor.value,
+    connectionName: connectionName.value,
+    tableName: tableName.value,
+    item: editorItem.value,
+  };
+};
+
 const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {
   const obj: RecordRule = {
-    connectionName: connectionName.value,
-    schemaName: props.schema?.name ?? "",
     tableRule: {
       table: tableName.value,
       details: details.value,
     },
+    editor: createEditorParams(),
   };
   const lastKnownScrollPosition = document.querySelector(".scroll-wrapper")?.scrollTop ?? 0;
   const newText = JSON.stringify(obj, null, 2);
@@ -111,14 +172,15 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
 </script>
 
 <template>
-  <section class="root">
-    <div class="toolbar">
+  <section class="rr-root">
+    <div v-if="visibleEditor" class="toolbar">
       <div class="tool-left">
         <label for="connectionName">Connection setting</label>
         <VsCodeDropdown
           id="connectionName"
           v-model="connectionName"
           :items="connectionItems"
+          style="z-index: 7"
           @change="updateTextDocument({ name: 'change', detail: 'connectionName' })"
         />
         <label for="tableName">Table</label>
@@ -126,89 +188,146 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
           id="tableName"
           v-model="tableName"
           :items="tableItems"
+          style="z-index: 7"
           @change="updateTextDocument({ name: 'change', detail: 'tableName' })"
         />
       </div>
       <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cansel"
+        <VsCodeButton
+          @click="updateTextDocument({ name: 'cancel' })"
+          appearance="secondary"
+          title="Cansel"
           ><fa icon="times" />Cancel</VsCodeButton
         >
+        <VsCodeButton @click="updateTextDocument({ name: 'save-rule' })" title="Save"
+          ><fa icon="check" />Ok</VsCodeButton
+        >
+      </div>
+    </div>
+    <div v-else class="toolbar">
+      <div class="tool-left">
+        <label for="keyword"> <fa icon="search" style="margin-right: 3px" />Search </label>
+        <VsCodeTextField
+          id="keyword"
+          v-model="keyword"
+          :maxlength="128"
+          title="keyword"
+          placeholder="Enter a keyword"
+        >
+        </VsCodeTextField>
+      </div>
+      <div class="tool-right">
         <VsCodeButton @click="updateTextDocument({ name: 'add-rule' })" title="Add rule"
           ><fa icon="plus" />Add rule</VsCodeButton
         >
       </div>
     </div>
-    <section>
-      <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
-        <section class="detail" v-for="(detail, idx) of details" :key="idx">
-          <div class="rule-name">
-            <label :for="`ruleName${idx}`">Rule name</label>
-            <VsCodeTextField
-              :id="`ruleName${idx}`"
-              v-model="detail.ruleName"
-              :maxlength="128"
-              :transparent="true"
-              :required="true"
-              style="flex-grow: 1"
-              @change="updateTextDocument()"
-            />
-            <VsCodeButton
-              @click="updateTextDocument({ name: 'delete-rule', detail: idx })"
-              title="Delete rule"
-              appearance="secondary"
-              ><fa icon="trash" />Delete rule</VsCodeButton
-            >
-            <VsCodeButton
-              @click="updateTextDocument({ name: 'duplicate-rule', detail: idx })"
-              title="Duplicate rule"
-              ><fa icon="plus" />Duplicate rule</VsCodeButton
-            >
-          </div>
-          <fieldset class="errors">
-            <legend>Error information</legend>
-            <label :for="`errorColumn${idx}`">Column</label>
-            <VsCodeDropdown
-              :id="`errorColumn${idx}`"
-              v-model="detail.error.column"
-              :items="columnItems"
-              :transparent="true"
-              :required="true"
-              style="width: 420px"
-              @change="updateTextDocument()"
-            ></VsCodeDropdown>
-            <label :for="`errorLimit${idx}`" style="margin-left: 10px">Detection limit</label>
-            <VsCodeTextField
-              :id="`errorLimit${idx}`"
-              v-model="detail.error.limit"
-              :min="0"
-              :max="9999999"
-              :maxlength="7"
-              :size="5"
-              :transparent="true"
-              :required="true"
-              type="number"
-              @change="updateTextDocument()"
-            ></VsCodeTextField>
-          </fieldset>
-          <div class="conditions">
-            <TopLevelCondition
-              v-model="detail.conditions"
-              :columnItems="columnItems"
-              @change="updateTextDocument()"
-            />
-          </div>
-        </section>
+    <div v-if="visibleEditor" class="editor">
+      <div class="rule-name">
+        <label for="ruleName">Rule name</label>
+        <VsCodeTextField
+          id="ruleName"
+          v-model="editorItem.ruleName"
+          :maxlength="128"
+          :transparent="true"
+          :required="true"
+          :change-on-mouseout="true"
+          style="flex-grow: 1"
+          @change="updateTextDocument()"
+        />
+      </div>
+      <fieldset class="errors">
+        <legend>Error information</legend>
+        <label for="errorColumn">Column</label>
+        <VsCodeDropdown
+          id="errorColumn"
+          v-model="editorItem.error.column"
+          :items="columnItems"
+          :transparent="true"
+          :required="true"
+          style="width: 420px; z-index: 5"
+          @change="updateTextDocument()"
+        ></VsCodeDropdown>
+        <label for="errorLimit" style="margin-left: 10px">Detection limit</label>
+        <VsCodeTextField
+          id="errorLimit"
+          v-model="editorItem.error.limit"
+          :min="0"
+          :max="9999999"
+          :maxlength="7"
+          :size="5"
+          :transparent="true"
+          :required="true"
+          :change-on-mouseout="true"
+          type="number"
+          @change="updateTextDocument()"
+        ></VsCodeTextField>
+      </fieldset>
+      <div class="conditions">
+        <TopLevelConditionVue
+          v-model="editorItem.conditions"
+          :columnItems="columnItems"
+          @change="updateTextDocument()"
+        />
+      </div>
+    </div>
+    <section class="items">
+      <div class="rr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2" class="rule-name">Rule name</th>
+              <th colspan="2">Error</th>
+              <th rowspan="2">Conditions</th>
+            </tr>
+            <tr>
+              <th class="w150">Column</th>
+              <th class="w100">Limit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(detail, idx) of computedDetails" :key="idx">
+              <td class="rule-name">
+                <p>{{ detail.ruleName }}</p>
+                <div class="controller">
+                  <VsCodeButton
+                    @click="updateTextDocument({ name: 'edit-rule', detail: idx })"
+                    title="Edit code"
+                    appearance="secondary"
+                    ><fa icon="pencil" />Edit</VsCodeButton
+                  >
+                  <VsCodeButton
+                    @click="updateTextDocument({ name: 'duplicate-rule', detail: idx })"
+                    title="Duplicate rule"
+                    ><fa icon="plus" />Duplicate</VsCodeButton
+                  >
+                  <VsCodeButton
+                    @click="updateTextDocument({ name: 'delete-rule', detail: idx })"
+                    title="Delete rule"
+                    appearance="secondary"
+                    ><fa icon="trash" />Delete</VsCodeButton
+                  >
+                </div>
+              </td>
+              <td class="w150">{{ detail.errorColumn }}</td>
+              <td class="w100">
+                {{ detail.errorLimit }}
+              </td>
+              <td style="white-space: pre-wrap">{{ detail.conditions }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </section>
 </template>
 
 <style scoped>
-.root {
+.rr-root {
   width: 100%;
   height: 100%;
-  margin: 3px;
-  padding: 1px;
+  display: flex;
+  flex-direction: column;
 }
 section.detail {
   margin-top: 25px;
@@ -242,7 +361,77 @@ div.conditions {
 label {
   margin-right: 4px;
 }
-.scroll-wrapper {
+
+label {
+  margin-right: 4px;
+}
+section.items {
+  padding: 5px;
+  flex-grow: 1;
+  display: flex;
+}
+.rr-scroll-wrapper {
   overflow: auto;
+  flex-grow: 1;
+}
+section.items table {
+  border-collapse: collapse;
+  width: 100%;
+}
+section.items table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--vscode-editorPane-background);
+}
+section.items table th {
+  height: 20px;
+  padding: 2px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+}
+
+td.rule-name > .controller {
+  display: flex;
+  justify-content: space-between;
+  visibility: hidden;
+}
+td.rule-name:hover > .controller {
+  visibility: visible;
+}
+
+section.items thead th.rule-name,
+section.items tbody td.rule-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 255px;
+  width: 255px;
+  background-color: var(--vscode-editorPane-background);
+}
+
+section.items table th,
+section.items table td {
+  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  padding: 2px;
+}
+
+section.items span.label {
+  display: inline-block;
+  vertical-align: middle;
+  height: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.w100 {
+  width: 100px;
+  max-width: 100px;
+}
+.w150 {
+  width: 150px;
+  max-width: 150px;
 }
 </style>

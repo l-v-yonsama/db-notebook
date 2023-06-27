@@ -23,7 +23,7 @@ import {
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { DbSchema, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
-import { CodeResolver } from "../shared/CodeResolver";
+import { CodeResolverParams } from "../shared/CodeResolverParams";
 
 const PREFIX = "[CodeResolverEditorProvider]";
 const componentName = "CodeResolverEditor";
@@ -60,7 +60,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
 
       const resolver = this.parseDoc(document);
 
-      this.initDbResourceParams(resolver.connectionName);
+      this.initDbResourceParams(resolver.editor.connectionName);
 
       const connectionSettingNames = this.stateStorage.getConnectionSettingNames();
       const msg: ToWebviewMessageEventType<CreateCodeResolverEditorActionCommand["params"]> = {
@@ -104,9 +104,6 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
       const { command, params } = message;
       log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
       switch (command) {
-        case "cancel":
-          webviewPanel.dispose();
-          return;
         case "updateCodeResolverTextDocument":
           await this.updateTextDocument(document, params);
           break;
@@ -124,12 +121,41 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
     this.scrollPos = scrollPos;
     const edit = new WorkspaceEdit();
 
-    const codeResolver = JSON.parse(newText) as CodeResolver;
+    const codeResolver = JSON.parse(newText) as CodeResolverParams;
     if (values) {
       switch (values.name) {
+        case "cancel":
+          {
+            const { editor } = codeResolver;
+            editor.visible = false;
+            editor.item = undefined;
+            editor.editingItemIndex = undefined;
+          }
+          break;
+        case "save-code-item":
+          {
+            const { items, editor } = codeResolver;
+            if (editor.editingItemIndex === undefined) {
+              items.push(editor.item!);
+            } else {
+              items.splice(editor.editingItemIndex, 1, editor.item!);
+            }
+            editor.visible = false;
+            editor.item = undefined;
+            editor.editingItemIndex = undefined;
+          }
+          break;
         case "add-code-item":
           {
-            codeResolver.items.push({
+            if (codeResolver.editor === undefined) {
+              codeResolver.editor = {
+                visible: true,
+                connectionName: "",
+              };
+            }
+            codeResolver.editor.editingItemIndex = undefined;
+            codeResolver.editor.visible = true;
+            codeResolver.editor.item = {
               title: "",
               description: "",
               resource: {
@@ -139,7 +165,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
                 },
               },
               details: [],
-            });
+            };
           }
           break;
         case "delete-code-item":
@@ -148,14 +174,39 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
             codeResolver.items.splice(index, 1);
           }
           break;
+        case "edit-code-item":
+          {
+            const index = (values.detail as number) ?? 0;
+            if (codeResolver.editor === undefined) {
+              codeResolver.editor = {
+                visible: true,
+                connectionName: "",
+              };
+            }
+            codeResolver.editor.editingItemIndex = index;
+            codeResolver.editor.visible = true;
+            const original = codeResolver.items[index];
+            codeResolver.editor.item = {
+              ...original,
+            };
+          }
+          break;
         case "duplicate-code-item":
           {
             const index = (values.detail as number) ?? 0;
+            if (codeResolver.editor === undefined) {
+              codeResolver.editor = {
+                visible: true,
+                connectionName: "",
+              };
+            }
+            codeResolver.editor.editingItemIndex = undefined;
+            codeResolver.editor.visible = true;
             const original = codeResolver.items[index];
-            codeResolver.items.splice(index + 1, 0, {
+            codeResolver.editor.item = {
               ...original,
-              title: original.title + " copy",
-            });
+              title: "Copy of " + original.title,
+            };
           }
           break;
         case "change":
@@ -198,14 +249,17 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
     }
   }
 
-  private parseDoc(doc: TextDocument): CodeResolver {
+  private parseDoc(doc: TextDocument): CodeResolverParams {
     const text = doc.getText();
     if (text.length) {
-      return JSON.parse(text) as CodeResolver;
+      return JSON.parse(text) as CodeResolverParams;
     }
     return {
-      connectionName: "",
       items: [],
+      editor: {
+        connectionName: "",
+        visible: false,
+      },
     };
   }
 }

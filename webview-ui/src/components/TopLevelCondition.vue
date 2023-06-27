@@ -55,7 +55,7 @@
                 :transparent="true"
                 :required="true"
                 @change="changeCondition"
-                style="width: 320px"
+                style="width: 320px; z-index: 4"
               ></VsCodeDropdown>
             </td>
             <td class="ope">
@@ -64,6 +64,7 @@
                 :items="operatorItems"
                 :transparent="true"
                 :required="true"
+                style="z-index: 4"
                 @change="changeCondition"
               ></VsCodeDropdown>
             </td>
@@ -80,7 +81,7 @@
                   :items="valTypeItems"
                   :transparent="true"
                   :required="true"
-                  style="margin-right: 3px"
+                  style="margin-right: 3px; z-index: 4"
                   @change="changeCondition({ name: 'valType', condition })"
                 ></VsCodeDropdown>
                 <VsCodeTextField
@@ -111,7 +112,7 @@
                   :transparent="true"
                   :required="true"
                   @change="changeCondition({ name: 'valColumn', condition })"
-                  style="flex-grow: 1"
+                  style="flex-grow: 1; z-index: 4"
                 ></VsCodeDropdown>
               </div>
             </td>
@@ -160,6 +161,12 @@ import type {
   AnyConditions,
   TopLevelCondition,
 } from "@/utilities/vscode";
+import {
+  isAllConditions,
+  isAnyConditions,
+  isConditionProperties,
+  isTopLevelCondition,
+} from "@/utilities/RRuleUtil";
 
 type Props = {
   modelValue: TableRuleDetail["conditions"];
@@ -180,19 +187,6 @@ const valTypeItems = [
   { label: "STATIC", value: "static" },
   { label: "COLUMN", value: "column" },
 ];
-
-function isTopLevelCondition(params: any): params is TopLevelCondition {
-  return isAllConditions(params) || isAnyConditions(params);
-}
-function isAllConditions(params: any): params is AllConditions {
-  return params["all"] !== undefined && params["all"].length !== undefined;
-}
-function isAnyConditions(params: any): params is AnyConditions {
-  return params["any"] !== undefined && params["any"].length !== undefined;
-}
-function isConditionProperties(params: any): params is ConditionProperties {
-  return params["fact"] !== undefined && params["operator"] !== undefined;
-}
 
 const conditionList = ref([] as ConditionProperties[]);
 const nestedList = ref([] as TopLevelCondition[]);

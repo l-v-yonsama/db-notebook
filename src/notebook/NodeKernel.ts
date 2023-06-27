@@ -62,6 +62,12 @@ export class NodeKernel {
         const names = settings.map(it => it.name).join(',');
         throw new Error('Connection settings not found. Available here [' + names + '].');
       };
+      const writeResultSetData = (title, o) => {
+        const rdb = mdd.ResultSetDataBuilder.from(o);
+        const rdh = rdb.build();
+        rdh.meta.tableName = title;
+        variables.set('_ResultSetData', rdh);
+      };
 
       const _saveVariables = () => {
         const saveMap = {};
@@ -105,6 +111,7 @@ export class NodeKernel {
 
     let stdout = "";
     let stderr = "";
+    let metadata;
 
     const promise = new Promise((resolve, reject) => {
       if (this.child) {
@@ -143,9 +150,18 @@ export class NodeKernel {
       log(`${PREFIX} ⭐️ERROR: retrieve variables [${e.message}]`);
     }
 
+    if (this.variables["_ResultSetData"]) {
+      const rdh = this.variables["_ResultSetData"];
+      delete this.variables["_ResultSetData"];
+      metadata = {
+        rdh,
+      };
+    }
+
     return {
       stdout,
       stderr,
+      metadata,
     };
   }
 

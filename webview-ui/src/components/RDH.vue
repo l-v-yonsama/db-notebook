@@ -135,7 +135,7 @@ function toValue(key: RdhKey, value: any): any {
   }
   switch (key.type) {
     case GC.GeneralColumnType.BIT:
-      return true ? "T" : "F";
+      return value === true ? "T" : "F";
     case GC.GeneralColumnType.TIMESTAMP:
     case GC.GeneralColumnType.TIMESTAMP_WITH_TIME_ZONE:
       return dayjs(value).format("YYYY-MM-DD HH:mm:ss");

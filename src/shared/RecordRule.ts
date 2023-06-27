@@ -1,9 +1,17 @@
-import type { TableRule } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { TableRule, TableRuleDetail } from "@l-v-yonsama/multi-platform-database-drivers";
 
 export type RecordRule = {
+  tableRule: TableRule;
+  editor: RecordRuleEditorPart;
+};
+
+export type RecordRuleEditorPart = {
+  visible: boolean;
   connectionName: string;
   schemaName: string;
-  tableRule: TableRule;
+  tableName: string;
+  item?: TableRuleDetail;
+  editingItemIndex?: number;
 };
 
 export type ConditionOperator =

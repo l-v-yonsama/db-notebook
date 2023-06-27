@@ -7,6 +7,7 @@ import vueClickOutsideElement from "vue-click-outside-element";
 import "splitpanes/dist/splitpanes.css";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
+  faCheck,
   faClipboard,
   faCirclePlay,
   faCodeCompare,
@@ -23,6 +24,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
+library.add(faCheck);
 library.add(faClipboard);
 library.add(faCirclePlay);
 library.add(faCodeCompare);

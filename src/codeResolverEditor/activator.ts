@@ -2,7 +2,7 @@ import { StateStorage } from "../utilities/StateStorage";
 import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
 import * as path from "path";
 import { CODE_RESOLVER_TYPE, CREATE_CODE_RESOLVER } from "../constant";
-import { CodeResolver } from "../shared/CodeResolver";
+import { CodeResolverParams } from "../shared/CodeResolverParams";
 import { CodeResolverEditorProvider } from "./editorProvider";
 import { writeToResource } from "../utilities/fsUtil";
 
@@ -28,9 +28,12 @@ export function activateCodeResolverEditor(context: ExtensionContext, stateStora
           return;
         }
 
-        const resolver: CodeResolver = {
-          connectionName: "",
+        const resolver: CodeResolverParams = {
           items: [],
+          editor: {
+            connectionName: "",
+            visible: false,
+          },
         };
         await writeToResource(uri, JSON.stringify(resolver, null, 1));
         // window.showInformationMessage(`Successfully saved, please open it.\n${uri.fsPath}`);

@@ -52,13 +52,7 @@ function displayCompareKeys(keys?: CompareKey[]) {
   if (!keys || keys.length === 0) {
     return "No compare keys";
   }
-  return keys
-    .map((it) => {
-      return it.kind === "primary" || it.kind === "custom"
-        ? `${it.kind} keys: ${it.names.join(",")}`
-        : `unique key: ${it.name}`;
-    })
-    .join(", ");
+  return keys.map((it) => `${it.kind} keys: ${it.names.join(",")}`).join(", ");
 }
 
 const clear = (item: Item) => {
@@ -74,11 +68,7 @@ const clear = (item: Item) => {
 const edit = (item: Item) => {
   compareKeyCheckboxSelected.value.splice(0, compareKeyCheckboxSelected.value.length);
   item.meta.compareKeys?.forEach((key) => {
-    if (key.kind === "primary" || key.kind === "custom") {
-      compareKeyCheckboxSelected.value.push(...key.names);
-    } else if (key.kind === "uniq") {
-      compareKeyCheckboxSelected.value.push(key.name);
-    }
+    compareKeyCheckboxSelected.value.push(...key.names);
   });
   compareKeyCheckboxItems.value.splice(0, compareKeyCheckboxItems.value.length);
   item.keys.forEach((key) => {
@@ -120,11 +110,7 @@ const save = () => {
       const compareKeyNames: string[] = [];
       if (it.meta?.compareKeys) {
         it.meta.compareKeys.forEach((key) => {
-          if (key.kind == "primary" || key.kind == "custom") {
-            compareKeyNames.push(...key.names);
-          } else {
-            compareKeyNames.push(key.name);
-          }
+          compareKeyNames.push(...key.names);
         });
       }
       return {

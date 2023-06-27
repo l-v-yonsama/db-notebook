@@ -10,7 +10,6 @@ import {
   window,
   workspace,
 } from "vscode";
-import { throttle } from "throttle-debounce";
 
 import { RECORD_RULE_TYPE } from "../constant";
 import { createWebviewContent } from "../utilities/webviewUtil";
@@ -56,13 +55,13 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
       const recordRule = this.parseDoc(document);
       const connectionSettingNames = this.stateStorage.getConnectionSettingNames();
       let schema: DbSchema | undefined = undefined;
-      if (recordRule.connectionName) {
-        let dbs = this.stateStorage.getResourceByName(recordRule.connectionName);
+      if (recordRule.editor.connectionName) {
+        let dbs = this.stateStorage.getResourceByName(recordRule.editor.connectionName);
         if (dbs === undefined) {
-          dbs = await this.stateStorage.loadResource(recordRule.connectionName, false, true);
+          dbs = await this.stateStorage.loadResource(recordRule.editor.connectionName, false, true);
         }
         if (dbs && dbs[0] instanceof RdsDatabase) {
-          schema = (dbs[0] as RdsDatabase).getSchema({ name: recordRule.schemaName });
+          schema = (dbs[0] as RdsDatabase).getSchema({ name: recordRule.editor.schemaName });
         }
       }
       const msg: ToWebviewMessageEventType = {
@@ -77,13 +76,7 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
       };
       webviewPanel.webview.postMessage(msg);
     };
-    // Hook up event handlers so that we can synchronize the webview with the text document.
-    //
-    // The text document acts as our model, so we have to sync change in the document to our
-    // editor and sync changes in the editor back to the document.
-    //
-    // Remember that a single text document can also be shared between multiple custom
-    // editors (this happens for example when you split a custom editor)
+
     const changeDocumentSubscription = workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.toString() === document.uri.toString()) {
         updateWebview();
@@ -135,9 +128,40 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
     const recordRule = JSON.parse(newText) as RecordRule;
     if (values) {
       switch (values.name) {
+        case "cancel":
+          {
+            const { editor } = recordRule;
+            editor.visible = false;
+            editor.item = undefined;
+            editor.editingItemIndex = undefined;
+          }
+          break;
+        case "save-rule":
+          {
+            const { tableRule, editor } = recordRule;
+            if (editor.editingItemIndex === undefined) {
+              tableRule.details.push(editor.item!);
+            } else {
+              tableRule.details.splice(editor.editingItemIndex, 1, editor.item!);
+            }
+            editor.visible = false;
+            editor.item = undefined;
+            editor.editingItemIndex = undefined;
+          }
+          break;
         case "add-rule":
           {
-            recordRule.tableRule.details.push({
+            if (recordRule.editor === undefined) {
+              recordRule.editor = {
+                visible: true,
+                connectionName: "",
+                schemaName: "",
+                tableName: "",
+              };
+            }
+            recordRule.editor.editingItemIndex = undefined;
+            recordRule.editor.visible = true;
+            recordRule.editor.item = {
               ruleName: "",
               error: {
                 column: "",
@@ -146,7 +170,7 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
               conditions: {
                 any: [],
               },
-            });
+            };
           }
           break;
         case "delete-rule":
@@ -155,25 +179,58 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
             recordRule.tableRule.details.splice(index, 1);
           }
           break;
+        case "edit-rule":
+          {
+            const index = (values.detail as number) ?? 0;
+            if (recordRule.editor === undefined) {
+              recordRule.editor = {
+                visible: true,
+                connectionName: "",
+                schemaName: "",
+                tableName: "",
+              };
+            }
+            recordRule.editor.editingItemIndex = index;
+            recordRule.editor.visible = true;
+            const original = recordRule.tableRule.details[index];
+            recordRule.editor.item = {
+              ...original,
+            };
+          }
+          break;
         case "duplicate-rule":
           {
             const index = (values.detail as number) ?? 0;
+            if (recordRule.editor === undefined) {
+              recordRule.editor = {
+                visible: true,
+                connectionName: "",
+                schemaName: "",
+                tableName: "",
+              };
+            }
+            recordRule.editor.editingItemIndex = undefined;
+            recordRule.editor.visible = true;
             const original = recordRule.tableRule.details[index];
-            recordRule.tableRule.details.splice(index + 1, 0, {
+            recordRule.editor.item = {
               ...original,
-              ruleName: original.ruleName + " copy",
-            });
+              ruleName: "Copy of " + original.ruleName,
+            };
           }
           break;
         case "change":
           {
             if (values.detail === "connectionName") {
-              let dbs = this.stateStorage.getResourceByName(recordRule.connectionName);
+              let dbs = this.stateStorage.getResourceByName(recordRule.editor.connectionName);
               if (dbs === undefined) {
-                dbs = await this.stateStorage.loadResource(recordRule.connectionName, false, true);
+                dbs = await this.stateStorage.loadResource(
+                  recordRule.editor.connectionName,
+                  false,
+                  true
+                );
               }
               if (dbs && dbs[0] instanceof RdsDatabase) {
-                recordRule.schemaName = dbs[0].getSchema({ isDefault: true }).name;
+                recordRule.editor.schemaName = dbs[0].getSchema({ isDefault: true }).name;
               }
             }
           }
@@ -197,11 +254,15 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
       return JSON.parse(text) as RecordRule;
     }
     return {
-      connectionName: "",
-      schemaName: "",
       tableRule: {
         table: "",
         details: [],
+      },
+      editor: {
+        connectionName: "",
+        schemaName: "",
+        tableName: "",
+        visible: false,
       },
     };
   }
