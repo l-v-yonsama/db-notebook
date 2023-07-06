@@ -196,7 +196,7 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
         <VsCodeButton
           @click="updateTextDocument({ name: 'cancel' })"
           appearance="secondary"
-          title="Cansel"
+          title="Cancel"
           ><fa icon="times" />Cancel</VsCodeButton
         >
         <VsCodeButton @click="updateTextDocument({ name: 'save-rule' })" title="Save"
@@ -331,16 +331,6 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
 }
 section.detail {
   margin-top: 25px;
-}
-.toolbar {
-  padding: 3px 4px;
-  margin-bottom: 13px;
-  display: flex;
-}
-.tool-left {
-  flex-grow: 1;
-  align-items: center;
-  display: flex;
 }
 
 div.rule-name {

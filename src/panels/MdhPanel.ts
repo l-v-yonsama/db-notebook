@@ -4,6 +4,9 @@ import {
   RDSBaseDriver,
   ResultSetData,
   ResultSetDataBuilder,
+  toDeleteStatementWithBinds,
+  toInsertStatementWithBinds,
+  toUpdateStatementWithBinds,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
@@ -18,11 +21,12 @@ import {
   ActionCommand,
   CompareParams,
   OutputParams,
+  SaveValuesParams,
   WriteToClipboardParams,
 } from "../shared/ActionParams";
 import { SHOW_RDH_DIFF } from "../constant";
 import { DiffTabParam } from "./DiffPanel";
-import { log } from "../utilities/logger";
+import { log, logError } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { rdhListToText } from "../utilities/rdhToText";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
@@ -227,8 +231,14 @@ export class MdhPanel {
               this._panel.webview.postMessage(msg);
             }
             return;
+          case "saveValues":
+            this.saveValues(params);
+            break;
           case "output":
             this.output(params);
+            return;
+          case "showError":
+            await window.showErrorMessage(params.message);
             return;
           case "writeToClipboard":
             this.writeToClipboard(params);
@@ -238,6 +248,145 @@ export class MdhPanel {
       undefined,
       this._disposables
     );
+  }
+
+  private async saveValues(params: SaveValuesParams) {
+    const tabItem = this.getTabItemById(params.tabId);
+    if (!tabItem) {
+      return;
+    }
+    const rdh = tabItem.list[0];
+    const { connectionName, tableName } = rdh.meta;
+    if (connectionName === undefined || tableName === undefined) {
+      return;
+    }
+    const setting = await MdhPanel.stateStorage?.getConnectionSettingByName(connectionName);
+    if (!setting) {
+      return;
+    }
+
+    const { insertList, updateList, deleteList } = params;
+    const totalCount = insertList.length + updateList.length + deleteList.length;
+    const increment = Math.floor(100 / totalCount);
+    const { ok, message } = await window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        return await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+          setting,
+          async (driver) => {
+            const toPositionedParameter = driver.isPositionedParameterAvailable();
+            let errorMessage = "";
+            for (let i = 0; i < insertList.length; i++) {
+              const prefix = `INSERT[${i + 1}/${insertList.length}] `;
+              const { values } = insertList[i];
+              try {
+                const { query, binds } = toInsertStatementWithBinds({
+                  tableName,
+                  keys: rdh.keys,
+                  values,
+                  toPositionedParameter,
+                });
+                log(`${prefix} sql:[${query}]`);
+                log(`${prefix} binds:${JSON.stringify(binds)}`);
+
+                const r = await driver.requestSql({
+                  sql: query,
+                  conditions: {
+                    binds,
+                  },
+                });
+                log(`${prefix} OK`);
+              } catch (e: any) {
+                errorMessage = e.message;
+                logError(`${prefix} NG:${e.message}`);
+              }
+              progress.report({
+                message: `Inserted [${i + 1}/${insertList.length}]`,
+                increment,
+              });
+            }
+
+            for (let i = 0; i < updateList.length; i++) {
+              const prefix = `UPDATE[${i + 1}/${updateList.length}] `;
+              const { values, conditions } = updateList[i];
+              try {
+                const { query, binds } = toUpdateStatementWithBinds({
+                  tableName,
+                  keys: rdh.keys,
+                  values,
+                  conditions,
+                  toPositionedParameter,
+                });
+
+                log(`${prefix} sql:[${query}]`);
+                log(`${prefix} binds:${JSON.stringify(binds)}`);
+
+                const r = await driver.requestSql({
+                  sql: query,
+                  conditions: {
+                    binds,
+                  },
+                });
+                log(`${prefix} OK`);
+              } catch (e: any) {
+                errorMessage = e.message;
+                logError(`${prefix} NG:${e.message}`);
+              }
+              progress.report({
+                message: `Updated [${i + 1}/${insertList.length}]`,
+                increment,
+              });
+            }
+
+            for (let i = 0; i < deleteList.length; i++) {
+              const prefix = `DELETE[${i + 1}/${deleteList.length}] `;
+              const { conditions } = deleteList[i];
+              try {
+                const { query, binds } = toDeleteStatementWithBinds({
+                  tableName,
+                  keys: rdh.keys,
+                  conditions,
+                  toPositionedParameter,
+                });
+                log(`${prefix} sql:[${query}]`);
+                log(`${prefix} binds:${JSON.stringify(binds)}`);
+
+                const r = await driver.requestSql({
+                  sql: query,
+                  conditions: {
+                    binds,
+                  },
+                });
+                log(`${prefix} OK`);
+              } catch (e: any) {
+                errorMessage = e.message;
+                logError(`${prefix} NG:${e.message}`);
+              }
+              progress.report({
+                message: `Deleted [${i + 1}/${insertList.length}]`,
+                increment,
+              });
+            }
+
+            progress.report({
+              increment: 100,
+            });
+            if (errorMessage) {
+              throw new Error(errorMessage);
+            }
+          }
+        );
+      }
+    );
+    if (ok) {
+      window.showInformationMessage("OK");
+      this.refresh(params);
+    } else if (message) {
+      window.showErrorMessage(message);
+    }
   }
 
   private async output(data: OutputParams) {

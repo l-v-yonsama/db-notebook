@@ -7,6 +7,7 @@ import {
   DbS3Bucket,
   DbSQSQueue,
   DbSchema,
+  GeneralResult,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ExtensionContext, SecretStorage } from "vscode";
@@ -40,27 +41,43 @@ export class StateStorage {
 
   async loadResource(
     connectionName: string,
-    force: boolean,
+    reload: boolean,
     wait = false
-  ): Promise<DbDatabase[] | undefined> {
-    log(`${PREFIX} loadResource(${connectionName}, force:${force}, wait:${wait})`);
+  ): Promise<GeneralResult<DbDatabase[]>> {
+    log(`${PREFIX} loadResource(${connectionName}, reload:${reload}, wait:${wait})`);
+    const ret: GeneralResult<DbDatabase[]> = {
+      ok: false,
+      message: "",
+    };
     const conRes = await this.getConnectionSettingByName(connectionName);
     if (!conRes) {
-      return;
+      ret.message = `Missing connection setting ${connectionName}`;
+      return ret;
     }
     let resInfo = this.resMap.get(connectionName);
-    if (resInfo?.res && !force) {
-      return resInfo?.res;
+    if (resInfo?.res && !reload) {
+      // Hit cache
+      ret.ok = true;
+      ret.result = resInfo.res;
+      return ret;
     }
     if (resInfo?.isInProgress) {
       if (!wait) {
-        return;
+        ret.message = "skipped.";
+        return ret;
       }
       for (let i = 0; i < 6 && resInfo?.isInProgress; i++) {
         await sleep(500);
         resInfo = this.resMap.get(connectionName);
       }
-      return resInfo?.res;
+      log(`${PREFIX} loadResource return res`);
+      if (resInfo?.res) {
+        ret.ok = true;
+        ret.result = resInfo.res;
+      } else {
+        ret.message = "skipped.";
+      }
+      return ret;
     }
     if (!resInfo) {
       resInfo = {
@@ -69,12 +86,10 @@ export class StateStorage {
       this.resMap.set(connectionName, resInfo);
     }
 
-    log(`${PREFIX} start driver.getInfomationSchemas`);
     const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
       conRes,
       async (driver) => await driver.getInfomationSchemas()
     );
-    log(`${PREFIX} end driver.getInfomationSchemas ok:${ok}`);
 
     if (ok && result) {
       for (const dbRes of result) {
@@ -113,11 +128,14 @@ export class StateStorage {
           });
       }
       this.resMap.set(connectionName, { isInProgress: false, res: result });
-      return result;
+      ret.result = result;
+      ret.ok = true;
     } else {
+      log(`${PREFIX} loadResource Error:${message}`);
       this.resMap.set(connectionName, { isInProgress: false, res: undefined });
-      throw new Error(message);
+      ret.message = message;
     }
+    return ret;
   }
 
   constructor(private context: ExtensionContext, private secretStorage: SecretStorage) {}
@@ -171,7 +189,7 @@ export class StateStorage {
     }
     await this.removePasswordAndStoreOnSecret(setting);
     list.push(setting);
-    this.context.globalState.update(STORAGE_KEY, list);
+    await this.context.globalState.update(STORAGE_KEY, list);
     return true;
   }
 
@@ -187,7 +205,7 @@ export class StateStorage {
     await this.removePasswordAndStoreOnSecret(setting);
 
     list.splice(idx, 1, setting);
-    this.context.globalState.update(STORAGE_KEY, list);
+    await this.context.globalState.update(STORAGE_KEY, list);
 
     return true;
   }
@@ -203,7 +221,7 @@ export class StateStorage {
     if (removed && removed[0].password) {
       await this.deleteSecret(removed[0].password);
     }
-    this.context.globalState.update(STORAGE_KEY, list);
+    await this.context.globalState.update(STORAGE_KEY, list);
     this.resMap.delete(name);
     return true;
   }

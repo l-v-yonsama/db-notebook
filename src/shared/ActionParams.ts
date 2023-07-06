@@ -2,20 +2,7 @@ import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-dri
 import type { ModeType } from "./ModeType";
 import type { ERDiagramSettingParams } from "./ERDiagram";
 import type { CodeResolverParams } from "./CodeResolverParams";
-
-// export type ActionCommandType =
-//   | "openScanPanel"
-//   | "closeScanPanel"
-//   | "search"
-//   | "output"
-//   | "refresh"
-//   | "compare"
-//   | "closeTab"
-//   | "selectTab"
-//   | "selectInnerTab"
-//   | "testConnectionSetting"
-//   | "saveConnectionSetting"
-//   | "deleteKey";
+import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
 
 export type TabIdParam = {
   tabId: string;
@@ -28,6 +15,8 @@ export type CompareParams = TabIdParam & {
 export type SaveCompareKeysParams = TabIdParam & {
   list: { index: number; compareKeyNames: string[] }[];
 };
+
+export type SaveValuesParams = TabIdParam & SaveValuesInRdhParams;
 
 export type OutputParams = TabIdParam & {
   fileType: "excel" | "csv" | "markdown" | "text";
@@ -53,9 +42,12 @@ export type ActionCommand =
   | SelectInnerTabActionCommand
   | TestConnectionSettingActionCommand
   | SaveConnectionSettingActionCommand
+  | SaveValuesActionCommand
+  | ShowErrorActionCommand
   | DeleteKeyActionCommand
   | UpdateTextDocumentActionCommand
-  | UpdateCodeResolverTextDocumentActionCommand;
+  | UpdateCodeResolverTextDocumentActionCommand
+  | OkActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -66,6 +58,8 @@ export type BaseActionCommand<T extends string, U = any> = {
   command: T;
   params: U;
 };
+
+export type ShowErrorActionCommand = BaseActionCommand<"showError", { message: string }>;
 
 export type TestConnectionSettingActionCommand = {
   command: "testConnectionSetting";
@@ -79,6 +73,8 @@ export type SaveConnectionSettingActionCommand = {
 };
 
 export type CancelActionCommand = BaseActionCommand<"cancel">;
+
+export type OkActionCommand = BaseActionCommand<"ok">;
 
 export type UpdateTextDocumentActionCommand = BaseActionCommand<
   "updateTextDocument",
@@ -142,6 +138,11 @@ export type CreateCodeResolverEditorActionCommand = BaseActionCommand<
 export type SaveCompareKeysActionCommand = {
   command: "saveCompareKeys";
   params: SaveCompareKeysParams;
+};
+
+export type SaveValuesActionCommand = {
+  command: "saveValues";
+  params: SaveValuesParams;
 };
 
 export type DeleteKeyActionCommand = {

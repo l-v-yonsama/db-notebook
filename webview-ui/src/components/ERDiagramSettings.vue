@@ -191,7 +191,7 @@ const action = (command: ActionCommand["command"]): void => {
         <VsCodeTextField id="title" v-model="title" style="width: calc(100% - 45px)" />
       </div>
       <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cansel"
+        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel"
           ><fa icon="times" />Cancel</VsCodeButton
         >
         <VsCodeButton
@@ -325,16 +325,7 @@ const action = (command: ActionCommand["command"]): void => {
   margin: 1px;
   padding: 1px;
 }
-.toolbar {
-  padding: 3px 4px;
-  margin-bottom: 13px;
-  display: flex;
-}
-.tool-left {
-  flex-grow: 1;
-  align-items: center;
-  display: flex;
-}
+
 table {
   border-collapse: collapse;
   width: 100%;

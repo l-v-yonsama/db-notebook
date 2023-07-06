@@ -58,7 +58,14 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
       if (recordRule.editor.connectionName) {
         let dbs = this.stateStorage.getResourceByName(recordRule.editor.connectionName);
         if (dbs === undefined) {
-          dbs = await this.stateStorage.loadResource(recordRule.editor.connectionName, false, true);
+          const { ok, result } = await this.stateStorage.loadResource(
+            recordRule.editor.connectionName,
+            false,
+            true
+          );
+          if (ok) {
+            dbs = result;
+          }
         }
         if (dbs && dbs[0] instanceof RdsDatabase) {
           schema = (dbs[0] as RdsDatabase).getSchema({ name: recordRule.editor.schemaName });
@@ -223,11 +230,14 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
             if (values.detail === "connectionName") {
               let dbs = this.stateStorage.getResourceByName(recordRule.editor.connectionName);
               if (dbs === undefined) {
-                dbs = await this.stateStorage.loadResource(
+                const { ok, result } = await this.stateStorage.loadResource(
                   recordRule.editor.connectionName,
                   false,
                   true
                 );
+                if (ok) {
+                  dbs = result;
+                }
               }
               if (dbs && dbs[0] instanceof RdsDatabase) {
                 recordRule.editor.schemaName = dbs[0].getSchema({ isDefault: true }).name;

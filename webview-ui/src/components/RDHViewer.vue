@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, defineExpose } from "vue";
 import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDH from "./RDH.vue";
 import type { CellFocusParams } from "@/types/RdhEvents";
@@ -13,6 +14,11 @@ type Props = {
 
 const props = defineProps<Props>();
 
+const rdhRef = ref<InstanceType<typeof RDH>>();
+const setRdhRef = (el: any) => {
+  rdhRef.value = el;
+};
+
 const emit = defineEmits<{
   (event: "onCellFocus", value: CellFocusParams): void;
 }>();
@@ -26,6 +32,15 @@ const emit = defineEmits<{
 function onCellFocus(params: CellFocusParams) {
   emit("onCellFocus", params);
 }
+
+const save = (): any => {
+  console.log("calledd save000");
+  return rdhRef.value?.save();
+};
+
+defineExpose({
+  save,
+});
 </script>
 
 <template>
@@ -43,6 +58,7 @@ function onCellFocus(params: CellFocusParams) {
           :showOnlyChanged="showOnlyChanged"
           :withComment="rdh.keys.some((it) => it.comment?.length)"
           @onCellFocus="onCellFocus"
+          :ref="setRdhRef"
         >
         </RDH>
       </pane>

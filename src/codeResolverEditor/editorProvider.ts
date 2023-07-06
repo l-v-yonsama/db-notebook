@@ -22,7 +22,7 @@ import {
 } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
-import { DbSchema, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
+import { RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
 
 const PREFIX = "[CodeResolverEditorProvider]";
@@ -234,7 +234,10 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
     if (connectionName) {
       let dbs = this.stateStorage.getResourceByName(connectionName);
       if (dbs === undefined) {
-        dbs = await this.stateStorage.loadResource(connectionName, false, true);
+        const { ok, result } = await this.stateStorage.loadResource(connectionName, false, true);
+        if (ok) {
+          dbs = result;
+        }
       }
       if (dbs && dbs[0] instanceof RdsDatabase) {
         const schema = dbs[0].getSchema({ isDefault: true });

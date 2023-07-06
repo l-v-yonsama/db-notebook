@@ -15,6 +15,7 @@ import { EXTENSION_NAME, SHOW_RDH_DIFF } from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
 import { initializePath } from "./utilities/fsUtil";
 import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
+import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 
 const PREFIX = "[extension]";
 
@@ -30,6 +31,7 @@ export async function activate(context: ExtensionContext) {
   ScanPanel.setStateStorage(stateStorage);
   MdhPanel.setStateStorage(stateStorage);
   DiffPanel.setStateStorage(stateStorage);
+  ViewConditionPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
 

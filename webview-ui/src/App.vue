@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { ModeType } from "./utilities/vscode";
 import { ref, onMounted, nextTick, reactive } from "vue";
+
 import MdhPanel from "./components/MdhPanel.vue";
 import DiffPanel from "./components/DiffPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
+import ViewConditionPanel from "./components/ViewConditionPanel.vue";
 import WriteToClipboardParamsPanel from "./components/WriteToClipboardParamsPanel.vue";
 import ConnectionSettingVue from "./components/ConnectionSetting.vue";
 import ResourceProperties from "./components/ResourceProperties.vue";
@@ -71,6 +73,13 @@ function messageListener(evt: MessageEvent) {
         visible.variablePanel = false;
         nextTick(() => {
           visible.variablePanel = true;
+        });
+        break;
+      case "ViewConditionPanel":
+        values.value = value;
+        visible.viewConditionPanel = false;
+        nextTick(() => {
+          visible.viewConditionPanel = true;
         });
         break;
       case "WriteToClipboardParamsPanel":
@@ -147,6 +156,7 @@ const visible = reactive<{
   scanPanel: boolean;
   diffPanel: boolean;
   variablePanel: boolean;
+  viewConditionPanel: boolean;
   writeToClipboardParamsPanel: boolean;
   eRDiagramSettingsPanel: boolean;
   recordRuleEditor: boolean;
@@ -159,6 +169,7 @@ const visible = reactive<{
   scanPanel: false,
   diffPanel: false,
   variablePanel: false,
+  viewConditionPanel: false,
   writeToClipboardParamsPanel: false,
   eRDiagramSettingsPanel: false,
   recordRuleEditor: false,
@@ -194,6 +205,12 @@ const resourcePropertiesValues = ref<{ [key: string]: string }>({});
     <DiffPanel v-if="visible.diffPanel" :ref="setDiffPanelRef"></DiffPanel>
     <ScanPanel ref="scanPanelRef" v-show="visible.scanPanel" :opt="scanValues"></ScanPanel>
     <VariablesPanel v-if="visible.variablePanel" :rdh="values" />
+    <ViewConditionPanel
+      v-if="visible.viewConditionPanel"
+      :tableRes="values.tableRes"
+      :numOfRows="values.numOfRows"
+      :limit="values.limit"
+    />
     <WriteToClipboardParamsPanel v-if="visible.writeToClipboardParamsPanel" :params="values" />
     <ERDiagramSettings
       v-if="visible.eRDiagramSettingsPanel"
@@ -264,5 +281,20 @@ fieldset.no-elements {
   align-items: center;
   height: 100%;
   width: 100%;
+}
+
+.toolbar {
+  padding: 3px 4px;
+  margin-bottom: 11px;
+  display: flex;
+}
+div.tool-left,
+div.tool-right {
+  display: flex;
+  column-gap: 3px;
+  align-items: center;
+}
+.tool-left {
+  flex-grow: 1;
 }
 </style>

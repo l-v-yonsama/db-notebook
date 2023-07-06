@@ -5,16 +5,9 @@ export * from "../../../src/shared/ActionParams";
 export * from "../../../src/shared/ModeType";
 export * from "../../../src/shared/RecordRule";
 export * from "../../../src/shared/CodeResolverParams";
+export * from "../../../src/shared/ViewConditionParams";
+export * from "../../../src/shared/SaveValuesInRdhParams";
 
-/**
- * A utility wrapper around the acquireVsCodeApi() function, which enables
- * message passing and state management between the webview and extension
- * contexts.
- *
- * This utility also enables webview code to be run in a web browser-based
- * dev server by using native web browser features that mock the functionality
- * enabled by acquireVsCodeApi.
- */
 class VSCodeAPIWrapper {
   private readonly vsCodeApi: WebviewApi<unknown> | undefined;
 

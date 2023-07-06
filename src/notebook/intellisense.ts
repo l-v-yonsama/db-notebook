@@ -39,12 +39,12 @@ const PREFIX = "[notebook/intellisense]";
 const throttleFunc = throttle(300, async (connectionName: string): Promise<void> => {
   log(`  ${PREFIX} start throttleFunc`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
-    log(`  ${PREFIX} end throttleFunc`);
+    log(`  ${PREFIX} end throttleFunc. No connection setting.`);
     return;
   }
-  const db = await storage.loadResource(connectionName, false, false);
-  if (db && db[0] instanceof RdsDatabase) {
-    rdsDatabase = db[0];
+  const { ok, result } = await storage.loadResource(connectionName, false, false);
+  if (ok && result && result[0] instanceof RdsDatabase) {
+    rdsDatabase = result[0];
   }
   log(`  ${PREFIX} end throttleFunc with rdsDatabase`);
 });

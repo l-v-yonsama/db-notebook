@@ -41,6 +41,7 @@ import { SQLConfigurationViewProvider } from "../form";
 import { ERDiagramParams, TableColumn, TableRelation } from "../shared/ERDiagram";
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
+import { ViewConditionPanel } from "../panels/ViewConditionPanel";
 
 type ResourceTreeParams = {
   context: ExtensionContext;
@@ -97,13 +98,13 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       conRes.isInProgress = true;
       dbResourceTree.changeConnectionTreeData(conRes);
 
-      try {
-        const dbResList = await stateStorage.loadResource(conRes.name, true, true);
-        conRes.isInProgress = false;
-        conRes.clearChildren();
-        dbResList?.forEach((dbRes) => conRes.addChild(dbRes));
-      } catch (e: any) {
-        window.showErrorMessage(e.message);
+      const { ok, message, result } = await stateStorage.loadResource(conRes.name, true, true);
+      conRes.isInProgress = false;
+      conRes.clearChildren();
+      if (ok && result) {
+        result?.forEach((dbRes) => conRes.addChild(dbRes));
+      } else {
+        window.showErrorMessage(message);
       }
     } catch (e: any) {
       window.showErrorMessage(e.message);
@@ -121,12 +122,12 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
         setting,
         async (driver) => {
-          return await driver.viewData(tableRes.name, { schemaName });
+          return await driver.count({ table: tableRes.name, schema: schemaName });
         }
       );
 
-      if (ok && result) {
-        MdhPanel.render(context.extensionUri, tableRes.name, [result]);
+      if (ok) {
+        ViewConditionPanel.render(context.extensionUri, tableRes, result);
       } else {
         window.showErrorMessage(message);
       }

@@ -83,6 +83,13 @@ onMounted(() => {
   nextTick(resetSpPaneWrapperHeight);
 });
 
+const rdhViewerRef = ref<InstanceType<typeof RDHViewer>>();
+const setRdhViewerRef = (el: any) => {
+  rdhViewerRef.value = el;
+};
+
+const editable = ref(true);
+
 function getActiveTabItem(): RdhTabItem | undefined {
   console.log("getActiveTabItem:", activeTabId.value);
   const tabId = activeTabId.value.substring(4); // 'tab-'
@@ -115,6 +122,7 @@ const showTab = (tabId: string) => {
 };
 
 const resetActiveInnerRdh = () => {
+  editable.value = false;
   noCompareKeys.value = true;
   activeInnerRdh.value = null;
   const tabItem = getActiveTabItem();
@@ -122,8 +130,7 @@ const resetActiveInnerRdh = () => {
     return;
   }
   const newRdh = tabItem.list[innerTabIndex.value];
-  console.log("innerTabIndex.value", innerTabIndex.value);
-  console.log("newRdh", newRdh);
+  editable.value = newRdh.meta?.editable === true;
 
   nextTick(() => {
     noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
@@ -163,8 +170,6 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
 };
 
 const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData[] }) => {
-  console.log("tabId", tabId);
-  console.log("value", value);
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
@@ -188,15 +193,35 @@ const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData
 };
 
 function actionToolbar(command: string, inParams?: any) {
-  console.log("called actionToolbar command", command, " inParams", inParams);
   const tabItem = getActiveTabItem();
   if (!tabItem) {
-    console.error("tab item naiyo");
     return;
   }
   const { tabId } = tabItem;
   let action = undefined;
   switch (command) {
+    case "saveValues":
+      {
+        const result = rdhViewerRef.value?.save();
+        if (result && result.ok) {
+          action = {
+            command,
+            params: {
+              tabId,
+              ...result,
+            },
+          };
+        } else {
+          vscode.postCommand({
+            command: "showError",
+            params: {
+              message: result.message,
+            },
+          });
+          return;
+        }
+      }
+      break;
     case "compare":
       compare(inParams);
       return;
@@ -320,6 +345,15 @@ defineExpose({
         @change="resetActiveInnerRdh"
       />
       <button
+        v-if="editable"
+        @click="actionToolbar('saveValues', {})"
+        title="Save changes to table"
+        class="primary"
+      >
+        <fa icon="arrow-up" />
+      </button>
+      <button
+        v-if="!editable"
         @click="actionToolbar('compare', {})"
         :disabled="inProgress || noCompareKeys"
         :title="noCompareKeys ? 'No compare keys(Primary, Unique)' : 'Compare with current content'"
@@ -327,6 +361,7 @@ defineExpose({
         <fa icon="code-compare" />
       </button>
       <SecondarySelectionAction
+        v-if="!editable"
         :items="compareDetailItems"
         title="Compare"
         @onSelect="selectedCompareMoreOptions"
@@ -400,6 +435,7 @@ defineExpose({
               :width="splitterWidth"
               :height="splitterHeight"
               :readonly="true"
+              :ref="setRdhViewerRef"
             />
           </div>
         </section>
@@ -418,6 +454,11 @@ section.MdhPanel {
 
 vscode-panel-view {
   padding: 4px;
+}
+
+.primary {
+  color: var(--button-primary-foreground) !important;
+  background: var(--button-primary-background) !important;
 }
 
 .tab-container-actions {

@@ -4,13 +4,11 @@
       <legend>
         <span v-if="noElements" class="codicon codicon-error"></span>
         <VsCodeDropdown
-          id="dbType"
           v-model="andOrSwitch"
           :items="andOrItems"
           @change="($e:Event) => handleOnChange('andOrSwitch', $e)"
         ></VsCodeDropdown>
         <VsCodeButton
-          class="fillBackGround"
           @click="addCondition"
           title="Add condition"
           appearance="secondary"
@@ -18,7 +16,6 @@
           ><fa icon="plus" />Add condition</VsCodeButton
         >
         <VsCodeButton
-          class="fillBackGround"
           @click="deleteTopLevelCondition"
           title="Delete condition"
           appearance="secondary"
@@ -26,7 +23,6 @@
           ><fa icon="trash" />Delete condition</VsCodeButton
         >
         <VsCodeButton
-          class="fillBackGround"
           @click="addNestedCondition"
           title="Add nested condition"
           appearance="secondary"
@@ -169,7 +165,7 @@ import {
 } from "@/utilities/RRuleUtil";
 
 type Props = {
-  modelValue: TableRuleDetail["conditions"];
+  modelValue: any; //TableRuleDetail["conditions"];
   columnItems: DropdownItem[];
 };
 const props = defineProps<Props>();
@@ -339,12 +335,6 @@ const updateSuperTextDocument = () => {
 };
 </script>
 <style scoped>
-.fillBackGround {
-  background: var(--dropdown-background);
-}
-fieldset {
-  background-color: rgba(10, 10, 10, 0.3);
-}
 section.condition {
   margin-top: 17px;
 }

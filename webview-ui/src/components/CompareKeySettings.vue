@@ -125,7 +125,7 @@ const save = () => {
 <template>
   <section>
     <div class="toolbar">
-      <VsCodeButton @click="cancel" appearance="secondary" title="Cansel">Cancel</VsCodeButton>
+      <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">Cancel</VsCodeButton>
       <VsCodeButton :disabled="!dirty" @click="save" title="Save compare keys">Save</VsCodeButton>
     </div>
     <table class="table">

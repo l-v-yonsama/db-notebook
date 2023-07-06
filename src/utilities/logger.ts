@@ -35,3 +35,14 @@ export function log(value: string) {
     console.log(value);
   }
 }
+export function logError(value: string) {
+  if (channel) {
+    try {
+      channel.error(value);
+    } catch (e) {
+      console.error("Error:logger.ts", e);
+    }
+  } else {
+    console.log(value);
+  }
+}

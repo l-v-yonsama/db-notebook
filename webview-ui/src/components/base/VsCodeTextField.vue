@@ -11,6 +11,7 @@
     :disabled="disabled"
     :maxlength="maxlength"
     :min="min"
+    :max="max"
     :size="size"
     :readonly="readonly"
   >
@@ -33,6 +34,7 @@ const props = defineProps<{
   readonly?: boolean;
   isTransparent?: boolean;
   min?: number;
+  max?: number;
   size?: number;
   required?: boolean;
   changeOnMouseout?: boolean;

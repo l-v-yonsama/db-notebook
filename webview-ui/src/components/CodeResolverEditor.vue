@@ -10,7 +10,7 @@ import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
-import type { CodeItem, CodeItemDetail } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { CodeItemDetail } from "@l-v-yonsama/multi-platform-database-drivers";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
@@ -32,7 +32,7 @@ const resetSectionHeight = () => {
   const editorPart = window.document.querySelector("section.cr-root div.editor");
   if (sectionWrapper?.clientHeight) {
     const epHeight = editorPart?.clientHeight ?? 0;
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - epHeight - 53, 100);
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - epHeight - 57, 100);
   }
 };
 
@@ -127,6 +127,7 @@ const computedItems = computed((): ComputedItem[] => {
 
 const createEditorParams = (): CodeResolverParams["editor"] => {
   return {
+    ...props.resolver.editor,
     visible: visibleEditor.value,
     connectionName: connectionName.value,
     item: editorItem.value,
@@ -212,7 +213,7 @@ const deleteDetail = (index: number) => {
         <VsCodeButton
           @click="updateTextDocument({ name: 'cancel' })"
           appearance="secondary"
-          title="Cansel"
+          title="Cancel"
           ><fa icon="times" />Cancel</VsCodeButton
         >
         <VsCodeButton @click="updateTextDocument({ name: 'save-code-item' })" title="Save"
@@ -354,7 +355,6 @@ const deleteDetail = (index: number) => {
           <span>Details</span>
 
           <VsCodeButton
-            class="fillBackGround"
             @click="addDetail"
             title="Add detail"
             appearance="secondary"
@@ -396,7 +396,6 @@ const deleteDetail = (index: number) => {
               </td>
               <td style="width: 85px">
                 <VsCodeButton
-                  class="fillBackGround"
                   @click="deleteDetail(idx2)"
                   title="Delete detail"
                   appearance="secondary"
@@ -416,9 +415,9 @@ const deleteDetail = (index: number) => {
           <thead>
             <tr>
               <th rowspan="2" class="code-name">Code name</th>
-              <th rowspan="2">Description</th>
               <th rowspan="2" class="w150">Applicable Resources</th>
               <th colspan="2">Code detail</th>
+              <th rowspan="2">Description</th>
             </tr>
             <tr>
               <th class="w100">Value</th>
@@ -452,12 +451,12 @@ const deleteDetail = (index: number) => {
                       >
                     </div>
                   </td>
-                  <td>{{ item.description }}</td>
                   <td class="w150">
                     {{ item.resource }}
                   </td>
                   <td class="w100">-</td>
                   <td class="w150">-</td>
+                  <td>{{ item.description }}</td>
                 </tr>
               </template>
               <template v-else>
@@ -485,12 +484,12 @@ const deleteDetail = (index: number) => {
                       >
                     </div>
                   </td>
-                  <td v-if="idx2 === 0" :rowspan="item.details.length">{{ item.description }}</td>
                   <td v-if="idx2 === 0" :rowspan="item.details.length" class="w150">
                     {{ item.resource }}
                   </td>
                   <td class="w100">{{ detail.code }}</td>
                   <td class="w150">{{ detail.label }}</td>
+                  <td v-if="idx2 === 0" :rowspan="item.details.length">{{ item.description }}</td>
                 </tr>
               </template>
             </template>
@@ -528,16 +527,6 @@ section.item {
 section.detail {
   margin-top: 25px;
 }
-.toolbar {
-  padding: 3px 4px;
-  margin-bottom: 13px;
-  display: flex;
-}
-.tool-left {
-  flex-grow: 1;
-  align-items: center;
-  display: flex;
-}
 
 div.code-name {
   display: flex;
@@ -550,7 +539,6 @@ fieldset {
   width: calc(100% - 55px);
   margin-left: 20px;
   column-gap: 5px;
-  background-color: rgba(10, 10, 10, 0.4);
 }
 legend {
   width: -webkit-fill-available;
@@ -560,6 +548,8 @@ legend {
 }
 fieldset.resource {
   flex-direction: column;
+  margin-top: 3px;
+  margin-bottom: 3px;
 }
 fieldset.resource > table {
   width: 100%;
