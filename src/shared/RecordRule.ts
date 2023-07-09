@@ -12,6 +12,7 @@ export type RecordRuleEditorPart = {
   tableName: string;
   item?: TableRuleDetail;
   editingItemIndex?: number;
+  keyword?: string;
 };
 
 export type ConditionOperator =

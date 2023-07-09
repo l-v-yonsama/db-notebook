@@ -10,73 +10,89 @@ import { CellMeta, RunResult, NotebookExecutionVariables } from "../types/Notebo
 import { NotebookCell } from "vscode";
 import { log } from "../utilities/logger";
 
-const PREFIX = "[DBNotebookController]";
+const PREFIX = "  [notebook/SqlKernel]";
 
-export const sqlKernelRun = async (
-  cell: NotebookCell,
-  stateStorage: StateStorage,
-  variables: NotebookExecutionVariables
-): Promise<RunResult> => {
-  let stdout = "";
-  let stderr = "";
-  let connectionSetting: ConnectionSetting | undefined = undefined;
-  const { connectionName }: CellMeta = cell.metadata;
+export class SqlKernel {
+  driver: RDSBaseDriver | undefined;
+  constructor(private stateStorage: StateStorage) {}
 
-  if (variables._skipSql === true) {
-    return {
-      stdout,
-      stderr: "Skipped.",
-    };
-  }
-  if (connectionName) {
-    connectionSetting = await stateStorage.getConnectionSettingByName(connectionName);
-  } else {
-    return {
-      stdout,
-      stderr: "Specify the connection name to be used.",
-    };
-  }
-  if (!connectionSetting) {
-    return {
-      stdout,
-      stderr: "Missing connection " + connectionName,
-    };
-  }
+  public async run(cell: NotebookCell, variables: NotebookExecutionVariables): Promise<RunResult> {
+    let stdout = "";
+    let stderr = "";
+    let connectionSetting: ConnectionSetting | undefined = undefined;
+    const { connectionName }: CellMeta = cell.metadata;
 
-  const { query, binds } = normalizeQuery({
-    query: cell.document.getText(),
-    bindParams: variables,
-  });
-  log(`${PREFIX} query:` + query);
-  log(`${PREFIX} binds:` + JSON.stringify(binds));
+    if (variables._skipSql === true) {
+      return {
+        stdout,
+        stderr: "Skipped.",
+      };
+    }
+    if (connectionName) {
+      connectionSetting = await this.stateStorage.getConnectionSettingByName(connectionName);
+    } else {
+      return {
+        stdout,
+        stderr: "Specify the connection name to be used.",
+      };
+    }
+    if (!connectionSetting) {
+      return {
+        stdout,
+        stderr: "Missing connection " + connectionName,
+      };
+    }
 
-  const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
-    RDSBaseDriver,
-    ResultSetData
-  >(
-    connectionSetting,
-    async (driver) =>
-      await driver.requestSql({
+    const { query, binds } = normalizeQuery({
+      query: cell.document.getText(),
+      bindParams: variables,
+    });
+    log(`${PREFIX} query:` + query);
+    log(`${PREFIX} binds:` + JSON.stringify(binds));
+
+    const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+      RDSBaseDriver,
+      ResultSetData
+    >(connectionSetting, async (driver) => {
+      this.driver = driver;
+      return await driver.requestSql({
         sql: query,
         conditions: {
           binds,
         },
-      })
-  );
+      });
+    });
+    this.driver = undefined;
 
-  let metadata = undefined;
-  if (ok && result) {
-    if (!result.meta.tableName) {
-      result.meta.tableName = `CELL${cell.index + 1}`;
+    let metadata = undefined;
+    if (ok && result) {
+      if (!result.meta.tableName) {
+        result.meta.tableName = `CELL${cell.index + 1}`;
+      }
+      metadata = { rdh: result };
+    } else {
+      stderr = message;
     }
-    metadata = { rdh: result };
-  } else {
-    stderr = message;
+
+    return {
+      stdout,
+      stderr,
+      metadata,
+    };
   }
 
-  return {
-    stdout,
-    stderr,
-    metadata,
-  };
-};
+  async interrupt(): Promise<void> {
+    if (this.driver) {
+      log(`${PREFIX} [interrupt] kill`);
+      const message = await this.driver.kill();
+      if (message) {
+        log(`${PREFIX} interrupt result:${message}`);
+      } else {
+        log(`${PREFIX} [interrupt] success`);
+      }
+      this.driver = undefined;
+    } else {
+      log(`${PREFIX} No interrupt target`);
+    }
+  }
+}

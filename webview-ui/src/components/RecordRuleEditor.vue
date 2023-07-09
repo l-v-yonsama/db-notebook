@@ -39,7 +39,7 @@ onMounted(() => {
   }
 });
 
-const keyword = ref("");
+const keyword = ref(props.recordRule.editor.keyword ?? "");
 const visibleEditor = ref(props.recordRule.editor.visible);
 const connectionName = ref(props.recordRule.editor.connectionName);
 const connectionItems = props.connectionSettingNames.map((it) => ({ label: it, value: it }));
@@ -63,13 +63,19 @@ const tableItems =
         value: it.name,
       }));
 
-const details = ref(props.recordRule.tableRule.details);
+const details = ref(
+  props.recordRule.tableRule.details.map((it, originalIndex) => ({
+    ...it,
+    originalIndex,
+  }))
+);
 
 type ComputedDetail = {
   ruleName: string;
   errorColumn: string;
   errorLimit: number;
   conditions: string;
+  originalIndex: number;
 };
 
 const computedDetails = computed((): ComputedDetail[] => {
@@ -96,6 +102,7 @@ const computedDetails = computed((): ComputedDetail[] => {
         errorColumn: item.error.column,
         errorLimit: item.error.limit,
         conditions: conditionsToString(item.conditions as any, columns.value as any, ""),
+        originalIndex: item.originalIndex,
       });
     });
   return list;
@@ -146,6 +153,7 @@ const createEditorParams = (): RecordRule["editor"] => {
     visible: visibleEditor.value,
     connectionName: connectionName.value,
     tableName: tableName.value,
+    keyword: keyword.value,
     item: editorItem.value,
   };
 };
@@ -211,8 +219,10 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
           id="keyword"
           v-model="keyword"
           :maxlength="128"
+          :change-on-mouseout="true"
           title="keyword"
           placeholder="Enter a keyword"
+          @change="updateTextDocument()"
         >
         </VsCodeTextField>
       </div>
@@ -291,18 +301,22 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
                 <p>{{ detail.ruleName }}</p>
                 <div class="controller">
                   <VsCodeButton
-                    @click="updateTextDocument({ name: 'edit-rule', detail: idx })"
+                    @click="updateTextDocument({ name: 'edit-rule', detail: detail.originalIndex })"
                     title="Edit code"
                     appearance="secondary"
                     ><fa icon="pencil" />Edit</VsCodeButton
                   >
                   <VsCodeButton
-                    @click="updateTextDocument({ name: 'duplicate-rule', detail: idx })"
+                    @click="
+                      updateTextDocument({ name: 'duplicate-rule', detail: detail.originalIndex })
+                    "
                     title="Duplicate rule"
                     ><fa icon="plus" />Duplicate</VsCodeButton
                   >
                   <VsCodeButton
-                    @click="updateTextDocument({ name: 'delete-rule', detail: idx })"
+                    @click="
+                      updateTextDocument({ name: 'delete-rule', detail: detail.originalIndex })
+                    "
                     title="Delete rule"
                     appearance="secondary"
                     ><fa icon="trash" />Delete</VsCodeButton

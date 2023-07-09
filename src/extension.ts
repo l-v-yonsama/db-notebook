@@ -59,14 +59,21 @@ export async function activate(context: ExtensionContext) {
   log(`${PREFIX} end activation.`);
   setupDisposeLogger(context);
 
-  process.on("uncaughtException", function (err) {
-    console.log("⭐️⭐️ [uncaughtException]----------------------------------");
-    console.log(err.name);
-    console.log(err.message);
-    console.log(err.toString());
-    console.log(err.stack);
-    log("⭐️⭐️uncaughtException:" + err);
-  });
+  // process.on("uncaughtException", function (err) {
+  //   console.log("⭐️⭐️ [uncaughtException]----------------------------------");
+  //   console.log(err.name);
+  //   console.log(err.message);
+  //   console.log(err.toString());
+  //   console.log(err.stack);
+  //   log("⭐️⭐️uncaughtException:" + err);
+  // });
+
+  // process.on("unhandledRejection", function (reason, err) {
+  //   console.log("⭐️⭐️ [unhandledRejection]----------------------------------");
+  //   console.log(reason);
+  //   console.log(err);
+  //   log("⭐️⭐️unhandledRejection:" + err);
+  // });
 }
 
 export async function deactivate() {

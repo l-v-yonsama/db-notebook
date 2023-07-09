@@ -35,7 +35,7 @@ import {
   workspace,
 } from "vscode";
 import { log } from "../utilities/logger";
-import { sqlKernelRun } from "./sqlKernel";
+import { SqlKernel } from "./sqlKernel";
 import {
   isJsonCell,
   isSqlCell,
@@ -61,6 +61,7 @@ export class MainController {
   readonly label = "Database Notebook";
   readonly supportedLanguages = ["sql", "javascript", "json"];
   private kernel: NodeKernel | undefined;
+  private sqlKernel: SqlKernel | undefined;
 
   private _executionOrder = 0;
   private readonly _controller: NotebookController;
@@ -157,6 +158,13 @@ export class MainController {
     this.interrupted = true;
     if (this.kernel) {
       this.kernel.interrupt();
+    } else {
+      log(`${PREFIX} No NodeKernel`);
+    }
+    if (this.sqlKernel) {
+      this.sqlKernel.interrupt();
+    } else {
+      log(`${PREFIX} No sqlKernel`);
     }
   }
 
@@ -241,7 +249,9 @@ export class MainController {
       throw new Error("Missing kernel");
     }
     if (isSqlCell(cell)) {
-      const r = await sqlKernelRun(cell, this.stateStorage, this.kernel.getStoredVariables());
+      this.sqlKernel = new SqlKernel(this.stateStorage);
+      const r = await this.sqlKernel.run(cell, this.kernel.getStoredVariables());
+      this.sqlKernel = undefined;
       if (r.metadata?.rdh?.meta?.type === "select") {
         const metadata: CellMeta = cell.metadata;
         if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
@@ -261,6 +271,7 @@ export class MainController {
           }
         }
       }
+
       return r;
     } else if (isJsonCell(cell)) {
       return await jsonKernelRun(cell, this.kernel);

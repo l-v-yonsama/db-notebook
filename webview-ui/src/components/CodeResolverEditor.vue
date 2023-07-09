@@ -44,7 +44,7 @@ onMounted(() => {
   }
 });
 
-const keyword = ref("");
+const keyword = ref(props.resolver.editor.keyword ?? "");
 const visibleEditor = ref(props.resolver.editor.visible);
 const connectionName = ref(props.resolver.editor.connectionName);
 const connectionItems = props.connectionSettingNames.map((it) => ({ label: it, value: it }));
@@ -75,12 +75,18 @@ const columnItems = props.columnNameList.map((it) => ({
   value: it.name,
 }));
 
-const items = ref(props.resolver.items);
+const items = ref(
+  props.resolver.items.map((it, originalIndex) => ({
+    ...it,
+    originalIndex,
+  }))
+);
 
 type ComputedItem = {
   title: string;
   description: string;
   resource: string;
+  originalIndex: number;
   details: {
     code: string;
     label: string;
@@ -107,17 +113,18 @@ const computedItems = computed((): ComputedItem[] => {
     })
     .forEach((item) => {
       let resource = "";
-      if (item.resource?.table) {
+      if (item.resource?.table?.pattern) {
         const { regex, pattern } = item.resource.table;
-        resource += `TABLE PATTERN: ${regex ? "(REGEX)" : ""} ${pattern}`;
+        resource += `TABLE: ${regex ? "(REGEX)" : ""} ${pattern}`;
       }
       {
         const { regex, pattern } = item.resource.column;
-        resource += `COLUMN PATTERN: ${regex ? "(REGEX)" : ""} ${pattern}`;
+        resource += `COLUMN: ${regex ? "(REGEX)" : ""} ${pattern}`;
       }
       list.push({
         title: item.title,
         description: item.description ?? "",
+        originalIndex: item.originalIndex,
         resource,
         details: item.details,
       });
@@ -130,6 +137,7 @@ const createEditorParams = (): CodeResolverParams["editor"] => {
     ...props.resolver.editor,
     visible: visibleEditor.value,
     connectionName: connectionName.value,
+    keyword: keyword.value,
     item: editorItem.value,
   };
 };
@@ -228,8 +236,10 @@ const deleteDetail = (index: number) => {
           id="keyword"
           v-model="keyword"
           :maxlength="128"
+          :change-on-mouseout="true"
           title="keyword"
           placeholder="Enter a keyword"
+          @change="updateTextDocument()"
         >
         </VsCodeTextField>
       </div>
@@ -432,19 +442,31 @@ const deleteDetail = (index: number) => {
                     <p>{{ item.title }}</p>
                     <div class="controller">
                       <VsCodeButton
-                        @click="updateTextDocument({ name: 'edit-code-item', detail: idx })"
+                        @click="
+                          updateTextDocument({ name: 'edit-code-item', detail: item.originalIndex })
+                        "
                         title="Edit code"
                         appearance="secondary"
                         ><fa icon="pencil" />Edit</VsCodeButton
                       >
                       <VsCodeButton
-                        @click="updateTextDocument({ name: 'duplicate-code-item', detail: idx })"
+                        @click="
+                          updateTextDocument({
+                            name: 'duplicate-code-item',
+                            detail: item.originalIndex,
+                          })
+                        "
                         title="Duplicate code"
                         appearance="secondary"
                         ><fa icon="plus" />Duplicate</VsCodeButton
                       >
                       <VsCodeButton
-                        @click="updateTextDocument({ name: 'delete-code-item', detail: idx })"
+                        @click="
+                          updateTextDocument({
+                            name: 'delete-code-item',
+                            detail: item.originalIndex,
+                          })
+                        "
                         title="Delete code"
                         appearance="secondary"
                         ><fa icon="trash" />Delete</VsCodeButton
@@ -465,19 +487,31 @@ const deleteDetail = (index: number) => {
                     <p>{{ item.title }}</p>
                     <div class="controller">
                       <VsCodeButton
-                        @click="updateTextDocument({ name: 'edit-code-item', detail: idx })"
+                        @click="
+                          updateTextDocument({ name: 'edit-code-item', detail: item.originalIndex })
+                        "
                         title="Edit code"
                         appearance="secondary"
                         ><fa icon="pencil" />Edit</VsCodeButton
                       >
                       <VsCodeButton
-                        @click="updateTextDocument({ name: 'duplicate-code-item', detail: idx })"
+                        @click="
+                          updateTextDocument({
+                            name: 'duplicate-code-item',
+                            detail: item.originalIndex,
+                          })
+                        "
                         title="Duplicate code"
                         appearance="secondary"
                         ><fa icon="plus" />Duplicate</VsCodeButton
                       >
                       <VsCodeButton
-                        @click="updateTextDocument({ name: 'delete-code-item', detail: idx })"
+                        @click="
+                          updateTextDocument({
+                            name: 'delete-code-item',
+                            detail: item.originalIndex,
+                          })
+                        "
                         title="Delete code"
                         appearance="secondary"
                         ><fa icon="trash" />Delete</VsCodeButton

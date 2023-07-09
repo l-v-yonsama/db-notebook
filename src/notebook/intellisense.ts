@@ -88,14 +88,17 @@ function setActivateDecorator(context: ExtensionContext) {
     if (timeout) {
       clearTimeout(timeout);
       timeout = undefined;
+      log(`${PREFIX} triggerUpdateDecorations cleartimeout`);
     }
     if (activeEditor && cell) {
+      log(`${PREFIX} triggerUpdateDecorations in active editor`);
       if (throttle) {
         timeout = setTimeout(() => updateDecorations(activeEditor, cell), 500);
       } else {
         updateDecorations(activeEditor, cell);
       }
     }
+    log(`${PREFIX} triggerUpdateDecorations done`);
   };
 
   context.subscriptions.push(
@@ -140,7 +143,6 @@ function setActivateDecorator(context: ExtensionContext) {
 function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookCell | undefined) {
   log(`${PREFIX} start updateDecorations`);
   if (cell === undefined || rdsDatabase === undefined || activeEditor === undefined) {
-    log(`${PREFIX} end updateDecorations`);
     return;
   }
 
@@ -154,6 +156,7 @@ function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookC
     }
     const sql = document.getText();
     const smallNumbers: DecorationOptions[] = [];
+
     const resList = getResourcePositions({ sql, db: rdsDatabase });
     resList
       .filter((it) => it.comment)
@@ -172,12 +175,11 @@ function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookC
         };
         smallNumbers.push(decoration);
       });
+
     activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
   } catch (e: any) {
     log(`${PREFIX} Error:${e.message}`);
   }
-
-  log(`${PREFIX} end updateDecorations`);
 }
 
 function getStoreKeys(): string[] {

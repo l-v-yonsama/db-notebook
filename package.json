@@ -532,7 +532,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.153",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.158",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

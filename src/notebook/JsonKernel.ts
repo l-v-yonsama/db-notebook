@@ -1,17 +1,9 @@
-import { StateStorage } from "../utilities/StateStorage";
-import {
-  ConnectionSetting,
-  DBDriverResolver,
-  RDSBaseDriver,
-  ResultSetData,
-  normalizeQuery,
-} from "@l-v-yonsama/multi-platform-database-drivers";
-import { CellMeta, RunResult, NotebookExecutionVariables } from "../types/Notebook";
+import { CellMeta, RunResult } from "../types/Notebook";
 import { NotebookCell } from "vscode";
 import { log } from "../utilities/logger";
 import { NodeKernel } from "./NodeKernel";
 
-const PREFIX = "[]";
+const PREFIX = "  [notebook/JsonKernel]";
 
 export const jsonKernelRun = async (
   cell: NotebookCell,
@@ -19,8 +11,6 @@ export const jsonKernelRun = async (
 ): Promise<RunResult> => {
   let stdout = "";
   let stderr = "";
-  let connectionSetting: ConnectionSetting | undefined = undefined;
-  const { connectionName }: CellMeta = cell.metadata;
 
   const variables = nodeKernel.getStoredVariables();
   if (variables._skipSql === true) {

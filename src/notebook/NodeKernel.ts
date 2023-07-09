@@ -13,7 +13,7 @@ import {
   writeToResource,
 } from "../utilities/fsUtil";
 
-const PREFIX = "[notebook/NodeKernel]";
+const PREFIX = "  [notebook/NodeKernel]";
 
 const baseDir = path.join(__filename, "..", "..", "..");
 const nodeModules = path.join(baseDir, "node_modules");
@@ -134,6 +134,7 @@ export class NodeKernel {
       }
     });
     await promise;
+    this.child = undefined;
 
     const reg = new RegExp(".*" + path.basename(this.scriptFile.fsPath) + ":[0-9]+\r?\n *");
     stderr = stderr.replace(reg, "");
@@ -166,10 +167,17 @@ export class NodeKernel {
   }
 
   interrupt() {
-    log(`${PREFIX} interrupt`);
     if (this.child) {
-      process.kill(this.child.pid);
+      log(`${PREFIX} [interrupt] kill pid:${this.child.pid}`);
+      try {
+        const message = process.kill(this.child.pid);
+        log(`${PREFIX} result:${message}`);
+      } catch (e: any) {
+        log(`${PREFIX} Error:${e.message}`);
+      }
       this.child = undefined;
+    } else {
+      log(`${PREFIX} No interrupt target`);
     }
   }
 
