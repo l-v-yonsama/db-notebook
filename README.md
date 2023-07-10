@@ -43,6 +43,10 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/04_er_diagram.gif)
 
+- Label display using code label resolver
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/06_label_display.gif)
+
 ## Requirements
 
 - node.js >= 14.14
