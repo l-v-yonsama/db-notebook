@@ -27,8 +27,21 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
 ## Examples
 
-- Setup connection settings, access to Mysql through the side-panel
-  - ![](./docs/images/01_setup.gif)
+- Setup connection settings, access to Mysql through the Side-panel
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/01_setup.gif)
+
+- Access to Mysql through the Notebook ( `Create a new blank Database Notebook` )
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/02_notebook.gif)
+
+- Variable sharing between notebook cells
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/03_variable_sharing.gif)
+
+- ER diagram creation in mermaid format
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/04_er_diagram.gif)
 
 ## Requirements
 

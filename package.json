@@ -168,11 +168,6 @@
           "group": "connection-setting@1"
         },
         {
-          "command": "database-notebook.show-resource-properties",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+,properties.*/",
-          "group": "connection-setting@1"
-        },
-        {
           "command": "database-notebook.create-er-diagram",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "inline"
