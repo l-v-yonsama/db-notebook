@@ -43,7 +43,11 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/04_er_diagram.gif)
 
-- Label display using code label resolver
+- Difference display using comparison key (Primary or Unique key)
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/05_diff.gif)
+
+- Label display using code label resolver ( `Create a new blank Code label resolver` )
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/06_label_display.gif)
 
@@ -55,3 +59,9 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
 The ER diagram is output in mermaid format.
 It is recommended to use the "[Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid)" extension together to visualize it.
+
+## 🎁 Donate
+
+<a href="https://www.buymeacoffee.com/lvyoshiokaI">
+  <img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174">
+</a>

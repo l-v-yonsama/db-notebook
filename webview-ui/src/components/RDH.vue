@@ -316,6 +316,10 @@ const toEditTypeMark = (editType?: RowValues["editType"]): string => {
   }
 };
 
+const copyToClipboard = (text: string) => {
+  navigator?.clipboard?.writeText(text);
+};
+
 const save = (): SaveValuesInRdhParams => {
   console.log("calledd save");
   const params: SaveValuesInRdhParams = {
@@ -497,15 +501,22 @@ defineExpose({
                 onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
               "
             ></VsCodeTextField>
-            <p
-              v-else
-              :title="toTitle(item, key.name)"
-              :style="{ width: `${key.width}px` }"
-              v-text="item[key.name]"
-            ></p>
-            <span v-if="item.$resolvedLabels[key.name]" class="code-label">{{
-              item.$resolvedLabels[key.name]
-            }}</span>
+            <template v-else>
+              <p
+                :title="toTitle(item, key.name)"
+                :style="{ width: `${key.width}px` }"
+                v-text="item[key.name]"
+              ></p>
+              <span v-if="item.$resolvedLabels[key.name]" class="code-label">{{
+                item.$resolvedLabels[key.name]
+              }}</span>
+              <VsCodeButton
+                @click="copyToClipboard(item[key.name])"
+                appearance="secondary"
+                class="copy-to-clipboard"
+                ><fa icon="clipboard"
+              /></VsCodeButton>
+            </template>
           </td>
         </tr>
       </template>
@@ -570,6 +581,15 @@ td.vcell > .code-label {
 }
 td.vcell:hover > .code-label {
   display: none;
+}
+td.vcell > .copy-to-clipboard {
+  display: none;
+  position: absolute;
+  right: 4px;
+  top: 4px;
+}
+td.vcell:hover > .copy-to-clipboard {
+  display: inline-block;
 }
 td.vcell > p {
   display: inline-block;
