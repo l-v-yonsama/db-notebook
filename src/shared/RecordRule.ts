@@ -15,23 +15,6 @@ export type RecordRuleEditorPart = {
   keyword?: string;
 };
 
-export type ConditionOperator =
-  | "equal"
-  | "notEqual"
-  | "lessThan"
-  | "lessThanInclusive"
-  | "greaterThan"
-  | "greaterThanInclusive"
-  | "in"
-  | "notIn";
-
-// export type ConditionPropertiesForWeb = {
-//   column: string;
-//   operator: ConditionOperator;
-//   value: { column: string } | any;
-//   comment: string;
-// };
-
 export type ConditionProperties = {
   fact: string;
   operator: string;
@@ -39,7 +22,6 @@ export type ConditionProperties = {
   path?: string;
   priority?: number;
   params?: {
-    comment: string;
     valType: "static" | "column";
     valColumn: string;
     [key: string]: any;

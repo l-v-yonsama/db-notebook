@@ -4,6 +4,8 @@ import {
   RDSBaseDriver,
   ResultSetData,
   ResultSetDataBuilder,
+  resolveCodeLabel,
+  runRuleEngine,
   toDeleteStatementWithBinds,
   toInsertStatementWithBinds,
   toUpdateStatementWithBinds,
@@ -86,7 +88,7 @@ export class MdhPanel {
       });
       MdhPanel.currentPanel = new MdhPanel(panel, extensionUri);
     }
-    //               vscode.window.activeColorTheme.kind===ColorThemeKind.Dark
+    // vscode.window.activeColorTheme.kind===ColorThemeKind.Dark
     MdhPanel.currentPanel.renderSub(
       title,
       list.map((it) => ResultSetDataBuilder.from(it).build())
@@ -542,6 +544,15 @@ export class MdhPanel {
               conditions: rdh.queryConditions,
               meta: rdh.meta,
             });
+            if (rdh.meta.tableRule) {
+              newRdh.meta.tableRule = rdh.meta.tableRule;
+              await runRuleEngine(newRdh);
+            }
+            if (rdh.meta.codeItems) {
+              newRdh.meta.codeItems = rdh.meta.codeItems;
+              await resolveCodeLabel(newRdh);
+            }
+
             tabItem.list[i] = newRdh;
           }
         }

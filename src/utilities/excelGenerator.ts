@@ -8,6 +8,7 @@ import {
   GeneralColumnType,
   RdhHelper,
   RdhKey,
+  RdhMeta,
   RecordRuleValidationResult,
   ResultSetData,
   ResultSetDataBuilder,
@@ -145,11 +146,12 @@ function createQueryResultSheet(
 ): number {
   let plusNo = 0;
 
+  const { tableName, comment, ruleViolationSummary } = rdh.meta;
   // table name / comment
   let cell = sheet.getCell(baseRowNo, 2);
-  let titleValue = rdh.meta.tableName;
-  if (rdh.meta.comment) {
-    titleValue += ` (${rdh.meta.comment})`;
+  let titleValue = tableName;
+  if (comment) {
+    titleValue += ` (${comment})`;
   }
   cell.value = "■ " + titleValue;
   plusNo++;
@@ -194,6 +196,25 @@ function createQueryResultSheet(
     plusNo++;
   }
 
+  if (ruleViolationSummary) {
+    const names = Object.keys(ruleViolationSummary);
+    cell = sheet.getCell(baseRowNo + plusNo, 2);
+    setTableHeaderCell(cell);
+    if (names.length === 1) {
+      cell.value = `Rule violation`;
+      sheet.mergeCells(`B${baseRowNo + plusNo}:C${baseRowNo + plusNo}`);
+    } else {
+      cell.value = `Rule violations`;
+      sheet.mergeCells(`B${baseRowNo + plusNo}:C${baseRowNo + plusNo + names.length - 1}`);
+    }
+    names.forEach((name, idx) => {
+      cell = sheet.getCell(baseRowNo + plusNo, 4);
+      cell.value = `*${idx + 1}: ${name}: ${ruleViolationSummary[name]}`;
+      plusNo++;
+    });
+    plusNo++;
+  }
+
   // resulet set
   cell = sheet.getCell(baseRowNo + plusNo, 2);
   cell.value = "No";
@@ -233,17 +254,20 @@ function createQueryResultSheet(
       const values = rdhRow.values;
       sheet.getCell(baseRowNo + plusNo, 2).value = ri + 1;
       rdh.keys.forEach((column: RdhKey, colIdx: number) => {
-        let ruleMessage: string | undefined = undefined;
+        let ruleMarker: string | undefined = undefined;
         let resolvedLabel: string | undefined = undefined;
 
         const v = values[column.name];
-        const ruleAnnonations = (rdhRow.meta[column.name]?.filter((it) => it.type === "Rul") ??
-          []) as RuleAnnotation[];
+        const ruleAnnonations = RowHelper.filterAnnotationByKeyOf<RuleAnnotation>(
+          rdhRow,
+          column.name,
+          "Rul"
+        );
         let format = getCellFormat(column.type);
         const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
         let isHyperText = column.meta && column.meta.is_hyperlink === true;
         if (ruleAnnonations.length) {
-          ruleMessage = ruleAnnonations.map((it) => it.values?.message ?? "").join("\n");
+          ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
           fillCell(cell, "Rul");
         }
         if (rdh.meta.codeItems) {
@@ -253,7 +277,7 @@ function createQueryResultSheet(
             "Cod"
           )?.values?.label;
         }
-        setAnyValueByIndex(cell, v, { isHyperText, format, ruleMessage, resolvedLabel });
+        setAnyValueByIndex(cell, v, { isHyperText, format, ruleMarker, resolvedLabel });
       });
       plusNo++;
     });
@@ -523,13 +547,14 @@ async function createBookFromDiffList(
         if (!rdh) {
           continue;
         }
+        const { tableName, comment, ruleViolationSummary } = rdh.meta;
 
         cur.tableRowNoList.push(cur.rowNo);
         // table name
         const cellTitle = sheet.getCell(cur.rowNo, 1);
         let titleValue = title;
-        if (rdh.meta.comment) {
-          titleValue += ` (${rdh.meta.comment})`;
+        if (comment) {
+          titleValue += ` (${comment})`;
         }
         if (diffResult.message) {
           titleValue += ` [${diffResult.message}]`;
@@ -572,6 +597,25 @@ async function createBookFromDiffList(
               cur.rowNo++;
             });
           }
+          cur.rowNo++;
+        }
+
+        if (ruleViolationSummary) {
+          const names = Object.keys(ruleViolationSummary);
+          cell = sheet.getCell(cur.rowNo, 1);
+          setTableHeaderCell(cell);
+          if (names.length === 1) {
+            cell.value = `Rule violation`;
+            sheet.mergeCells(`B${cur.rowNo}:C${cur.rowNo}`);
+          } else {
+            cell.value = `Rule violations`;
+            sheet.mergeCells(`B${cur.rowNo}:C${cur.rowNo + names.length - 1}`);
+          }
+          names.forEach((name, idx) => {
+            cell = sheet.getCell(cur.rowNo, 3);
+            cell.value = `*${idx + 1}: ${name}: ${ruleViolationSummary[name]}`;
+            cur.rowNo++;
+          });
           cur.rowNo++;
         }
 
@@ -646,11 +690,25 @@ async function createBookFromDiffList(
 
             rdh.keys.forEach((column: RdhKey, colIdx: number) => {
               let annotationMessage: any = undefined;
-              let ruleMessage: string | undefined = undefined;
+              let ruleMarker: string | undefined = undefined;
               let resolvedLabel: string | undefined = undefined;
               let format = getCellFormat(column.type);
               const v = values[column.name];
               const cell = sheet.getCell(cur.rowNo, colIdx + 2);
+
+              const isHyperText = column.meta && column.meta.is_hyperlink === true;
+              const ruleAnnonations = RowHelper.filterAnnotationByKeyOf<RuleAnnotation>(
+                rdhRow,
+                column.name,
+                "Rul"
+              );
+              if (ruleAnnonations.length) {
+                ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
+              }
+
+              if (ruleMarker) {
+                fillCell(cell, "Rul");
+              }
               if (inserted) {
                 fillCell(cell, "Add");
               } else if (removed) {
@@ -670,13 +728,7 @@ async function createBookFromDiffList(
                   annotationMessage = annotation.values?.otherValue;
                 }
               }
-              const isHyperText = column.meta && column.meta.is_hyperlink === true;
-              const ruleAnnonations = (rdhRow.meta[column.name]?.filter(
-                (it) => it.type === "Rul"
-              ) ?? []) as RuleAnnotation[];
-              if (ruleAnnonations.length) {
-                ruleMessage = ruleAnnonations.map((it) => it.values?.message ?? "").join("\n");
-              }
+
               if (rdh.meta.codeItems) {
                 resolvedLabel = RowHelper.getFirstAnnotationOf<CodeResolvedAnnotation>(
                   rdhRow,
@@ -684,11 +736,12 @@ async function createBookFromDiffList(
                   "Cod"
                 )?.values?.label;
               }
+
               setAnyValueByIndex(cell, v, {
                 annotationMessage,
                 isHyperText,
                 format,
-                ruleMessage,
+                ruleMarker,
                 resolvedLabel,
               });
             });
@@ -933,7 +986,7 @@ function setAnyValueByIndex(
   text: any,
   options?: {
     annotationMessage?: any;
-    ruleMessage?: string;
+    ruleMarker?: string;
     resolvedLabel?: string;
     isHyperText?: boolean;
     wrap?: boolean;
@@ -975,7 +1028,7 @@ function setAnyValueByIndex(
     let useFormat = !!options.format;
     if (
       options.annotationMessage !== undefined ||
-      options.ruleMessage !== undefined ||
+      options.ruleMarker !== undefined ||
       options.resolvedLabel !== undefined
     ) {
       cellValue = {
@@ -983,7 +1036,7 @@ function setAnyValueByIndex(
       };
       let me = text ?? "";
       let you = options.annotationMessage ?? "";
-      let rule = options.ruleMessage ?? "";
+      let ruleMarker = options.ruleMarker ?? "";
       // 比較対象も横並びにする場合は標準型のまま
       if (options.format) {
         if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
@@ -992,6 +1045,17 @@ function setAnyValueByIndex(
             you = toDateString(you, options.format);
           }
         }
+      }
+      if (options.ruleMarker) {
+        cellValue.richText.push({
+          text: `${ruleMarker} `,
+          font: {
+            color: {
+              argb: "33663366",
+            },
+            size: 8,
+          },
+        });
       }
       cellValue.richText.push({
         text: me,
@@ -1002,16 +1066,6 @@ function setAnyValueByIndex(
           font: {
             color: {
               argb: "66333366",
-            },
-          },
-        });
-      }
-      if (options.ruleMessage) {
-        cellValue.richText.push({
-          text: `\n{${rule}}`,
-          font: {
-            color: {
-              argb: "33663366",
             },
           },
         });
@@ -1102,6 +1156,23 @@ function nvl(s: string | undefined, rep: string) {
     return rep;
   }
   return s;
+}
+
+function toRuleMarker(
+  ruleViolationSummary: RdhMeta["ruleViolationSummary"],
+  rules: RuleAnnotation[]
+): string | undefined {
+  if (ruleViolationSummary === undefined) {
+    return undefined;
+  }
+  const marks: number[] = [];
+  const names = Object.keys(ruleViolationSummary);
+  names.forEach((it, idx) => {
+    if (rules.some((rule) => rule.values?.name === it)) {
+      marks.push(idx + 1);
+    }
+  });
+  return marks.length > 0 ? `*${marks.join(",")}` : undefined;
 }
 
 function writeTocRecords(tocSheet: Excel.Worksheet, tocRecords: TocRecords, rowNo: number): number {

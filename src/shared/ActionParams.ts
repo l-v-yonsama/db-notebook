@@ -166,6 +166,7 @@ export type WriteToClipboardParams<T = any> = TabIdParam & {
   outputWithType: "none" | "withComment" | "withType" | "both";
   withRowNo: boolean;
   withCodeLabel: boolean;
+  withRuleViolation: boolean;
   limit?: number; // default:10
   specifyDetail?: boolean;
   options?: T;

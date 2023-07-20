@@ -28,6 +28,7 @@ const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): s
     maxPrintLines,
     withRowNo: params.withRowNo,
     withCodeLabel: params.withCodeLabel,
+    withRuleViolation: params.withRuleViolation,
     ...createOutputDetail(params.outputWithType),
   };
   let ret = "";

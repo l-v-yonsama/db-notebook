@@ -375,6 +375,7 @@ defineExpose({
             fileType: 'text',
             outputWithType: 'withComment',
             withRowNo: true,
+            withRuleViolation: true,
             withCodeLabel: true,
           })
         "

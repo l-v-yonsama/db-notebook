@@ -3,11 +3,13 @@
     <fieldset :class="{ 'no-elements': noElements }">
       <legend>
         <span v-if="noElements" class="codicon codicon-error"></span>
-        <VsCodeDropdown
+
+        <VsCodeRadioGroupVue
           v-model="andOrSwitch"
           :items="andOrItems"
           @change="($e:Event) => handleOnChange('andOrSwitch', $e)"
-        ></VsCodeDropdown>
+        />
+
         <VsCodeButton
           @click="addCondition"
           title="Add condition"
@@ -37,8 +39,7 @@
             <th class="col">Column</th>
             <th class="ope">Operator</th>
             <th class="val">Value</th>
-            <th class="com">Comment</th>
-            <th class="ctl">Control</th>
+            <th class="ctl">&nbsp;</th>
           </tr>
         </thead>
         <tbody>
@@ -51,7 +52,7 @@
                 :transparent="true"
                 :required="true"
                 @change="changeCondition"
-                style="width: 320px; z-index: 4"
+                style="width: 310px"
               ></VsCodeDropdown>
             </td>
             <td class="ope">
@@ -60,64 +61,45 @@
                 :items="operatorItems"
                 :transparent="true"
                 :required="true"
-                style="z-index: 4"
                 @change="changeCondition"
               ></VsCodeDropdown>
             </td>
             <td class="val">
-              <div style="display: flex; column-gap: 5px">
+              <div v-if="hasValueOperator(conditionList[idx].operator)" class="val-def">
                 <VsCodeDropdown
-                  v-show="
-                    conditionList[idx].operator !== 'isNull' &&
-                    conditionList[idx].operator !== 'isNotNull' &&
-                    conditionList[idx].operator !== 'isNil' &&
-                    conditionList[idx].operator !== 'isNotNil'
-                  "
+                  v-if="selectableValType(conditionList[idx].operator)"
                   v-model="conditionList[idx].params!.valType"
                   :items="valTypeItems"
                   :transparent="true"
                   :required="true"
-                  style="margin-right: 3px; z-index: 4"
+                  class="valType"
                   @change="changeCondition({ name: 'valType', condition })"
                 ></VsCodeDropdown>
                 <VsCodeTextField
-                  v-if="
-                  conditionList[idx].params!.valType === 'static' &&
-                  conditionList[idx].operator !== 'isNull' &&
-                  conditionList[idx].operator !== 'isNotNull' &&
-                  conditionList[idx].operator !== 'isNil' &&
-                  conditionList[idx].operator !== 'isNotNil'
-                "
+                  v-if="conditionList[idx].params!.valType === 'static'"
                   v-model="conditionList[idx].value"
                   :maxlength="256"
                   :transparent="true"
                   :required="true"
+                  :change-on-mouseout="true"
                   style="flex-grow: 1"
                   @change="changeCondition()"
                 ></VsCodeTextField>
+                <p
+                  style="margin: 0 3px"
+                  v-if="!selectableValType(conditionList[idx].operator)"
+                  v-text="toExample(conditionList[idx])"
+                ></p>
                 <VsCodeDropdown
-                  v-if="
-                  conditionList[idx].params!.valType === 'column' &&
-                  conditionList[idx].operator !== 'isNull' &&
-                  conditionList[idx].operator !== 'isNotNull' &&
-                  conditionList[idx].operator !== 'isNil' &&
-                  conditionList[idx].operator !== 'isNotNil'
-                "
+                  v-if="conditionList[idx].params!.valType === 'column' && selectableValType(conditionList[idx].operator)"
                   v-model="conditionList[idx].params!.valColumn"
                   :items="columnItems"
                   :transparent="true"
                   :required="true"
                   @change="changeCondition({ name: 'valColumn', condition })"
-                  style="flex-grow: 1; z-index: 4"
+                  style="flex-grow: 1"
                 ></VsCodeDropdown>
               </div>
-            </td>
-            <td class="com">
-              <VsCodeTextField
-                v-model="conditionList[idx].params!.comment"
-                :maxlength="256"
-                @change="changeCondition()"
-              ></VsCodeTextField>
             </td>
             <td class="ctl">
               <VsCodeButton
@@ -126,7 +108,7 @@
                 @click="deleteCondition(idx)"
                 title="Delete"
               >
-                <span class="codicon codicon-trash"></span>Delete
+                <span class="codicon codicon-trash"></span>Del
               </VsCodeButton>
             </td>
           </tr>
@@ -148,9 +130,11 @@
 import { computed, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import type { DropdownItem } from "@/types/Components";
-import type { TableRuleDetail } from "@l-v-yonsama/multi-platform-database-drivers";
+import { OPERATORS } from "@/utilities/RRuleUtil";
+
 import type {
   ConditionProperties,
   AllConditions,
@@ -163,9 +147,11 @@ import {
   isConditionProperties,
   isTopLevelCondition,
 } from "@/utilities/RRuleUtil";
+import { GeneralColumnType } from "@/types/lib/GeneralColumnType";
+import { isNumericLike } from "@/utilities/GeneralColumnUtil";
 
 type Props = {
-  modelValue: any; //TableRuleDetail["conditions"];
+  modelValue: any; // TableRuleDetail["conditions"];
   columnItems: DropdownItem[];
 };
 const props = defineProps<Props>();
@@ -207,23 +193,7 @@ if (isAnyConditions(props.modelValue)) {
   });
 }
 
-const operatorItems: DropdownItem[] = [
-  { label: "-", value: "" },
-  { label: "IS NULL", value: "isNull" },
-  { label: "IS NOT NULL", value: "isNotNull" },
-  { label: "IS NIL", value: "isNil" },
-  { label: "IS NOT NIL", value: "isNotNil" },
-  { label: "=", value: "equal" },
-  { label: "≠", value: "notEqual" },
-  { label: "<", value: "lessThan" },
-  { label: "≦", value: "lessThanInclusive" },
-  { label: ">", value: "greaterThan" },
-  { label: "≧", value: "greaterThanInclusive" },
-  { label: "STARTS WITH", value: "startsWith" },
-  { label: "ENDS WITH", value: "endsWith" },
-  { label: "∈ (IN)", value: "in" },
-  { label: "∉ (NOT IN)", value: "notIn" },
-];
+const operatorItems = OPERATORS;
 
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: any): void;
@@ -303,7 +273,6 @@ const addCondition = () => {
     operator: "",
     value: "",
     params: {
-      comment: "",
       valType: "static",
       valColumn: "",
     },
@@ -333,8 +302,38 @@ const addNestedCondition = () => {
 const updateSuperTextDocument = () => {
   changeCondition();
 };
+
+const hasValueOperator = (ope: string): boolean => {
+  return ope !== "isNull" && ope !== "isNotNull" && ope !== "isNil" && ope !== "isNotNil";
+};
+
+const selectableValType = (ope: string): boolean => {
+  return ope !== "between" && ope !== "in" && ope !== "notIn";
+};
+
+const toExample = (p: ConditionProperties): string => {
+  const { operator, fact } = p;
+  let colType = GeneralColumnType.INTEGER;
+  if (fact) {
+    colType =
+      props.columnItems.find((it) => it.value === fact)?.meta?.colType ?? GeneralColumnType.INTEGER;
+  }
+  if (isNumericLike(colType)) {
+    if (operator === "between") {
+      return "e.g. 10,20";
+    }
+    return "e.g. 10,20,30";
+  }
+  if (operator === "between") {
+    return "e.g. a,b";
+  }
+  return "e.g. a,b,c";
+};
 </script>
 <style scoped>
+vscode-dropdown.open {
+  z-index: 20;
+}
 section.condition {
   margin-top: 17px;
 }
@@ -352,21 +351,31 @@ table {
   width: 60px;
   max-width: 60px;
 }
-
+.valType {
+  margin-right: 3px;
+  z-index: 4;
+}
 .ctl {
-  width: 80px;
-  max-width: 80px;
+  width: 60px;
+  max-width: 60px;
 }
 .col {
-  width: 320px;
+  width: 310px;
 }
 .com {
   width: 110px;
   text-align: center;
 }
 .ope {
-  width: 102px;
-  max-width: 102px;
+  width: 110px;
+  max-width: 110px;
   text-align: center;
+}
+.val-def {
+  display: flex;
+  column-gap: 5px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
 }
 </style>

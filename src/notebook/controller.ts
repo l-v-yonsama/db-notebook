@@ -155,16 +155,20 @@ export class MainController {
 
   private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
     log(`${PREFIX} interruptHandler`);
-    this.interrupted = true;
-    if (this.kernel) {
-      this.kernel.interrupt();
-    } else {
-      log(`${PREFIX} No NodeKernel`);
-    }
-    if (this.sqlKernel) {
-      this.sqlKernel.interrupt();
-    } else {
-      log(`${PREFIX} No sqlKernel`);
+    try {
+      this.interrupted = true;
+      if (this.kernel) {
+        this.kernel.interrupt();
+      } else {
+        log(`${PREFIX} No NodeKernel`);
+      }
+      if (this.sqlKernel) {
+        this.sqlKernel.interrupt();
+      } else {
+        log(`${PREFIX} No sqlKernel`);
+      }
+    } catch (e: any) {
+      log(`${PREFIX} interruptHandler Error:${e.message}`);
     }
   }
 
@@ -173,6 +177,7 @@ export class MainController {
     notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
+    log(`${PREFIX} _executeAll START`);
     this.interrupted = false;
     const connectionSettings = await this.stateStorage.getConnectionSettingList();
     this.kernel = await NodeKernel.create(connectionSettings);
@@ -186,7 +191,7 @@ export class MainController {
     this.currentVariables = this.kernel.getStoredVariables();
     await this.kernel.dispose();
     this.kernel = undefined;
-    // this.setActiveContext();
+    log(`${PREFIX} _executeAll END`);
   }
 
   private async _doExecution(notebook: NotebookDocument, cell: NotebookCell): Promise<void> {
@@ -217,6 +222,7 @@ export class MainController {
                   withComment,
                   withRowNo: true,
                   withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
+                  withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
                 }),
                 "text/markdown"
               ),
@@ -255,9 +261,10 @@ export class MainController {
       if (r.metadata?.rdh?.meta?.type === "select") {
         const metadata: CellMeta = cell.metadata;
         if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
-          const rrule = await readRuleFile(cell);
+          const rrule = await readRuleFile(cell, r.metadata.rdh);
           if (rrule) {
             r.metadata.rdh.meta.tableRule = rrule.tableRule;
+            log(`${PREFIX} rrule.tableRule:${JSON.stringify(rrule.tableRule, null, 1)}`);
             const runRuleEngineResult = await runRuleEngine(r.metadata.rdh);
             log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
           }

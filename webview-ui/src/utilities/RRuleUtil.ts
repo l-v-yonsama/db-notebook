@@ -1,3 +1,4 @@
+import type { DropdownItem } from "@/types/Components";
 import type {
   ConditionProperties,
   AllConditions,
@@ -19,7 +20,7 @@ export function isConditionProperties(params: any): params is ConditionPropertie
   return params["fact"] !== undefined && params["operator"] !== undefined;
 }
 
-const OPERATORS = [
+export const OPERATORS: DropdownItem[] = [
   { label: "-", value: "" },
   { label: "IS NULL", value: "isNull" },
   { label: "IS NOT NULL", value: "isNotNull" },
@@ -33,6 +34,7 @@ const OPERATORS = [
   { label: "≧", value: "greaterThanInclusive" },
   { label: "STARTS WITH", value: "startsWith" },
   { label: "ENDS WITH", value: "endsWith" },
+  { label: "BETWEEN", value: "between" },
   { label: "∈ (IN)", value: "in" },
   { label: "∉ (NOT IN)", value: "notIn" },
 ];

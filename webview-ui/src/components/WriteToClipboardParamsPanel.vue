@@ -41,6 +41,7 @@ const withComment = ref(false);
 const limit = ref(props.params.params.limit ?? 10);
 const withRowNo = ref(props.params.params.withRowNo);
 const withCodeLabel = ref(props.params.params.withCodeLabel);
+const withRuleViolation = ref(props.params.params.withRuleViolation);
 
 const { outputWithType } = props.params.params;
 switch (outputWithType) {
@@ -76,6 +77,11 @@ const handleChangeResolvedLabel = (checked: boolean) => {
   handleChange();
 };
 
+const handleChangeRuleViolation = (checked: boolean) => {
+  withRuleViolation.value = checked;
+  handleChange();
+};
+
 const handleChange = (refresh = true) => {
   let outputWithType: WriteToClipboardParams["outputWithType"] = "none";
   if (withType.value) {
@@ -100,6 +106,7 @@ const handleChange = (refresh = true) => {
       specifyDetail: refresh,
       withRowNo: withRowNo.value,
       withCodeLabel: withCodeLabel.value,
+      withRuleViolation: withRuleViolation.value,
     },
   });
 };
@@ -135,6 +142,7 @@ const cancel = () => {
         </td>
       </tr>
       <tr>
+        <td>&nbsp;</td>
         <td>
           <vscode-checkbox
             v-model="withType"
@@ -159,18 +167,10 @@ const cancel = () => {
             >Row no</vscode-checkbox
           >
         </td>
-        <td>
-          <vscode-checkbox
-            v-model="withCodeLabel"
-            :checked="withCodeLabel === true"
-            @change="($e:any) => handleChangeResolvedLabel($e.target.checked)"
-            >Resolved Label</vscode-checkbox
-          >
-        </td>
       </tr>
       <tr>
         <th>Limit rows</th>
-        <td colspan="3">
+        <td>
           <VsCodeTextField
             v-model="limit"
             type="number"
@@ -179,10 +179,26 @@ const cancel = () => {
             @change="handleChange(true)"
           ></VsCodeTextField>
         </td>
+        <td>
+          <vscode-checkbox
+            v-model="withCodeLabel"
+            :checked="withCodeLabel === true"
+            @change="($e:any) => handleChangeResolvedLabel($e.target.checked)"
+            >Resolved Label</vscode-checkbox
+          >
+        </td>
+        <td>
+          <vscode-checkbox
+            v-model="withRuleViolation"
+            :checked="withRuleViolation === true"
+            @change="($e:any) => handleChangeRuleViolation($e.target.checked)"
+            >Rule violation</vscode-checkbox
+          >
+        </td>
       </tr>
     </table>
     <fieldset>
-      <legend>Preview text</legend>
+      <legend>Preview text (Displayable preview records is 10)</legend>
       <textarea readonly :value="params.previewText" wrap="off"></textarea>
     </fieldset>
   </section>

@@ -310,9 +310,14 @@ const deleteKey = (): void => {
   vscode.postCommand(action);
 };
 
+const stopProgress = (): void => {
+  inProgress.value = false;
+};
+
 defineExpose({
   addTabItem,
   removeTabItem,
+  stopProgress,
   setSearchResult,
 });
 </script>
@@ -536,6 +541,7 @@ vscode-panel-view {
 .toolbar .multiple {
   display: flex;
   column-gap: 2px;
+  flex-grow: 1;
 }
 .toolbar .multiple .left {
   display: flex;

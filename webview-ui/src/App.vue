@@ -128,6 +128,9 @@ function messageListener(evt: MessageEvent) {
     case "ScanPanel-set-search-result":
       scanPanelRef.value?.setSearchResult(value);
       break;
+    case "ScanPanel-stop-progress":
+      scanPanelRef.value?.stopProgress();
+      break;
     case "MdhPanel-add-tab-item":
       mdhPanelRef.value?.addTabItem(value);
       break;

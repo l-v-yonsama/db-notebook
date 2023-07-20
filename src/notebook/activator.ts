@@ -101,6 +101,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         withRowNo: true,
         withCodeLabel: true,
         specifyDetail: true,
+        withRuleViolation: true,
         limit: 10,
       });
     })
@@ -195,7 +196,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         label: path.relative(rootPath, it.fsPath),
         description: undefined,
       }));
-      const NO_USE = "No use";
+      const NO_USE = "Unused";
       items.unshift({
         label: NO_USE,
         description: "Stop using rules",
@@ -239,7 +240,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         label: path.relative(rootPath, it.fsPath),
         description: undefined,
       }));
-      const NO_USE = "No use";
+      const NO_USE = "Unused";
       items.unshift({
         label: NO_USE,
         description: "Stop using code resolver",

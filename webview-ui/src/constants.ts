@@ -44,6 +44,7 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem<
       outputWithType: "none",
       withRowNo: true,
       withCodeLabel: true,
+      withRuleViolation: true,
     },
   });
   WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
@@ -54,6 +55,7 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem<
       outputWithType: "both",
       withRowNo: true,
       withCodeLabel: true,
+      withRuleViolation: true,
     },
   });
 });
@@ -69,5 +71,6 @@ WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
     withRowNo: true,
     withCodeLabel: true,
     specifyDetail: true,
+    withRuleViolation: true,
   },
 });

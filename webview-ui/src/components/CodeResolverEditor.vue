@@ -29,10 +29,8 @@ window.addEventListener("resize", () => resetSectionHeight());
 
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector("section.cr-root");
-  const editorPart = window.document.querySelector("section.cr-root div.editor");
   if (sectionWrapper?.clientHeight) {
-    const epHeight = editorPart?.clientHeight ?? 0;
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - epHeight - 57, 100);
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 57, 100);
   }
 };
 
@@ -249,178 +247,177 @@ const deleteDetail = (index: number) => {
         >
       </div>
     </div>
-    <div v-if="visibleEditor" class="editor">
-      <div class="code-name">
-        <label :for="`codeName`">Code name</label>
-        <VsCodeTextField
-          :id="`codeName`"
-          v-model="editorItem.title"
-          :maxlength="128"
-          :transparent="true"
-          :required="true"
-          :change-on-mouseout="true"
-          style="flex-grow: 1"
-          @change="updateTextDocument()"
-        />
-      </div>
-      <div class="description">
-        <label :for="`description`">Description</label>
-        <VsCodeTextField
-          :id="`description`"
-          v-model="editorItem.description"
-          :maxlength="256"
-          :transparent="true"
-          :change-on-mouseout="true"
-          style="flex-grow: 1"
-          @change="updateTextDocument()"
-        />
-      </div>
-      <fieldset class="resource">
-        <legend>Applicable Resources</legend>
-        <table>
-          <tbody>
-            <tr>
-              <td style="width: 130px">
-                <vscode-checkbox
-                  :checked="editorItem.resource.table !== undefined"
-                  @change="($e:any) => handleChangeSpecifyResourceTable($e.target.checked)"
-                  style="margin-right: auto"
-                  >Specify table</vscode-checkbox
-                >
-              </td>
-              <td style="width: 170px">
-                <template v-if="editorItem.resource.table !== undefined">
+    <div class="cr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+      <div v-if="visibleEditor" class="editor">
+        <div class="code-name">
+          <label :for="`codeName`">Code name</label>
+          <VsCodeTextField
+            :id="`codeName`"
+            v-model="editorItem.title"
+            :maxlength="128"
+            :transparent="true"
+            :required="true"
+            :change-on-mouseout="true"
+            style="flex-grow: 1"
+            @change="updateTextDocument()"
+          />
+        </div>
+        <div class="description">
+          <label :for="`description`">Description</label>
+          <VsCodeTextField
+            :id="`description`"
+            v-model="editorItem.description"
+            :maxlength="256"
+            :transparent="true"
+            :change-on-mouseout="true"
+            style="flex-grow: 1"
+            @change="updateTextDocument()"
+          />
+        </div>
+        <fieldset class="resource">
+          <legend>Applicable Resources</legend>
+          <table>
+            <tbody>
+              <tr>
+                <td style="width: 130px">
                   <vscode-checkbox
-                    :checked="editorItem.resource.table.regex"
-                    @change="($e:any) => handleChangeRegexResource('table', $e.target.checked)"
+                    :checked="editorItem.resource.table !== undefined"
+                    @change="($e:any) => handleChangeSpecifyResourceTable($e.target.checked)"
+                    style="margin-right: auto"
+                    >Specify table</vscode-checkbox
+                  >
+                </td>
+                <td style="width: 170px">
+                  <template v-if="editorItem.resource.table !== undefined">
+                    <vscode-checkbox
+                      :checked="editorItem.resource.table.regex"
+                      @change="($e:any) => handleChangeRegexResource('table', $e.target.checked)"
+                      >Regular expression</vscode-checkbox
+                    >
+                  </template>
+                </td>
+                <td>
+                  <template v-if="editorItem.resource.table !== undefined">
+                    <VsCodeDropdown
+                      v-if="!editorItem.resource.table.regex"
+                      :id="`resourceTable`"
+                      v-model="editorItem.resource.table.pattern"
+                      :items="tableItems"
+                      :transparent="true"
+                      :required="true"
+                      style="z-index: 11"
+                      @change="updateTextDocument()"
+                    ></VsCodeDropdown>
+
+                    <VsCodeTextField
+                      v-if="editorItem.resource.table.regex"
+                      :id="`resourceTable`"
+                      v-model="editorItem.resource.table.pattern"
+                      :maxlength="256"
+                      :transparent="true"
+                      :required="true"
+                      :change-on-mouseout="true"
+                      @change="updateTextDocument()"
+                    ></VsCodeTextField>
+                  </template>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <label :for="`resourceColumn`">Column</label>
+                </td>
+                <td>
+                  <vscode-checkbox
+                    :checked="editorItem.resource.column.regex"
+                    @change="($e:any) => handleChangeRegexResource(  'column', $e.target.checked)"
                     >Regular expression</vscode-checkbox
                   >
-                </template>
-              </td>
-              <td>
-                <template v-if="editorItem.resource.table !== undefined">
+                </td>
+                <td>
                   <VsCodeDropdown
-                    v-if="!editorItem.resource.table.regex"
-                    :id="`resourceTable`"
-                    v-model="editorItem.resource.table.pattern"
-                    :items="tableItems"
+                    v-if="!editorItem.resource.column.regex"
+                    :id="`resourceColumn`"
+                    v-model="editorItem.resource.column.pattern"
+                    :items="columnItems"
                     :transparent="true"
                     :required="true"
-                    style="z-index: 11"
                     @change="updateTextDocument()"
                   ></VsCodeDropdown>
 
                   <VsCodeTextField
-                    v-if="editorItem.resource.table.regex"
-                    :id="`resourceTable`"
-                    v-model="editorItem.resource.table.pattern"
+                    v-if="editorItem.resource.column.regex"
+                    :id="`resourceColumn`"
+                    v-model="editorItem.resource.column.pattern"
                     :maxlength="256"
                     :transparent="true"
                     :required="true"
                     :change-on-mouseout="true"
                     @change="updateTextDocument()"
                   ></VsCodeTextField>
-                </template>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <label :for="`resourceColumn`">Column</label>
-              </td>
-              <td>
-                <vscode-checkbox
-                  :checked="editorItem.resource.column.regex"
-                  @change="($e:any) => handleChangeRegexResource(  'column', $e.target.checked)"
-                  >Regular expression</vscode-checkbox
-                >
-              </td>
-              <td>
-                <VsCodeDropdown
-                  v-if="!editorItem.resource.column.regex"
-                  :id="`resourceColumn`"
-                  v-model="editorItem.resource.column.pattern"
-                  :items="columnItems"
-                  :transparent="true"
-                  :required="true"
-                  @change="updateTextDocument()"
-                ></VsCodeDropdown>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </fieldset>
+        <fieldset class="details">
+          <legend>
+            <span>Details</span>
 
-                <VsCodeTextField
-                  v-if="editorItem.resource.column.regex"
-                  :id="`resourceColumn`"
-                  v-model="editorItem.resource.column.pattern"
-                  :maxlength="256"
-                  :transparent="true"
-                  :required="true"
-                  :change-on-mouseout="true"
-                  @change="updateTextDocument()"
-                ></VsCodeTextField>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </fieldset>
-      <fieldset class="details">
-        <legend>
-          <span>Details</span>
-
-          <VsCodeButton
-            @click="addDetail"
-            title="Add detail"
-            appearance="secondary"
-            style="margin-left: 2px"
-            ><fa icon="plus" />Add detail</VsCodeButton
-          >
-        </legend>
-        <table v-if="editorItem.details.length > 0">
-          <thead>
-            <tr>
-              <th class="no">No</th>
-              <th class="code">Code</th>
-              <th class="label">Label</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(detail, idx2) of editorItem.details">
-              <td class="no" style="text-align: right">{{ idx2 + 1 }}</td>
-              <td class="code">
-                <VsCodeTextField
-                  v-model="editorItem.details[idx2].code"
-                  :maxlength="256"
-                  :transparent="true"
-                  :required="true"
-                  :change-on-mouseout="true"
-                  @change="changeDetail(detail)"
-                ></VsCodeTextField>
-              </td>
-              <td class="label">
-                <VsCodeTextField
-                  v-model="editorItem.details[idx2].label"
-                  :maxlength="256"
-                  :transparent="true"
-                  :required="true"
-                  :change-on-mouseout="true"
-                  style="flex-grow: 1"
-                  @change="changeDetail(detail)"
-                ></VsCodeTextField>
-              </td>
-              <td style="width: 85px">
-                <VsCodeButton
-                  @click="deleteDetail(idx2)"
-                  title="Delete detail"
-                  appearance="secondary"
-                  style="margin-left: 2px"
-                  ><fa icon="trash" />Delete</VsCodeButton
-                >
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </fieldset>
-    </div>
-
-    <section class="items">
-      <div class="cr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+            <VsCodeButton
+              @click="addDetail"
+              title="Add detail"
+              appearance="secondary"
+              style="margin-left: 2px"
+              ><fa icon="plus" />Add detail</VsCodeButton
+            >
+          </legend>
+          <table v-if="editorItem.details.length > 0">
+            <thead>
+              <tr>
+                <th class="no">No</th>
+                <th class="code">Code</th>
+                <th class="label">Label</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(detail, idx2) of editorItem.details">
+                <td class="no" style="text-align: right">{{ idx2 + 1 }}</td>
+                <td class="code">
+                  <VsCodeTextField
+                    v-model="editorItem.details[idx2].code"
+                    :maxlength="256"
+                    :transparent="true"
+                    :required="true"
+                    :change-on-mouseout="true"
+                    @change="changeDetail(detail)"
+                  ></VsCodeTextField>
+                </td>
+                <td class="label">
+                  <VsCodeTextField
+                    v-model="editorItem.details[idx2].label"
+                    :maxlength="256"
+                    :transparent="true"
+                    :required="true"
+                    :change-on-mouseout="true"
+                    style="flex-grow: 1"
+                    @change="changeDetail(detail)"
+                  ></VsCodeTextField>
+                </td>
+                <td style="width: 85px">
+                  <VsCodeButton
+                    @click="deleteDetail(idx2)"
+                    title="Delete detail"
+                    appearance="secondary"
+                    style="margin-left: 2px"
+                    ><fa icon="trash" />Delete</VsCodeButton
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </fieldset>
+      </div>
+      <section v-else class="items">
         <table>
           <thead>
             <tr>
@@ -529,8 +526,8 @@ const deleteDetail = (index: number) => {
             </template>
           </tbody>
         </table>
-      </div>
-    </section>
+      </section>
+    </div>
   </section>
 </template>
 

@@ -140,6 +140,7 @@ export class ScanPanel {
           case "Queue":
             keyword.label = "Keyword";
             keyword.value = "";
+            limit.value = 10;
             break;
           case "LogGroup":
             multilineKeyword = true;
@@ -390,6 +391,11 @@ export class ScanPanel {
       this._panel.webview.postMessage(msg);
     } else {
       vscode.window.showErrorMessage(message);
+      const msg2: ToWebviewMessageEventType = {
+        command: componentName + "-stop-progress",
+        value: null,
+      };
+      this._panel.webview.postMessage(msg2);
     }
   }
 

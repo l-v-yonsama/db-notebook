@@ -24,10 +24,8 @@ window.addEventListener("resize", () => resetSectionHeight());
 
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector("section.rr-root");
-  const editorPart = window.document.querySelector("section.rr-root div.editor");
   if (sectionWrapper?.clientHeight) {
-    const epHeight = editorPart?.clientHeight ?? 0;
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - epHeight - 53, 100);
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 53, 100);
   }
 };
 
@@ -117,6 +115,7 @@ const resetColumns = () => {
   columnItems.value.push({
     label: "-",
     value: "",
+    meta: {},
   });
 
   if (tableName.value) {
@@ -132,6 +131,9 @@ const resetColumns = () => {
         columnItems.value.push({
           label,
           value: it.name,
+          meta: {
+            colType: it.colType,
+          },
         });
       });
     }
@@ -166,7 +168,7 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
     },
     editor: createEditorParams(),
   };
-  const lastKnownScrollPosition = document.querySelector(".scroll-wrapper")?.scrollTop ?? 0;
+  const lastKnownScrollPosition = document.querySelector(".rr-scroll-wrapper")?.scrollTop ?? 0;
   const newText = JSON.stringify(obj, null, 2);
   vscode.postCommand({
     command: "updateTextDocument",
@@ -232,57 +234,57 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
         >
       </div>
     </div>
-    <div v-if="visibleEditor" class="editor">
-      <div class="rule-name">
-        <label for="ruleName">Rule name</label>
-        <VsCodeTextField
-          id="ruleName"
-          v-model="editorItem.ruleName"
-          :maxlength="128"
-          :transparent="true"
-          :required="true"
-          :change-on-mouseout="true"
-          style="flex-grow: 1"
-          @change="updateTextDocument()"
-        />
+    <div class="rr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+      <div v-if="visibleEditor" class="editor">
+        <div class="rule-name">
+          <label for="ruleName">Rule name</label>
+          <VsCodeTextField
+            id="ruleName"
+            v-model="editorItem.ruleName"
+            :maxlength="128"
+            :transparent="true"
+            :required="true"
+            :change-on-mouseout="true"
+            style="flex-grow: 1"
+            @change="updateTextDocument()"
+          />
+        </div>
+        <fieldset class="errors">
+          <legend>Error information</legend>
+          <label for="errorColumn">Column</label>
+          <VsCodeDropdown
+            id="errorColumn"
+            v-model="editorItem.error.column"
+            :items="columnItems"
+            :transparent="true"
+            :required="true"
+            style="width: 420px; z-index: 5"
+            @change="updateTextDocument()"
+          ></VsCodeDropdown>
+          <label for="errorLimit" style="margin-left: 10px">Detection limit</label>
+          <VsCodeTextField
+            id="errorLimit"
+            v-model="editorItem.error.limit"
+            :min="0"
+            :max="9999999"
+            :maxlength="7"
+            :size="5"
+            :transparent="true"
+            :required="true"
+            :change-on-mouseout="true"
+            type="number"
+            @change="updateTextDocument()"
+          ></VsCodeTextField>
+        </fieldset>
+        <div class="conditions">
+          <TopLevelConditionVue
+            v-model="editorItem.conditions"
+            :columnItems="columnItems"
+            @change="updateTextDocument()"
+          />
+        </div>
       </div>
-      <fieldset class="errors">
-        <legend>Error information</legend>
-        <label for="errorColumn">Column</label>
-        <VsCodeDropdown
-          id="errorColumn"
-          v-model="editorItem.error.column"
-          :items="columnItems"
-          :transparent="true"
-          :required="true"
-          style="width: 420px; z-index: 5"
-          @change="updateTextDocument()"
-        ></VsCodeDropdown>
-        <label for="errorLimit" style="margin-left: 10px">Detection limit</label>
-        <VsCodeTextField
-          id="errorLimit"
-          v-model="editorItem.error.limit"
-          :min="0"
-          :max="9999999"
-          :maxlength="7"
-          :size="5"
-          :transparent="true"
-          :required="true"
-          :change-on-mouseout="true"
-          type="number"
-          @change="updateTextDocument()"
-        ></VsCodeTextField>
-      </fieldset>
-      <div class="conditions">
-        <TopLevelConditionVue
-          v-model="editorItem.conditions"
-          :columnItems="columnItems"
-          @change="updateTextDocument()"
-        />
-      </div>
-    </div>
-    <section class="items">
-      <div class="rr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+      <section v-else class="items">
         <table>
           <thead>
             <tr>
@@ -331,8 +333,8 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
             </tr>
           </tbody>
         </table>
-      </div>
-    </section>
+      </section>
+    </div>
   </section>
 </template>
 

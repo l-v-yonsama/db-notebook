@@ -164,6 +164,7 @@ const action = (command: ActionCommand["command"]): void => {
         outputWithType: "none",
         withRowNo: false,
         withCodeLabel: false,
+        withRuleViolation: false,
         options: {
           title: title.value,
           items,

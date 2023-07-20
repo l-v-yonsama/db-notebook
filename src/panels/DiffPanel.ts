@@ -112,7 +112,6 @@ export class DiffPanel {
     list2: ResultSetData[]
   ): Promise<DiffTabItem> {
     let subTitle = "";
-    console.log("DiffPanel createTabItem");
     if (list1.length) {
       let before = dayjs(list1[0].created).format("HH:mm");
       let after = dayjs(list2[0].created).format("HH:mm");
@@ -156,8 +155,14 @@ export class DiffPanel {
 
           await sleep(10);
           const diffResult = diff(rdh1, rdh2);
+          if (rdh1.meta.tableRule) {
+            await runRuleEngine(rdh1);
+          }
           if (rdh2.meta.tableRule) {
             await runRuleEngine(rdh2);
+          }
+          if (rdh1.meta.codeItems) {
+            await resolveCodeLabel(rdh1);
           }
           if (rdh2.meta.codeItems) {
             await resolveCodeLabel(rdh2);
@@ -371,6 +376,9 @@ export class DiffPanel {
                 });
                 if (rdh.meta.tableRule) {
                   afterRdh.meta.tableRule = rdh.meta.tableRule;
+                }
+                if (rdh.meta.codeItems) {
+                  afterRdh.meta.codeItems = rdh.meta.codeItems;
                 }
                 afterList[i] = afterRdh;
               }

@@ -12,7 +12,7 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
 
   // Commands
   context.subscriptions.push(
-    commands.registerCommand(CREATE_NEW_RECORD_RULE, async (tableRes: DbTable) => {
+    commands.registerCommand(CREATE_NEW_RECORD_RULE, async (tableRes?: DbTable) => {
       try {
         const fileFilters = {
           "Record Rule": ["rrule"],
@@ -20,7 +20,9 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
         let wsfolder = workspace.workspaceFolders?.[0].uri?.fsPath ?? "";
 
         const uri = await window.showSaveDialog({
-          defaultUri: Uri.file(path.join(wsfolder, `${tableRes.name}.rrule`)),
+          defaultUri: Uri.file(
+            path.join(wsfolder, tableRes ? `${tableRes.name}.rrule` : "new-code-resolver.rrule")
+          ),
           filters: fileFilters,
           title: "Save Record Rule file",
         });
@@ -28,16 +30,16 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
         if (!uri) {
           return;
         }
-        const { conName, schemaName } = tableRes.meta;
+        // const { conName, schemaName } = tableRes?.meta?;
         const recordRule: RecordRule = {
           tableRule: {
-            table: tableRes.name,
+            table: tableRes?.name ?? "",
             details: [],
           },
           editor: {
-            connectionName: conName,
-            schemaName,
-            tableName: tableRes.name,
+            connectionName: tableRes?.meta?.conName ?? "",
+            schemaName: tableRes?.meta?.schemaName ?? "",
+            tableName: tableRes?.name ?? "",
             visible: true,
           },
         };

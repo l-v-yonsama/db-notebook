@@ -1,6 +1,9 @@
 export type DropdownItem = {
   value: string | number;
   label: string;
+  meta?: {
+    [key: string]: any;
+  };
 };
 
 type SecondaryItemDivider = {

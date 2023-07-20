@@ -66,7 +66,10 @@ export class WriteToClipboardParamsPanel {
       componentName,
       value: {
         params: this.params,
-        previewText: rdhListToText(this.list, this.params!),
+        previewText: rdhListToText(this.list, {
+          ...this.params!,
+          limit: Math.min(this.params?.limit ?? 10, 10),
+        }),
       },
     };
 

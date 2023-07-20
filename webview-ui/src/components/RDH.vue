@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref, nextTick, computed } from "vue";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import * as GC from "@/types/lib/GeneralColumnType";
 import VsCodeButton from "./base/VsCodeButton.vue";
@@ -49,6 +49,10 @@ type RowValues = {
   editType?: RowEditType;
   $meta: RdhRow["meta"];
   [key: string]: any;
+
+  $ruleViolationMarks: {
+    [key: string]: string | undefined;
+  };
   $resolvedLabels: {
     [key: string]: any;
   };
@@ -85,6 +89,16 @@ if (props.rdh.meta?.compareKeys?.length) {
     compareKey = props.rdh.meta.compareKeys[0];
   }
 }
+
+const { ruleViolationSummary } = props.rdh.meta;
+
+const legend = ruleViolationSummary
+  ? Object.keys(ruleViolationSummary)
+      .map((k, idx) => `*${idx + 1}: ${k}: ${ruleViolationSummary[k]}`)
+      .join(" , ")
+  : "";
+
+const height = computed(() => (legend.length > 0 ? Math.max(props.height - 16, 0) : props.height));
 
 const columns = ref(
   props.rdh.keys.map((k) => {
@@ -148,6 +162,7 @@ const list = ref(
       const item: RowValues = {
         $meta: row.meta,
         $resolvedLabels: {},
+        $ruleViolationMarks: {},
       };
       if (editable && compareKey) {
         item.$beforeKeyValues = {};
@@ -166,6 +181,23 @@ const list = ref(
           const code = meta[k.name]?.find((it) => it.type === "Cod") as CodeResolvedAnnotation;
           item.$resolvedLabels[k.name] = code?.values?.label;
         }
+        if (ruleViolationSummary) {
+          const meta: RdhRow["meta"] = item["$meta"];
+          const rules = meta[k.name]?.filter((it) => it.type === "Rul") as RuleAnnotation[];
+          if (rules && rules.length) {
+            const marks: number[] = [];
+            const names = Object.keys(ruleViolationSummary);
+            names.forEach((it, idx) => {
+              if (rules.some((rule) => rule.values?.name === it)) {
+                marks.push(idx + 1);
+              }
+            });
+            let legend = marks.length > 0 ? `*${marks.join(",")}` : undefined;
+            if (legend) {
+              item.$ruleViolationMarks[k.name] = legend;
+            }
+          }
+        }
       });
       return item;
     })
@@ -176,6 +208,7 @@ const addRow = (): void => {
     editType: "ins",
     $meta: {},
     $resolvedLabels: {},
+    $ruleViolationMarks: {},
   };
   props.rdh.keys.map((k) => {
     empty[k.name] = "";
@@ -293,15 +326,6 @@ const rowStyle = (p: any): any => {
   return null;
 };
 
-const toTitle = (item: RowValues, key: string): string => {
-  const meta: RdhRow["meta"] = item["$meta"];
-  const rule = meta[key]?.find((it) => it.type === "Rul") as RuleAnnotation;
-  if (rule && rule.values && rule.values?.message) {
-    return rule.values.message;
-  }
-  return item[key];
-};
-
 const toEditTypeMark = (editType?: RowValues["editType"]): string => {
   if (editType === undefined) {
     return "";
@@ -411,116 +435,131 @@ defineExpose({
 </script>
 
 <template>
-  <section class="table" :class="{ readonly: !editable }">
-    <VirtualList
-      v-if="visible"
-      :items="list"
-      :table="true"
-      class="list-table"
-      :style="{ height: `${height}px` }"
-    >
-      <template #prepend>
-        <thead>
-          <tr>
-            <th v-if="editable" class="ctrl">CONTROL</th>
-            <th class="row">ROW</th>
-            <th
-              v-for="(key, idx) of columns"
-              :key="idx"
-              :title="key.name"
-              :style="{ width: `${key.width}px` }"
-            >
-              <span class="codicon" :class="key.typeClass"></span
-              ><span
-                class="label"
-                :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }"
-                >{{ key.name }}</span
-              >
-              <a class="widen" @click="key.width += 100"
-                ><span class="codicon codicon-arrow-both"></span
-              ></a>
-            </th>
-          </tr>
-          <tr v-if="withComment || editable">
-            <th v-if="editable" class="ctrl">
-              <div style="display: flex !important">
-                <VsCodeButton v-if="editable" @click="addRow" title="Add row" appearance="secondary"
-                  ><fa icon="plus" />Add</VsCodeButton
-                >
-              </div>
-            </th>
-            <th class="row"></th>
-            <th
-              v-for="(key, idx) of columns"
-              :key="idx"
-              :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }"
-              :title="key.comment"
-            >
-              {{ key.comment }}
-            </th>
-          </tr>
-        </thead>
-      </template>
-      <template #default="{ item, index }">
-        <tr :style="rowStyle(item)">
-          <td v-if="editable" class="ctrl">
-            <div>
-              <VsCodeButton
-                v-if="editable"
-                :disabled="item.editType === 'ins'"
-                @click="editRow(index)"
-                title="Update row"
-                appearance="secondary"
-                ><fa icon="pencil"
-              /></VsCodeButton>
-              <VsCodeButton
-                v-if="editable"
-                @click="deleteRow(index)"
-                title="Delete row"
-                appearance="secondary"
-                ><fa icon="trash"
-              /></VsCodeButton>
-            </div>
-          </td>
-          <td class="row">
-            {{ toEditTypeMark(item.editType) }}
-            {{ index + 1 }}
-          </td>
-          <td class="vcell" v-for="(key, idx) of columns" :key="idx" :style="cellStyle(item, key)">
-            <VsCodeTextField
-              v-if="item.editType === 'ins' || item.editType === 'upd'"
-              v-model="item[key.name]"
-              :readonly="false"
-              :required="key.required"
-              :transparent="true"
-              :maxlength="1000"
-              :size="key.inputSize"
-              :title="toTitle(item, key.name)"
-              style="width: 99%"
-              @onCellFocus="
-                onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
-              "
-            ></VsCodeTextField>
-            <template v-else>
-              <p
-                :title="toTitle(item, key.name)"
+  <section>
+    <section class="table" :class="{ readonly: !editable }">
+      <VirtualList
+        v-if="visible"
+        :items="list"
+        :table="true"
+        class="list-table"
+        :style="{ height: `${height}px` }"
+      >
+        <template #prepend>
+          <thead>
+            <tr>
+              <th v-if="editable" class="ctrl">CONTROL</th>
+              <th class="row">ROW</th>
+              <th
+                v-for="(key, idx) of columns"
+                :key="idx"
+                :title="key.name"
                 :style="{ width: `${key.width}px` }"
-                v-text="item[key.name]"
-              ></p>
-              <span v-if="item.$resolvedLabels[key.name]" class="code-label">{{
-                item.$resolvedLabels[key.name]
-              }}</span>
-              <VsCodeButton
-                @click="copyToClipboard(item[key.name])"
-                appearance="secondary"
-                class="copy-to-clipboard"
-                ><fa icon="clipboard"
-              /></VsCodeButton>
-            </template>
-          </td>
-        </tr>
-      </template>
-    </VirtualList>
+              >
+                <span class="codicon" :class="key.typeClass"></span
+                ><span
+                  class="label"
+                  :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }"
+                  >{{ key.name }}</span
+                >
+                <a class="widen" @click="key.width += 100"
+                  ><span class="codicon codicon-arrow-both"></span
+                ></a>
+              </th>
+            </tr>
+            <tr v-if="withComment || editable">
+              <th v-if="editable" class="ctrl">
+                <div style="display: flex !important">
+                  <VsCodeButton
+                    v-if="editable"
+                    @click="addRow"
+                    title="Add row"
+                    appearance="secondary"
+                    ><fa icon="plus" />Add</VsCodeButton
+                  >
+                </div>
+              </th>
+              <th class="row"></th>
+              <th
+                v-for="(key, idx) of columns"
+                :key="idx"
+                :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }"
+                :title="key.comment"
+              >
+                {{ key.comment }}
+              </th>
+            </tr>
+          </thead>
+        </template>
+        <template #default="{ item, index }">
+          <tr :style="rowStyle(item)">
+            <td v-if="editable" class="ctrl">
+              <div>
+                <VsCodeButton
+                  v-if="editable"
+                  :disabled="item.editType === 'ins'"
+                  @click="editRow(index)"
+                  title="Update row"
+                  appearance="secondary"
+                  ><fa icon="pencil"
+                /></VsCodeButton>
+                <VsCodeButton
+                  v-if="editable"
+                  @click="deleteRow(index)"
+                  title="Delete row"
+                  appearance="secondary"
+                  ><fa icon="trash"
+                /></VsCodeButton>
+              </div>
+            </td>
+            <td class="row">
+              {{ toEditTypeMark(item.editType) }}
+              {{ index + 1 }}
+            </td>
+            <td
+              class="vcell"
+              v-for="(key, idx) of columns"
+              :key="idx"
+              :style="cellStyle(item, key)"
+            >
+              <VsCodeTextField
+                v-if="item.editType === 'ins' || item.editType === 'upd'"
+                v-model="item[key.name]"
+                :readonly="false"
+                :required="key.required"
+                :transparent="true"
+                :maxlength="1000"
+                :size="key.inputSize"
+                style="width: 99%"
+                @onCellFocus="
+                  onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
+                "
+              ></VsCodeTextField>
+              <template v-else>
+                <p :style="{ width: `${key.width}px` }">
+                  <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
+                    item.$ruleViolationMarks[key.name]
+                  }}</span
+                  >{{ item[key.name] }}
+                </p>
+                <span v-if="item.$resolvedLabels[key.name]" class="code-label">{{
+                  item.$resolvedLabels[key.name]
+                }}</span>
+                <VsCodeButton
+                  v-if="
+                    item[key.name] !== undefined && item[key.name] !== null && item[key.name] !== ''
+                  "
+                  @click="copyToClipboard(item[key.name])"
+                  appearance="secondary"
+                  class="copy-to-clipboard"
+                  ><fa icon="clipboard"
+                /></VsCodeButton>
+              </template>
+            </td>
+          </tr>
+        </template>
+      </VirtualList>
+    </section>
+    <p v-if="legend.length" class="rule-violation-legend" v-text="legend"></p>
   </section>
 </template>
 
@@ -598,6 +637,11 @@ td.vcell > p {
   overflow: hidden;
   white-space: nowrap;
 }
+td.vcell span.violation-mark {
+  font-size: x-small;
+  font-weight: bold;
+  margin-right: 4px;
+}
 
 th {
   height: 20px;
@@ -647,9 +691,8 @@ span.label {
   overflow: hidden;
   white-space: nowrap;
 }
-
-.scroller {
-  height: 100%;
+p.rule-violation-legend {
+  margin: 0 5px;
 }
 /* tr.inserted {
   background-color: var(--vscode-diffEditor-insertedTextBackground) !important;
