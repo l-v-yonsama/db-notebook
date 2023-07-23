@@ -21,7 +21,7 @@
     "vue-click-outside-element": "^3.1.2"
   },
   "devDependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.165",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.166",
     "@types/node": "^16.11.27",
     "@types/splitpanes": "^2.2.1",
     "@types/vscode-webview": "^1.57.0",

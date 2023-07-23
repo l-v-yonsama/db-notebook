@@ -1,14 +1,9 @@
-import type { ViewConditionItemOperator } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { TableRuleDetail } from "@l-v-yonsama/multi-platform-database-drivers";
 
 export type ViewConditionParams = {
-  conditions: ViewConditionUiItem[];
+  conditions: TableRuleDetail["conditions"];
+  specfyCondition: boolean;
   limit: number;
-  andOr: "and" | "or";
   editable: boolean;
-};
-
-export type ViewConditionUiItem = {
-  column: string;
-  operator: ViewConditionItemOperator;
-  value: string;
+  preview: boolean;
 };

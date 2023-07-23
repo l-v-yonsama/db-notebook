@@ -2,10 +2,7 @@ import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vsco
 import {
   DBDriverResolver,
   DbTable,
-  MultipleValueViewConditionItem,
-  NoValueViewConditionItem,
   RDSBaseDriver,
-  SingleValueViewConditionItem,
   toViewDataQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
@@ -27,6 +24,7 @@ export class ViewConditionPanel {
   private _disposables: Disposable[] = [];
   private tableRes: DbTable | undefined;
   private numOfRows: number = 0;
+  private isPositionedParameterAvailable: boolean | undefined;
 
   private constructor(panel: WebviewPanel, private extensionUri: Uri) {
     this._panel = panel;
@@ -72,6 +70,7 @@ export class ViewConditionPanel {
 
   async renderSub() {
     // send to webview
+    const previewSql = await this.getPreviewSql({ all: [] }, false);
     const msg: ToWebviewMessageEventType = {
       command: "create",
       componentName,
@@ -79,15 +78,13 @@ export class ViewConditionPanel {
         tableRes: this.tableRes,
         limit: Math.min(1000, this.numOfRows),
         numOfRows: this.numOfRows,
+        previewSql,
       },
     };
 
     this._panel.webview.postMessage(msg);
   }
 
-  /**
-   * Cleans up and disposes of webview resources when the webview panel is closed.
-   */
   public dispose() {
     log(`${PREFIX} dispose`);
     ViewConditionPanel.currentPanel = undefined;
@@ -98,6 +95,36 @@ export class ViewConditionPanel {
       if (disposable) {
         disposable.dispose();
       }
+    }
+  }
+
+  private async getPreviewSql(
+    conditions: ViewConditionParams["conditions"],
+    specfyCondition: boolean
+  ): Promise<string> {
+    const { tableRes } = this;
+    if (!tableRes || !ViewConditionPanel.stateStorage) {
+      return "";
+    }
+    const { conName, schemaName } = tableRes.meta;
+    if (this.isPositionedParameterAvailable === undefined) {
+      const setting = await ViewConditionPanel.stateStorage.getConnectionSettingByName(conName);
+      if (!setting) {
+        return "";
+      }
+      const driver = DBDriverResolver.getInstance().createDriver<RDSBaseDriver>(setting);
+      this.isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
+    }
+    try {
+      const { query } = toViewDataQuery({
+        tableRes,
+        schemaName,
+        toPositionedParameter: this.isPositionedParameterAvailable,
+        conditions: specfyCondition ? conditions : undefined,
+      });
+      return query + "";
+    } catch (_) {
+      return "";
     }
   }
 
@@ -112,7 +139,22 @@ export class ViewConditionPanel {
             return;
           case "ok":
             {
-              const p = params as ViewConditionParams;
+              const { conditions, specfyCondition, limit, editable, preview } =
+                params as ViewConditionParams;
+
+              if (preview) {
+                const previewSql = await this.getPreviewSql(conditions, specfyCondition);
+                // send to webview
+                const msg: ToWebviewMessageEventType = {
+                  command: componentName + "-set-preview-sql",
+                  componentName,
+                  value: previewSql,
+                };
+                this._panel.webview.postMessage(msg);
+
+                return;
+              }
+
               const { tableRes } = this;
               if (!tableRes || !ViewConditionPanel.stateStorage) {
                 return;
@@ -133,51 +175,27 @@ export class ViewConditionPanel {
                       tableRes,
                       schemaName,
                       toPositionedParameter: driver.isPositionedParameterAvailable(),
-                      conditions: {
-                        andOr: p.andOr,
-                        items: p.conditions.map((it) => {
-                          const { column, operator, value } = it;
-                          switch (it.operator) {
-                            case "isNull":
-                            case "isNotNull":
-                              return {
-                                column,
-                                operator,
-                              } as NoValueViewConditionItem;
-                            case "in":
-                            case "notIn":
-                              return {
-                                column,
-                                operator,
-                                values: value.match(/(\\.|[^,])+/g)?.map((s) => s.trim()),
-                              } as MultipleValueViewConditionItem;
-                            default:
-                              return {
-                                column,
-                                operator,
-                                value,
-                              } as SingleValueViewConditionItem;
-                          }
-                        }),
-                      },
+                      conditions: specfyCondition ? conditions : undefined,
                     });
+
                     log(`${PREFIX} query:[${query}]`);
                     log(`${PREFIX} binds:[${binds}]`);
                     return await driver.requestSql({
                       sql: query,
                       conditions: {
                         binds,
-                        maxRows: p.limit,
+                        maxRows: limit,
                       },
                       meta: {
                         tableName: tableRes.name,
                         compareKeys: tableRes.getCompareKeys(),
                         comment: tableRes.comment,
-                        editable: p.editable,
+                        editable,
                       },
                     });
                   }
                 );
+
               if (ok && result) {
                 MdhPanel.render(this.extensionUri, tableRes.name, [result]);
               } else {

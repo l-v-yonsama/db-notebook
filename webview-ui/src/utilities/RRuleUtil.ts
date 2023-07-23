@@ -37,7 +37,28 @@ export const OPERATORS: DropdownItem[] = [
   { label: "BETWEEN", value: "between" },
   { label: "∈ (IN)", value: "in" },
   { label: "∉ (NOT IN)", value: "notIn" },
+  // only view condition
+  { label: "LIKE", value: "like" },
 ];
+
+export const RULE_BASE_OPERATORS = OPERATORS.filter((it) => {
+  if (it.value === "like") {
+    return false;
+  }
+  return true;
+});
+
+export const VIEW_CONDITIONAL_OPERATORS = OPERATORS.filter((it) => {
+  if (
+    it.value === "isNil" ||
+    it.value === "isNotNil" ||
+    it.value === "startsWith" ||
+    it.value === "endsWith"
+  ) {
+    return false;
+  }
+  return true;
+});
 
 export function conditionsToString(
   condition: TopLevelCondition,

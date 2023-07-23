@@ -1,56 +1,84 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { defineExpose, nextTick, ref, onMounted } from "vue";
 import { vscode } from "@/utilities/vscode";
-import type { ViewConditionParams, ViewConditionUiItem } from "@/utilities/vscode";
+import type { UpdateTextDocumentActionCommand, ViewConditionParams } from "@/utilities/vscode";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import type { DbTable, ViewConditionItem } from "@l-v-yonsama/multi-platform-database-drivers";
+
 import type { DropdownItem } from "@/types/Components";
+import TopLevelConditionVue from "./TopLevelCondition.vue";
+import type { DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
+import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 type Props = {
   tableRes: DbTable;
   numOfRows: number;
   limit: number;
+  previewSql: string;
 };
 
 const props = defineProps<Props>();
-const andOrSwitch = ref("and" as "and" | "or");
 
-const andOrItems = [
-  { label: "AND", value: "and" },
-  { label: "OR", value: "or" },
-];
+const sectionHeight = ref(300);
 
-const operatorItems: DropdownItem[] = [
-  { label: "-", value: "" },
-  { label: "IS NULL", value: "isNull" },
-  { label: "IS NOT NULL", value: "isNotNull" },
-  { label: "=", value: "equal" },
-  { label: "≠", value: "notEqual" },
-  { label: "<", value: "lessThan" },
-  { label: "≦", value: "lessThanInclusive" },
-  { label: ">", value: "greaterThan" },
-  { label: "≧", value: "greaterThanInclusive" },
-  { label: "LIKE", value: "like" },
-  { label: "NOT LIKE", value: "notlike" },
-  { label: "IN", value: "in" },
-  { label: "NOT IN", value: "notIn" },
-];
+window.addEventListener("resize", () => resetSectionHeight());
 
-const columnItems = props.tableRes.children.map((it) => ({
-  value: it.name,
-  label: it.comment ? `${it.name} (${it.comment})` : it.name,
-}));
-columnItems.unshift({
-  label: "-",
-  value: "",
+const resetSectionHeight = () => {
+  const sectionWrapper = window.document.querySelector(".view-conditional-root");
+  if (sectionWrapper?.clientHeight) {
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 35, 100);
+  }
+};
+
+onMounted(() => {
+  nextTick(resetSectionHeight);
 });
 
-const limit = ref(props.limit);
-const limitMax = Math.min(100000, props.numOfRows);
+const specifyCondition = ref(false);
+const previewSql = ref(props.previewSql);
 
-const conditions = ref([] as ViewConditionUiItem[]);
+const limit = ref((props.limit ?? 0) + "");
+const limitMax = Math.min(100000, props.numOfRows);
+const visibleCondition = ref(true);
+
+const columnItems = ref(
+  props.tableRes.children.map((it) => {
+    let label = it.name;
+    if (it.comment) {
+      label += " " + it.comment;
+    }
+
+    return {
+      label,
+      value: it.name,
+      meta: {
+        colType: it.colType,
+      },
+    };
+  }) as DropdownItem[]
+);
+columnItems.value.unshift({
+  label: "-",
+  value: "",
+  meta: {},
+});
+
+const editorItem = ref({
+  conditions: {
+    all: [
+      {
+        fact: "",
+        operator: "",
+        value: "",
+        params: {
+          valType: "static",
+          valColumn: "",
+        },
+      },
+    ],
+  },
+});
 
 const cancel = () => {
   vscode.postCommand({
@@ -58,14 +86,28 @@ const cancel = () => {
     params: {},
   });
 };
+const handleSpecifyConditionOnChange = (newVal: boolean) => {
+  console.log("called handleSpecifyConditionOnChange:", newVal);
+  specifyCondition.value = newVal;
+  ok(false, true);
+};
+const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {
+  console.log("called updateTextDocument:" + values);
+  console.log("editorItem", JSON.stringify(editorItem.value));
+  visibleCondition.value = false;
+  nextTick(() => {
+    visibleCondition.value = true;
+    ok(false, true);
+  });
+};
 
-const ok = (editable: boolean) => {
-  const andOr = andOrSwitch.value;
+const ok = (editable: boolean, preview: boolean) => {
   const params: ViewConditionParams = {
-    conditions: JSON.parse(JSON.stringify(conditions.value)),
-    andOr,
-    limit: limit.value,
+    conditions: JSON.parse(JSON.stringify(editorItem.value.conditions)),
+    specfyCondition: specifyCondition.value,
+    limit: Number(limit.value),
     editable,
+    preview,
   };
   vscode.postCommand({
     command: "ok",
@@ -73,21 +115,18 @@ const ok = (editable: boolean) => {
   });
 };
 
-const addCondition = () => {
-  conditions.value.push({
-    column: "",
-    operator: "equal",
-    value: "",
-  });
+const setPreviewSql = (sql: string): void => {
+  console.log(" called setpreviewll", sql);
+  previewSql.value = sql;
 };
 
-const deleteCondition = (idx: number) => {
-  conditions.value.splice(idx, 1);
-};
+defineExpose({
+  setPreviewSql,
+});
 </script>
 
 <template>
-  <section class="condition-root">
+  <section class="view-conditional-root">
     <div class="toolbar">
       <div class="tool-left">
         <label for="tableName">Table:</label>
@@ -121,97 +160,56 @@ const deleteCondition = (idx: number) => {
           ><fa icon="times" />Cancel</VsCodeButton
         >
         <VsCodeButton
-          @click="ok(true)"
+          @click="ok(true, false)"
           appearance="secondary"
           title="Retlieve in editable mode"
           style="margin-right: 5px"
           ><fa icon="pencil" />Retlieve in editable mode</VsCodeButton
         >
-        <VsCodeButton @click="ok(false)" title="Retlieve"><fa icon="check" />Retlieve</VsCodeButton>
+        <VsCodeButton @click="ok(false, false)" title="Retlieve"
+          ><fa icon="check" />Retlieve</VsCodeButton
+        >
       </div>
     </div>
-    <div class="editor">
+    <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+      <div class="editor">
+        <fieldset class="conditions">
+          <legend>
+            <span style="margin-right: 30px">Conditions</span>
+
+            <vscode-checkbox
+              :checked="specifyCondition === true"
+              @change="($e:any) => handleSpecifyConditionOnChange($e.target.checked)"
+              style="margin-right: auto"
+              >Specify</vscode-checkbox
+            >
+          </legend>
+          <TopLevelConditionVue
+            v-if="visibleCondition && specifyCondition"
+            v-model="editorItem.conditions"
+            :columnItems="columnItems"
+            :rule-base-mode="false"
+            :lv="0"
+            @change="updateTextDocument()"
+          />
+        </fieldset>
+      </div>
       <fieldset class="conditions">
-        <legend>
-          <label style="margin-right: 30px">Conditions: </label>
-          <VsCodeDropdown
-            v-model="andOrSwitch"
-            :items="andOrItems"
-            style="margin-right: 5px"
-          ></VsCodeDropdown>
-          <VsCodeButton
-            @click="addCondition"
-            title="Add condition"
-            appearance="secondary"
-            style="margin-left: 2px"
-            ><fa icon="plus" />Add condition</VsCodeButton
-          >
-        </legend>
-        <table v-if="conditions.length > 0">
-          <thead>
-            <tr>
-              <th class="col">Column</th>
-              <th class="ope">Operator</th>
-              <th class="val">Value</th>
-              <th class="ctl">&nbsp;</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, idx) of conditions" :key="idx">
-              <td class="col">
-                <VsCodeDropdown
-                  v-model="item.column"
-                  :items="columnItems"
-                  :transparent="true"
-                  :required="true"
-                  style="width: 100%"
-                ></VsCodeDropdown>
-              </td>
-              <td class="ope">
-                <VsCodeDropdown
-                  v-model="item.operator"
-                  :items="operatorItems"
-                  :transparent="true"
-                  :required="true"
-                  style="width: 100%"
-                ></VsCodeDropdown>
-              </td>
-              <td class="val">
-                <VsCodeTextField
-                  v-if="item.operator !== 'isNull' && item.operator !== 'isNotNull'"
-                  v-model="item.value"
-                  :maxlength="256"
-                  :transparent="true"
-                  :required="true"
-                  style="width: 100%"
-                ></VsCodeTextField>
-              </td>
-              <td class="ctl">
-                <VsCodeButton
-                  appearance="secondary"
-                  class="deleteKey"
-                  @click="deleteCondition(idx)"
-                  title="Delete"
-                >
-                  <span class="codicon codicon-trash"></span>Delete
-                </VsCodeButton>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <legend>Preview</legend>
+        <p class="preview" v-text="previewSql"></p>
       </fieldset>
     </div>
   </section>
 </template>
 
 <style scoped>
-section.condition-root {
+section.view-conditional-root {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
-section.condition-root > div {
+section.view-conditional-root > div {
   margin: 5px;
 }
 div.toolbar {
@@ -228,6 +226,10 @@ div.toolbar {
   white-space: nowrap;
   max-width: 180px;
 }
+
+.scroll-wrapper {
+  overflow: auto;
+}
 table {
   width: 100%;
 }
@@ -243,5 +245,18 @@ table {
   width: 122px;
   max-width: 122px;
   text-align: center;
+}
+.eg {
+  width: 122px;
+  max-width: 122px;
+  text-align: center;
+}
+
+fieldset.conditions {
+  margin-top: 15px;
+}
+p.preview {
+  margin: 5px;
+  white-space: pre-wrap;
 }
 </style>

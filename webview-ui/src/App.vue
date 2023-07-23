@@ -33,6 +33,11 @@ const setDiffPanelRef = (el: any) => {
   diffPanelRef.value = el;
 };
 
+const viewConditionPanelRef = ref<InstanceType<typeof ViewConditionPanel>>();
+const setViewConditionPanelRef = (el: any) => {
+  viewConditionPanelRef.value = el;
+};
+
 function messageListener(evt: MessageEvent) {
   const { data } = evt;
   const { command, componentName, value } = data;
@@ -143,6 +148,9 @@ function messageListener(evt: MessageEvent) {
     case "DiffPanel-set-search-result":
       diffPanelRef.value?.setSearchResult(value);
       break;
+    case "ViewConditionPanel-set-preview-sql":
+      viewConditionPanelRef.value?.setPreviewSql(value);
+      break;
   }
 }
 
@@ -213,6 +221,8 @@ const resourcePropertiesValues = ref<{ [key: string]: string }>({});
       :tableRes="values.tableRes"
       :numOfRows="values.numOfRows"
       :limit="values.limit"
+      :preview-sql="values.previewSql"
+      :ref="setViewConditionPanelRef"
     />
     <WriteToClipboardParamsPanel v-if="visible.writeToClipboardParamsPanel" :params="values" />
     <ERDiagramSettings

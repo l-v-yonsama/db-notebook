@@ -18,6 +18,7 @@
           ><fa icon="plus" />Add condition</VsCodeButton
         >
         <VsCodeButton
+          v-if="lv > 0"
           @click="deleteTopLevelCondition"
           title="Delete condition"
           appearance="secondary"
@@ -61,6 +62,7 @@
                 :items="operatorItems"
                 :transparent="true"
                 :required="true"
+                style="width: 100%"
                 @change="changeCondition"
               ></VsCodeDropdown>
             </td>
@@ -118,6 +120,8 @@
         <TopLevelCondition
           v-model="nestedList[idx]"
           :columnItems="columnItems"
+          :rule-base-mode="props.ruleBaseMode"
+          :lv="props.lv + 1"
           @change="updateSuperTextDocument()"
           @deleteTopLevelCondition="deleteTopLevelConditionAndUpdateDocument(idx)"
         />
@@ -133,7 +137,7 @@ import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import type { DropdownItem } from "@/types/Components";
-import { OPERATORS } from "@/utilities/RRuleUtil";
+import { RULE_BASE_OPERATORS, VIEW_CONDITIONAL_OPERATORS } from "@/utilities/RRuleUtil";
 
 import type {
   ConditionProperties,
@@ -153,6 +157,8 @@ import { isNumericLike } from "@/utilities/GeneralColumnUtil";
 type Props = {
   modelValue: any; // TableRuleDetail["conditions"];
   columnItems: DropdownItem[];
+  ruleBaseMode: boolean;
+  lv: number;
 };
 const props = defineProps<Props>();
 
@@ -193,7 +199,7 @@ if (isAnyConditions(props.modelValue)) {
   });
 }
 
-const operatorItems = OPERATORS;
+const operatorItems = props.ruleBaseMode ? RULE_BASE_OPERATORS : VIEW_CONDITIONAL_OPERATORS;
 
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: any): void;
@@ -307,8 +313,10 @@ const hasValueOperator = (ope: string): boolean => {
   return ope !== "isNull" && ope !== "isNotNull" && ope !== "isNil" && ope !== "isNotNil";
 };
 
+// レコードルール向けの場合は比較値の指定方法を選択可能
+// 但し、比較値が配列になる場合は選択不可能
 const selectableValType = (ope: string): boolean => {
-  return ope !== "between" && ope !== "in" && ope !== "notIn";
+  return props.ruleBaseMode && ope !== "between" && ope !== "in" && ope !== "notIn";
 };
 
 const toExample = (p: ConditionProperties): string => {
@@ -318,16 +326,18 @@ const toExample = (p: ConditionProperties): string => {
     colType =
       props.columnItems.find((it) => it.value === fact)?.meta?.colType ?? GeneralColumnType.INTEGER;
   }
-  if (isNumericLike(colType)) {
-    if (operator === "between") {
-      return "e.g. 10,20";
+  switch (operator) {
+    case "like":
+      return "%hoge%";
+    case "between": {
+      return isNumericLike(colType) ? "e.g. 10,20" : "e.g. a,b";
     }
-    return "e.g. 10,20,30";
+    case "in":
+    case "notIn": {
+      return isNumericLike(colType) ? "e.g. 10,20,30" : "e.g. a,b,c";
+    }
   }
-  if (operator === "between") {
-    return "e.g. a,b";
-  }
-  return "e.g. a,b,c";
+  return "";
 };
 </script>
 <style scoped>
@@ -367,8 +377,8 @@ table {
   text-align: center;
 }
 .ope {
-  width: 110px;
-  max-width: 110px;
+  width: 130px;
+  max-width: 130px;
   text-align: center;
 }
 .val-def {

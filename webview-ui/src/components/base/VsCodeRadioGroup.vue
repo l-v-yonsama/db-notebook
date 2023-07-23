@@ -39,7 +39,7 @@ const props = withDefaults(
 
 const clickBox = (value: string | number, $e: InputEvent) => {
   emit("update:modelValue", value);
-  emit("change", {});
+  // emit("change", {});
 };
 
 const emit = defineEmits<{

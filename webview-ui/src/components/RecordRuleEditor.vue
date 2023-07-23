@@ -280,6 +280,8 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
           <TopLevelConditionVue
             v-model="editorItem.conditions"
             :columnItems="columnItems"
+            :rule-base-mode="true"
+            :lv="0"
             @change="updateTextDocument()"
           />
         </div>
