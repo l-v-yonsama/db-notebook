@@ -3,12 +3,13 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
+import Paragraph from "./base/Paragraph.vue";
 import type { DbColumn, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
 import { vscode, type RecordRule, type UpdateTextDocumentActionCommand } from "@/utilities/vscode";
 
 import type { DropdownItem } from "@/types/Components";
 import TopLevelConditionVue from "./TopLevelCondition.vue";
-import { conditionsToString, hasKeywordInConditions } from "@/utilities/RRuleUtil";
+import { conditionsToString } from "@/utilities/RRuleUtil";
 
 type Props = {
   connectionSettingNames: string[];
@@ -84,12 +85,15 @@ const computedDetails = computed((): ComputedDetail[] => {
       if (keyword.value.length === 0) {
         return true;
       }
-      const k = keyword.value;
+      const k = (keyword.value ?? "").toLocaleLowerCase();
       if (
-        it.ruleName.indexOf(k) >= 0 ||
-        it.error.column.indexOf(k) >= 0 ||
-        hasKeywordInConditions(it.conditions as any, columns.value as any, k)
+        it.ruleName.toLocaleLowerCase().indexOf(k) >= 0 ||
+        it.error.column.toLocaleLowerCase().indexOf(k) >= 0
       ) {
+        return true;
+      }
+      const cs = conditionsToString(it.conditions as any, columns.value as any, "");
+      if (cs.toLocaleLowerCase().indexOf(k) >= 0) {
         return true;
       }
       return false;
@@ -302,7 +306,7 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
           <tbody>
             <tr v-for="(detail, idx) of computedDetails" :key="idx">
               <td class="rule-name">
-                <p>{{ detail.ruleName }}</p>
+                <Paragraph :text="detail.ruleName" :highlight-text="keyword" />
                 <div class="controller">
                   <VsCodeButton
                     @click="updateTextDocument({ name: 'edit-rule', detail: detail.originalIndex })"
@@ -327,11 +331,15 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
                   >
                 </div>
               </td>
-              <td class="w150">{{ detail.errorColumn }}</td>
+              <td class="w150">
+                <Paragraph :text="detail.errorColumn" :highlight-text="keyword" />
+              </td>
               <td class="w100">
                 {{ detail.errorLimit }}
               </td>
-              <td style="white-space: pre-wrap">{{ detail.conditions }}</td>
+              <td style="white-space: pre-wrap">
+                <Paragraph :text="detail.conditions" :highlight-text="keyword" />
+              </td>
             </tr>
           </tbody>
         </table>

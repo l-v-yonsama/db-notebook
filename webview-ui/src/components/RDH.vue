@@ -54,7 +54,7 @@ type RowValues = {
     [key: string]: string | undefined;
   };
   $resolvedLabels: {
-    [key: string]: any;
+    [key: string]: CodeResolvedAnnotation["values"];
   };
   $beforeKeyValues?: {
     [key: string]: any;
@@ -179,7 +179,7 @@ const list = ref(
         if (props.rdh.meta?.codeItems) {
           const meta = row.meta;
           const code = meta[k.name]?.find((it) => it.type === "Cod") as CodeResolvedAnnotation;
-          item.$resolvedLabels[k.name] = code?.values?.label;
+          item.$resolvedLabels[k.name] = code?.values;
         }
         if (ruleViolationSummary) {
           const meta: RdhRow["meta"] = item["$meta"];
@@ -345,7 +345,6 @@ const copyToClipboard = (text: string) => {
 };
 
 const save = (): SaveValuesInRdhParams => {
-  console.log("calledd save");
   const params: SaveValuesInRdhParams = {
     insertList: [],
     updateList: [],
@@ -535,15 +534,24 @@ defineExpose({
                 "
               ></VsCodeTextField>
               <template v-else>
-                <p :style="{ width: `${key.width}px` }">
+                <p
+                  :class="{ 'code-value': item.$resolvedLabels[key.name] }"
+                  :style="{ width: `${key.width}px` }"
+                >
                   <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
                     item.$ruleViolationMarks[key.name]
                   }}</span
                   >{{ item[key.name] }}
                 </p>
-                <span v-if="item.$resolvedLabels[key.name]" class="code-label">{{
-                  item.$resolvedLabels[key.name]
-                }}</span>
+                <span
+                  v-if="item.$resolvedLabels[key.name]"
+                  class="marker-box code-label"
+                  :class="{
+                    'marker-info': item.$resolvedLabels[key.name]?.isUndefined === false,
+                    'marker-error': item.$resolvedLabels[key.name]?.isUndefined,
+                  }"
+                  >{{ item.$resolvedLabels[key.name]?.label }}</span
+                >
                 <VsCodeButton
                   v-if="
                     item[key.name] !== undefined && item[key.name] !== null && item[key.name] !== ''
@@ -613,8 +621,6 @@ td.vcell > .code-label {
   position: absolute;
   right: 4px;
   top: 4px;
-  background-color: var(--vscode-editorPane-background);
-  border: 1px solid var(--vscode-diffEditor-removedTextBackground);
   border-radius: 3px;
   padding: 1px;
 }
@@ -693,6 +699,9 @@ span.label {
 }
 p.rule-violation-legend {
   margin: 0 5px;
+}
+p.code-value {
+  text-align: left;
 }
 /* tr.inserted {
   background-color: var(--vscode-diffEditor-insertedTextBackground) !important;

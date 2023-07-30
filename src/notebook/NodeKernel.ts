@@ -162,6 +162,7 @@ export class NodeKernel {
     return {
       stdout,
       stderr,
+      skipped: false,
       metadata,
     };
   }

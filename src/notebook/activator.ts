@@ -116,12 +116,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   );
   context.subscriptions.push(
     commands.registerCommand(SHOW_ALL_VARIABLES, async () => {
-      const filePath = window.activeNotebookEditor?.notebook.uri.fsPath ?? "";
-      const cells = window.activeNotebookEditor?.notebook.getCells();
+      const notebook = window.activeNotebookEditor?.notebook;
+      const cells = notebook?.getCells();
       if (!cells) {
         return;
       }
-      const variables = controller.getVariables();
+      const variables = controller.getVariables(notebook!);
       if (!variables) {
         return;
       }

@@ -35,6 +35,7 @@ export type NotebookExecutionVariables = {
 export type RunResult = {
   stdout: string;
   stderr: string;
+  skipped: boolean;
   metadata?: {
     rdh?: ResultSetData;
     [key: string]: any;

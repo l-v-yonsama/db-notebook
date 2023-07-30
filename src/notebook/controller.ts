@@ -55,18 +55,22 @@ const hasMessageField = (error: any): error is { message: string } => {
   }
 };
 
+type NoteSession = {
+  currentVariables: { [key: string]: any } | undefined;
+  kernel: NodeKernel | undefined;
+  sqlKernel: SqlKernel | undefined;
+  interrupted: boolean;
+};
+
 export class MainController {
   readonly controllerId = `${NOTEBOOK_TYPE}-controller`;
   readonly notebookType = NOTEBOOK_TYPE;
   readonly label = "Database Notebook";
   readonly supportedLanguages = ["sql", "javascript", "json"];
-  private kernel: NodeKernel | undefined;
-  private sqlKernel: SqlKernel | undefined;
 
   private _executionOrder = 0;
   private readonly _controller: NotebookController;
-  private currentVariables: { [key: string]: any } | undefined;
-  private interrupted: boolean = false;
+  private readonly noteSessions = new Map<string, NoteSession>();
 
   constructor(private context: ExtensionContext, private stateStorage: StateStorage) {
     this._controller = notebooks.createNotebookController(
@@ -143,8 +147,8 @@ export class MainController {
     commands.executeCommand("setContext", "hasSql", hasSql);
   }
 
-  getVariables() {
-    return this.currentVariables;
+  getVariables(notebook: NotebookDocument) {
+    return this.getNoteSession(notebook)?.currentVariables;
   }
 
   dispose(): void {
@@ -153,22 +157,30 @@ export class MainController {
     log(`${PREFIX} disposed`);
   }
 
+  private getNoteSession(notebook: NotebookDocument): NoteSession | undefined {
+    return this.noteSessions.get(notebook.uri.path);
+  }
+
   private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
     log(`${PREFIX} interruptHandler`);
-    try {
-      this.interrupted = true;
-      if (this.kernel) {
-        this.kernel.interrupt();
-      } else {
-        log(`${PREFIX} No NodeKernel`);
+    const noteSession = this.getNoteSession(notebook);
+    if (noteSession) {
+      const { kernel, sqlKernel } = noteSession;
+      try {
+        noteSession.interrupted = true;
+        if (kernel) {
+          kernel.interrupt();
+        } else {
+          log(`${PREFIX} No NodeKernel`);
+        }
+        if (sqlKernel) {
+          sqlKernel.interrupt();
+        } else {
+          log(`${PREFIX} No sqlKernel`);
+        }
+      } catch (e: any) {
+        log(`${PREFIX} interruptHandler Error:${e.message}`);
       }
-      if (this.sqlKernel) {
-        this.sqlKernel.interrupt();
-      } else {
-        log(`${PREFIX} No sqlKernel`);
-      }
-    } catch (e: any) {
-      log(`${PREFIX} interruptHandler Error:${e.message}`);
     }
   }
 
@@ -178,19 +190,31 @@ export class MainController {
     _controller: NotebookController
   ): Promise<void> {
     log(`${PREFIX} _executeAll START`);
-    this.interrupted = false;
     const connectionSettings = await this.stateStorage.getConnectionSettingList();
-    this.kernel = await NodeKernel.create(connectionSettings);
+    const kernel = await NodeKernel.create(connectionSettings);
+    let noteSession: NoteSession = {
+      kernel,
+      sqlKernel: undefined,
+      currentVariables: undefined,
+      interrupted: false,
+    };
+    this.noteSessions.set(notebook.uri.path, noteSession);
 
     for (let cell of cells) {
-      if (this.interrupted) {
+      if (noteSession.interrupted) {
         break;
       }
       await this._doExecution(notebook, cell);
+      const tmp = this.getNoteSession(notebook);
+      if (tmp) {
+        noteSession = tmp;
+      }
     }
-    this.currentVariables = this.kernel.getStoredVariables();
-    await this.kernel.dispose();
-    this.kernel = undefined;
+    noteSession.currentVariables = kernel.getStoredVariables();
+    await noteSession.kernel!.dispose();
+    noteSession.kernel = undefined;
+    this.noteSessions.delete(notebook.uri.path);
+
     log(`${PREFIX} _executeAll END`);
   }
 
@@ -203,13 +227,18 @@ export class MainController {
     const outputs: NotebookCellOutput[] = [];
     let success = true;
     try {
-      const { stdout, stderr, metadata } = await this.run(notebook, cell);
+      const { stdout, stderr, skipped, metadata } = await this.run(notebook, cell);
       if (stdout.length) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
       }
       if (stderr) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stdout(stderr)]));
         success = false;
+      }
+      if (skipped) {
+        outputs.push(
+          new NotebookCellOutput([NotebookCellOutputItem.text("### `SKIPPED!`", "text/markdown")])
+        );
       }
       if (metadata?.rdh) {
         const cellMeta: CellMeta = cell.metadata;
@@ -247,17 +276,23 @@ export class MainController {
   private async run(notebook: NotebookDocument, cell: NotebookCell): Promise<RunResult> {
     if ((cell.metadata as CellMeta)?.markAsSkip === true) {
       return {
-        stdout: "SKIPPED",
+        stdout: "",
         stderr: "",
+        skipped: true,
       };
     }
-    if (!this.kernel) {
+    const noteSession = this.getNoteSession(notebook);
+    if (!noteSession) {
+      throw new Error("Missing session");
+    }
+
+    if (!noteSession.kernel) {
       throw new Error("Missing kernel");
     }
     if (isSqlCell(cell)) {
-      this.sqlKernel = new SqlKernel(this.stateStorage);
-      const r = await this.sqlKernel.run(cell, this.kernel.getStoredVariables());
-      this.sqlKernel = undefined;
+      noteSession.sqlKernel = new SqlKernel(this.stateStorage);
+      const r = await noteSession.sqlKernel.run(cell, noteSession.kernel.getStoredVariables());
+      noteSession.sqlKernel = undefined;
       if (r.metadata?.rdh?.meta?.type === "select") {
         const metadata: CellMeta = cell.metadata;
         if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
@@ -265,8 +300,16 @@ export class MainController {
           if (rrule) {
             r.metadata.rdh.meta.tableRule = rrule.tableRule;
             log(`${PREFIX} rrule.tableRule:${JSON.stringify(rrule.tableRule, null, 1)}`);
-            const runRuleEngineResult = await runRuleEngine(r.metadata.rdh);
-            log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
+            try {
+              const runRuleEngineResult = await runRuleEngine(r.metadata.rdh);
+              log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
+            } catch (e) {
+              throw new Error(
+                `RuleEngineError:${(e as Error).message}. Unuse or review the following file. ${
+                  metadata.ruleFile
+                }`
+              );
+            }
           }
         }
         if (metadata.codeResolverFile && (await existsFileOnStorage(metadata.codeResolverFile))) {
@@ -281,10 +324,10 @@ export class MainController {
 
       return r;
     } else if (isJsonCell(cell)) {
-      return await jsonKernelRun(cell, this.kernel);
+      return await jsonKernelRun(cell, noteSession.kernel);
     }
 
-    return this.kernel!.run(cell);
+    return noteSession.kernel!.run(cell);
   }
 }
 

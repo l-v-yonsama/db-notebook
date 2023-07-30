@@ -25,7 +25,8 @@ export class SqlKernel {
     if (variables._skipSql === true) {
       return {
         stdout,
-        stderr: "Skipped.",
+        stderr,
+        skipped: true,
       };
     }
     if (connectionName) {
@@ -34,12 +35,14 @@ export class SqlKernel {
       return {
         stdout,
         stderr: "Specify the connection name to be used.",
+        skipped: false,
       };
     }
     if (!connectionSetting) {
       return {
         stdout,
         stderr: "Missing connection " + connectionName,
+        skipped: false,
       };
     }
 
@@ -77,6 +80,7 @@ export class SqlKernel {
     return {
       stdout,
       stderr,
+      skipped: false,
       metadata,
     };
   }

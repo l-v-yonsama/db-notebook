@@ -5,7 +5,7 @@ import type {
   AnyConditions,
   TopLevelCondition,
 } from "@/utilities/vscode";
-import type { DbColumn, RdhKey } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { DbColumn } from "@l-v-yonsama/multi-platform-database-drivers";
 
 export function isTopLevelCondition(params: any): params is TopLevelCondition {
   return isAllConditions(params) || isAnyConditions(params);
@@ -103,38 +103,4 @@ export function conditionsToString(
     }
   }
   return s;
-}
-
-export function hasKeywordInConditions(
-  condition: TopLevelCondition,
-  columns: DbColumn[],
-  keyword: string
-): boolean {
-  const nestedList = [];
-  if (isAllConditions(condition)) {
-    nestedList.push(...condition.all);
-  } else {
-    nestedList.push(...condition.any);
-  }
-
-  for (const nest of nestedList) {
-    if (isTopLevelCondition(nest)) {
-      if (hasKeywordInConditions(nest, columns, keyword)) {
-        return true;
-      }
-    } else {
-      const k = keyword.toLocaleLowerCase();
-      // condition
-      const { fact, value } = nest;
-      if (fact.toLocaleLowerCase().indexOf(k) >= 0) {
-        return true;
-      }
-      if (typeof value === "object" && value?.fact && typeof value.fact === "string") {
-        if (value.fact.toLocaleLowerCase().indexOf(k) >= 0) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
 }

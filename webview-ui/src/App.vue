@@ -310,4 +310,30 @@ div.tool-right {
 .tool-left {
   flex-grow: 1;
 }
+
+.highlighted {
+  background-color: var(--vscode-editor-selectionBackground) !important;
+}
+.error-foreground {
+  color: var(--vscode-editorError-foreground) !important;
+}
+.marker-box {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--vscode-editorHoverWidget-border) !important;
+  color: var(--vscode-editorHoverWidget-foreground);
+}
+
+.marker-info {
+  border-color: var(--vscode-editorInfo-border) !important;
+  color: var(--vscode-editorInfo-foreground) !important;
+}
+.marker-warning {
+  border-color: var(--vscode-editorWarning-border) !important;
+  color: var(--vscode-editorWarning-foreground) !important;
+}
+.marker-error {
+  border-color: var(--vscode-editorError-border) !important;
+  color: var(--vscode-editorError-foreground) !important;
+}
 </style>

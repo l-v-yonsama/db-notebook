@@ -10,6 +10,7 @@ import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import Paragraph from "./base/Paragraph.vue";
 import type { CodeItemDetail } from "@l-v-yonsama/multi-platform-database-drivers";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
@@ -436,7 +437,7 @@ const deleteDetail = (index: number) => {
               <template v-if="item.details.length === 0">
                 <tr>
                   <td class="code-name">
-                    <p>{{ item.title }}</p>
+                    <Paragraph :text="item.title" :highlight-text="keyword" />
                     <div class="controller">
                       <VsCodeButton
                         @click="
@@ -475,13 +476,13 @@ const deleteDetail = (index: number) => {
                   </td>
                   <td class="w100">-</td>
                   <td class="w150">-</td>
-                  <td>{{ item.description }}</td>
+                  <td><Paragraph :text="item.description" :highlight-text="keyword" /></td>
                 </tr>
               </template>
               <template v-else>
                 <tr v-for="(detail, idx2) of item.details" :key="`${idx}-${idx2}`">
                   <td v-if="idx2 === 0" :rowspan="item.details.length" class="code-name">
-                    <p>{{ item.title }}</p>
+                    <Paragraph :text="item.title" :highlight-text="keyword" />
                     <div class="controller">
                       <VsCodeButton
                         @click="
@@ -518,9 +519,11 @@ const deleteDetail = (index: number) => {
                   <td v-if="idx2 === 0" :rowspan="item.details.length" class="w150">
                     {{ item.resource }}
                   </td>
-                  <td class="w100">{{ detail.code }}</td>
-                  <td class="w150">{{ detail.label }}</td>
-                  <td v-if="idx2 === 0" :rowspan="item.details.length">{{ item.description }}</td>
+                  <td class="w100"><Paragraph :text="detail.code" :highlight-text="keyword" /></td>
+                  <td class="w150"><Paragraph :text="detail.label" :highlight-text="keyword" /></td>
+                  <td v-if="idx2 === 0" :rowspan="item.details.length">
+                    <Paragraph :text="item.description" :highlight-text="keyword" />
+                  </td>
                 </tr>
               </template>
             </template>

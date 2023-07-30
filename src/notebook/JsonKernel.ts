@@ -16,7 +16,8 @@ export const jsonKernelRun = async (
   if (variables._skipSql === true) {
     return {
       stdout,
-      stderr: "Skipped.",
+      stderr,
+      skipped: true,
     };
   }
 
@@ -36,5 +37,6 @@ export const jsonKernelRun = async (
   return {
     stdout,
     stderr,
+    skipped: false,
   };
 };
