@@ -121,6 +121,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       if (!cells) {
         return;
       }
+
       const variables = controller.getVariables(notebook!);
       if (!variables) {
         return;

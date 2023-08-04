@@ -288,7 +288,7 @@ defineExpose({
       :disabled="mode === 'update'"
       :maxlength="128"
     ></VsCodeTextField>
-    <p v-if="isDuplicateName">Duplicate name</p>
+    <p v-if="isDuplicateName" class="marker-error">Duplicate name</p>
 
     <label v-show="visibleHostOrDatabase" for="host">Host</label>
     <p v-if="isShowMode" v-show="visibleHostOrDatabase" id="host">{{ host }}</p>

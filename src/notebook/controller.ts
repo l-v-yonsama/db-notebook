@@ -56,7 +56,7 @@ const hasMessageField = (error: any): error is { message: string } => {
 };
 
 type NoteSession = {
-  currentVariables: { [key: string]: any } | undefined;
+  executionOrder: number;
   kernel: NodeKernel | undefined;
   sqlKernel: SqlKernel | undefined;
   interrupted: boolean;
@@ -68,9 +68,9 @@ export class MainController {
   readonly label = "Database Notebook";
   readonly supportedLanguages = ["sql", "javascript", "json"];
 
-  private _executionOrder = 0;
   private readonly _controller: NotebookController;
   private readonly noteSessions = new Map<string, NoteSession>();
+  private readonly noteVariables = new Map<string, { [key: string]: any }>();
 
   constructor(private context: ExtensionContext, private stateStorage: StateStorage) {
     this._controller = notebooks.createNotebookController(
@@ -83,6 +83,10 @@ export class MainController {
     this._controller.supportsExecutionOrder = true;
     this._controller.executeHandler = this._executeAll.bind(this);
     this._controller.interruptHandler = this._interruptHandler.bind(this);
+
+    workspace.onDidCloseNotebookDocument((e) => {
+      this.noteVariables.delete(e.uri.path);
+    });
 
     context.subscriptions.push(
       workspace.onDidChangeNotebookDocument((e) => {
@@ -115,6 +119,13 @@ export class MainController {
         new CodeLabelResolverProvider()
       )
     );
+    // context.subscriptions.push(
+    //   notebooks.registerNotebookCellStatusBarItemProvider(
+    //     NOTEBOOK_TYPE,
+    //     new ExplainMarkerProvider()
+    //   )
+    // );
+
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
@@ -147,8 +158,8 @@ export class MainController {
     commands.executeCommand("setContext", "hasSql", hasSql);
   }
 
-  getVariables(notebook: NotebookDocument) {
-    return this.getNoteSession(notebook)?.currentVariables;
+  getVariables(notebook: NotebookDocument): { [key: string]: any } | undefined {
+    return this.noteVariables.get(notebook.uri.path);
   }
 
   dispose(): void {
@@ -193,24 +204,25 @@ export class MainController {
     const connectionSettings = await this.stateStorage.getConnectionSettingList();
     const kernel = await NodeKernel.create(connectionSettings);
     let noteSession: NoteSession = {
+      executionOrder: 0,
       kernel,
       sqlKernel: undefined,
-      currentVariables: undefined,
       interrupted: false,
     };
     this.noteSessions.set(notebook.uri.path, noteSession);
+    this.noteVariables.set(notebook.uri.path, kernel.getStoredVariables());
 
     for (let cell of cells) {
       if (noteSession.interrupted) {
         break;
       }
-      await this._doExecution(notebook, cell);
+      await this._doExecution(notebook, cell, noteSession);
       const tmp = this.getNoteSession(notebook);
       if (tmp) {
         noteSession = tmp;
       }
     }
-    noteSession.currentVariables = kernel.getStoredVariables();
+    this.noteVariables.set(notebook.uri.path, kernel.getStoredVariables());
     await noteSession.kernel!.dispose();
     noteSession.kernel = undefined;
     this.noteSessions.delete(notebook.uri.path);
@@ -218,16 +230,28 @@ export class MainController {
     log(`${PREFIX} _executeAll END`);
   }
 
-  private async _doExecution(notebook: NotebookDocument, cell: NotebookCell): Promise<void> {
+  private async _doExecution(
+    notebook: NotebookDocument,
+    cell: NotebookCell,
+    noteSession: NoteSession
+  ): Promise<void> {
     const execution = this._controller.createNotebookCellExecution(cell);
-
-    execution.executionOrder = ++this._executionOrder;
+    noteSession.executionOrder++;
+    execution.executionOrder = noteSession.executionOrder;
     execution.start(Date.now());
 
     const outputs: NotebookCellOutput[] = [];
     let success = true;
+    let stdout = "";
+    let stderr = "";
+    let skipped = false;
+    let metadata = undefined;
     try {
-      const { stdout, stderr, skipped, metadata } = await this.run(notebook, cell);
+      const r = await this.run(notebook, cell);
+      stdout = r.stdout;
+      stderr = r.stderr;
+      skipped = r.skipped;
+      metadata = r.metadata;
       if (stdout.length) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
       }
@@ -264,6 +288,7 @@ export class MainController {
       console.error(err);
       success = false;
       if (hasMessageField(err)) {
+        stderr = err.message;
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stdout(err.message)]));
       } else {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.error(err)]));
@@ -271,6 +296,15 @@ export class MainController {
     }
     execution.replaceOutput(outputs);
     execution.end(success, Date.now());
+    if (noteSession.kernel) {
+      noteSession.kernel.updateVariable(`$cell${noteSession.executionOrder}`, {
+        success,
+        stdout,
+        stderr,
+        skipped,
+        metadata,
+      });
+    }
   }
 
   private async run(notebook: NotebookDocument, cell: NotebookCell): Promise<RunResult> {
@@ -401,6 +435,34 @@ class CodeLabelResolverProvider implements NotebookCellStatusBarItemProvider {
     return item;
   }
 }
+
+// class ExplainMarkerProvider implements NotebookCellStatusBarItemProvider {
+//   constructor() {}
+
+//   async provideCellStatusBarItems(
+//     cell: NotebookCell
+//   ): Promise<NotebookCellStatusBarItem | undefined> {
+//     if (!isSqlCell(cell)) {
+//       return undefined;
+//     }
+
+//     if (!cell.document.getText().toLocaleLowerCase().includes("select")) {
+//       return undefined;
+//     }
+
+//     const { markWithExplain }: CellMeta = cell.metadata;
+//     let tooltip = "";
+//     if (markWithExplain) {
+//       tooltip = "$(graph-left) Without explain";
+//     } else {
+//       tooltip = "$(graph-left) With explain";
+//     }
+//     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
+//     // item.command = CELL_SPECIFY_CODE_RESOLVER_TO_USE;
+//     item.tooltip = tooltip;
+//     return item;
+//   }
+// }
 
 class MarkCellAsSkipProvider implements NotebookCellStatusBarItemProvider {
   constructor() {}

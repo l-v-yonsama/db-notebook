@@ -6,6 +6,7 @@ export type CellMeta = {
   ruleFile?: string;
   codeResolverFile?: string;
   showComment?: boolean;
+  markWithExplain?: boolean;
   markAsSkip?: boolean;
   readonly [key: string]: any;
 };

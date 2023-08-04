@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { StateStorage } from "./utilities/StateStorage";
 import {
   DBDriverResolver,
+  DbConnection,
   DbResource,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -90,6 +91,9 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
             await this.stateStorage.editConnectionSetting(params);
           }
           await vscode.commands.executeCommand(REFRESH_RESOURCES);
+          const res = Object.assign(new DbConnection(params.name), params);
+          this.setForm("show", res);
+
           break;
       }
     });
@@ -112,6 +116,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
     } else {
       this.cacheForm = undefined;
     }
+
     this.show();
 
     let msg: ToWebviewMessageEventType;

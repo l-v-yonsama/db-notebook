@@ -125,7 +125,9 @@ const resetColumns = () => {
   if (tableName.value) {
     const tableRes = props.schema?.children?.find((it) => it.name === tableName.value);
     if (tableRes) {
-      tableRes.children.forEach((it) => {
+      const children = tableRes.children.sort((a, b) => a.name.localeCompare(b.name));
+
+      children.forEach((it) => {
         columns.value.push(it);
 
         let label = it.name;
@@ -432,6 +434,7 @@ section.items table th,
 section.items table td {
   border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
   padding: 2px;
+  overflow: hidden;
 }
 
 section.items span.label {

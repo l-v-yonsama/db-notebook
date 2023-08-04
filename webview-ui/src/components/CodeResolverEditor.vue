@@ -84,7 +84,16 @@ const items = ref(
 type ComputedItem = {
   title: string;
   description: string;
-  resource: string;
+  resource: {
+    table?: {
+      regex: boolean;
+      pattern: string;
+    };
+    column: {
+      regex: boolean;
+      pattern: string;
+    };
+  };
   originalIndex: number;
   details: {
     code: string;
@@ -100,31 +109,29 @@ const computedItems = computed((): ComputedItem[] => {
       if (keyword.value.length === 0) {
         return true;
       }
-      const k = keyword.value;
+      const k = (keyword.value ?? "").toLocaleLowerCase();
       if (
-        it.title.indexOf(k) >= 0 ||
-        (it.description && it.description.indexOf(k) >= 0) ||
-        it.details.some((detail) => detail.code.indexOf(k) >= 0 || detail.label.indexOf(k) >= 0)
+        it.title.toLocaleLowerCase().indexOf(k) >= 0 ||
+        (it.resource?.table?.pattern &&
+          it.resource.table.pattern.toLocaleLowerCase().indexOf(k) >= 0) ||
+        it.resource.column.pattern.toLocaleLowerCase().indexOf(k) >= 0 ||
+        (it.description && it.description.toLocaleLowerCase().indexOf(k) >= 0) ||
+        it.details.some(
+          (detail) =>
+            detail.code.toLocaleLowerCase().indexOf(k) >= 0 ||
+            detail.label.toLocaleLowerCase().indexOf(k) >= 0
+        )
       ) {
         return true;
       }
       return false;
     })
     .forEach((item) => {
-      let resource = "";
-      if (item.resource?.table?.pattern) {
-        const { regex, pattern } = item.resource.table;
-        resource += `TABLE: ${regex ? "(REGEX)" : ""} ${pattern}`;
-      }
-      {
-        const { regex, pattern } = item.resource.column;
-        resource += `COLUMN: ${regex ? "(REGEX)" : ""} ${pattern}`;
-      }
       list.push({
         title: item.title,
         description: item.description ?? "",
         originalIndex: item.originalIndex,
-        resource,
+        resource: item.resource,
         details: item.details,
       });
     });
@@ -472,7 +479,24 @@ const deleteDetail = (index: number) => {
                     </div>
                   </td>
                   <td class="w150">
-                    {{ item.resource }}
+                    <div v-if="item.resource.table">
+                      <span>TABLE:</span>
+                      <Paragraph
+                        :text="item.resource.table.pattern"
+                        :highlight-text="keyword"
+                        style="display: inline-block"
+                      />
+                      <span v-if="item.resource.table.regex">(REGEX)</span>
+                    </div>
+                    <div>
+                      <span>COLMUN:</span>
+                      <Paragraph
+                        :text="item.resource.column.pattern"
+                        :highlight-text="keyword"
+                        style="display: inline-block"
+                      />
+                      <span v-if="item.resource.column.regex">(REGEX)</span>
+                    </div>
                   </td>
                   <td class="w100">-</td>
                   <td class="w150">-</td>
@@ -517,7 +541,24 @@ const deleteDetail = (index: number) => {
                     </div>
                   </td>
                   <td v-if="idx2 === 0" :rowspan="item.details.length" class="w150">
-                    {{ item.resource }}
+                    <div v-if="item.resource.table">
+                      <span>TABLE:</span>
+                      <Paragraph
+                        :text="item.resource.table.pattern"
+                        :highlight-text="keyword"
+                        style="display: inline-block"
+                      />
+                      <span v-if="item.resource.table.regex">(REGEX)</span>
+                    </div>
+                    <div>
+                      <span>COLMUN:</span>
+                      <Paragraph
+                        :text="item.resource.column.pattern"
+                        :highlight-text="keyword"
+                        style="display: inline-block"
+                      />
+                      <span v-if="item.resource.column.regex">(REGEX)</span>
+                    </div>
                   </td>
                   <td class="w100"><Paragraph :text="detail.code" :highlight-text="keyword" /></td>
                   <td class="w150"><Paragraph :text="detail.label" :highlight-text="keyword" /></td>
@@ -652,6 +693,7 @@ section.items table th,
 section.items table td {
   border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
   padding: 2px;
+  overflow: hidden;
 }
 
 section.items span.label {

@@ -38,7 +38,6 @@ import {
   WRITE_ER_DIAGRAM_TO_CLIPBOARD,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
-import { ERDiagramParams, TableColumn, TableRelation } from "../shared/ERDiagram";
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { ViewConditionPanel } from "../panels/ViewConditionPanel";
