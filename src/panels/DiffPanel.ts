@@ -9,7 +9,6 @@ import {
 } from "vscode";
 import {
   DBDriverResolver,
-  DiffResult,
   RDSBaseDriver,
   RdhHelper,
   ResultSetData,
@@ -18,7 +17,6 @@ import {
   resolveCodeLabel,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage, sleep } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
@@ -29,28 +27,13 @@ import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { log } from "../utilities/logger";
-import { nextTick } from "process";
+import { DiffPanelEventData, DiffTabItem } from "../shared/MessageEventData";
 
 const PREFIX = "[DiffPanel]";
 
 dayjs.extend(utc);
 
 const componentName = "DiffPanel";
-
-type DiffTabInnerItem = {
-  tabId: string;
-  title: string;
-  rdh1: ResultSetData;
-  rdh2: ResultSetData;
-  diffResult: DiffResult;
-};
-
-type DiffTabItem = {
-  tabId: string;
-  title: string;
-  subTitle: string;
-  list: DiffTabInnerItem[];
-};
 
 export type DiffTabParam = {
   title: string;
@@ -69,7 +52,11 @@ export class DiffPanel {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, extensionUri);
+    this._panel.webview.html = createWebviewContent(
+      this._panel.webview,
+      extensionUri,
+      componentName
+    );
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -202,11 +189,14 @@ export class DiffPanel {
       item.list = tmpItem.list;
       item.subTitle = tmpItem.subTitle;
 
-      const msg: ToWebviewMessageEventType = {
-        command: componentName + "-set-search-result",
+      const msg: DiffPanelEventData = {
+        command: "set-search-result",
+        componentName: "DiffPanel",
         value: {
-          tabId: item.tabId,
-          value: item,
+          searchResult: {
+            tabId: item.tabId,
+            value: item,
+          },
         },
       };
       this._panel.webview.postMessage(msg);
@@ -216,17 +206,12 @@ export class DiffPanel {
     item = await this.createTabItem(title, list1, list2);
     this.items.push(item);
 
-    // send to webview
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
-    };
-
-    this._panel.webview.postMessage(msg);
-
-    const msg2: ToWebviewMessageEventType = {
-      command: componentName + "-add-tab-item",
-      value: item,
+    const msg2: DiffPanelEventData = {
+      command: "add-tab-item",
+      componentName: "DiffPanel",
+      value: {
+        addTabItem: item,
+      },
     };
     this._panel.webview.postMessage(msg2);
     return item;

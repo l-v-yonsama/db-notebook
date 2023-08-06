@@ -340,52 +340,57 @@ const toExample = (p: ConditionProperties): string => {
   return "";
 };
 </script>
-<style scoped>
+<style lang="scss" scoped>
 vscode-dropdown.open {
   z-index: 20;
 }
 section.condition {
   margin-top: 17px;
-}
-.condition fieldset legend {
-  width: -webkit-fill-available;
-}
-.condition fieldset legend > vscode-dropdown:first-of-type {
-  margin-right: auto;
-}
 
-table {
-  width: 100%;
-}
-.no {
-  width: 60px;
-  max-width: 60px;
-}
-.valType {
-  margin-right: 3px;
-  z-index: 4;
-}
-.ctl {
-  width: 60px;
-  max-width: 60px;
-}
-.col {
-  width: 310px;
-}
-.com {
-  width: 110px;
-  text-align: center;
-}
-.ope {
-  width: 130px;
-  max-width: 130px;
-  text-align: center;
-}
-.val-def {
-  display: flex;
-  column-gap: 5px;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
+  fieldset {
+    legend {
+      width: -webkit-fill-available;
+
+      & > vscode-dropdown:first-of-type {
+        margin-right: auto;
+      }
+    }
+
+    table {
+      width: 100%;
+
+      .no {
+        width: 60px;
+        max-width: 60px;
+      }
+      .valType {
+        margin-right: 3px;
+        z-index: 4;
+      }
+      .ctl {
+        width: 60px;
+        max-width: 60px;
+      }
+      .col {
+        width: 310px;
+      }
+      .com {
+        width: 110px;
+        text-align: center;
+      }
+      .ope {
+        width: 130px;
+        max-width: 130px;
+        text-align: center;
+      }
+      .val-def {
+        display: flex;
+        column-gap: 5px;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+      }
+    }
+  }
 }
 </style>

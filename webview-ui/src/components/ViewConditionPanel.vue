@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import { defineExpose, nextTick, ref, onMounted } from "vue";
+import { nextTick, ref, onMounted, computed } from "vue";
 import { vscode } from "@/utilities/vscode";
-import type { UpdateTextDocumentActionCommand, ViewConditionParams } from "@/utilities/vscode";
+import type {
+  UpdateTextDocumentActionCommand,
+  ViewConditionPanelEventData,
+  ViewConditionParams,
+} from "@/utilities/vscode";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 
 import type { DropdownItem } from "@/types/Components";
 import TopLevelConditionVue from "./TopLevelCondition.vue";
-import type { DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
+
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
-
-type Props = {
-  tableRes: DbTable;
-  numOfRows: number;
-  limit: number;
-  previewSql: string;
-};
-
-const props = defineProps<Props>();
 
 const sectionHeight = ref(300);
 
@@ -36,14 +31,30 @@ onMounted(() => {
 });
 
 const specifyCondition = ref(false);
-const previewSql = ref(props.previewSql);
+const previewSql = ref("");
 
-const limit = ref((props.limit ?? 0) + "");
-const limitMax = Math.min(100000, props.numOfRows);
+const limit = ref("0");
+const numOfRows = ref(0);
+let limitMax = 100000;
 const visibleCondition = ref(true);
+const tableNameWithComment = ref("");
 
-const columnItems = ref(
-  props.tableRes.children.map((it) => {
+const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void => {
+  if (v === undefined) {
+    return;
+  }
+
+  limit.value = (v.limit ?? 0) + "";
+  numOfRows.value = v.numOfRows;
+  limitMax = Math.min(100000, v.numOfRows);
+  previewSql.value = v.previewSql;
+  if (v.tableRes.comment) {
+    tableNameWithComment.value = `${v.tableRes.name} (${v.tableRes.comment})`;
+  } else {
+    tableNameWithComment.value = v.tableRes.name;
+  }
+
+  const items = v.tableRes.children.map((it) => {
     let label = it.name;
     if (it.comment) {
       label += " " + it.comment;
@@ -56,13 +67,17 @@ const columnItems = ref(
         colType: it.colType,
       },
     };
-  }) as DropdownItem[]
-);
-columnItems.value.unshift({
-  label: "-",
-  value: "",
-  meta: {},
-});
+  }) as DropdownItem[];
+  items.unshift({
+    label: "-",
+    value: "",
+    meta: {},
+  });
+  columnItems.value.splice(0, columnItems.value.length);
+  items.forEach((it) => columnItems.value.push(it));
+};
+
+const columnItems = ref([] as DropdownItem[]);
 
 const editorItem = ref({
   conditions: {
@@ -87,13 +102,16 @@ const cancel = () => {
   });
 };
 const handleSpecifyConditionOnChange = (newVal: boolean) => {
-  console.log("called handleSpecifyConditionOnChange:", newVal);
   specifyCondition.value = newVal;
+
+  console.log("visibleCondition", visibleCondition.value);
+  console.log("specifyCondition", specifyCondition.value);
+  console.log("editorItem.conditions", editorItem);
+  console.log("columnItems", columnItems.value);
+
   ok(false, true);
 };
 const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {
-  console.log("called updateTextDocument:" + values);
-  console.log("editorItem", JSON.stringify(editorItem.value));
   visibleCondition.value = false;
   nextTick(() => {
     visibleCondition.value = true;
@@ -116,12 +134,29 @@ const ok = (editable: boolean, preview: boolean) => {
 };
 
 const setPreviewSql = (sql: string): void => {
-  console.log(" called setpreviewll", sql);
   previewSql.value = sql;
 };
 
+const recieveMessage = (data: ViewConditionPanelEventData) => {
+  const { command, value } = data;
+  switch (command) {
+    case "initialize":
+      if (value.initialize === undefined) {
+        return;
+      }
+      initialize(value.initialize);
+      break;
+    case "set-preview-sql":
+      if (value.setPreviewSql === undefined) {
+        return;
+      }
+      setPreviewSql(value.setPreviewSql.previewSql);
+      break;
+  }
+};
+
 defineExpose({
-  setPreviewSql,
+  recieveMessage,
 });
 </script>
 
@@ -130,14 +165,9 @@ defineExpose({
     <div class="toolbar">
       <div class="tool-left">
         <label for="tableName">Table:</label>
-        <span id="tableName"
-          >{{ props.tableRes.name
-          }}{{
-            (props.tableRes.comment ?? "").length > 0 ? ` (${props.tableRes.comment})` : ""
-          }}</span
-        >
+        <span id="tableName">{{ tableNameWithComment }}</span>
         <label for="numOfRows">Current rows:</label>
-        <span id="numOfRows">{{ props.numOfRows }}</span>
+        <span id="numOfRows">{{ numOfRows }}</span>
         <label for="limit">Limit:</label>
         <VsCodeTextField
           id="limit"

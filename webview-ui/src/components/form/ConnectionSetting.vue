@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import VsCodeButton from "./base/VsCodeButton.vue";
-import VsCodeTextField from "./base/VsCodeTextField.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import VsCodeCheckboxGroup from "./base/VsCodeCheckboxGroup.vue";
-import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
+import VsCodeButton from "../base/VsCodeButton.vue";
+import VsCodeTextField from "../base/VsCodeTextField.vue";
+import VsCodeDropdown from "../base/VsCodeDropdown.vue";
+import VsCodeCheckboxGroup from "../base/VsCodeCheckboxGroup.vue";
+import VsCodeRadioGroupVue from "../base/VsCodeRadioGroup.vue";
 import * as DBTypeConst from "@/types/lib/DBType";
 import * as AwsRegionConst from "@/types/lib/AwsRegion";
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";

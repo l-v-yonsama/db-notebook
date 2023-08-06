@@ -13,10 +13,8 @@ import {
 
 import { CODE_RESOLVER_TYPE } from "../constant";
 import { createWebviewContent } from "../utilities/webviewUtil";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import {
   ActionCommand,
-  CreateCodeResolverEditorActionCommand,
   NameWithComment,
   UpdateCodeResolverTextDocumentActionCommand,
 } from "../shared/ActionParams";
@@ -24,9 +22,11 @@ import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
+import { ComponentName } from "../shared/ComponentName";
+import { CodeResolverEditorEventData } from "../shared/MessageEventData";
 
 const PREFIX = "[CodeResolverEditorProvider]";
-const componentName = "CodeResolverEditor";
+const componentName: ComponentName = "CodeResolverEditor";
 
 export class CodeResolverEditorProvider implements CustomTextEditorProvider {
   private scrollPos: number = 0;
@@ -52,7 +52,8 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
     };
     webviewPanel.webview.html = createWebviewContent(
       webviewPanel.webview,
-      this.context.extensionUri
+      this.context.extensionUri,
+      componentName
     );
 
     const updateWebview = async () => {
@@ -63,15 +64,17 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
       this.initDbResourceParams(resolver.editor.connectionName);
 
       const connectionSettingNames = this.stateStorage.getConnectionSettingNames();
-      const msg: ToWebviewMessageEventType<CreateCodeResolverEditorActionCommand["params"]> = {
-        command: "create",
-        componentName,
+      const msg: CodeResolverEditorEventData = {
+        command: "initialize",
+        componentName: "CodeResolverEditor",
         value: {
-          connectionSettingNames: ["", ...connectionSettingNames],
-          tableNameList: this.tableNameList,
-          columnNameList: this.columnNameList,
-          resolver,
-          scrollPos: this.scrollPos,
+          initialize: {
+            connectionSettingNames: ["", ...connectionSettingNames],
+            tableNameList: this.tableNameList,
+            columnNameList: this.columnNameList,
+            resolver,
+            scrollPos: this.scrollPos,
+          },
         },
       };
       webviewPanel.webview.postMessage(msg);

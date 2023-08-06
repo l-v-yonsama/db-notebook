@@ -13,15 +13,16 @@ import {
 
 import { RECORD_RULE_TYPE } from "../constant";
 import { createWebviewContent } from "../utilities/webviewUtil";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { RecordRule } from "../shared/RecordRule";
 import { ActionCommand, UpdateTextDocumentActionCommand } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { DbSchema, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ComponentName } from "../shared/ComponentName";
+import { RecordRuleEditorEventData } from "../shared/MessageEventData";
 
 const PREFIX = "[RecordRuleEditorProvider]";
-const componentName = "RecordRuleEditor";
+const componentName: ComponentName = "RecordRuleEditor";
 
 export class RecordRuleEditorProvider implements CustomTextEditorProvider {
   private scrollPos: number = 0;
@@ -46,7 +47,8 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
     //    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
     webviewPanel.webview.html = createWebviewContent(
       webviewPanel.webview,
-      this.context.extensionUri
+      this.context.extensionUri,
+      componentName
     );
 
     const updateWebview = async () => {
@@ -71,14 +73,16 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
           schema = (dbs[0] as RdsDatabase).getSchema({ name: recordRule.editor.schemaName });
         }
       }
-      const msg: ToWebviewMessageEventType = {
-        command: "create",
-        componentName,
+      const msg: RecordRuleEditorEventData = {
+        command: "initialize",
+        componentName: "RecordRuleEditor",
         value: {
-          connectionSettingNames,
-          schema,
-          recordRule,
-          scrollPos: this.scrollPos,
+          initialize: {
+            connectionSettingNames,
+            schema,
+            recordRule,
+            scrollPos: this.scrollPos,
+          },
         },
       };
       webviewPanel.webview.postMessage(msg);

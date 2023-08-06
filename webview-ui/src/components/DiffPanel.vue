@@ -10,7 +10,12 @@ import {
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
 import RDHViewer from "./RDHViewer.vue";
-import type { CloseTabActionCommand, CompareParams, OutputParams } from "@/utilities/vscode";
+import type {
+  CloseTabActionCommand,
+  CompareParams,
+  DiffPanelEventData,
+  OutputParams,
+} from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS } from "@/constants";
@@ -217,10 +222,28 @@ const selectedMoreOptions = (v: MoreOption): void => {
   resetActiveInnerRdh();
 };
 
+const recieveMessage = (data: DiffPanelEventData) => {
+  const { command, value } = data;
+
+  switch (command) {
+    case "add-tab-item":
+      if (value.addTabItem === undefined) {
+        return;
+      }
+      addTabItem(value.addTabItem);
+      break;
+    case "set-search-result":
+      if (value.searchResult === undefined) {
+        return;
+      }
+      setSearchResult(value.searchResult);
+      break;
+  }
+};
+
 defineExpose({
-  addTabItem,
+  recieveMessage,
   removeTabItem,
-  setSearchResult,
 });
 </script>
 

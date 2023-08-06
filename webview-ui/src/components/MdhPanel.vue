@@ -17,6 +17,7 @@ import type {
   CompareParams,
   OutputParams,
   WriteToClipboardParams,
+  MdhPanelEventData,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
@@ -327,10 +328,24 @@ const saveCompareKeys = (
   contentMode.value = "tab";
 };
 
+const recieveMessage = (data: MdhPanelEventData) => {
+  const { command, value } = data;
+
+  switch (command) {
+    case "add-tab-item":
+      addTabItem(value.addTabItem);
+      break;
+    case "set-search-result":
+      if (value.searchResult === undefined) {
+        return;
+      }
+      setSearchResult(value.searchResult);
+      break;
+  }
+};
+
 defineExpose({
-  addTabItem,
-  removeTabItem,
-  setSearchResult,
+  recieveMessage,
 });
 </script>
 

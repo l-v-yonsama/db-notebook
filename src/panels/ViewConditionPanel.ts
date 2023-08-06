@@ -5,17 +5,18 @@ import {
   RDSBaseDriver,
   toViewDataQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
 import { ActionCommand } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { MdhPanel } from "./MdhPanel";
 import { ViewConditionParams } from "../shared/ViewConditionParams";
+import { ComponentName } from "../shared/ComponentName";
+import { ViewConditionPanelEventData } from "../shared/MessageEventData";
 
 const PREFIX = "[ViewConditionPanel]";
 
-const componentName = "ViewConditionPanel";
+const componentName: ComponentName = "ViewConditionPanel";
 
 export class ViewConditionPanel {
   public static currentPanel: ViewConditionPanel | undefined;
@@ -30,7 +31,11 @@ export class ViewConditionPanel {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, this.extensionUri);
+    this._panel.webview.html = createWebviewContent(
+      this._panel.webview,
+      this.extensionUri,
+      componentName
+    );
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -69,16 +74,20 @@ export class ViewConditionPanel {
   }
 
   async renderSub() {
-    // send to webview
+    if (!this.tableRes) {
+      return;
+    }
     const previewSql = await this.getPreviewSql({ all: [] }, false);
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
+    const msg: ViewConditionPanelEventData = {
+      command: "initialize",
+      componentName: "ViewConditionPanel",
       value: {
-        tableRes: this.tableRes,
-        limit: Math.min(1000, this.numOfRows),
-        numOfRows: this.numOfRows,
-        previewSql,
+        initialize: {
+          tableRes: this.tableRes,
+          limit: Math.min(1000, this.numOfRows),
+          numOfRows: this.numOfRows,
+          previewSql,
+        },
       },
     };
 
@@ -145,10 +154,14 @@ export class ViewConditionPanel {
               if (preview) {
                 const previewSql = await this.getPreviewSql(conditions, specfyCondition);
                 // send to webview
-                const msg: ToWebviewMessageEventType = {
-                  command: componentName + "-set-preview-sql",
-                  componentName,
-                  value: previewSql,
+                const msg: ViewConditionPanelEventData = {
+                  command: "set-preview-sql",
+                  componentName: "ViewConditionPanel",
+                  value: {
+                    setPreviewSql: {
+                      previewSql,
+                    },
+                  },
                 };
                 this._panel.webview.postMessage(msg);
 

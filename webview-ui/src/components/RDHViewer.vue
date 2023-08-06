@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, defineExpose } from "vue";
+import { ref } from "vue";
 import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDH from "./RDH.vue";
 import type { CellFocusParams } from "@/types/RdhEvents";

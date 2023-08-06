@@ -1,15 +1,16 @@
 import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { rdhListToText } from "../utilities/rdhToText";
+import { WriteToClipboardParamsPanelEventData } from "../shared/MessageEventData";
+import { ComponentName } from "../shared/ComponentName";
 
 const PREFIX = "[WriteToClipboardParamsPanel]";
 
-const componentName = "WriteToClipboardParamsPanel";
+const componentName: ComponentName = "WriteToClipboardParamsPanel";
 
 export class WriteToClipboardParamsPanel {
   public static currentPanel: WriteToClipboardParamsPanel | undefined;
@@ -22,7 +23,11 @@ export class WriteToClipboardParamsPanel {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, extensionUri);
+    this._panel.webview.html = createWebviewContent(
+      this._panel.webview,
+      extensionUri,
+      componentName
+    );
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -60,16 +65,20 @@ export class WriteToClipboardParamsPanel {
   }
 
   async renderSub() {
-    // send to webview
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
+    if (!this.params) {
+      return;
+    }
+    const msg: WriteToClipboardParamsPanelEventData = {
+      command: "initialize",
+      componentName: "WriteToClipboardParamsPanel",
       value: {
-        params: this.params,
-        previewText: rdhListToText(this.list, {
-          ...this.params!,
-          limit: Math.min(this.params?.limit ?? 10, 10),
-        }),
+        initialize: {
+          params: this.params,
+          previewText: rdhListToText(this.list, {
+            ...this.params!,
+            limit: Math.min(this.params?.limit ?? 10, 10),
+          }),
+        },
       },
     };
 

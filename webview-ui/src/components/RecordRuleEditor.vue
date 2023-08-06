@@ -4,20 +4,23 @@ import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import Paragraph from "./base/Paragraph.vue";
-import type { DbColumn, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
-import { vscode, type RecordRule, type UpdateTextDocumentActionCommand } from "@/utilities/vscode";
+import type {
+  DbColumn,
+  DbSchema,
+  TableRuleDetail,
+} from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  vscode,
+  type RecordRule,
+  type UpdateTextDocumentActionCommand,
+  type RecordRuleEditorEventData,
+} from "@/utilities/vscode";
 
 import type { DropdownItem } from "@/types/Components";
 import TopLevelConditionVue from "./TopLevelCondition.vue";
 import { conditionsToString } from "@/utilities/RRuleUtil";
 
-type Props = {
-  connectionSettingNames: string[];
-  schema: DbSchema | undefined;
-  recordRule: RecordRule;
-  scrollPos: number;
-};
-const props = defineProps<Props>();
+let recordRule: RecordRule;
 
 const sectionHeight = ref(300);
 
@@ -32,42 +35,66 @@ const resetSectionHeight = () => {
 
 onMounted(() => {
   nextTick(resetSectionHeight);
-  const wrapper = document.querySelector(".rr-scroll-wrapper");
-  if (wrapper) {
-    wrapper.scrollTop = props.scrollPos ?? 0;
-  }
 });
 
-const keyword = ref(props.recordRule.editor.keyword ?? "");
-const visibleEditor = ref(props.recordRule.editor.visible);
-const connectionName = ref(props.recordRule.editor.connectionName);
-const connectionItems = props.connectionSettingNames.map((it) => ({ label: it, value: it }));
-const editorItem = ref(
-  props.recordRule.editor.item ?? {
-    ruleName: "",
-    conditions: { all: [] },
-    error: {
-      column: "",
-      limit: 100,
-    },
+const keyword = ref("");
+const visibleEditor = ref(false);
+const connectionName = ref("");
+const connectionItems: DropdownItem[] = [];
+const editorItem = ref({
+  ruleName: "",
+  conditions: { all: [] },
+  error: {
+    column: "",
+    limit: 100,
+  },
+});
+
+const tableName = ref("");
+const tableItems = [] as DropdownItem[];
+
+const details = ref([] as (TableRuleDetail & { originalIndex: number })[]);
+
+const initialize = (v: RecordRuleEditorEventData["value"]["initialize"]): void => {
+  if (v === undefined) {
+    return;
   }
-);
+  recordRule = v.recordRule;
+  keyword.value = v.recordRule.editor.keyword ?? "";
+  visibleEditor.value = v.recordRule.editor.visible;
+  connectionName.value = v.recordRule.editor.connectionName;
+  connectionItems.splice(0, connectionItems.length);
+  v.connectionSettingNames.map((it) => {
+    connectionItems.push({ label: it, value: it });
+  });
+  tableName.value = v.recordRule.tableRule.table;
 
-const tableName = ref(props.recordRule.tableRule.table);
-const tableItems =
-  props.schema === undefined || props.schema === null
-    ? []
-    : props.schema.children.map((it) => ({
-        label: `${it.name} ${it.comment ?? ""}`,
-        value: it.name,
-      }));
+  tableItems.splice(0, tableItems.length);
+  (v.schema === undefined || v.schema === null ? [] : v.schema.children).forEach((it) =>
+    tableItems.push({
+      label: `${it.name} ${it.comment ?? ""}`,
+      value: it.name,
+    })
+  );
 
-const details = ref(
-  props.recordRule.tableRule.details.map((it, originalIndex) => ({
-    ...it,
-    originalIndex,
-  }))
-);
+  details.value.splice(0, details.value.length);
+
+  v.recordRule.tableRule.details.forEach((it, originalIndex) =>
+    details.value.push({
+      ...it,
+      originalIndex,
+    })
+  );
+
+  const wrapper = document.querySelector(".rr-scroll-wrapper");
+  if (wrapper) {
+    wrapper.scrollTop = v.scrollPos ?? 0;
+  }
+
+  resetColumns(v.schema as DbSchema);
+
+  Object.assign(editorItem.value, v.recordRule.editor.item);
+};
 
 type ComputedDetail = {
   ruleName: string;
@@ -113,7 +140,7 @@ const computedDetails = computed((): ComputedDetail[] => {
 const columns = ref([] as DbColumn[]);
 const columnItems = ref([] as DropdownItem[]);
 
-const resetColumns = () => {
+const resetColumns = (schema?: DbSchema) => {
   columns.value.splice(0, columns.value.length);
   columnItems.value.splice(0, columnItems.value.length);
   columnItems.value.push({
@@ -123,7 +150,7 @@ const resetColumns = () => {
   });
 
   if (tableName.value) {
-    const tableRes = props.schema?.children?.find((it) => it.name === tableName.value);
+    const tableRes = schema?.children?.find((it) => it.name === tableName.value);
     if (tableRes) {
       const children = tableRes.children.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -146,8 +173,6 @@ const resetColumns = () => {
   }
 };
 
-resetColumns();
-
 const cancel = () => {
   vscode.postCommand({
     command: "cancel",
@@ -157,7 +182,7 @@ const cancel = () => {
 
 const createEditorParams = (): RecordRule["editor"] => {
   return {
-    ...props.recordRule.editor,
+    ...recordRule.editor,
     visible: visibleEditor.value,
     connectionName: connectionName.value,
     tableName: tableName.value,
@@ -185,6 +210,22 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
     },
   });
 };
+
+const recieveMessage = (data: RecordRuleEditorEventData) => {
+  const { command, value } = data;
+  switch (command) {
+    case "initialize":
+      if (value.initialize === undefined) {
+        return;
+      }
+      initialize(value.initialize);
+      break;
+  }
+};
+
+defineExpose({
+  recieveMessage,
+});
 </script>
 
 <template>
@@ -350,7 +391,7 @@ const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .rr-root {
   width: 100%;
   height: 100%;
@@ -376,75 +417,77 @@ div.conditions {
   width: calc(100% - 30px);
   margin-left: 20px;
 }
-label {
-  margin-right: 4px;
-}
 
 label {
   margin-right: 4px;
 }
-section.items {
-  padding: 5px;
-  flex-grow: 1;
-  display: flex;
-}
+
 .rr-scroll-wrapper {
   overflow: auto;
   flex-grow: 1;
 }
-section.items table {
-  border-collapse: collapse;
-  width: 100%;
-}
-section.items table thead {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background-color: var(--vscode-editorPane-background);
-}
-section.items table th {
-  height: 20px;
-  padding: 2px;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  position: relative;
-}
 
-td.rule-name > .controller {
+section.items {
+  padding: 5px;
+  flex-grow: 1;
   display: flex;
-  justify-content: space-between;
-  visibility: hidden;
-}
-td.rule-name:hover > .controller {
-  visibility: visible;
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background-color: var(--vscode-editorPane-background);
+    }
+  }
+
+  th,
+  td {
+    border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+    padding: 2px;
+    overflow: hidden;
+
+    &.rule-name {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      min-width: 255px;
+      width: 255px;
+      background-color: var(--vscode-editorPane-background);
+
+      & > .controller {
+        display: flex;
+        justify-content: space-between;
+        visibility: hidden;
+      }
+      &:hover > .controller {
+        visibility: visible;
+      }
+    }
+  }
+
+  th {
+    height: 20px;
+    padding: 2px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  span.label {
+    display: inline-block;
+    vertical-align: middle;
+    height: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
 }
 
-section.items thead th.rule-name,
-section.items tbody td.rule-name {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  min-width: 255px;
-  width: 255px;
-  background-color: var(--vscode-editorPane-background);
-}
-
-section.items table th,
-section.items table td {
-  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
-  padding: 2px;
-  overflow: hidden;
-}
-
-section.items span.label {
-  display: inline-block;
-  vertical-align: middle;
-  height: 100%;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-}
 .w100 {
   width: 100px;
   max-width: 100px;

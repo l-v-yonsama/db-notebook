@@ -1,14 +1,15 @@
 import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { ActionCommand } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
+import { ComponentName } from "../shared/ComponentName";
+import { VariablesPanelEventData } from "../shared/MessageEventData";
 
 const PREFIX = "[VariablesPanel]";
 
-const componentName = "VariablesPanel";
+const componentName: ComponentName = "VariablesPanel";
 
 export class VariablesPanel {
   public static currentPanel: VariablesPanel | undefined;
@@ -20,7 +21,11 @@ export class VariablesPanel {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, extensionUri);
+    this._panel.webview.html = createWebviewContent(
+      this._panel.webview,
+      extensionUri,
+      componentName
+    );
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -49,11 +54,17 @@ export class VariablesPanel {
   }
 
   async renderSub() {
-    // send to webview
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
-      value: this.variables,
+    if (!this.variables) {
+      return;
+    }
+    const msg: VariablesPanelEventData = {
+      command: "initialize",
+      componentName: "VariablesPanel",
+      value: {
+        initialize: {
+          variables: this.variables,
+        },
+      },
     };
 
     this._panel.webview.postMessage(msg);
@@ -85,16 +96,6 @@ export class VariablesPanel {
         //   case "refresh":
         //     this.refresh(params);
         //     return;
-        //   case "compare":
-        //     this.compare(params);
-        //     return;
-        //   case "output":
-        //     this.output(params);
-        //     return;
-        //   case "writeToClipboard":
-        //     this.writeToClipboard(params);
-        //     return;
-        // }
       },
       undefined,
       this._disposables

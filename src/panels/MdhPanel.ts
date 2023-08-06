@@ -11,7 +11,6 @@ import {
   toUpdateStatementWithBinds,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
@@ -33,12 +32,14 @@ import { createWebviewContent } from "../utilities/webviewUtil";
 import { rdhListToText } from "../utilities/rdhToText";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { WriteToClipboardParamsPanel } from "./WriteToClipboardParamsPanel";
+import { ComponentName } from "../shared/ComponentName";
+import { MdhPanelEventData } from "../shared/MessageEventData";
 
 const PREFIX = "[MdhPanel]";
 
 dayjs.extend(utc);
 
-const componentName = "MdhPanel";
+const componentName: ComponentName = "MdhPanel";
 
 type RdhTabItem = {
   tabId: string;
@@ -60,7 +61,11 @@ export class MdhPanel {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, this.extensionUri);
+    this._panel.webview.html = createWebviewContent(
+      this._panel.webview,
+      this.extensionUri,
+      componentName
+    );
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -114,11 +119,14 @@ export class MdhPanel {
     if (item) {
       // Reset
       item.list = list;
-      const msg: ToWebviewMessageEventType = {
-        command: componentName + "-set-search-result",
+      const msg: MdhPanelEventData = {
+        command: "set-search-result",
+        componentName: "MdhPanel",
         value: {
-          tabId: item.tabId,
-          value: item.list,
+          searchResult: {
+            tabId: item.tabId,
+            value: item.list,
+          },
         },
       };
       this._panel.webview.postMessage(msg);
@@ -128,17 +136,12 @@ export class MdhPanel {
     item = this.createTabItem(title, list);
     this.items.push(item);
 
-    // send to webview
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
-    };
-
-    this._panel.webview.postMessage(msg);
-
-    const msg2: ToWebviewMessageEventType = {
-      command: componentName + "-add-tab-item",
-      value: item,
+    const msg2: MdhPanelEventData = {
+      command: "add-tab-item",
+      componentName: "MdhPanel",
+      value: {
+        addTabItem: item,
+      },
     };
     this._panel.webview.postMessage(msg2);
     return item;
@@ -223,11 +226,14 @@ export class MdhPanel {
                   names: item.compareKeyNames,
                 });
               });
-              const msg: ToWebviewMessageEventType = {
-                command: componentName + "-set-search-result",
+              const msg: MdhPanelEventData = {
+                command: "set-search-result",
+                componentName: "MdhPanel",
                 value: {
-                  tabId,
-                  value: tabItem.list,
+                  searchResult: {
+                    tabId,
+                    value: tabItem.list,
+                  },
                 },
               };
               this._panel.webview.postMessage(msg);
@@ -562,11 +568,14 @@ export class MdhPanel {
         vscode.window.showErrorMessage(message);
       }
     }
-    const msg: ToWebviewMessageEventType = {
-      command: componentName + "-set-search-result",
+    const msg: MdhPanelEventData = {
+      command: "set-search-result",
+      componentName: "MdhPanel",
       value: {
-        tabId,
-        value: tabItem.list,
+        searchResult: {
+          tabId,
+          value: tabItem.list,
+        },
       },
     };
     this._panel.webview.postMessage(msg);

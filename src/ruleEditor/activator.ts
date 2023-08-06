@@ -44,7 +44,6 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
           },
         };
         await writeToResource(uri, JSON.stringify(recordRule, null, 1));
-        // window.showInformationMessage(`Successfully saved, please open it.\n${uri.fsPath}`);
 
         commands.executeCommand("vscode.openWith", uri, RECORD_RULE_TYPE);
       } catch (e: any) {

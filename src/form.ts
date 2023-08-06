@@ -8,14 +8,17 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ModeType } from "./shared/ModeType";
 import { CONNECTION_SETTING_FORM_VIEWID, REFRESH_RESOURCES } from "./constant";
-import { ToWebviewMessageEventType } from "./types/ToWebviewMessageEvent";
 import { ActionCommand } from "./shared/ActionParams";
 import { log } from "./utilities/logger";
 import { createWebviewContent } from "./utilities/webviewUtil";
+import { ComponentName } from "./shared/ComponentName";
+import { DBFormEventData } from "./shared/MessageEventData";
 
 const PREFIX = "[form]";
 
 let provider: SQLConfigurationViewProvider;
+
+const componentName: ComponentName = "DBFormView";
 
 export function activateFormProvider(
   context: vscode.ExtensionContext,
@@ -57,7 +60,11 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
       localResourceRoots: [this.context.extensionUri],
     };
 
-    webviewView.webview.html = createWebviewContent(webviewView.webview, this.context.extensionUri);
+    webviewView.webview.html = createWebviewContent(
+      webviewView.webview,
+      this.context.extensionUri,
+      componentName
+    );
 
     // receive from webview
     webviewView.webview.onDidReceiveMessage(async (message: ActionCommand) => {
@@ -73,9 +80,12 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
             } else {
               vscode.window.showInformationMessage("OK");
             }
-            let msg: ToWebviewMessageEventType = {
-              command: "ConnectionSetting-stop-progress",
-              value: {},
+            let msg: DBFormEventData = {
+              command: "stop-progress",
+              componentName: "DBFormView",
+              value: {
+                subComponentName: "ConnectionSetting",
+              },
             };
             this.webviewView?.webview.postMessage(msg);
           }
@@ -119,25 +129,31 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
 
     this.show();
 
-    let msg: ToWebviewMessageEventType;
+    let msg: DBFormEventData;
     if (res?.resourceType === ResourceType.Connection || mode === "create") {
       const prohibitedNames =
         mode === "update" ? [] : this.stateStorage.getConnectionSettingNames();
       // send to webview
       msg = {
-        command: "create",
-        componentName: "ConnectionSetting",
+        command: "initialize",
+        componentName: "DBFormView",
         value: {
-          mode,
-          setting: res,
-          prohibitedNames,
+          subComponentName: "ConnectionSetting",
+          connectionSetting: {
+            mode,
+            setting: res as DbConnection,
+            prohibitedNames,
+          },
         },
       };
     } else {
       msg = {
-        command: "create",
-        componentName: "ResourceProperties",
-        value: res?.getProperties() ?? {},
+        command: "initialize",
+        componentName: "DBFormView",
+        value: {
+          subComponentName: "ResourceProperties",
+          resourceProperties: res?.getProperties() ?? {},
+        },
       };
     }
     this.webviewView?.webview.postMessage(msg);

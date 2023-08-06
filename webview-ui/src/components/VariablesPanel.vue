@@ -2,13 +2,10 @@
 import { ref, onMounted, nextTick } from "vue";
 import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDHViewer from "./RDHViewer.vue";
-import type { CellFocusParams } from "@/types/RdhEvents";
+import type { VariablesPanelEventData } from "../../../src/shared/MessageEventData";
 
-type Props = {
-  rdh: ResultSetData;
-};
+const rdh = ref(undefined as ResultSetData | undefined);
 
-const props = defineProps<Props>();
 const splitterWidth = ref(300);
 const splitterHeight = ref(300);
 
@@ -24,42 +21,44 @@ const resetSpPaneWrapperHeight = () => {
   }
 };
 
+const initialize = (v: VariablesPanelEventData["value"]["initialize"]): void => {
+  if (v === undefined) {
+    return;
+  }
+  rdh.value = v.variables;
+};
+
 onMounted(() => {
   nextTick(resetSpPaneWrapperHeight);
   setTimeout(resetSpPaneWrapperHeight, 50);
   setTimeout(resetSpPaneWrapperHeight, 200);
 });
 
-const onCellFocus = (params: CellFocusParams): void => {
-  // openLogStreamParams.value.canAction = false;
-  // console.log("onCellFocus:", params);
-  // const tabItem = getActiveTabItem();
-  // console.log("tabItem=", tabItem);
-  // if (!tabItem) {
-  //   console.log("No tab Item");
-  //   return;
-  // }
-  // const logGroupName = tabItem.title;
-  // const logStream = params.rowValues["@logStream"];
-  // const startTime = params.rowValues["@timestamp"];
-  // if (tabItem.rootRes["resourceType"] === "LogGroup") {
-  //   openLogStreamParams.value.parentTabId = tabItem.tabId;
-  //   openLogStreamParams.value.logGroupName = logGroupName;
-  //   openLogStreamParams.value.logStream = logStream;
-  //   openLogStreamParams.value.startTime = startTime;
-  //   openLogStreamParams.value.canAction = true;
-  // }
+const recieveMessage = (data: VariablesPanelEventData) => {
+  const { command, value } = data;
+  switch (command) {
+    case "initialize":
+      if (value.initialize === undefined) {
+        return;
+      }
+      initialize(value.initialize);
+      break;
+  }
 };
+
+defineExpose({
+  recieveMessage,
+});
 </script>
 
 <template>
   <section class="VariablesPanel">
     <RDHViewer
+      v-if="rdh"
       :rdh="rdh"
       :width="splitterWidth"
       :height="splitterHeight"
       :readonly="true"
-      @onCellFocus="onCellFocus"
     />
   </section>
 </template>

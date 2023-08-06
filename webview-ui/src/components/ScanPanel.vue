@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, defineExpose, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick } from "vue";
 import dayjs from "dayjs";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextArea from "./base/VsCodeTextArea.vue";
@@ -12,19 +12,22 @@ import {
   vsCodePanelTab,
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
-import type { DbResource, ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDHViewer from "./RDHViewer.vue";
 import type {
   CloseScanPanelActionCommand,
   DeleteKeyActionCommand,
   OpenScanPanelActionCommand,
   OutputParams,
+  ScanPanelEventData,
   SearchScanPanelActionCommand,
+  ScanTabItem,
+  ScanConditionItem,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import type { SecondaryItem } from "@/types/Components";
-import type { DBType } from "@/types/lib/DBType";
+// import type { DBType } from "@/types/lib/DBType";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -51,38 +54,30 @@ const outputDetailItems = ref([
   },
 ] as SecondaryItem[]);
 
-type Props = {
-  opt: {
-    dbType: string;
-  };
-};
+// type ConditionItem = {
+//   label: string;
+//   value: any;
+//   visible: boolean;
+//   description?: string;
+// };
 
-const props = defineProps<Props>();
-
-type ConditionItem = {
-  label: string;
-  value: any;
-  visible: boolean;
-  description?: string;
-};
-
-type TabItem = {
-  tabId: string;
-  conName: string;
-  rootRes: DbResource;
-  title: string;
-  dbType: DBType;
-  rdh: any;
-  limit: ConditionItem;
-  keyword: ConditionItem;
-  startTime: ConditionItem;
-  endTime: ConditionItem;
-  multilineKeyword: boolean;
-  parentTarget?: string;
-};
+// type TabItem = {
+//   tabId: string;
+//   conName: string;
+//   rootRes: DbResource;
+//   title: string;
+//   dbType: DBType;
+//   rdh: any;
+//   limit: ConditionItem;
+//   keyword: ConditionItem;
+//   startTime: ConditionItem;
+//   endTime: ConditionItem;
+//   multilineKeyword: boolean;
+//   parentTarget?: string;
+// };
 
 const activeTabId = ref("");
-const tabItems = ref([] as TabItem[]);
+const tabItems = ref([] as ScanTabItem[]);
 const inProgress = ref(false);
 const isMultiLineKeyword = ref(false);
 const splitterWidth = ref(300);
@@ -126,10 +121,10 @@ onMounted(() => {
   setTimeout(resetSpPaneWrapperHeight, 200);
 });
 
-function getActiveTabItem(): TabItem | undefined {
+function getActiveTabItem(): ScanTabItem | undefined {
   console.log("getActiveTabItem:", activeTabId.value);
   const tabId = activeTabId.value.substring(4); // 'tab-'
-  return tabItems.value.find((it) => it.tabId === tabId) as TabItem;
+  return tabItems.value.find((it) => it.tabId === tabId) as ScanTabItem;
 }
 
 function isActiveTabId(tabId: string): boolean {
@@ -169,7 +164,7 @@ const toNum = (s: string): number | undefined => {
   return n;
 };
 
-const toIso8601String = (item: ConditionItem): string | undefined => {
+const toIso8601String = (item: ScanConditionItem): string | undefined => {
   if (!item.visible) {
     return undefined;
   }
@@ -193,7 +188,7 @@ const showTab = (tabId: string) => {
   vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
-const addTabItem = (tabItem: TabItem) => {
+const addTabItem = (tabItem: ScanTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
@@ -314,11 +309,35 @@ const stopProgress = (): void => {
   inProgress.value = false;
 };
 
+const recieveMessage = (data: ScanPanelEventData) => {
+  const { command, value } = data;
+  switch (command) {
+    case "add-tab-item":
+      if (value.addTabItem === undefined) {
+        return;
+      }
+      addTabItem(value.addTabItem);
+      break;
+    case "set-search-result":
+      if (value.searchResult === undefined) {
+        return;
+      }
+      setSearchResult(value.searchResult);
+      break;
+    case "remove-tab-item":
+      if (value.removeTabItem === undefined) {
+        return;
+      }
+      removeTabItem(value.removeTabItem.tabId);
+      break;
+    case "stop-progress":
+      stopProgress();
+      break;
+  }
+};
+
 defineExpose({
-  addTabItem,
-  removeTabItem,
-  stopProgress,
-  setSearchResult,
+  recieveMessage,
 });
 </script>
 
@@ -492,7 +511,7 @@ defineExpose({
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 section.ScanPanel {
   display: block;
   width: 100%;
@@ -514,62 +533,68 @@ vscode-panel-view {
   border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 0 8px 0 4px;
   align-items: center;
-}
-.tab-container-actions > button {
-  width: 26px;
-  height: 26px;
-  background: transparent;
-  border: none;
-  color: var(--foreground);
-  outline: none;
-  font-size: var(--type-ramp-base-font-size);
-  fill: currentcolor;
-  cursor: pointer;
+
+  & > button {
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: none;
+    color: var(--foreground);
+    outline: none;
+    font-size: var(--type-ramp-base-font-size);
+    fill: currentcolor;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--vscode-toolbar-hoverBackground);
+    }
+  }
 }
 
-.tab-container-actions > button:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-}
+.toolbar {
+  .single {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    column-gap: 5px;
+    margin-bottom: 2px;
 
-.toolbar .single {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  column-gap: 5px;
-  margin-bottom: 2px;
-}
-.toolbar .multiple {
-  display: flex;
-  column-gap: 2px;
-  flex-grow: 1;
-}
-.toolbar .multiple .left {
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  justify-content: flex-end;
-  column-gap: 5px;
-  margin-bottom: 2px;
-}
-.toolbar .multiple .right {
-  display: flex;
-  flex-grow: 1;
-  flex-direction: column;
-}
+    .deleteKey {
+      position: absolute;
+      left: 2px;
+      top: -1px;
+    }
+  }
 
-.toolbar .multiple .right > .openStream {
-  position: absolute;
-  right: 92px;
-  top: -1px;
-}
-.toolbar .multiple .right > .search {
-  position: absolute;
-  right: 6px;
-  top: -1px;
-}
-.toolbar .single .deleteKey {
-  position: absolute;
-  left: 2px;
-  top: -1px;
+  .multiple {
+    display: flex;
+    column-gap: 2px;
+    flex-grow: 1;
+
+    .left {
+      display: flex;
+      flex-direction: column;
+      align-items: start;
+      justify-content: flex-end;
+      column-gap: 5px;
+      margin-bottom: 2px;
+    }
+    .right {
+      display: flex;
+      flex-grow: 1;
+      flex-direction: column;
+
+      & > .openStream {
+        position: absolute;
+        right: 92px;
+        top: -1px;
+      }
+      & > .search {
+        position: absolute;
+        right: 6px;
+        top: -1px;
+      }
+    }
+  }
 }
 </style>

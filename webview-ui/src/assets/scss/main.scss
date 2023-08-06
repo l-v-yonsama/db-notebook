@@ -1,0 +1,88 @@
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  height: 100vh;
+  overflow: hidden;
+
+  & > * {
+    margin: 1px 0;
+  }
+}
+
+.close-action {
+  display: flex;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+}
+
+button[disabled] {
+  cursor: not-allowed !important;
+}
+
+.splitpanes.default-theme .splitpanes__pane {
+  background-color: inherit !important;
+}
+
+legend {
+  display: flex;
+  align-items: center;
+}
+.verr {
+  background-color: var(--vscode-diffEditor-removedTextBackground) !important;
+}
+
+fieldset.no-elements {
+  border-color: var(--vscode-diffEditor-removedTextBackground) !important;
+  background-color: var(--vscode-diffEditor-removedTextBackground) !important;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.toolbar {
+  padding: 3px 4px;
+  margin-bottom: 11px;
+  display: flex;
+}
+div.tool-left,
+div.tool-right {
+  display: flex;
+  column-gap: 3px;
+  align-items: center;
+}
+.tool-left {
+  flex-grow: 1;
+}
+
+.highlighted {
+  background-color: var(--vscode-editor-selectionBackground) !important;
+}
+.error-foreground {
+  color: var(--vscode-editorError-foreground) !important;
+}
+.marker-box {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--vscode-editorHoverWidget-border) !important;
+  color: var(--vscode-editorHoverWidget-foreground);
+}
+
+.marker-info {
+  border-color: var(--vscode-editorInfo-border) !important;
+  color: var(--vscode-editorInfo-foreground) !important;
+}
+.marker-warning {
+  border-color: var(--vscode-editorWarning-border) !important;
+  color: var(--vscode-editorWarning-foreground) !important;
+}
+.marker-error {
+  border-color: var(--vscode-editorError-border) !important;
+  color: var(--vscode-editorError-foreground) !important;
+}

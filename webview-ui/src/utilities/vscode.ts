@@ -7,6 +7,8 @@ export * from "../../../src/shared/RecordRule";
 export * from "../../../src/shared/CodeResolverParams";
 export * from "../../../src/shared/ViewConditionParams";
 export * from "../../../src/shared/SaveValuesInRdhParams";
+export * from "../../../src/shared/ComponentName";
+export * from "../../../src/shared/MessageEventData";
 
 class VSCodeAPIWrapper {
   private readonly vsCodeApi: WebviewApi<unknown> | undefined;

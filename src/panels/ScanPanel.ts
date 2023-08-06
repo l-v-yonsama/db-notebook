@@ -11,7 +11,6 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { createBookFromRdh } from "../utilities/excelGenerator";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
@@ -20,57 +19,37 @@ import { ActionCommand } from "../shared/ActionParams";
 import { OutputParams } from "../shared/ActionParams";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { log } from "../utilities/logger";
+import {
+  ScanPanelEventData,
+  ScanTabItem,
+  ScanConditionItem,
+  ScanReqInput,
+} from "../shared/MessageEventData";
+import { ComponentName } from "../shared/ComponentName";
 
 const PREFIX = "[ScanPanel]";
 
 dayjs.extend(utc);
 
-export const componentName = "ScanPanel";
-
-type ConditionItem = {
-  label: string;
-  value: any;
-  visible: boolean;
-  description?: string;
-};
-
-type TabItem = {
-  tabId: string;
-  conName: string;
-  rootRes: DbResource;
-  title: string;
-  dbType: DBType;
-  rdh?: any;
-  limit: ConditionItem;
-  keyword: ConditionItem;
-  startTime: ConditionItem;
-  endTime: ConditionItem;
-  multilineKeyword: boolean;
-  parentTarget?: string;
-  lastSearchParam?: ScanReqInput;
-};
-
-type ScanReqInput = {
-  tabId: string;
-  keyword: string;
-  limit?: number;
-  startTime?: any;
-  endTime?: any;
-};
+export const componentName: ComponentName = "ScanPanel";
 
 export class ScanPanel {
   public static currentPanel: ScanPanel | undefined;
   private static stateStorage: StateStorage | undefined;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
-  private items: TabItem[] = [];
+  private items: ScanTabItem[] = [];
   private activeTitle = "";
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, extensionUri);
+    this._panel.webview.html = createWebviewContent(
+      this._panel.webview,
+      extensionUri,
+      componentName
+    );
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -106,9 +85,9 @@ export class ScanPanel {
     conName: string,
     dbType: DBType,
     rootRes: DbResource,
-    ctor?: (item: TabItem) => void
-  ): TabItem {
-    const createCondition = (label: string, value: any): ConditionItem => ({
+    ctor?: (item: ScanTabItem) => void
+  ): ScanTabItem {
+    const createCondition = (label: string, value: any): ScanConditionItem => ({
       label,
       value,
       visible: true,
@@ -178,14 +157,14 @@ export class ScanPanel {
     return item;
   }
 
-  private getTabItem(res: DbResource): TabItem | undefined {
+  private getTabItem(res: DbResource): ScanTabItem | undefined {
     return this.items.find((it) => it.tabId === res.id);
   }
 
   async renderSub(
     rootRes: DbResource,
-    ctor?: (item: TabItem) => void
-  ): Promise<TabItem | undefined> {
+    ctor?: (item: ScanTabItem) => void
+  ): Promise<ScanTabItem | undefined> {
     const { conName } = rootRes.meta;
     const setting = await ScanPanel.stateStorage?.getConnectionSettingByName(conName);
     if (!setting) {
@@ -199,17 +178,12 @@ export class ScanPanel {
     }
     this.activeTitle = title;
 
-    // send to webview
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
-    };
-
-    this._panel.webview.postMessage(msg);
-
-    const msg2: ToWebviewMessageEventType = {
-      command: componentName + "-add-tab-item",
-      value: item,
+    const msg2: ScanPanelEventData = {
+      command: "add-tab-item",
+      componentName: "ScanPanel",
+      value: {
+        addTabItem: item,
+      },
     };
     this._panel.webview.postMessage(msg2);
     return item;
@@ -381,19 +355,23 @@ export class ScanPanel {
         rdh.meta.tableName = rootRes.name;
       }
 
-      const msg: ToWebviewMessageEventType = {
-        command: componentName + "-set-search-result",
+      const msg: ScanPanelEventData = {
+        command: "set-search-result",
+        componentName: "ScanPanel",
         value: {
-          tabId,
-          value: rdh,
+          searchResult: {
+            tabId,
+            value: rdh,
+          },
         },
       };
       this._panel.webview.postMessage(msg);
     } else {
       vscode.window.showErrorMessage(message);
-      const msg2: ToWebviewMessageEventType = {
-        command: componentName + "-stop-progress",
-        value: null,
+      const msg2: ScanPanelEventData = {
+        command: "stop-progress",
+        componentName: "ScanPanel",
+        value: {},
       };
       this._panel.webview.postMessage(msg2);
     }
@@ -411,10 +389,13 @@ export class ScanPanel {
 
     let panelItem = this.items.find((it) => it.tabId === newResId);
 
-    const msg: ToWebviewMessageEventType = {
-      command: componentName + "-remove-tab-item",
+    const msg: ScanPanelEventData = {
+      command: "remove-tab-item",
+      componentName: "ScanPanel",
       value: {
-        tabId: newResId,
+        removeTabItem: {
+          tabId: newResId,
+        },
       },
     };
     console.log(msg);

@@ -577,7 +577,7 @@ defineExpose({
   width: 100%;
 }
 </style>
-<style scoped>
+<style lang="scss" scoped>
 thead {
   position: sticky;
   top: 0;
@@ -589,64 +589,84 @@ td,
 th {
   border-right: calc(var(--border-width) * 1px) groove var(--dropdown-border);
   border-bottom: calc(var(--border-width) * 1px) groove var(--dropdown-border);
-}
 
-.row,
-.ctrl {
-  min-width: 80px;
-  width: 80px;
-  max-width: 80px;
-}
+  &.row,
+  &.ctrl {
+    min-width: 80px;
+    width: 80px;
+    max-width: 80px;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--vscode-editorPane-background);
+  }
 
-.ctrl > div {
-  display: none;
-}
-.ctrl:hover > div {
-  display: flex;
-  flex-direction: row;
-  column-gap: 3px;
-}
-.ctrl > div > vscode-button {
-  flex: 1;
+  &.ctrl {
+    & > div {
+      display: none;
+
+      & > vscode-button {
+        flex: 1;
+      }
+    }
+    &:hover > div {
+      display: flex;
+      flex-direction: row;
+      column-gap: 3px;
+    }
+  }
 }
 
 td {
   text-align: center;
-}
-td.vcell {
-  position: relative;
-}
-td.vcell > .code-label {
-  display: inline-block;
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  border-radius: 3px;
-  padding: 1px;
-}
-td.vcell:hover > .code-label {
-  display: none;
-}
-td.vcell > .copy-to-clipboard {
-  display: none;
-  position: absolute;
-  right: 4px;
-  top: 4px;
-}
-td.vcell:hover > .copy-to-clipboard {
-  display: inline-block;
-}
-td.vcell > p {
-  display: inline-block;
-  margin: 5px 1px;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-}
-td.vcell span.violation-mark {
-  font-size: x-small;
-  font-weight: bold;
-  margin-right: 4px;
+
+  &.row,
+  &.ctrl {
+    text-align: right;
+    padding-right: 5px;
+  }
+
+  &.vcell {
+    position: relative;
+
+    & > .code-label {
+      display: inline-block;
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      border-radius: 3px;
+      padding: 1px;
+    }
+
+    &:hover > .code-label {
+      display: none;
+    }
+
+    & > .copy-to-clipboard {
+      display: none;
+      position: absolute;
+      right: 4px;
+      top: 4px;
+    }
+
+    &:hover > .copy-to-clipboard {
+      display: inline-block;
+    }
+
+    & > p {
+      display: inline-block;
+      margin: 5px 1px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    span.violation-mark {
+      font-size: x-small;
+      font-weight: bold;
+      margin-right: 4px;
+    }
+  }
 }
 
 th {
@@ -656,33 +676,17 @@ th {
   overflow: hidden;
   white-space: nowrap;
   position: relative;
-}
 
-th > a.widen {
-  cursor: pointer;
-  display: none;
-  position: absolute;
-  right: 2px;
-  top: 2px;
-}
-th:hover > a.widen {
-  display: inline-block;
-}
-
-thead th.row,
-thead th.ctrl,
-tbody td.row,
-tbody td.ctrl {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background-color: var(--vscode-editorPane-background);
-}
-
-tbody td.row,
-tbody td.ctrl {
-  text-align: right;
-  padding-right: 5px;
+  & > a.widen {
+    cursor: pointer;
+    display: none;
+    position: absolute;
+    right: 2px;
+    top: 2px;
+  }
+  &:hover > a.widen {
+    display: inline-block;
+  }
 }
 
 span.codicon {

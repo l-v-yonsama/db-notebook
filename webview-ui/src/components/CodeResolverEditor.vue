@@ -4,25 +4,18 @@ import {
   vscode,
   type UpdateCodeResolverTextDocumentActionCommand,
   type CodeResolverParams,
-  type NameWithComment,
+  type CodeResolverEditorEventData,
 } from "@/utilities/vscode";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
 import Paragraph from "./base/Paragraph.vue";
-import type { CodeItemDetail } from "@l-v-yonsama/multi-platform-database-drivers";
+
+import type { DropdownItem } from "@/types/Components";
+import type { CodeItem, CodeItemDetail } from "@l-v-yonsama/multi-platform-database-drivers";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
-
-type Props = {
-  connectionSettingNames: string[];
-  tableNameList: NameWithComment[];
-  columnNameList: NameWithComment[];
-  resolver: CodeResolverParams;
-  scrollPos: number;
-};
-const props = defineProps<Props>();
 
 const sectionHeight = ref(300);
 
@@ -37,49 +30,75 @@ const resetSectionHeight = () => {
 
 onMounted(() => {
   nextTick(resetSectionHeight);
+});
+
+let resolver: CodeResolverParams;
+const keyword = ref("");
+const visibleEditor = ref(false);
+const connectionName = ref("");
+const connectionItems: DropdownItem[] = [];
+const editorItem = ref({
+  title: "",
+  description: "",
+  resource: {
+    column: {
+      regex: false,
+      pattern: "",
+    },
+  },
+  details: [],
+} as CodeItem);
+const tableItems = [] as DropdownItem[];
+const columnItems = [] as DropdownItem[];
+const items = ref([] as (CodeItem & { originalIndex: number })[]);
+
+const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void => {
+  if (v === undefined) {
+    return;
+  }
+  resolver = v.resolver;
+  keyword.value = v.resolver.editor.keyword ?? "";
+  visibleEditor.value = v.resolver.editor.visible;
+  connectionName.value = v.resolver.editor.connectionName;
+  connectionItems.splice(0, connectionItems.length);
+  v.connectionSettingNames.map((it) => {
+    connectionItems.push({ label: it, value: it });
+  });
+
+  tableItems.splice(0, tableItems.length);
+  v.tableNameList.forEach((it) =>
+    tableItems.push({
+      label: `${it.name}${it.comment ? " (" + it.comment + ")" : ""}`,
+      value: it.name,
+    })
+  );
+  tableItems.unshift({
+    label: "-",
+    value: "",
+  });
+
+  columnItems.splice(0, columnItems.length);
+  v.columnNameList.forEach((it) =>
+    columnItems.push({
+      label: `${it.name}${it.comment ? " (" + it.comment + ")" : ""}`,
+      value: it.name,
+    })
+  );
+
   const wrapper = document.querySelector(".cr-scroll-wrapper");
   if (wrapper) {
-    wrapper.scrollTop = props.scrollPos ?? 0;
+    wrapper.scrollTop = v.scrollPos ?? 0;
   }
-});
+  items.value.splice(0, items.value.length);
+  v.resolver.items.forEach((it, originalIndex) =>
+    items.value.push({
+      ...it,
+      originalIndex,
+    })
+  );
 
-const keyword = ref(props.resolver.editor.keyword ?? "");
-const visibleEditor = ref(props.resolver.editor.visible);
-const connectionName = ref(props.resolver.editor.connectionName);
-const connectionItems = props.connectionSettingNames.map((it) => ({ label: it, value: it }));
-const editorItem = ref(
-  props.resolver.editor.item ?? {
-    title: "",
-    description: "",
-    resource: {
-      column: {
-        regex: false,
-        pattern: "",
-      },
-    },
-    details: [],
-  }
-);
-
-const tableItems = props.tableNameList.map((it) => ({
-  label: `${it.name}${it.comment ? " (" + it.comment + ")" : ""}`,
-  value: it.name,
-}));
-tableItems.unshift({
-  label: "-",
-  value: "",
-});
-const columnItems = props.columnNameList.map((it) => ({
-  label: `${it.name}${it.comment ? " (" + it.comment + ")" : ""}`,
-  value: it.name,
-}));
-
-const items = ref(
-  props.resolver.items.map((it, originalIndex) => ({
-    ...it,
-    originalIndex,
-  }))
-);
+  Object.assign(editorItem.value, v.resolver.editor.item);
+};
 
 type ComputedItem = {
   title: string;
@@ -140,7 +159,7 @@ const computedItems = computed((): ComputedItem[] => {
 
 const createEditorParams = (): CodeResolverParams["editor"] => {
   return {
-    ...props.resolver.editor,
+    ...resolver.editor,
     visible: visibleEditor.value,
     connectionName: connectionName.value,
     keyword: keyword.value,
@@ -209,6 +228,22 @@ const deleteDetail = (index: number) => {
   editorItem.value.details.splice(index, 1);
   updateTextDocument();
 };
+
+const recieveMessage = (data: CodeResolverEditorEventData) => {
+  const { command, value } = data;
+  switch (command) {
+    case "initialize":
+      if (value.initialize === undefined) {
+        return;
+      }
+      initialize(value.initialize);
+      break;
+  }
+};
+
+defineExpose({
+  recieveMessage,
+});
 </script>
 
 <template>
@@ -575,32 +610,25 @@ const deleteDetail = (index: number) => {
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .cr-root {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
-div.editor vscode-dropdown {
-  z-index: 5;
-}
+
 div.editor {
   padding: 5px;
+
+  vscode-dropdown {
+    z-index: 5;
+  }
 }
 div.description {
   display: flex;
   flex-direction: row;
   column-gap: 5px;
-}
-section.item {
-  display: flex;
-  flex-direction: column;
-  row-gap: 10px;
-  margin-bottom: 25px;
-}
-section.detail {
-  margin-top: 25px;
 }
 
 div.code-name {
@@ -618,92 +646,101 @@ fieldset {
 legend {
   width: -webkit-fill-available;
 }
-.details fieldset legend > span {
-  margin-right: auto;
-}
+
 fieldset.resource {
   flex-direction: column;
   margin-top: 3px;
   margin-bottom: 3px;
+
+  & > table {
+    width: 100%;
+
+    vscode-dropdown,
+    vscode-text-field {
+      width: 100%;
+    }
+  }
 }
-fieldset.resource > table {
-  width: 100%;
-}
-fieldset.resource > table vscode-dropdown,
-fieldset.resource > table vscode-text-field {
-  width: 100%;
-}
-.details table {
-  width: 100%;
-}
-.details table vscode-text-field {
-  width: 100%;
+
+fieldset.details {
+  table {
+    width: 100%;
+
+    vscode-text-field {
+      width: 100%;
+    }
+  }
 }
 label {
   margin-right: 4px;
+}
+
+.cr-scroll-wrapper {
+  overflow: auto;
+  flex-grow: 1;
 }
 section.items {
   padding: 5px;
   flex-grow: 1;
   display: flex;
-}
-.cr-scroll-wrapper {
-  overflow: auto;
-  flex-grow: 1;
-}
-section.items table {
-  border-collapse: collapse;
-  width: 100%;
-}
-section.items table thead {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background-color: var(--vscode-editorPane-background);
-}
-section.items table th {
-  height: 20px;
-  padding: 2px;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  position: relative;
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background-color: var(--vscode-editorPane-background);
+
+      th {
+        height: 20px;
+        padding: 2px;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+        position: relative;
+      }
+    }
+
+    th,
+    td {
+      border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+      padding: 2px;
+      overflow: hidden;
+
+      &.code-name,
+      &.code-name {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        min-width: 255px;
+        width: 255px;
+        background-color: var(--vscode-editorPane-background);
+
+        & > .controller {
+          display: flex;
+          justify-content: space-between;
+          visibility: hidden;
+        }
+        &:hover > .controller {
+          visibility: visible;
+        }
+      }
+    }
+  }
+
+  span.label {
+    display: inline-block;
+    vertical-align: middle;
+    height: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
 }
 
-td.code-name > .controller {
-  display: flex;
-  justify-content: space-between;
-  visibility: hidden;
-}
-td.code-name:hover > .controller {
-  visibility: visible;
-}
-
-section.items thead th.code-name,
-section.items tbody td.code-name {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  min-width: 255px;
-  width: 255px;
-  background-color: var(--vscode-editorPane-background);
-}
-
-section.items table th,
-section.items table td {
-  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
-  padding: 2px;
-  overflow: hidden;
-}
-
-section.items span.label {
-  display: inline-block;
-  vertical-align: middle;
-  height: 100%;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-}
 .w100 {
   width: 100px;
   max-width: 100px;

@@ -1,20 +1,17 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { vscode, type CancelActionCommand, type WriteToClipboardParams } from "@/utilities/vscode";
+import {
+  vscode,
+  type CancelActionCommand,
+  type WriteToClipboardParams,
+  type WriteToClipboardParamsPanelEventData,
+} from "@/utilities/vscode";
 import type { DropdownItem } from "@/types/Components";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
-
-type Props = {
-  params: {
-    params: WriteToClipboardParams;
-    previewText: string;
-  };
-};
-const props = defineProps<Props>();
 
 const fileTypeItems: DropdownItem[] = [
   {
@@ -35,27 +32,41 @@ const fileTypeItems: DropdownItem[] = [
   },
 ];
 
-const fileType = ref(props.params.params.fileType);
+type InitParams = WriteToClipboardParamsPanelEventData["value"]["initialize"];
+
+const fileType = ref("text" as WriteToClipboardParams["fileType"]);
+const previewText = ref("");
 const withType = ref(false);
 const withComment = ref(false);
-const limit = ref(props.params.params.limit ?? 10);
-const withRowNo = ref(props.params.params.withRowNo);
-const withCodeLabel = ref(props.params.params.withCodeLabel);
-const withRuleViolation = ref(props.params.params.withRuleViolation);
+const limit = ref(10);
+const withRowNo = ref(false);
+const withCodeLabel = ref(false);
+const withRuleViolation = ref(false);
 
-const { outputWithType } = props.params.params;
-switch (outputWithType) {
-  case "both":
-    withType.value = true;
-    withComment.value = true;
-    break;
-  case "withComment":
-    withComment.value = true;
-    break;
-  case "withType":
-    withType.value = true;
-    break;
-}
+const initialize = (v: InitParams): void => {
+  if (v === undefined) {
+    return;
+  }
+  fileType.value = v.params.fileType;
+  const { outputWithType } = v.params;
+  switch (outputWithType) {
+    case "both":
+      withType.value = true;
+      withComment.value = true;
+      break;
+    case "withComment":
+      withComment.value = true;
+      break;
+    case "withType":
+      withType.value = true;
+      break;
+  }
+  limit.value = v.params.limit ?? 10;
+  withRowNo.value = v.params.withRowNo;
+  withCodeLabel.value = v.params.withCodeLabel;
+  withRuleViolation.value = v.params.withRuleViolation;
+  previewText.value = v.previewText;
+};
 
 const handleChangeType = (checked: boolean) => {
   withType.value = checked;
@@ -118,6 +129,22 @@ const cancel = () => {
   };
   vscode.postCommand(action);
 };
+
+const recieveMessage = (data: WriteToClipboardParamsPanelEventData) => {
+  const { command, value } = data;
+  switch (command) {
+    case "initialize":
+      if (value.initialize === undefined) {
+        return;
+      }
+      initialize(value.initialize);
+      break;
+  }
+};
+
+defineExpose({
+  recieveMessage,
+});
 </script>
 
 <template>
@@ -199,7 +226,7 @@ const cancel = () => {
     </table>
     <fieldset>
       <legend>Preview text (Displayable preview records is 10)</legend>
-      <textarea readonly :value="params.previewText" wrap="off"></textarea>
+      <textarea readonly :value="previewText" wrap="off"></textarea>
     </fieldset>
   </section>
 </template>

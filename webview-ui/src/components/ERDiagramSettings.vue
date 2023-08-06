@@ -6,14 +6,11 @@ import type {
   DbTable,
   ForeignKeyConstraintDetail,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { vscode, type ActionCommand } from "@/utilities/vscode";
-
-type Props = {
-  title: string;
-  tables: DbTable[];
-  selectedTable?: DbTable;
-};
-const props = defineProps<Props>();
+import {
+  vscode,
+  type ActionCommand,
+  type ERDiagramSettingsPanelEventData,
+} from "@/utilities/vscode";
 
 const sectionHeight = ref(300);
 
@@ -52,28 +49,38 @@ function getReferenceTableNames(references?: {
   return [];
 }
 
-const title = ref(props.title);
+const title = ref("");
+const allTableItems = ref([] as TableItem[]);
+let tables: DbTable[] = [];
+
+const initialize = (v: ERDiagramSettingsPanelEventData["value"]["initialize"]): void => {
+  if (v === undefined) {
+    return;
+  }
+  tables = v.params.tables as DbTable[];
+  title.value = v.params.title;
+
+  v.params.tables.forEach((table) => {
+    allTableItems.value.push({
+      name: table.name,
+      comment: table.comment ?? "",
+      selected: v.params.selectedTable?.name === table.name ?? false,
+      referencedFrom: getReferenceTableNames(table.foreignKeys?.referencedFrom),
+      referenceTo: getReferenceTableNames(table.foreignKeys?.referenceTo),
+      isAll: true,
+      isKeys: true,
+      isNotNull: true,
+      columns: [],
+      fkColumns: Object.keys(table.foreignKeys?.referenceTo ?? {}),
+    });
+  });
+
+  allTableItems.value.forEach((tableItem) => {
+    resetAll(tableItem, true);
+  });
+};
 
 const zeroSelection = computed(() => allTableItems.value.every((it) => !it.selected));
-
-const allTableItems = ref(
-  props.tables.map((table) => ({
-    name: table.name,
-    comment: table.comment ?? "",
-    selected: props.selectedTable?.name === table.name ?? false,
-    referencedFrom: getReferenceTableNames(table.foreignKeys?.referencedFrom),
-    referenceTo: getReferenceTableNames(table.foreignKeys?.referenceTo),
-    isAll: true,
-    isKeys: true,
-    isNotNull: true,
-    columns: [],
-    fkColumns: Object.keys(table.foreignKeys?.referenceTo ?? {}),
-  })) as TableItem[]
-);
-
-allTableItems.value.forEach((tableItem) => {
-  resetAll(tableItem, true);
-});
 
 function resetAll(tableItem: TableItem, checked: boolean) {
   tableItem.columns.splice(0, tableItem.columns.length);
@@ -82,8 +89,7 @@ function resetAll(tableItem: TableItem, checked: boolean) {
     tableItem.isKeys = true;
     tableItem.isNotNull = true;
     tableItem.columns.push(
-      ...(props.tables.find((it) => it.name === tableItem.name)?.children.map((it) => it.name) ??
-        [])
+      ...(tables.find((it) => it.name === tableItem.name)?.children.map((it) => it.name) ?? [])
     );
     return;
   }
@@ -97,7 +103,7 @@ function resetKeys(tableItem: TableItem, checked: boolean) {
   tableItem.columns.splice(0, tableItem.columns.length);
 
   tableItem.columns.push(
-    ...(props.tables
+    ...(tables
       .find((it) => it.name === tableItem.name)
       ?.children.filter((it) => {
         const dispByKey =
@@ -115,7 +121,7 @@ function resetNotNull(tableItem: TableItem, checked: boolean) {
   tableItem.columns.splice(0, tableItem.columns.length);
 
   tableItem.columns.push(
-    ...(props.tables
+    ...(tables
       .find((it) => it.name === tableItem.name)
       ?.children.filter((it) => {
         const dispByKey =
@@ -182,6 +188,22 @@ const action = (command: ActionCommand["command"]): void => {
     },
   });
 };
+
+const recieveMessage = (data: ERDiagramSettingsPanelEventData) => {
+  const { command, value } = data;
+  switch (command) {
+    case "initialize":
+      if (value.initialize === undefined) {
+        return;
+      }
+      initialize(value.initialize);
+      break;
+  }
+};
+
+defineExpose({
+  recieveMessage,
+});
 </script>
 
 <template>

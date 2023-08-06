@@ -10,8 +10,6 @@ import {
   commands,
   env,
 } from "vscode";
-import { DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ToWebviewMessageEventType } from "../types/ToWebviewMessageEvent";
 import { StateStorage } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
@@ -21,27 +19,34 @@ import { createWebviewContent } from "../utilities/webviewUtil";
 import { ERDiagramSettingParams } from "../shared/ERDiagram";
 import { createERDiagramParams, createErDiagram } from "../utilities/erDiagramGenerator";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
+import { ComponentName } from "../shared/ComponentName";
+import {
+  ERDiagramSettingsInputParams,
+  ERDiagramSettingsPanelEventData,
+} from "../shared/MessageEventData";
 
 const PREFIX = "[ERDiagramSettingsPanel]";
 
 dayjs.extend(utc);
 
-const componentName = "ERDiagramSettingsPanel";
-
-type InputParams = { title: string; tables: DbTable[]; selectedTable?: DbTable };
+const componentName: ComponentName = "ERDiagramSettingsPanel";
 
 export class ERDiagramSettingsPanel {
   public static currentPanel: ERDiagramSettingsPanel | undefined;
   private static stateStorage?: StateStorage;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
-  private variables: InputParams | undefined;
+  private variables: ERDiagramSettingsInputParams | undefined;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     this._panel = panel;
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(this._panel.webview, extensionUri);
+    this._panel.webview.html = createWebviewContent(
+      this._panel.webview,
+      extensionUri,
+      componentName
+    );
     this._setWebviewMessageListener(this._panel.webview);
   }
 
@@ -53,7 +58,7 @@ export class ERDiagramSettingsPanel {
     ERDiagramSettingsPanel.stateStorage = storage;
   }
 
-  public static render(extensionUri: Uri, params: InputParams) {
+  public static render(extensionUri: Uri, params: ERDiagramSettingsInputParams) {
     log(`${PREFIX} render`);
     if (ERDiagramSettingsPanel.currentPanel) {
       ERDiagramSettingsPanel.currentPanel._panel.reveal(ViewColumn.Two);
@@ -79,11 +84,17 @@ export class ERDiagramSettingsPanel {
   }
 
   async renderSub() {
-    // send to webview
-    const msg: ToWebviewMessageEventType = {
-      command: "create",
-      componentName,
-      value: this.variables,
+    if (!this.variables) {
+      return;
+    }
+    const msg: ERDiagramSettingsPanelEventData = {
+      command: "initialize",
+      componentName: "ERDiagramSettingsPanel",
+      value: {
+        initialize: {
+          params: this.variables,
+        },
+      },
     };
 
     this._panel.webview.postMessage(msg);
