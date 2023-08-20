@@ -8,4 +8,5 @@ export type ComponentName =
   | "DBFormView"
   | "ERDiagramSettingsPanel"
   | "RecordRuleEditor"
+  | "NotebookCellMetadataPanel"
   | "CodeResolverEditor";

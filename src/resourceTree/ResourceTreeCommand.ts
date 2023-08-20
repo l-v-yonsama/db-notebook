@@ -21,7 +21,7 @@ import { ResourceTreeProvider } from "./ResourceTreeProvider";
 import { MdhPanel } from "../panels/MdhPanel";
 import { ScanPanel } from "../panels/ScanPanel";
 import {
-  CLONE_CONNECTION_SETTING,
+  DUPLICATE_CONNECTION_SETTING,
   CREATE_CONNECTION_SETTING,
   CREATE_ER_DIAGRAM,
   CREATE_ER_DIAGRAM_WITH_SETTINGS,
@@ -66,8 +66,8 @@ const registerConnectionSettingCommand = (params: ResourceTreeParams) => {
   commands.registerCommand(EDIT_CONNECTION_SETTING, async (conRes: DbConnection) => {
     connectionSettingViewProvider.setForm("update", conRes);
   });
-  commands.registerCommand(CLONE_CONNECTION_SETTING, async (conRes: DbConnection) => {
-    connectionSettingViewProvider.setForm("clone", conRes);
+  commands.registerCommand(DUPLICATE_CONNECTION_SETTING, async (conRes: DbConnection) => {
+    connectionSettingViewProvider.setForm("duplicate", conRes);
   });
   commands.registerCommand(DELETE_CONNECTION_SETTING, async (conRes: DbConnection) => {
     const answer = await window.showInformationMessage(

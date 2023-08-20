@@ -33,19 +33,13 @@ import { rdhListToText } from "../utilities/rdhToText";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { WriteToClipboardParamsPanel } from "./WriteToClipboardParamsPanel";
 import { ComponentName } from "../shared/ComponentName";
-import { MdhPanelEventData } from "../shared/MessageEventData";
+import { MdhPanelEventData, RdhTabItem } from "../shared/MessageEventData";
 
 const PREFIX = "[MdhPanel]";
 
 dayjs.extend(utc);
 
 const componentName: ComponentName = "MdhPanel";
-
-type RdhTabItem = {
-  tabId: string;
-  title: string;
-  list: ResultSetData[];
-};
 
 /**
  * This class manages the state and behavior of HelloWorld webview panels.
@@ -102,10 +96,12 @@ export class MdhPanel {
 
   private createTabItem(title: string, list: ResultSetData[]): RdhTabItem {
     const tabId = createHash("md5").update(title).digest("hex");
+    const refreshable = list.every((it) => it.meta.type === "select" || it.meta.type === "show");
     const item: RdhTabItem = {
       tabId,
       title,
       list,
+      refreshable,
     };
     return item;
   }
@@ -544,6 +540,7 @@ export class MdhPanel {
             }
 
             const rdh = tabItem.list[i];
+            const { type } = rdh.meta;
             const sql = rdh.sqlStatement!;
             const newRdh = await driver.requestSql({
               sql,

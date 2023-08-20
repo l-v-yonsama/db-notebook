@@ -20,7 +20,7 @@ export const FLUSH_DB = `${EXTENSION_NAME}.flush-db`;
 export const CREATE_CONNECTION_SETTING = `${EXTENSION_NAME}.create-connection-setting`;
 export const SHOW_CONNECTION_SETTING = `${EXTENSION_NAME}.show-connection-setting`;
 export const EDIT_CONNECTION_SETTING = `${EXTENSION_NAME}.edit-connection-setting`;
-export const CLONE_CONNECTION_SETTING = `${EXTENSION_NAME}.clone-connection-setting`;
+export const DUPLICATE_CONNECTION_SETTING = `${EXTENSION_NAME}.duplicate-connection-setting`;
 export const DELETE_CONNECTION_SETTING = `${EXTENSION_NAME}.delete-connection-setting`;
 
 export const SHOW_SCAN_PANEL = `${EXTENSION_NAME}.show-scan-panel`;
@@ -41,10 +41,8 @@ export const CELL_WRITE_TO_CLIPBOARD = `${EXTENSION_NAME}.cell.write-to-clipboar
 export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
 export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
 export const SPECIFY_CONNECTION_ALL = `${EXTENSION_NAME}.specify-connection-all`;
-export const CELL_SPECIFY_RULES_TO_USE = `${EXTENSION_NAME}.cell.specify-rules-to-use`;
-export const CELL_SPECIFY_CODE_RESOLVER_TO_USE = `${EXTENSION_NAME}.cell.specify-code-resolver-to-use`;
 export const CELL_MARK_CELL_AS_SKIP = `${EXTENSION_NAME}.cell.mark-cell-as-skip`;
-export const CELL_TOGGLE_SHOW_COMMENT = `${EXTENSION_NAME}.cell.toggle-show-comment`;
+export const CELL_SHOW_METADATA_SETTINGS = `${EXTENSION_NAME}.cell.show-metadata-setting`;
 
 //---------------------------------------------------
 // RECORD RULE EDITOR

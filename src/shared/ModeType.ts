@@ -1,1 +1,1 @@
-export type ModeType = "create" | "update" | "show" | "clone";
+export type ModeType = "create" | "update" | "show" | "duplicate";

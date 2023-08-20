@@ -92,8 +92,8 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           break;
         case "saveConnectionSetting":
           const mode = message.mode;
-          if (mode === "create" || mode === "clone") {
-            if (mode === "clone") {
+          if (mode === "create" || mode === "duplicate") {
+            if (mode === "duplicate") {
               params.id = undefined;
             }
             await this.stateStorage.addConnectionSetting(params);

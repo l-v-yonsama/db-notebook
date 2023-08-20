@@ -42,7 +42,7 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem<
     value: {
       fileType: fileType as WriteToClipboardParams["fileType"],
       outputWithType: "none",
-      withRowNo: true,
+      withRowNo: false,
       withCodeLabel: true,
       withRuleViolation: true,
     },
@@ -53,7 +53,7 @@ export const WRITE_TO_CLIP_BOARD_DETAIL_ITEMS: SecondaryItem<
     value: {
       fileType: fileType as WriteToClipboardParams["fileType"],
       outputWithType: "both",
-      withRowNo: true,
+      withRowNo: false,
       withCodeLabel: true,
       withRuleViolation: true,
     },
@@ -68,7 +68,7 @@ WRITE_TO_CLIP_BOARD_DETAIL_ITEMS.push({
   value: {
     fileType: "text",
     outputWithType: "withComment",
-    withRowNo: true,
+    withRowNo: false,
     withCodeLabel: true,
     specifyDetail: true,
     withRuleViolation: true,

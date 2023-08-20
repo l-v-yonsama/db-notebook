@@ -16,6 +16,7 @@ import { activateRuleEditor } from "./ruleEditor/activator";
 import { initializePath } from "./utilities/fsUtil";
 import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
+import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 
 const PREFIX = "[extension]";
 
@@ -32,6 +33,7 @@ export async function activate(context: ExtensionContext) {
   MdhPanel.setStateStorage(stateStorage);
   DiffPanel.setStateStorage(stateStorage);
   ViewConditionPanel.setStateStorage(stateStorage);
+  NotebookCellMetadataPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
 

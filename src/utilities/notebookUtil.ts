@@ -3,14 +3,26 @@ import { CellMeta } from "../types/Notebook";
 import { RecordRule } from "../shared/RecordRule";
 import { readFileOnStorage } from "./fsUtil";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
-import { TopLevelCondition } from "json-rules-engine";
+
 import {
   ResultSetData,
   stringConditionToJsonCondition,
 } from "@l-v-yonsama/multi-platform-database-drivers";
+import { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
 
 export const isSqlCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql";
+};
+
+export const isSelectOrShowSqlCell = (cell: NotebookCell): boolean => {
+  if (!isSqlCell(cell) || cell.outputs.length === 0) {
+    return false;
+  }
+  const meta: SQLRunResultMetadata | undefined = cell.outputs[0].metadata;
+  if (!meta) {
+    return false;
+  }
+  return meta.type === "select" || meta.type === "show";
 };
 
 export const isJsonCell = (cell: NotebookCell): boolean => {

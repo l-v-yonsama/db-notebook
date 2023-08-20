@@ -2,10 +2,8 @@ import {
   NOTEBOOK_TYPE,
   CELL_OPEN_MDH,
   CELL_SPECIFY_CONNECTION_TO_USE,
-  CELL_SPECIFY_RULES_TO_USE,
-  CELL_TOGGLE_SHOW_COMMENT,
+  CELL_SHOW_METADATA_SETTINGS,
   CELL_WRITE_TO_CLIPBOARD,
-  CELL_SPECIFY_CODE_RESOLVER_TO_USE,
   CELL_MARK_CELL_AS_SKIP,
 } from "../constant";
 import { NodeKernel } from "./NodeKernel";
@@ -44,6 +42,7 @@ import {
 } from "../utilities/notebookUtil";
 import { jsonKernelRun } from "./JsonKernel";
 import { existsFileOnStorage } from "../utilities/fsUtil";
+import { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
 
 const PREFIX = "[notebook/Controller]";
 
@@ -98,38 +97,28 @@ export class MainController {
         this.setActiveContext(notebook);
       })
     );
+
+    //---------------------------
+    // STATUS BAR ITEM PROVIDERS
+    //---------------------------
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new MarkCellAsSkipProvider()
+      )
+    );
+
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
         new ConnectionSettingProvider(stateStorage)
       )
     );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new CommentProvider())
-    );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new RecordRuleProvider(stateStorage)
-      )
-    );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new CodeLabelResolverProvider()
-      )
-    );
-    // context.subscriptions.push(
-    //   notebooks.registerNotebookCellStatusBarItemProvider(
-    //     NOTEBOOK_TYPE,
-    //     new ExplainMarkerProvider()
-    //   )
-    // );
 
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
-        new MarkCellAsSkipProvider()
+        new CellMetadataProvider(stateStorage)
       )
     );
 
@@ -256,7 +245,7 @@ export class MainController {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
       }
       if (stderr) {
-        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stdout(stderr)]));
+        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stdout(stderr)], metadata));
         success = false;
       }
       if (skipped) {
@@ -264,6 +253,7 @@ export class MainController {
           new NotebookCellOutput([NotebookCellOutputItem.text("### `SKIPPED!`", "text/markdown")])
         );
       }
+
       if (metadata?.rdh) {
         const cellMeta: CellMeta = cell.metadata;
         const withComment = metadata.rdh.keys.some((it) => (it.comment ?? "").length);
@@ -284,8 +274,35 @@ export class MainController {
           )
         );
       }
+
+      if (metadata?.explainRdh) {
+        const md = ResultSetDataBuilder.from(metadata.explainRdh).toMarkdown({
+          withComment: true,
+          withRowNo: false,
+        });
+
+        outputs.push(
+          new NotebookCellOutput(
+            [NotebookCellOutputItem.text(`\`[Explain plan]\`\n${md}`, "text/markdown")],
+            metadata
+          )
+        );
+      }
+
+      if (metadata?.analyzedRdh) {
+        const md = ResultSetDataBuilder.from(metadata.analyzedRdh).toMarkdown({
+          withComment: false,
+          withRowNo: false,
+        });
+
+        outputs.push(
+          new NotebookCellOutput(
+            [NotebookCellOutputItem.text(`\`[Explain analyze]\`\n${md}`, "text/markdown")],
+            metadata
+          )
+        );
+      }
     } catch (err: any) {
-      console.error(err);
       success = false;
       if (hasMessageField(err)) {
         stderr = err.message;
@@ -328,14 +345,15 @@ export class MainController {
       const r = await noteSession.sqlKernel.run(cell, noteSession.kernel.getStoredVariables());
       noteSession.sqlKernel = undefined;
       if (r.metadata?.rdh?.meta?.type === "select") {
+        const { rdh } = r.metadata;
         const metadata: CellMeta = cell.metadata;
         if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
-          const rrule = await readRuleFile(cell, r.metadata.rdh);
+          const rrule = await readRuleFile(cell, rdh);
           if (rrule) {
-            r.metadata.rdh.meta.tableRule = rrule.tableRule;
+            rdh.meta.tableRule = rrule.tableRule;
             log(`${PREFIX} rrule.tableRule:${JSON.stringify(rrule.tableRule, null, 1)}`);
             try {
-              const runRuleEngineResult = await runRuleEngine(r.metadata.rdh);
+              const runRuleEngineResult = await runRuleEngine(rdh);
               log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
             } catch (e) {
               throw new Error(
@@ -349,8 +367,8 @@ export class MainController {
         if (metadata.codeResolverFile && (await existsFileOnStorage(metadata.codeResolverFile))) {
           const codeResolver = await readCodeResolverFile(cell);
           if (codeResolver) {
-            r.metadata.rdh.meta.codeItems = codeResolver.items;
-            const resolveCodeLabelResult = await resolveCodeLabel(r.metadata.rdh);
+            rdh.meta.codeItems = codeResolver.items;
+            const resolveCodeLabelResult = await resolveCodeLabel(rdh);
             log(`${PREFIX} resolveCodeLabel:${resolveCodeLabelResult}`);
           }
         }
@@ -366,7 +384,7 @@ export class MainController {
 }
 
 // --- status bar
-class RecordRuleProvider implements NotebookCellStatusBarItemProvider {
+class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
 
   async provideCellStatusBarItems(
@@ -375,94 +393,70 @@ class RecordRuleProvider implements NotebookCellStatusBarItemProvider {
     if (!isSqlCell(cell)) {
       return undefined;
     }
-    if (!cell.document.getText().toLocaleLowerCase().includes("select")) {
-      return undefined;
-    }
 
-    const { ruleFile }: CellMeta = cell.metadata;
+    const {
+      ruleFile,
+      codeResolverFile,
+      markWithinQuery,
+      markWithExplain,
+      markWithExplainAnalyze,
+      markAsSkip,
+    }: CellMeta = cell.metadata;
     let tooltip = "";
-    if (ruleFile) {
-      let displayFileName = ruleFile;
-      if (displayFileName.endsWith(".rrule")) {
-        displayFileName = displayFileName.substring(0, displayFileName.length - 6);
+
+    tooltip = "$(gear) Show metadata";
+
+    let sqlMode = "";
+    if (markWithinQuery !== false) {
+      sqlMode += "Query";
+    }
+    if (markWithExplain) {
+      if (sqlMode.length > 0) {
+        sqlMode += ",";
       }
-      if (await existsFileOnStorage(ruleFile)) {
-        tooltip = "$(checklist) Use " + abbr(displayFileName, 18);
-      } else {
-        tooltip = "$(warning) Missing Rule " + abbr(displayFileName, 18);
+      sqlMode += "Explain";
+    }
+    if (markWithExplainAnalyze) {
+      if (sqlMode.length > 0) {
+        sqlMode += ",";
       }
-    } else {
-      tooltip = "$(info) Specify Rule";
-    }
-    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
-    item.command = CELL_SPECIFY_RULES_TO_USE;
-    item.tooltip = tooltip;
-    return item;
-  }
-}
-
-class CodeLabelResolverProvider implements NotebookCellStatusBarItemProvider {
-  constructor() {}
-
-  async provideCellStatusBarItems(
-    cell: NotebookCell
-  ): Promise<NotebookCellStatusBarItem | undefined> {
-    if (!isSqlCell(cell)) {
-      return undefined;
-    }
-    if (!cell.document.getText().toLocaleLowerCase().includes("select")) {
-      return undefined;
+      sqlMode += "Analyze";
     }
 
-    const { codeResolverFile }: CellMeta = cell.metadata;
-    let tooltip = "";
+    if (markAsSkip !== true) {
+      tooltip += ` $(send) Execution(${sqlMode})`;
+    }
+
     if (codeResolverFile) {
       let displayFileName = codeResolverFile;
       if (displayFileName.endsWith(".cresolver")) {
         displayFileName = displayFileName.substring(0, displayFileName.length - 10);
       }
       if (await existsFileOnStorage(codeResolverFile)) {
-        tooltip = "$(replace) Use " + abbr(displayFileName, 18);
+        tooltip += " $(replace) Use " + abbr(displayFileName, 18);
       } else {
-        tooltip = "$(warning) Missing Code resolver " + abbr(displayFileName, 18);
+        tooltip += " $(warning) Missing Code resolver " + abbr(displayFileName, 18);
       }
-    } else {
-      tooltip = "$(info) Specify Code resolver";
     }
+
+    if (ruleFile) {
+      let displayFileName = ruleFile;
+      if (displayFileName.endsWith(".rrule")) {
+        displayFileName = displayFileName.substring(0, displayFileName.length - 6);
+      }
+      if (await existsFileOnStorage(ruleFile)) {
+        tooltip += " $(checklist) Use " + abbr(displayFileName, 18);
+      } else {
+        tooltip += " $(warning) Missing Rule " + abbr(displayFileName, 18);
+      }
+    }
+
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
-    item.command = CELL_SPECIFY_CODE_RESOLVER_TO_USE;
+    item.command = CELL_SHOW_METADATA_SETTINGS;
     item.tooltip = tooltip;
     return item;
   }
 }
-
-// class ExplainMarkerProvider implements NotebookCellStatusBarItemProvider {
-//   constructor() {}
-
-//   async provideCellStatusBarItems(
-//     cell: NotebookCell
-//   ): Promise<NotebookCellStatusBarItem | undefined> {
-//     if (!isSqlCell(cell)) {
-//       return undefined;
-//     }
-
-//     if (!cell.document.getText().toLocaleLowerCase().includes("select")) {
-//       return undefined;
-//     }
-
-//     const { markWithExplain }: CellMeta = cell.metadata;
-//     let tooltip = "";
-//     if (markWithExplain) {
-//       tooltip = "$(graph-left) Without explain";
-//     } else {
-//       tooltip = "$(graph-left) With explain";
-//     }
-//     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
-//     // item.command = CELL_SPECIFY_CODE_RESOLVER_TO_USE;
-//     item.tooltip = tooltip;
-//     return item;
-//   }
-// }
 
 class MarkCellAsSkipProvider implements NotebookCellStatusBarItemProvider {
   constructor() {}
@@ -486,30 +480,6 @@ class MarkCellAsSkipProvider implements NotebookCellStatusBarItemProvider {
     }
     const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_MARK_CELL_AS_SKIP;
-    item.tooltip = tooltip;
-    return item;
-  }
-}
-
-class CommentProvider implements NotebookCellStatusBarItemProvider {
-  constructor() {}
-
-  async provideCellStatusBarItems(
-    cell: NotebookCell
-  ): Promise<NotebookCellStatusBarItem | undefined> {
-    if (!isSqlCell(cell)) {
-      return undefined;
-    }
-
-    const { showComment }: CellMeta = cell.metadata;
-    let tooltip = "";
-    if (showComment === true) {
-      tooltip = "$(eye-closed) Hide comment";
-    } else {
-      tooltip = "$(eye) Show comment";
-    }
-    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
-    item.command = CELL_TOGGLE_SHOW_COMMENT;
     item.tooltip = tooltip;
     return item;
   }
@@ -544,8 +514,12 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
 
 class WriteToClipboardProvider implements NotebookCellStatusBarItemProvider {
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    const rdh = <ResultSetData | undefined>cell.outputs[0]?.metadata?.["rdh"];
-    if (!rdh) {
+    const rMetadata: SQLRunResultMetadata | undefined = cell.outputs[0]?.metadata;
+    if (!rMetadata) {
+      return;
+    }
+    const { rdh, explainRdh, analyzedRdh } = rMetadata;
+    if (rdh === undefined && explainRdh === undefined && analyzedRdh === undefined) {
       return;
     }
     const item = new NotebookCellStatusBarItem(
@@ -560,16 +534,20 @@ class WriteToClipboardProvider implements NotebookCellStatusBarItemProvider {
 
 class RdhProvider implements NotebookCellStatusBarItemProvider {
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    const rdh = <ResultSetData | undefined>cell.outputs[0]?.metadata?.["rdh"];
-    if (!rdh) {
+    const rMetadata: SQLRunResultMetadata | undefined = cell.outputs[0]?.metadata;
+    if (!rMetadata) {
+      return;
+    }
+    const { rdh, explainRdh, analyzedRdh } = rMetadata;
+    if (rdh === undefined && explainRdh === undefined && analyzedRdh === undefined) {
       return;
     }
     const item = new NotebookCellStatusBarItem(
-      "$(table) Open results",
+      "$(table) Open outputs",
       NotebookCellStatusBarAlignment.Right
     );
     item.command = CELL_OPEN_MDH;
-    item.tooltip = "Open results in panel";
+    item.tooltip = "Open outputs in panel";
     return item;
   }
 }

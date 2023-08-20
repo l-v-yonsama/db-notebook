@@ -34,7 +34,6 @@ function onCellFocus(params: CellFocusParams) {
 }
 
 const save = (): any => {
-  console.log("calledd save000");
   return rdhRef.value?.save();
 };
 

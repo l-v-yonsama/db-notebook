@@ -10,6 +10,7 @@ import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ViewConditionPanel from "./components/ViewConditionPanel.vue";
 import WriteToClipboardParamsPanel from "./components/WriteToClipboardParamsPanel.vue";
+import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
 
 import ERDiagramSettings from "./components/ERDiagramSettings.vue";
 import RecordRuleEditor from "./components/RecordRuleEditor.vue";
@@ -23,6 +24,7 @@ const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
 const viewConditionPanelRef = ref<InstanceType<typeof ViewConditionPanel>>();
 const variablesPanelRef = ref<InstanceType<typeof VariablesPanel>>();
 const writeToClipboardParamsPanelRef = ref<InstanceType<typeof WriteToClipboardParamsPanel>>();
+const notebookCellMetadataPanelRef = ref<InstanceType<typeof NotebookCellMetadataPanel>>();
 const eRDiagramSettingsPanelRef = ref<InstanceType<typeof ERDiagramSettingsVue>>();
 const recordRuleEditorRef = ref<InstanceType<typeof RecordRuleEditor>>();
 const codeResolverEditorRef = ref<InstanceType<typeof CodeResolverEditor>>();
@@ -55,6 +57,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "WriteToClipboardParamsPanel":
       writeToClipboardParamsPanelRef.value?.recieveMessage(data);
+      break;
+    case "NotebookCellMetadataPanel":
+      notebookCellMetadataPanelRef.value?.recieveMessage(data);
       break;
     case "ERDiagramSettingsPanel":
       eRDiagramSettingsPanelRef.value?.recieveMessage(data);
@@ -99,6 +104,11 @@ onMounted(() => {
     <ERDiagramSettings
       v-if="currentComponentName === 'ERDiagramSettingsPanel'"
       ref="eRDiagramSettingsPanelRef"
+    />
+
+    <NotebookCellMetadataPanel
+      v-if="currentComponentName === 'NotebookCellMetadataPanel'"
+      ref="notebookCellMetadataPanelRef"
     />
 
     <RecordRuleEditor

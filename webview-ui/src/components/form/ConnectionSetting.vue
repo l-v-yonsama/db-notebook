@@ -121,7 +121,7 @@ const acceptValues = computed((): boolean => {
       }
     }
   }
-  if (props.mode === "clone" || props.mode === "create") {
+  if (props.mode === "duplicate" || props.mode === "create") {
     if (props.prohibitedNames.includes(name.value)) {
       return false;
     }
@@ -130,7 +130,7 @@ const acceptValues = computed((): boolean => {
 });
 
 const isDuplicateName = computed((): boolean => {
-  if (props.mode === "clone" || props.mode === "create") {
+  if (props.mode === "duplicate" || props.mode === "create") {
     return props.prohibitedNames.includes(name.value);
   }
   return false;

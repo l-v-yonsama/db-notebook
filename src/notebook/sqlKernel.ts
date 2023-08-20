@@ -9,6 +9,7 @@ import {
 import { CellMeta, RunResult, NotebookExecutionVariables } from "../types/Notebook";
 import { NotebookCell } from "vscode";
 import { log } from "../utilities/logger";
+import * as os from "os";
 
 const PREFIX = "  [notebook/SqlKernel]";
 
@@ -18,14 +19,15 @@ export class SqlKernel {
 
   public async run(cell: NotebookCell, variables: NotebookExecutionVariables): Promise<RunResult> {
     let stdout = "";
-    let stderr = "";
+    let stderrs: string[] = [];
     let connectionSetting: ConnectionSetting | undefined = undefined;
-    const { connectionName }: CellMeta = cell.metadata;
+    const { connectionName, markWithExplain, markWithExplainAnalyze, markWithinQuery }: CellMeta =
+      cell.metadata;
 
     if (variables._skipSql === true) {
       return {
         stdout,
-        stderr,
+        stderr: "",
         skipped: true,
       };
     }
@@ -53,33 +55,77 @@ export class SqlKernel {
     log(`${PREFIX} query:` + query);
     log(`${PREFIX} binds:` + JSON.stringify(binds));
 
-    const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
-      RDSBaseDriver,
-      ResultSetData
-    >(connectionSetting, async (driver) => {
-      this.driver = driver;
-      return await driver.requestSql({
-        sql: query,
-        conditions: {
-          binds,
-        },
-      });
-    });
-    this.driver = undefined;
+    let metadata: RunResult["metadata"] = {};
 
-    let metadata = undefined;
-    if (ok && result) {
-      if (!result.meta.tableName) {
-        result.meta.tableName = `CELL${cell.index + 1}`;
+    if (markWithExplainAnalyze) {
+      const { message } = await DBDriverResolver.getInstance().flowTransaction<RDSBaseDriver>(
+        connectionSetting,
+        async (driver) => {
+          this.driver = driver;
+          metadata!.analyzedRdh = await driver.explainAnalyzeSql({
+            sql: query,
+            conditions: {
+              binds,
+            },
+          });
+        },
+        {
+          transactionControlType: "alwaysRollback",
+        }
+      );
+
+      if (message) {
+        stderrs.push(`Explain Analyze Error: ${message}`);
       }
-      metadata = { rdh: result };
-    } else {
-      stderr = message;
     }
+
+    if (markWithExplain) {
+      const { message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+        connectionSetting,
+        async (driver) => {
+          this.driver = driver;
+          metadata!.explainRdh = await driver.explainSql({
+            sql: query,
+            conditions: {
+              binds,
+            },
+          });
+        }
+      );
+      if (message) {
+        stderrs.push(`Explain Error: ${message}`);
+      }
+    }
+
+    if (markWithinQuery !== false) {
+      const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+        RDSBaseDriver,
+        ResultSetData
+      >(connectionSetting, async (driver) => {
+        this.driver = driver;
+        return await driver.requestSql({
+          sql: query,
+          conditions: {
+            binds,
+          },
+        });
+      });
+      if (ok && result) {
+        if (!result.meta.tableName) {
+          result.meta.tableName = `CELL${cell.index + 1}`;
+        }
+        metadata!.rdh = result;
+        metadata!.tableName = result.meta.tableName;
+        metadata!.type = result.meta.type;
+      } else {
+        stderrs.push(`Execute query Error: ${message}`);
+      }
+    }
+    this.driver = undefined;
 
     return {
       stdout,
-      stderr,
+      stderr: stderrs.join(os.EOL),
       skipped: false,
       metadata,
     };

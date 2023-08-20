@@ -18,18 +18,13 @@ import type {
   OutputParams,
   WriteToClipboardParams,
   MdhPanelEventData,
+  RdhTabItem,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS, WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
-
-type RdhTabItem = {
-  tabId: string;
-  title: string;
-  list: ResultSetData[];
-};
 
 const activeTabId = ref("");
 const tabItems = ref([] as RdhTabItem[]);
@@ -90,6 +85,7 @@ const setRdhViewerRef = (el: any) => {
 };
 
 const editable = ref(true);
+const refreshable = ref(false);
 
 function getActiveTabItem(): RdhTabItem | undefined {
   console.log("getActiveTabItem:", activeTabId.value);
@@ -124,6 +120,7 @@ const showTab = (tabId: string) => {
 
 const resetActiveInnerRdh = () => {
   editable.value = false;
+  refreshable.value = false;
   noCompareKeys.value = true;
   activeInnerRdh.value = null;
   const tabItem = getActiveTabItem();
@@ -132,6 +129,7 @@ const resetActiveInnerRdh = () => {
   }
   const newRdh = tabItem.list[innerTabIndex.value];
   editable.value = newRdh.meta?.editable === true;
+  refreshable.value = tabItem.refreshable;
 
   nextTick(() => {
     noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
@@ -333,7 +331,9 @@ const recieveMessage = (data: MdhPanelEventData) => {
 
   switch (command) {
     case "add-tab-item":
-      addTabItem(value.addTabItem);
+      if (value.addTabItem) {
+        addTabItem(value.addTabItem);
+      }
       break;
     case "set-search-result":
       if (value.searchResult === undefined) {
@@ -368,7 +368,7 @@ defineExpose({
         <fa icon="arrow-up" />
       </button>
       <button
-        v-if="!editable"
+        v-if="!editable && refreshable"
         @click="actionToolbar('compare', {})"
         :disabled="inProgress || noCompareKeys"
         :title="noCompareKeys ? 'No compare keys(Primary, Unique)' : 'Compare with current content'"
@@ -376,12 +376,17 @@ defineExpose({
         <fa icon="code-compare" />
       </button>
       <SecondarySelectionAction
-        v-if="!editable"
+        v-if="!editable && refreshable"
         :items="compareDetailItems"
         title="Compare"
         @onSelect="selectedCompareMoreOptions"
       />
-      <button @click="actionToolbar('refresh', {})" :disabled="inProgress" title="Search again">
+      <button
+        v-if="refreshable"
+        @click="actionToolbar('refresh', {})"
+        :disabled="inProgress"
+        title="Search again"
+      >
         <fa icon="rotate" />
       </button>
       <button
@@ -389,7 +394,7 @@ defineExpose({
           writeToClipboard({
             fileType: 'text',
             outputWithType: 'withComment',
-            withRowNo: true,
+            withRowNo: false,
             withRuleViolation: true,
             withCodeLabel: true,
           })

@@ -3,6 +3,7 @@ import type { ModeType } from "./ModeType";
 import type { ERDiagramSettingParams } from "./ERDiagram";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
+import type { CellMeta } from "../types/Notebook";
 
 export type TabIdParam = {
   tabId: string;
@@ -31,6 +32,7 @@ export type ActionCommand =
   | CreateERDiagramActionCommand
   | CreateCodeResolverEditorActionCommand
   | SaveCompareKeysActionCommand
+  | SaveNotebookCellMetadataActionCommand
   | OutputActionCommand
   | WriteToClipboardActionCommand
   | OpenScanPanelActionCommand
@@ -139,6 +141,13 @@ export type SaveCompareKeysActionCommand = {
   command: "saveCompareKeys";
   params: SaveCompareKeysParams;
 };
+
+export type SaveNotebookCellMetadataActionCommand = BaseActionCommand<
+  "saveNotebookCellMetadata",
+  {
+    metadata: CellMeta;
+  }
+>;
 
 export type SaveValuesActionCommand = {
   command: "saveValues";

@@ -12,6 +12,8 @@ import type { ModeType } from "./ModeType";
 import type { NameWithComment, WriteToClipboardParams } from "./ActionParams";
 import type { RecordRule } from "./RecordRule";
 import type { CodeResolverParams } from "./CodeResolverParams";
+import type { CellMeta } from "../types/Notebook";
+import type { SQLRunResultMetadata } from "./SQLRunResultMetadata";
 
 export type MessageEventData =
   | MdhPanelEventData
@@ -20,6 +22,7 @@ export type MessageEventData =
   | ViewConditionPanelEventData
   | VariablesPanelEventData
   | WriteToClipboardParamsPanelEventData
+  | NotebookCellMetadataPanelEventData
   | ERDiagramSettingsPanelEventData
   | RecordRuleEditorEventData
   | CodeResolverEditorEventData
@@ -33,6 +36,13 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
   value: V;
 };
 
+export type RdhTabItem = {
+  tabId: string;
+  title: string;
+  refreshable: boolean;
+  list: ResultSetData[];
+};
+
 export type MdhPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand | "set-search-result" | "add-tab-item",
   "MdhPanel",
@@ -41,7 +51,7 @@ export type MdhPanelEventData = BaseMessageEventData<
       tabId: string;
       value: ResultSetData[];
     };
-    addTabItem?: any;
+    addTabItem?: RdhTabItem;
   }
 >;
 
@@ -151,6 +161,19 @@ export type WriteToClipboardParamsPanelEventData = BaseMessageEventData<
     initialize?: {
       params: WriteToClipboardParams;
       previewText: string;
+    };
+  }
+>;
+
+export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "NotebookCellMetadataPanel",
+  {
+    initialize?: {
+      metadata: CellMeta;
+      connectionSettingNames: string[];
+      codeFileItems: { label: string; value: string }[];
+      ruleFileItems: { label: string; value: string }[];
     };
   }
 >;

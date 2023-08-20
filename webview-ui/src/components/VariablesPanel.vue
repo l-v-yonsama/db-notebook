@@ -2,7 +2,7 @@
 import { ref, onMounted, nextTick } from "vue";
 import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDHViewer from "./RDHViewer.vue";
-import type { VariablesPanelEventData } from "../../../src/shared/MessageEventData";
+import type { VariablesPanelEventData } from "@/utilities/vscode";
 
 const rdh = ref(undefined as ResultSetData | undefined);
 

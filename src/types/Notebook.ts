@@ -1,13 +1,14 @@
-import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
-import { NotebookCellKind } from "vscode";
+import type { NotebookCellKind } from "vscode";
+import type { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
 
 export type CellMeta = {
+  markAsSkip?: boolean;
   connectionName?: string;
+  showComment?: boolean;
   ruleFile?: string;
   codeResolverFile?: string;
-  showComment?: boolean;
+  markWithinQuery?: boolean;
   markWithExplain?: boolean;
-  markAsSkip?: boolean;
   readonly [key: string]: any;
 };
 
@@ -37,8 +38,5 @@ export type RunResult = {
   stdout: string;
   stderr: string;
   skipped: boolean;
-  metadata?: {
-    rdh?: ResultSetData;
-    [key: string]: any;
-  };
+  metadata?: SQLRunResultMetadata;
 };

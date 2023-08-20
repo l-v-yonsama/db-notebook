@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -158,7 +158,7 @@
           "group": "connection-setting@1"
         },
         {
-          "command": "database-notebook.clone-connection-setting",
+          "command": "database-notebook.duplicate-connection-setting",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+$/",
           "group": "connection-setting@1"
         },
@@ -367,7 +367,7 @@
         "category": "connection-setting"
       },
       {
-        "command": "database-notebook.clone-connection-setting",
+        "command": "database-notebook.duplicate-connection-setting",
         "title": "Clone setting",
         "icon": {
           "dark": "media/dark/files.svg",
@@ -461,24 +461,14 @@
         "icon": "$(debug-disconnect)"
       },
       {
-        "command": "database-notebook.cell.specify-rules-to-use",
-        "title": "Specify record rule to use",
-        "icon": "$(checklist)"
-      },
-      {
-        "command": "database-notebook.cell.specify-code-resolver-to-use",
-        "title": "Specify code resolver to use",
-        "icon": "$(replace)"
-      },
-      {
         "command": "database-notebook.cell.mark-cell-as-skip",
         "title": "Mark cell as skip",
         "icon": "$(debug-step-over)"
       },
       {
-        "command": "database-notebook.cell.toggle-show-comment",
-        "title": "Toggle show comment",
-        "icon": "$(info)"
+        "command": "database-notebook.cell.show-metadata-setting",
+        "title": "Show settings",
+        "icon": "$(gear)"
       },
       {
         "command": "database-notebook.show-rdh-diff",
@@ -527,7 +517,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.167",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.177",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",
