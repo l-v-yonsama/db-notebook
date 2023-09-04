@@ -261,12 +261,13 @@ export class MainController {
           new NotebookCellOutput(
             [
               NotebookCellOutputItem.text(
-                ResultSetDataBuilder.from(metadata.rdh).toMarkdown({
-                  withComment,
-                  withRowNo: true,
-                  withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
-                  withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
-                }),
+                `\`[Query Result]\` ${metadata.rdh.summary?.info}\n` +
+                  ResultSetDataBuilder.from(metadata.rdh).toMarkdown({
+                    withComment,
+                    withRowNo: true,
+                    withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
+                    withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
+                  }),
                 "text/markdown"
               ),
             ],

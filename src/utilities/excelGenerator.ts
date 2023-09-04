@@ -86,6 +86,7 @@ function createQueryResultListSheet(
       { label: "COMMENT", key: "comment" },
       { label: "TYPE", key: "type" },
       { label: "ROWS", key: "rows" },
+      { label: "ELAPSED TIME", key: "time" },
     ],
     records: [],
   };
@@ -98,6 +99,10 @@ function createQueryResultListSheet(
     });
     sheet.getColumn("A").width = 2;
     list.forEach((rdh, idx) => {
+      let time = "-";
+      if (rdh.summary?.elapsedTimeMilli !== undefined) {
+        time = (rdh.summary.elapsedTimeMilli / 1000).toFixed(2) + " sec";
+      }
       tocRecords.records.push({
         no: idx + 1,
         tableName: {
@@ -107,6 +112,7 @@ function createQueryResultListSheet(
         comment: rdh.meta.comment,
         type: rdh.meta.type,
         rows: rdh.meta.type === "select" ? rdh.rows.length : "-",
+        time,
       });
       const plusRows = createQueryResultSheet(sheet, rdh, baseRowNo, options.rdh.outputWithType);
       baseRowNo += plusRows + 2;
