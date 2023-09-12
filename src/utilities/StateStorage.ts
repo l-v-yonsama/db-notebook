@@ -31,7 +31,7 @@ export class StateStorage {
   private resMap = new Map<string, DbResInfo>();
 
   getResourceByName(connectionName: string): DbDatabase[] | undefined {
-    log(`${PREFIX} getResourceByName(${connectionName})`);
+    // log(`${PREFIX} getResourceByName(${connectionName})`);
 
     if (this.resMap.has(connectionName)) {
       return this.resMap.get(connectionName)?.res;
@@ -44,7 +44,7 @@ export class StateStorage {
     reload: boolean,
     wait = false
   ): Promise<GeneralResult<DbDatabase[]>> {
-    log(`${PREFIX} loadResource(${connectionName}, reload:${reload}, wait:${wait})`);
+    // log(`${PREFIX} loadResource(${connectionName}, reload:${reload}, wait:${wait})`);
     const ret: GeneralResult<DbDatabase[]> = {
       ok: false,
       message: "",
@@ -70,7 +70,7 @@ export class StateStorage {
         await sleep(500);
         resInfo = this.resMap.get(connectionName);
       }
-      log(`${PREFIX} loadResource return res`);
+      // log(`${PREFIX} loadResource return res`);
       if (resInfo?.res) {
         ret.ok = true;
         ret.result = resInfo.res;
@@ -141,7 +141,7 @@ export class StateStorage {
   constructor(private context: ExtensionContext, private secretStorage: SecretStorage) {}
 
   async getConnectionSettingList(): Promise<ConnectionSetting[]> {
-    log(`${PREFIX} getConnectionSettingList`);
+    // log(`${PREFIX} getConnectionSettingList`);
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
     for (const it of list) {
       if (it.id) {
@@ -152,12 +152,12 @@ export class StateStorage {
   }
 
   getPasswordlessConnectionSettingList(): ConnectionSetting[] {
-    log(`${PREFIX} getPasswordlessConnectionSettingList`);
+    // log(`${PREFIX} getPasswordlessConnectionSettingList`);
     return this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
   }
 
   async getConnectionSettingByName(name: string): Promise<ConnectionSetting | undefined> {
-    log(`${PREFIX} getConnectionSettingByName(${name})`);
+    // log(`${PREFIX} getConnectionSettingByName(${name})`);
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
     const setting = list.find((it) => it.name === name);
     if (setting) {
@@ -211,7 +211,7 @@ export class StateStorage {
   }
 
   async deleteConnectionSetting(name: string): Promise<boolean> {
-    log(`${PREFIX} deleteConnectionSetting name:[${name}]`);
+    // log(`${PREFIX} deleteConnectionSetting name:[${name}]`);
     const list = await this.getConnectionSettingList();
     const idx = list.findIndex((it) => it.name === name);
     if (idx < 0) {

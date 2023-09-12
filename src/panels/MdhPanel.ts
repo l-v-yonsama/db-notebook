@@ -6,9 +6,9 @@ import {
   ResultSetDataBuilder,
   resolveCodeLabel,
   runRuleEngine,
-  toDeleteStatementWithBinds,
-  toInsertStatementWithBinds,
-  toUpdateStatementWithBinds,
+  toDeleteStatement,
+  toInsertStatement,
+  toUpdateStatement,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
@@ -164,7 +164,7 @@ export class MdhPanel {
     webview.onDidReceiveMessage(
       async (message: ActionCommand) => {
         const { command, params } = message;
-        log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
+        // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
         switch (command) {
           case "closeTab":
             {
@@ -287,11 +287,14 @@ export class MdhPanel {
               const prefix = `INSERT[${i + 1}/${insertList.length}] `;
               const { values } = insertList[i];
               try {
-                const { query, binds } = toInsertStatementWithBinds({
+                const { query, binds } = toInsertStatement({
                   tableName,
-                  keys: rdh.keys,
+                  columns: rdh.keys,
                   values,
-                  toPositionedParameter,
+                  bindOption: {
+                    specifyValuesWithBindParameters: true,
+                    toPositionedParameter,
+                  },
                 });
                 log(`${prefix} sql:[${query}]`);
                 log(`${prefix} binds:${JSON.stringify(binds)}`);
@@ -317,12 +320,15 @@ export class MdhPanel {
               const prefix = `UPDATE[${i + 1}/${updateList.length}] `;
               const { values, conditions } = updateList[i];
               try {
-                const { query, binds } = toUpdateStatementWithBinds({
+                const { query, binds } = toUpdateStatement({
                   tableName,
-                  keys: rdh.keys,
+                  columns: rdh.keys,
                   values,
                   conditions,
-                  toPositionedParameter,
+                  bindOption: {
+                    specifyValuesWithBindParameters: true,
+                    toPositionedParameter,
+                  },
                 });
 
                 log(`${prefix} sql:[${query}]`);
@@ -349,11 +355,14 @@ export class MdhPanel {
               const prefix = `DELETE[${i + 1}/${deleteList.length}] `;
               const { conditions } = deleteList[i];
               try {
-                const { query, binds } = toDeleteStatementWithBinds({
+                const { query, binds } = toDeleteStatement({
                   tableName,
-                  keys: rdh.keys,
+                  columns: rdh.keys,
                   conditions,
-                  toPositionedParameter,
+                  bindOption: {
+                    specifyValuesWithBindParameters: true,
+                    toPositionedParameter,
+                  },
                 });
                 log(`${prefix} sql:[${query}]`);
                 log(`${prefix} binds:${JSON.stringify(binds)}`);

@@ -368,7 +368,7 @@
       },
       {
         "command": "database-notebook.duplicate-connection-setting",
-        "title": "Clone setting",
+        "title": "Duplicate setting",
         "icon": {
           "dark": "media/dark/files.svg",
           "light": "media/light/files.svg"
@@ -517,7 +517,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.179",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.180",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "short-unique-id": "^4.4.4",

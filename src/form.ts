@@ -69,7 +69,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
     // receive from webview
     webviewView.webview.onDidReceiveMessage(async (message: ActionCommand) => {
       const { command, params } = message;
-      log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
+      // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
       switch (command) {
         case "testConnectionSetting":
           {

@@ -113,7 +113,7 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
     // Receive message from the webview.
     webviewPanel.webview.onDidReceiveMessage(async (message: ActionCommand) => {
       const { command, params } = message;
-      log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
+      // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
       switch (command) {
         case "cancel":
           webviewPanel.dispose();

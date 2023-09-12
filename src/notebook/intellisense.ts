@@ -37,20 +37,20 @@ import { isSqlCell } from "../utilities/notebookUtil";
 const PREFIX = "[notebook/intellisense]";
 
 const throttleFunc = throttle(300, async (connectionName: string): Promise<void> => {
-  log(`  ${PREFIX} start throttleFunc`);
+  // log(`  ${PREFIX} start throttleFunc`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
-    log(`  ${PREFIX} end throttleFunc. No connection setting.`);
+    // log(`  ${PREFIX} end throttleFunc. No connection setting.`);
     return;
   }
   const { ok, result } = await storage.loadResource(connectionName, false, false);
   if (ok && result && result[0] instanceof RdsDatabase) {
     rdsDatabase = result[0];
   }
-  log(`  ${PREFIX} end throttleFunc with rdsDatabase`);
+  // log(`  ${PREFIX} end throttleFunc with rdsDatabase`);
 });
 
 export async function setupDbResource(connectionName: string) {
-  log(`${PREFIX} setupDbResource`);
+  // log(`${PREFIX} setupDbResource`);
   throttleFunc(connectionName);
 }
 
@@ -58,13 +58,13 @@ let storage: StateStorage;
 let rdsDatabase: RdsDatabase | undefined;
 
 export function activateIntellisense(context: ExtensionContext, stateStorage: StateStorage) {
-  log(`${PREFIX} start activateIntellisense`);
+  // log(`${PREFIX} start activateIntellisense`);
   storage = stateStorage;
 
   context.subscriptions.push(createJsIntellisense());
   context.subscriptions.push(createSQLIntellisense());
   setActivateDecorator(context);
-  log(`${PREFIX} end activateIntellisense`);
+  // log(`${PREFIX} end activateIntellisense`);
 }
 
 const smallNumberDecorationType = window.createTextEditorDecorationType({
@@ -77,28 +77,28 @@ const smallNumberDecorationType = window.createTextEditorDecorationType({
 });
 
 function setActivateDecorator(context: ExtensionContext) {
-  log(`${PREFIX} start setActivateDecorator`);
+  // log(`${PREFIX} start setActivateDecorator`);
   let activeEditor = window.activeTextEditor;
   // let activeNotebook = window.activeNotebookEditor?.notebook;
   let cell: NotebookCell | undefined;
   let timeout: NodeJS.Timer | undefined = undefined;
 
   const triggerUpdateDecorations = (throttle = false) => {
-    log(`${PREFIX} triggerUpdateDecorations`);
+    // log(`${PREFIX} triggerUpdateDecorations`);
     if (timeout) {
       clearTimeout(timeout);
       timeout = undefined;
-      log(`${PREFIX} triggerUpdateDecorations cleartimeout`);
+      // log(`${PREFIX} triggerUpdateDecorations cleartimeout`);
     }
     if (activeEditor && cell) {
-      log(`${PREFIX} triggerUpdateDecorations in active editor`);
+      // log(`${PREFIX} triggerUpdateDecorations in active editor`);
       if (throttle) {
         timeout = setTimeout(() => updateDecorations(activeEditor, cell), 500);
       } else {
         updateDecorations(activeEditor, cell);
       }
     }
-    log(`${PREFIX} triggerUpdateDecorations done`);
+    // log(`${PREFIX} triggerUpdateDecorations done`);
   };
 
   context.subscriptions.push(
@@ -137,11 +137,11 @@ function setActivateDecorator(context: ExtensionContext) {
       }
     })
   );
-  log(`${PREFIX} end setActivateDecorator`);
+  // log(`${PREFIX} end setActivateDecorator`);
 }
 
 function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookCell | undefined) {
-  log(`${PREFIX} start updateDecorations`);
+  // log(`${PREFIX} start updateDecorations`);
   if (cell === undefined || rdsDatabase === undefined || activeEditor === undefined) {
     return;
   }
@@ -183,7 +183,7 @@ function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookC
 }
 
 function getStoreKeys(): string[] {
-  log(`${PREFIX} getStoreKeys`);
+  // log(`${PREFIX} getStoreKeys`);
   if (window.activeNotebookEditor?.notebook === undefined) {
     return [];
   }
@@ -207,7 +207,7 @@ function getStoreKeys(): string[] {
 }
 
 function createJsIntellisense() {
-  log(`${PREFIX} createJsIntellisense`);
+  // log(`${PREFIX} createJsIntellisense`);
   return languages.registerCompletionItemProvider(
     [{ language: "javascript", notebookType: NOTEBOOK_TYPE }],
     {
@@ -352,6 +352,34 @@ function createJsIntellisense() {
         });
         list.push(item);
 
+        // SES
+        item = createDriverResolverCompletionItem({
+          label: "verifyEmailAddress",
+          conNamesString,
+          bodyScript: '  await driver.sesClient.verifyEmailAddress("${2}");',
+          detail: "Verify Email Address",
+          docString: DOCUMENT_OF_VERIFY_EMAIL_ADDRESS,
+        });
+        list.push(item);
+
+        item = createDriverResolverCompletionItem({
+          label: "verifyDomainIdentity",
+          conNamesString,
+          bodyScript: '  await driver.sesClient.verifyDomainIdentity("${2}");',
+          detail: "Verify Domain",
+          docString: DOCUMENT_OF_VERIFY_DOMAIN,
+        });
+        list.push(item);
+
+        item = createDriverResolverCompletionItem({
+          label: "listIdentities",
+          conNamesString,
+          bodyScript: '  await driver.sesClient.listIdentities("${2|Domain,EmailAddress|}");',
+          detail: "List Identities",
+          docString: DOCUMENT_OF_LIST_ID,
+        });
+        list.push(item);
+
         return list;
       },
     }
@@ -373,7 +401,7 @@ function createDriverResolverCompletionItem({
   docString: string;
   resultAsRdh?: boolean;
 }) {
-  log(`${PREFIX} createDriverResolverCompletionItem`);
+  // log(`${PREFIX} createDriverResolverCompletionItem`);
   const item = new CompletionItem("driverResolver." + label);
   item.insertText = new SnippetString(
     "const { ok, message, result } = await driverResolver\n" +
@@ -571,4 +599,16 @@ scan(params: {
   endTime?: number;
   targetResourceType?: ResourceType;
 }): Promise<ResultSetData>
+`;
+
+const DOCUMENT_OF_VERIFY_EMAIL_ADDRESS = `... in workflow.
+verifyEmailAddress(emailAddress: string): Promise<void>;
+`;
+
+const DOCUMENT_OF_VERIFY_DOMAIN = `... in workflow.
+verifyDomainIdentity(domain: string): Promise<void>;
+`;
+
+const DOCUMENT_OF_LIST_ID = `... in workflow.
+listIdentities(identityType: IdentityType): Promise<string[]>;
 `;

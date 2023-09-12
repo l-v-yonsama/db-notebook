@@ -183,7 +183,7 @@ export class NodeKernel {
   }
 
   async dispose() {
-    log(`${PREFIX} dispose`);
+    // log(`${PREFIX} dispose`);
     this.child = undefined;
     await deleteResource(this.tmpDirectory, { recursive: true });
   }
