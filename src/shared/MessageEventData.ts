@@ -61,6 +61,7 @@ export type DiffTabInnerItem = {
   rdh1: ResultSetData;
   rdh2: ResultSetData;
   diffResult: DiffResult;
+  undoChangeStatements?: string[];
 };
 
 export type DiffTabItem = {

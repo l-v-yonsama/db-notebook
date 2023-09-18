@@ -5,6 +5,7 @@ import {
   AnnotationType,
   CodeResolvedAnnotation,
   DiffResult,
+  DiffToUndoChangesResult,
   GeneralColumnType,
   RdhHelper,
   RdhKey,
@@ -26,10 +27,18 @@ const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";
 
 const RECORD_RULE_SHEET_NAME = "RECORD_RULES";
 
+const UNDO_CHANGE_SQL_SHEET_NAME = "UNDO_CHANGES";
+
 interface IHyperLink {
   title: string;
   address: string;
 }
+
+type UndoChangeSheetParams = {
+  title: string;
+  tableName?: string;
+  undoChangeStatements: string[];
+};
 
 type TocHeaderCol = {
   label: string;
@@ -421,6 +430,7 @@ async function createBookFromDiffList(
     rdh1: ResultSetData;
     rdh2: ResultSetData;
     diffResult: DiffResult;
+    undoChangeStatements?: string[];
   }[],
   targetExcelPath: string,
   options?: BookCreateOption
@@ -774,6 +784,24 @@ async function createBookFromDiffList(
       };
     });
 
+    // Undo Changes
+    const undoList = diffList
+      .filter((it) => it.undoChangeStatements !== undefined)
+      .map((it) => ({
+        title: it.title,
+        tableName: it.rdh1.meta.tableName,
+        undoChangeStatements: it.undoChangeStatements!,
+      }));
+    if (undoList.length) {
+      // create a sheet.
+      tocRowNo += 2;
+      cell = tocSheet.getCell(`C${tocRowNo}`);
+      cell.value = "■ Undo changes";
+      tocRowNo++;
+      const tocRecords = createUndoChangeSheet(workbook, undoList);
+      tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+    }
+
     // RECORD RULES
     if (options?.rule?.withRecordRule === true) {
       tocRowNo += 2;
@@ -921,6 +949,61 @@ function createRecordRulesSheet(
       rowNo += 2;
     });
     rowNo += 3;
+  });
+  return tocRecords;
+}
+
+function createUndoChangeSheet(
+  workbook: Excel.Workbook,
+  list: UndoChangeSheetParams[]
+): TocRecords {
+  const tocRecords: TocRecords = {
+    headers: [
+      { label: "No", key: "no" },
+      { label: "TABLE NAME", key: "tableName" },
+      { label: "NUMBER OF STATEMENTS", key: "numOfStatements" },
+    ],
+    records: [],
+  };
+  var sheet = workbook.addWorksheet(UNDO_CHANGE_SQL_SHEET_NAME, {
+    views: [{ state: "frozen", ySplit: 3 }],
+    pageSetup: { paperSize: 9, orientation: "portrait" },
+  });
+  sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
+  sheet.mergeCells("A1:C1");
+  sheet.autoFilter = "B3:D3";
+  sheet.getColumn("A").width = 2;
+  sheet.getColumn("B").width = 12;
+  sheet.getColumn("C").width = 8;
+
+  let cell: any;
+  let rowNo = 3;
+
+  list.forEach((it, idx) => {
+    const { title, tableName, undoChangeStatements } = it;
+
+    tocRecords.records.push({
+      no: idx + 1,
+      tableName: {
+        text: tableName ?? "-",
+        hyperlink: `#${UNDO_CHANGE_SQL_SHEET_NAME}!B${rowNo}`,
+      },
+      numOfStatements: undoChangeStatements.length,
+    });
+
+    // Table name
+    cell = sheet.getCell(`B${rowNo}`);
+    setTableHeaderCell(cell);
+    cell.value = `-- ${idx + 1}:${tableName}`;
+    rowNo++;
+
+    undoChangeStatements.forEach((statement) => {
+      // Rule name
+      cell = sheet.getCell(`B${rowNo}`);
+      cell.value = `${statement};`;
+      rowNo++;
+    });
+    rowNo += 2;
   });
   return tocRecords;
 }

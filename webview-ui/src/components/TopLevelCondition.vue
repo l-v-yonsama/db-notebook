@@ -151,8 +151,7 @@ import {
   isConditionProperties,
   isTopLevelCondition,
 } from "@/utilities/RRuleUtil";
-import { GeneralColumnType } from "@/types/lib/GeneralColumnType";
-import { isNumericLike } from "@/utilities/GeneralColumnUtil";
+import { GeneralColumnTypeConst, isNumericLike } from "@/utilities/GeneralColumnUtil";
 
 type Props = {
   modelValue: any; // TableRuleDetail["conditions"];
@@ -321,10 +320,11 @@ const selectableValType = (ope: string): boolean => {
 
 const toExample = (p: ConditionProperties): string => {
   const { operator, fact } = p;
-  let colType = GeneralColumnType.INTEGER;
+  let colType = GeneralColumnTypeConst.INTEGER;
   if (fact) {
     colType =
-      props.columnItems.find((it) => it.value === fact)?.meta?.colType ?? GeneralColumnType.INTEGER;
+      props.columnItems.find((it) => it.value === fact)?.meta?.colType ??
+      GeneralColumnTypeConst.INTEGER;
   }
   switch (operator) {
     case "like":

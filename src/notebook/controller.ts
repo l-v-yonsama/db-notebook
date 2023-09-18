@@ -189,7 +189,7 @@ export class MainController {
     notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
-    log(`${PREFIX} _executeAll START`);
+    // log(`${PREFIX} _executeAll START`);
     const connectionSettings = await this.stateStorage.getConnectionSettingList();
     const kernel = await NodeKernel.create(connectionSettings);
     let noteSession: NoteSession = {
@@ -216,7 +216,7 @@ export class MainController {
     noteSession.kernel = undefined;
     this.noteSessions.delete(notebook.uri.path);
 
-    log(`${PREFIX} _executeAll END`);
+    // log(`${PREFIX} _executeAll END`);
   }
 
   private async _doExecution(

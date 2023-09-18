@@ -432,7 +432,7 @@ function createDocumentation({ script, ext, uri }: { script: string; ext: string
 }
 
 function createSQLIntellisense() {
-  log(`${PREFIX} createSQLIntellisense`);
+  // log(`${PREFIX} createSQLIntellisense`);
 
   return languages.registerCompletionItemProvider(
     [{ language: "sql", notebookType: NOTEBOOK_TYPE }],
@@ -448,16 +448,16 @@ function createSQLIntellisense() {
         const linePrefix = document.lineAt(position).text.substr(0, position.character);
         const lastChar = linePrefix.length > 0 ? linePrefix.substring(linePrefix.length - 1) : "";
         const m = linePrefix.match(/[ \t]*([ \t".0-9a-zA-Z_$-]+)$/);
-        log(
-          `${PREFIX} linePrefix:[${linePrefix}] position:${JSON.stringify(
-            position
-          )} lastChar:[${lastChar}] match:[${m}]`
-        );
+        // log(
+        //   `${PREFIX} linePrefix:[${linePrefix}] position:${JSON.stringify(
+        //     position
+        //   )} lastChar:[${lastChar}] match:[${m}]`
+        // );
         if (m) {
           let parentWord = "";
           let keyword = "";
           const target = m[1].trim();
-          log(`${PREFIX} target:[${target}]`);
+          // log(`${PREFIX} target:[${target}]`);
           if (lastChar === ".") {
             const m2 = target.match(/("?[.0-9a-zA-Z_$-]+"?)\.$/);
             if (m2) {
@@ -465,15 +465,15 @@ function createSQLIntellisense() {
             }
           } else {
             const m2 = target.match(/(("?[.0-9a-zA-Z_$-]+"?)\.)?("?[.0-9a-zA-Z_$-]+"?)$/);
-            log(`${PREFIX} m2:[${m2}]`);
+            // log(`${PREFIX} m2:[${m2}]`);
             if (m2) {
               parentWord = m2[2];
               keyword = m2[3];
             }
           }
-          log(
-            `${PREFIX} linePrefix:[${linePrefix}] keyword:[${keyword}] parentWord:[${parentWord}]`
-          );
+          // log(
+          //   `${PREFIX} linePrefix:[${linePrefix}] keyword:[${keyword}] parentWord:[${parentWord}]`
+          // );
 
           if (rdsDatabase) {
             getProposals({ db: rdsDatabase, sql, keyword, lastChar, parentWord }).forEach((s) => {

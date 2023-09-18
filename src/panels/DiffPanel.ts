@@ -13,7 +13,9 @@ import {
   RdhHelper,
   ResultSetData,
   ResultSetDataBuilder,
+  createUndoChangeSQL,
   diff,
+  diffToUndoChanges,
   resolveCodeLabel,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -154,11 +156,28 @@ export class DiffPanel {
           if (rdh2.meta.codeItems) {
             await resolveCodeLabel(rdh2);
           }
+          const { tableName, schemaName } = rdh1.meta;
+
+          let undoChangeStatements: string[] | undefined = undefined;
+          if (tableName) {
+            const undoChangeResult = diffToUndoChanges(rdh1, rdh2);
+            const list = createUndoChangeSQL({
+              schemaName,
+              tableName,
+              columns: rdh1.keys,
+              bindOption: {
+                specifyValuesWithBindParameters: false,
+              },
+              diffResult: undoChangeResult,
+            });
+            undoChangeStatements = list.map((it) => it.query);
+          }
 
           item.list.push({
             tabId: createTabId(),
             title: rdh1.meta.tableName ?? "",
             diffResult,
+            undoChangeStatements,
             rdh1,
             rdh2,
           });

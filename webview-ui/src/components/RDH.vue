@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, nextTick, computed } from "vue";
 import type { CellFocusParams } from "@/types/RdhEvents";
-import * as GC from "@/types/lib/GeneralColumnType";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import {
   isNumericLike,
+  isDate,
   isDateTimeOrDateOrTime,
+  isDateTime,
   isDateTimeOrDate,
   isArray,
   isBinaryLike,
@@ -13,6 +14,7 @@ import {
   isEnumOrSet,
   isJsonLike,
   isTextLike,
+  isYear,
 } from "@/utilities/GeneralColumnUtil";
 import type {
   EditRowInsertValues,
@@ -30,6 +32,7 @@ import type {
   AnnotationType,
   RuleAnnotation,
   CompareKey,
+  GeneralColumnType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
@@ -109,14 +112,14 @@ const columns = ref(
     if (isNumericLike(k.type)) {
       typeClass = "codicon-symbol-numeric";
       type = "number";
-      if (k.type == GC.GeneralColumnType.YEAR) {
+      if (isYear(k.type)) {
         width = 55;
       }
     } else if (isDateTimeOrDateOrTime(k.type)) {
       typeClass = "codicon-calendar";
       width = 160;
       if (isDateTimeOrDate(k.type)) {
-        if (k.type == GC.GeneralColumnType.DATE) {
+        if (isDate(k.type)) {
           width = 96;
         }
       } else {
@@ -239,15 +242,16 @@ function toValue(key: RdhKey, value: any): any {
   if (value == undefined) {
     return value;
   }
-  switch (key.type) {
-    case GC.GeneralColumnType.BIT:
-      return value === true ? "T" : "F";
-    case GC.GeneralColumnType.TIMESTAMP:
-    case GC.GeneralColumnType.TIMESTAMP_WITH_TIME_ZONE:
-      return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
-    case GC.GeneralColumnType.DATE:
-      return dayjs(value).format("YYYY-MM-DD");
+  if (isBooleanLike(key.type)) {
+    return value === true ? "T" : "F";
   }
+  if (isDateTime(key.type)) {
+    return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
+  }
+  if (isDate(key.type)) {
+    return dayjs(value).format("YYYY-MM-DD");
+  }
+
   return value;
 }
 
@@ -304,7 +308,7 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
   };
   const meta: RdhRow["meta"] = p["$meta"];
   if (hasAnnotationsOf(meta, "Upd", keyInfo.name)) {
-    styles["background-color"] = "rgba(112, 83, 255, 0.29) !important";
+    styles["background-color"] = "rgba(112, 83, 255, 0.32) !important";
   }
   if (hasAnnotationsOf(meta, "Rul", keyInfo.name)) {
     styles["background-color"] = "rgba(232, 232, 83, 0.21) !important";
@@ -319,7 +323,7 @@ const rowStyle = (p: any): any => {
   } else if (hasAnnotationsOf(meta, "Del")) {
     return { "background-color": "rgba(255, 83, 112, 0.25) !important" };
   } else if (hasAnnotationsOf(meta, "Upd")) {
-    return { "background-color": "rgba(112, 83, 255, 0.11) !important" };
+    return { "background-color": "rgba(112, 83, 255, 0.17) !important" };
   } else if (hasAnnotationsOf(meta, "Rul")) {
     return { "background-color": "rgba(232, 232, 83, 0.09) !important" };
   }

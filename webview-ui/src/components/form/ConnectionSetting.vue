@@ -81,6 +81,8 @@ const visiblePassword = computed(
     awsCredentialType.value === SupplyCredentials.ExplicitInProperty
 );
 
+const visibleTimezone = computed((): boolean => DBTypeConst.isRDSType(dbType.value));
+
 const urlLabel = computed((): string => (DBTypeConst.isAws(dbType.value) ? "Endpoint url" : "URL"));
 
 const userLabel = computed((): string =>
@@ -162,6 +164,7 @@ const props = withDefaults(defineProps<Props>(), {
     dbType: DBTypeConst.DBType.MySQL,
     user: "",
     password: "",
+    timezone: "",
     url: "",
     awsCredentiaSetting: {
       services: AwsServiceTypeValues,
@@ -183,6 +186,7 @@ const database = ref(props.item.database);
 const dbType = ref(props.item.dbType);
 const user = ref(props.item.user);
 const password = ref(props.item.password);
+const timezone = ref(props.item.timezone);
 const url = ref(props.item.url);
 const region = ref(props.item.awsSetting?.region ?? "");
 const awsProfile = ref(props.item.awsSetting?.profile ?? "");
@@ -219,6 +223,7 @@ function createItem(): ConnectionSetting {
     dbType: dbType.value,
     user: user.value,
     password: password.value,
+    timezone: timezone.value,
     url: url.value,
     awsSetting,
   };
@@ -246,6 +251,7 @@ function setDefault() {
   host.value = "127.0.0.1";
   user.value = "";
   password.value = "";
+  timezone.value = "";
   url.value = "";
   switch (dbType.value) {
     case DBTypeConst.DBType.Redis:
@@ -355,6 +361,16 @@ defineExpose({
       id="password"
       v-model="password"
       :maxlength="128"
+    ></VsCodeTextField>
+
+    <label v-show="visibleTimezone" for="timezone">Timezone(Optional)</label>
+    <p v-if="isShowMode && visibleTimezone" id="timezone">{{ timezone }}</p>
+    <VsCodeTextField
+      v-if="!isShowMode && visibleTimezone"
+      id="timezone"
+      v-model="timezone"
+      :maxlength="128"
+      placeholder="±00:00"
     ></VsCodeTextField>
 
     <label v-show="isAwsWithExplicitCredentials" for="url">{{ urlLabel }}</label>
