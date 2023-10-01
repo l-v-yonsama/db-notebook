@@ -258,7 +258,6 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
       new Range(0, 0, document.lineCount, 0),
       JSON.stringify(recordRule, null, 1)
     );
-    console.log("applyEdit forSave ", recordRule);
     return workspace.applyEdit(edit);
   }
 

@@ -6,6 +6,9 @@ import {
   Uri,
   ViewColumn,
   ProgressLocation,
+  commands,
+  NotebookCellData,
+  NotebookCellKind,
 } from "vscode";
 import {
   DBDriverResolver,
@@ -24,12 +27,19 @@ import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
 import * as path from "path";
 import { createHash } from "crypto";
-import { ActionCommand, CompareParams, OutputParams } from "../shared/ActionParams";
+import {
+  ActionCommand,
+  CompareParams,
+  CreateUndoChangeSqlActionCommand,
+  OutputParams,
+} from "../shared/ActionParams";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { log } from "../utilities/logger";
 import { DiffPanelEventData, DiffTabItem } from "../shared/MessageEventData";
+import { getIconPath } from "../utilities/fsUtil";
+import { CREATE_NEW_NOTEBOOK } from "../constant";
 
 const PREFIX = "[DiffPanel]";
 
@@ -76,7 +86,7 @@ export class DiffPanel {
         // Panel view type
         "DiffResultSetsType",
         // Panel title
-        "ResultSetsDiff",
+        "Diff",
         // The editor column the panel should be displayed in
         ViewColumn.One,
         // Extra panel configurations
@@ -89,6 +99,7 @@ export class DiffPanel {
           ],
         }
       );
+      panel.iconPath = getIconPath("git-compare.svg");
       DiffPanel.currentPanel = new DiffPanel(panel, extensionUri);
     }
     //               vscode.window.activeColorTheme.kind===ColorThemeKind.Dark
@@ -120,6 +131,7 @@ export class DiffPanel {
       tabId,
       title,
       subTitle,
+      hasUndoChangeSql: false,
       list: [],
     };
 
@@ -181,6 +193,10 @@ export class DiffPanel {
             rdh1,
             rdh2,
           });
+
+          item.hasUndoChangeSql = item.list.some(
+            (it) => (it.undoChangeStatements?.length ?? 0) > 0
+          );
         }
         progress.report({
           increment: 100,
@@ -289,11 +305,97 @@ export class DiffPanel {
           case "output":
             this.output(params);
             return;
+          case "createUndoChangeSql":
+            this.createUndoChangeSql(params);
+            return;
         }
       },
       undefined,
       this._disposables
     );
+  }
+
+  private async createUndoChangeSql(params: CreateUndoChangeSqlActionCommand["params"]) {
+    const { tabId } = params;
+    const tabItem = this.getTabItemById(tabId);
+    if (!tabItem) {
+      return;
+    }
+    // Undo Changes
+    const hasUndoChangeStatements = tabItem.list.some(
+      (it) => it.undoChangeStatements !== undefined && it.undoChangeStatements.length > 0
+    );
+
+    if (!hasUndoChangeStatements) {
+      return;
+    }
+    const contents: string[] = [];
+
+    const baseList = tabItem.list.map((it) => it.rdh1);
+    const conNames = [...new Set(baseList.map((it) => it.meta.connectionName + ""))];
+
+    contents.push(`const startTime = new Date().getTime();`);
+    contents.push(`let totalAffectedRows = 0;`);
+    contents.push(
+      `const rdb = new ResultSetDataBuilder([{name:'affectedRows',type:'numeric'},{name:'sql',type:'text',width:500,align:'left'}]);`
+    );
+    contents.push(``);
+    contents.push(`const requestSql = async (driver, sql) => {`);
+    contents.push(
+      `  // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/classes/RDSBaseDriver.md#requestsql `
+    );
+    contents.push(`  const r = await driver.requestSql({ sql });`);
+    contents.push(`  const affectedRows = r?.summary?.affectedRows ?? 0;`);
+    contents.push(`  totalAffectedRows += affectedRows;`);
+    contents.push(`  rdb.addRow({ affectedRows, sql });`);
+    contents.push(`};`);
+    contents.push(``);
+
+    for (let i = 0; i < conNames.length; i++) {
+      const conName = conNames[i];
+      const setting = await DiffPanel.stateStorage?.getConnectionSettingByName(conName);
+      if (!setting) {
+        continue;
+      }
+      const undoList = tabItem.list.filter(
+        (it) =>
+          it.rdh1.meta.connectionName === conName &&
+          it.undoChangeStatements &&
+          it.undoChangeStatements.length > 0
+      );
+      if (undoList.length === 0) {
+        continue;
+      }
+      contents.push(`const con${i + 1} = getConnectionSettingByName('${conName}');`);
+      contents.push(
+        `const result${i + 1} = await DBDriverResolver.getInstance().flowTransaction(con${
+          i + 1
+        }, async (driver) => {`
+      );
+      undoList.forEach((it, index) => {
+        contents.push(`  // ${index + 1}:${it.rdh1.meta.tableName}`);
+        it.undoChangeStatements?.forEach((sql) => {
+          contents.push(`  await requestSql(driver, "${sql.replace('"', '\\"')}");`);
+        });
+        contents.push("");
+      });
+      contents.push(`},{ transactionControlType: 'rollbackOnError' }`);
+      contents.push(`);`);
+      contents.push(`console.log('result${i + 1}', JSON.stringify(result${i + 1}, null, 2));`);
+    }
+    contents.push(``);
+    contents.push(`const elapsedTimeMilli = new Date().getTime() - startTime;`);
+    contents.push(`rdb.setSummary({`);
+    contents.push(`  elapsedTimeMilli,`);
+    contents.push(`  affectedRows: totalAffectedRows`);
+    contents.push(`});`);
+    contents.push(`writeResultSetData('Undo changes results', rdb.build());`);
+
+    const cell = new NotebookCellData(NotebookCellKind.Code, contents.join("\n"), "javascript");
+
+    commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+
+    //   let totalAffectedRows
   }
 
   private async output(data: OutputParams) {

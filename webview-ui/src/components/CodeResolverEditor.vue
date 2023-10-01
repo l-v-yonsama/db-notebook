@@ -58,7 +58,6 @@ const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void
   }
   resolver = v.resolver;
   keyword.value = v.resolver.editor.keyword ?? "";
-  visibleEditor.value = v.resolver.editor.visible;
   connectionName.value = v.resolver.editor.connectionName;
   connectionItems.splice(0, connectionItems.length);
   v.connectionSettingNames.map((it) => {
@@ -98,6 +97,7 @@ const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void
   );
 
   Object.assign(editorItem.value, v.resolver.editor.item);
+  visibleEditor.value = v.resolver.editor.visible;
 };
 
 type ComputedItem = {
@@ -236,7 +236,8 @@ const recieveMessage = (data: CodeResolverEditorEventData) => {
       if (value.initialize === undefined) {
         return;
       }
-      initialize(value.initialize);
+      visibleEditor.value = false;
+      nextTick(() => initialize(value.initialize));
       break;
   }
 };

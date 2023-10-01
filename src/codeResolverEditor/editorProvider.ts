@@ -61,7 +61,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
 
       const resolver = this.parseDoc(document);
 
-      this.initDbResourceParams(resolver.editor.connectionName);
+      await this.initDbResourceParams(resolver.editor.connectionName);
 
       const connectionSettingNames = this.stateStorage.getConnectionSettingNames();
       const msg: CodeResolverEditorEventData = {
@@ -232,6 +232,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
   }
 
   private async initDbResourceParams(connectionName?: string) {
+    log(`${PREFIX} initDbResourceParams connectionName:${connectionName}`);
     this.tableNameList = [];
     this.columnNameList = [];
     if (connectionName) {

@@ -68,6 +68,7 @@ export type DiffTabItem = {
   tabId: string;
   title: string;
   subTitle: string;
+  hasUndoChangeSql: boolean;
   list: DiffTabInnerItem[];
 };
 

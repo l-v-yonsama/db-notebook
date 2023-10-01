@@ -58,13 +58,13 @@ let storage: StateStorage;
 let rdsDatabase: RdsDatabase | undefined;
 
 export function activateIntellisense(context: ExtensionContext, stateStorage: StateStorage) {
-  // log(`${PREFIX} start activateIntellisense`);
+  log(`${PREFIX} start activateIntellisense`);
   storage = stateStorage;
 
   context.subscriptions.push(createJsIntellisense());
   context.subscriptions.push(createSQLIntellisense());
   setActivateDecorator(context);
-  // log(`${PREFIX} end activateIntellisense`);
+  log(`${PREFIX} end activateIntellisense`);
 }
 
 const smallNumberDecorationType = window.createTextEditorDecorationType({
@@ -264,7 +264,7 @@ function createJsIntellisense() {
           list.push(item);
         });
 
-        // driverResolver
+        // DBDriverResolver
         item = createDriverResolverCompletionItem({
           label: "workflow",
           conNamesString,
@@ -402,9 +402,9 @@ function createDriverResolverCompletionItem({
   resultAsRdh?: boolean;
 }) {
   // log(`${PREFIX} createDriverResolverCompletionItem`);
-  const item = new CompletionItem("driverResolver." + label);
+  const item = new CompletionItem("DBDriverResolver." + label);
   item.insertText = new SnippetString(
-    "const { ok, message, result } = await driverResolver\n" +
+    "const { ok, message, result } = await DBDriverResolver\n" +
       ".getInstance()\n" +
       ".workflow(getConnectionSettingByName('${1|" +
       conNamesString +

@@ -31,6 +31,7 @@ export type ActionCommand =
   | CompareActionCommand
   | CreateERDiagramActionCommand
   | CreateCodeResolverEditorActionCommand
+  | CreateUndoChangeSqlActionCommand
   | SaveCompareKeysActionCommand
   | SaveNotebookCellMetadataActionCommand
   | OutputActionCommand
@@ -148,6 +149,8 @@ export type SaveNotebookCellMetadataActionCommand = BaseActionCommand<
     metadata: CellMeta;
   }
 >;
+
+export type CreateUndoChangeSqlActionCommand = BaseActionCommand<"createUndoChangeSql", TabIdParam>;
 
 export type SaveValuesActionCommand = {
   command: "saveValues";

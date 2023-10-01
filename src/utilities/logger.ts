@@ -18,7 +18,6 @@ export function setupDisposeLogger(context: ExtensionContext) {
   channel.dispose = () => {
     disposeChannel.apply(channel);
     channel = undefined;
-    console.log("Channel disposed!!!");
   };
 
   context.subscriptions.push(channel);

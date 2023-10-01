@@ -1,5 +1,7 @@
 import { ExtensionContext, Uri, workspace } from "vscode";
+import * as path from "path";
 import { log } from "./logger";
+import { mediaDir } from "../constant";
 
 let storagePath: Uri;
 let nodeModulesPath: Uri;
@@ -14,6 +16,13 @@ export const initializePath = (context: ExtensionContext): void => {
 export const getNodeModulePath = (name: string): string => {
   const moduleUri = Uri.joinPath(nodeModulesPath, name);
   return winToLinuxPath(moduleUri.fsPath);
+};
+
+export const getIconPath = (fileName: string): { readonly light: Uri; readonly dark: Uri } => {
+  return {
+    light: Uri.file(path.join(mediaDir, "light", fileName)),
+    dark: Uri.file(path.join(mediaDir, "dark", fileName)),
+  };
 };
 
 export const winToLinuxPath = (s: string) => s.replace(/\\/g, "/");

@@ -14,6 +14,10 @@ export const isSqlCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql";
 };
 
+export const isJsCell = (cell: NotebookCell): boolean => {
+  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "javascript";
+};
+
 export const isSelectOrShowSqlCell = (cell: NotebookCell): boolean => {
   if (!isSqlCell(cell) || cell.outputs.length === 0) {
     return false;

@@ -5,7 +5,6 @@ import {
   AnnotationType,
   CodeResolvedAnnotation,
   DiffResult,
-  DiffToUndoChangesResult,
   GeneralColumnType,
   RdhHelper,
   RdhKey,
@@ -1174,7 +1173,7 @@ function setAnyValueByIndex(
     if (useFormat && options.format) {
       cell.numFmt = options.format;
       if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
-        cellValue = toDate(text);
+        cellValue = convertToLocalTimezoneDate(text);
       }
     }
   }
@@ -1185,7 +1184,10 @@ function toDateString(target: any, format: CellFormat): string {
   if (target === undefined || target === null || target.length === 0) {
     return "";
   }
-  return dayjs(target).format(format === CellFormat.date ? "YYYY-MM-DD" : "YYYY-MM-DD HH:mm:ss");
+  var d = toDate(target)?.toUTCString();
+  return dayjs(d)
+    .add(dayjs().utcOffset(), "minute")
+    .format(format === CellFormat.date ? "YYYY-MM-DD" : "YYYY-MM-DD HH:mm:ss");
 }
 
 function setAnyValue(
@@ -1282,4 +1284,11 @@ function writeTocRecords(tocSheet: Excel.Worksheet, tocRecords: TocRecords, rowN
   });
 
   return plusNo;
+}
+
+function convertToLocalTimezoneDate(e: Date | undefined | null): Date | undefined | null {
+  if (e === null || e === undefined) {
+    return e;
+  }
+  return dayjs(toDate(e.toUTCString())).add(dayjs().utcOffset(), "minute").toDate();
 }

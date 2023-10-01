@@ -14,6 +14,8 @@ import type {
   CloseTabActionCommand,
   CompareParams,
   DiffPanelEventData,
+  DiffTabInnerItem,
+  DiffTabItem,
   OutputParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
@@ -21,21 +23,6 @@ import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS } from "@/constants";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
-
-type DiffTabInnerItem = {
-  tabId: string;
-  title: string;
-  rdh1: any;
-  rdh2: any;
-  diffResult: any;
-};
-
-type DiffTabItem = {
-  tabId: string;
-  title: string;
-  subTitle: string;
-  list: DiffTabInnerItem[];
-};
 
 const activeTabId = ref("");
 const tabItems = ref([] as DiffTabItem[]);
@@ -48,6 +35,7 @@ const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh1 = ref(null as any);
 const activeInnerRdh2 = ref(null as any);
 const displayOnlyChanged = ref(false);
+const hasUndoChangeSql = ref(false);
 
 const outputDetailItems = OUTPUT_DETAIL_ITEMS;
 const compareDetailItems = [
@@ -111,11 +99,13 @@ function isActiveTabId(tabId: string): boolean {
 }
 
 const showTab = (tabId: string) => {
+  hasUndoChangeSql.value = false;
   activeTabId.value = `tab-${tabId}`;
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
   }
+  hasUndoChangeSql.value = tabItem.hasUndoChangeSql;
   innerTabItems.value.splice(0, innerTabItems.value.length);
   innerTabVisible.value = false;
   tabItem.list.forEach((item: DiffTabInnerItem, idx) => {
@@ -217,6 +207,20 @@ const output = (params: Omit<OutputParams, "tabId">): void => {
   });
 };
 
+const createUndoChangeSql = (): void => {
+  const tabItem = getActiveTabItem();
+  if (!tabItem) {
+    return;
+  }
+
+  vscode.postCommand({
+    command: "createUndoChangeSql",
+    params: {
+      tabId: tabItem.tabId,
+    },
+  });
+};
+
 const selectedMoreOptions = (v: MoreOption): void => {
   displayOnlyChanged.value = v.displayFilter == "onlyChanged";
   resetActiveInnerRdh();
@@ -277,6 +281,13 @@ defineExpose({
         title="Output as Excel"
         @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
       />
+      <button
+        :disabled="!hasUndoChangeSql"
+        @click="createUndoChangeSql"
+        title="Create undo change sql"
+      >
+        <fa icon="rotate-left" />
+      </button>
       <SecondarySelectionAction
         :items="moreDetailItems"
         title="more"

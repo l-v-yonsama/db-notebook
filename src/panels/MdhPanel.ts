@@ -1,4 +1,4 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
+import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn, ThemeIcon } from "vscode";
 import {
   DBDriverResolver,
   RDSBaseDriver,
@@ -34,6 +34,7 @@ import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { WriteToClipboardParamsPanel } from "./WriteToClipboardParamsPanel";
 import { ComponentName } from "../shared/ComponentName";
 import { MdhPanelEventData, RdhTabItem } from "../shared/MessageEventData";
+import { getIconPath } from "../utilities/fsUtil";
 
 const PREFIX = "[MdhPanel]";
 
@@ -85,6 +86,7 @@ export class MdhPanel {
           Uri.joinPath(extensionUri, "webview-ui/build"),
         ],
       });
+      panel.iconPath = getIconPath("output.svg");
       MdhPanel.currentPanel = new MdhPanel(panel, extensionUri);
     }
     // vscode.window.activeColorTheme.kind===ColorThemeKind.Dark

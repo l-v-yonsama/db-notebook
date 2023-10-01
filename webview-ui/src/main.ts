@@ -19,6 +19,7 @@ import {
   faPencil,
   faPlus,
   faRotate,
+  faRotateLeft,
   faSearch,
   faTrash,
   faTimes,
@@ -37,6 +38,7 @@ library.add(faLeaf);
 library.add(faPencil);
 library.add(faPlus);
 library.add(faRotate);
+library.add(faRotateLeft);
 library.add(faSearch);
 library.add(faTrash);
 library.add(faTimes);

@@ -49,10 +49,9 @@ export class NodeKernel {
     (async () => {
       const myfs = require('fs');
       const variables = require('${winToLinuxPath(path.join(nodeModules, "store"))}');
-      const mdd = require('${winToLinuxPath(
+      const {DBDriverResolver,ResultSetDataBuilder} = require('${winToLinuxPath(
         path.join(nodeModules, "@l-v-yonsama/multi-platform-database-drivers")
       )}');
-      const driverResolver = mdd.DBDriverResolver;
       const getConnectionSettingByName = (s) => {
         const settings = ${JSON.stringify(this.connectionSettings)};
         const o = settings.find(it => it.name == s);
@@ -63,7 +62,7 @@ export class NodeKernel {
         throw new Error('Connection settings not found. Available here [' + names + '].');
       };
       const writeResultSetData = (title, o) => {
-        const rdb = mdd.ResultSetDataBuilder.from(o);
+        const rdb = ResultSetDataBuilder.from(o);
         const rdh = rdb.build();
         rdh.meta.tableName = title;
         variables.set('_ResultSetData', rdh);
@@ -105,6 +104,7 @@ export class NodeKernel {
     this.scriptFile = Uri.joinPath(this.tmpDirectory, scriptName);
 
     const script = await this.createScript(cell);
+    console.log("script=", script);
     await writeToResource(this.scriptFile, script);
 
     this.child = cp.spawn("node", [this.scriptFile.fsPath]);

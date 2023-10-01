@@ -113,7 +113,10 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
     commands.registerCommand(CELL_OPEN_MDH, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
       const rrm: SQLRunResultMetadata | undefined = cell.outputs?.[0].metadata;
-      if (!isSqlCell(cell) || rrm === undefined) {
+      if (
+        rrm === undefined ||
+        (rrm.rdh === undefined && rrm.explainRdh === undefined && rrm.analyzedRdh === undefined)
+      ) {
         return;
       }
 
