@@ -3,10 +3,14 @@ import { ref, computed } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckboxGroup from "./base/VsCodeCheckboxGroup.vue";
 
-import type { CompareKey, RdhMeta } from "@l-v-yonsama/multi-platform-database-drivers";
+import type {
+  CompareKey,
+  RdhMeta,
+  ResultSetData,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
-  rdhList: any[];
+  rdhList: ResultSetData[];
 };
 const props = defineProps<Props>();
 
@@ -25,6 +29,7 @@ type Item = {
   index: number;
   keys: string[];
   meta: RdhMeta;
+  initializedAtEdit: boolean;
   showEditor: boolean;
   dirty: boolean;
 };
@@ -32,8 +37,9 @@ const list = ref(
   props.rdhList.map(
     (rdh, idx): Item => ({
       index: idx,
-      keys: rdh.keys.map((it: any) => it.name),
+      keys: rdh.keys.map((it) => it.name),
       meta: rdh.meta,
+      initializedAtEdit: false,
       showEditor: false,
       dirty: false,
     })
@@ -66,10 +72,21 @@ const clear = (item: Item) => {
 };
 
 const edit = (item: Item) => {
-  compareKeyCheckboxSelected.value.splice(0, compareKeyCheckboxSelected.value.length);
-  item.meta.compareKeys?.forEach((key) => {
-    compareKeyCheckboxSelected.value.push(...key.names);
-  });
+  if (!item.initializedAtEdit) {
+    compareKeyCheckboxSelected.value.splice(0, compareKeyCheckboxSelected.value.length);
+    const rdhKeys = new Set<string>();
+    item.meta.compareKeys?.forEach((ckey) => {
+      item.keys.forEach((rdhKeyName) => {
+        if (
+          ckey.names.some((ckName) => ckName.toLocaleLowerCase() == rdhKeyName.toLocaleLowerCase())
+        ) {
+          rdhKeys.add(rdhKeyName);
+        }
+      });
+    });
+    compareKeyCheckboxSelected.value.push(...rdhKeys);
+    item.initializedAtEdit = true;
+  }
   compareKeyCheckboxItems.value.splice(0, compareKeyCheckboxItems.value.length);
   item.keys.forEach((key) => {
     compareKeyCheckboxItems.value.push({
