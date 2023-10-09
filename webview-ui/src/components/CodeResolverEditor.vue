@@ -60,6 +60,10 @@ const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void
   keyword.value = v.resolver.editor.keyword ?? "";
   connectionName.value = v.resolver.editor.connectionName;
   connectionItems.splice(0, connectionItems.length);
+  connectionItems.push({
+    label: "-",
+    value: "",
+  });
   v.connectionSettingNames.map((it) => {
     connectionItems.push({ label: it, value: it });
   });

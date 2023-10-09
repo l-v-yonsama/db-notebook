@@ -38,6 +38,7 @@ onMounted(() => {
 });
 
 const keyword = ref("");
+const initialized = ref(false);
 const visibleEditor = ref(false);
 const connectionName = ref("");
 const connectionItems: DropdownItem[] = [];
@@ -55,8 +56,11 @@ const tableItems = [] as DropdownItem[];
 
 const details = ref([] as (TableRuleDetail & { originalIndex: number })[]);
 
-const initialize = (v: RecordRuleEditorEventData["value"]["initialize"]): void => {
+const initialize = async (v: RecordRuleEditorEventData["value"]["initialize"]) => {
+  initialized.value = false;
+  await nextTick();
   if (v === undefined) {
+    initialized.value = true;
     return;
   }
   recordRule = v.recordRule;
@@ -64,18 +68,14 @@ const initialize = (v: RecordRuleEditorEventData["value"]["initialize"]): void =
   visibleEditor.value = v.recordRule.editor.visible;
   connectionName.value = v.recordRule.editor.connectionName;
   connectionItems.splice(0, connectionItems.length);
+  connectionItems.push({
+    label: "-",
+    value: "",
+  });
   v.connectionSettingNames.map((it) => {
     connectionItems.push({ label: it, value: it });
   });
   tableName.value = v.recordRule.tableRule.table;
-
-  tableItems.splice(0, tableItems.length);
-  (v.schema === undefined || v.schema === null ? [] : v.schema.children).forEach((it) =>
-    tableItems.push({
-      label: `${it.name} ${it.comment ?? ""}`,
-      value: it.name,
-    })
-  );
 
   details.value.splice(0, details.value.length);
 
@@ -86,14 +86,31 @@ const initialize = (v: RecordRuleEditorEventData["value"]["initialize"]): void =
     })
   );
 
+  resetTables(v.schema);
+  resetColumns(v.schema as DbSchema);
+
+  Object.assign(editorItem.value, v.recordRule.editor.item);
+  initialized.value = true;
+
+  await nextTick();
   const wrapper = document.querySelector(".rr-scroll-wrapper");
   if (wrapper) {
     wrapper.scrollTop = v.scrollPos ?? 0;
   }
+};
 
-  resetColumns(v.schema as DbSchema);
-
-  Object.assign(editorItem.value, v.recordRule.editor.item);
+const resetTables = async (schema?: DbSchema) => {
+  tableItems.splice(0, tableItems.length);
+  tableItems.push({
+    label: "-",
+    value: "",
+  });
+  (schema === undefined || schema === null ? [] : schema.children).forEach((it) =>
+    tableItems.push({
+      label: `${it.name} ${it.comment ?? ""}`,
+      value: it.name,
+    })
+  );
 };
 
 type ComputedDetail = {
@@ -229,7 +246,7 @@ defineExpose({
 </script>
 
 <template>
-  <section class="rr-root">
+  <section v-if="initialized" class="rr-root">
     <div v-if="visibleEditor" class="toolbar">
       <div class="tool-left">
         <label for="connectionName">Connection setting</label>

@@ -15,7 +15,7 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 - Convenient visualization of result sets
   - Difference display using comparison key (Primary or Unique key)
   - Label display using code label resolver
-  - Display of record rule validation errors
+  - Verify result sets comply with a rule.
   - Output in Excel file format
 - Create and execute "Undo changes sql statements"
 
@@ -53,6 +53,10 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 - Label display using code label resolver ( `Create a new blank Code label resolver` )
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/06_label_display.gif)
+
+- Verify records comply with a rule ( `Create a new blank DB record rule` )
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/07_record_rule.gif)
 
 ## Requirements
 

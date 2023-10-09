@@ -88,7 +88,6 @@ const editable = ref(true);
 const refreshable = ref(false);
 
 function getActiveTabItem(): RdhTabItem | undefined {
-  console.log("getActiveTabItem:", activeTabId.value);
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as RdhTabItem;
 }
@@ -143,7 +142,6 @@ const resetActiveInnerRdh = () => {
 
 const addTabItem = (tabItem: RdhTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
-  console.log("addTabItem ", tabItem, idx);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
   }
@@ -290,7 +288,6 @@ const writeToClipboard = (params: Omit<WriteToClipboardParams, "tabId">): void =
 
 const selectedCompareMoreOptions = (v: CompareMoreOption): void => {
   const { command } = v;
-  console.log(v);
   switch (command) {
     case "compare": {
       compare({});
@@ -309,12 +306,10 @@ const saveCompareKeys = (
     compareKeyNames: string[];
   }[]
 ): void => {
-  console.log("called saveCompareKeys");
   const tabItem = getActiveTabItem();
   if (!tabItem) {
     return;
   }
-  console.log("tabItem tabItem", tabItem);
 
   vscode.postCommand({
     command: "saveCompareKeys",

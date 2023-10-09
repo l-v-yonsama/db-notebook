@@ -32,7 +32,7 @@ import type {
   AnnotationType,
   RuleAnnotation,
   CompareKey,
-  GeneralColumnType,
+  FileAnnotation,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
@@ -64,6 +64,9 @@ type RowValues = {
   };
   $beforeValues?: {
     [key: string]: any;
+  };
+  $fileValues: {
+    [key: string]: FileAnnotation["values"];
   };
 };
 
@@ -166,6 +169,8 @@ const list = ref(
         $meta: row.meta,
         $resolvedLabels: {},
         $ruleViolationMarks: {},
+        $imageFileValues: {},
+        $fileValues: {},
       };
       if (editable && compareKey) {
         item.$beforeKeyValues = {};
@@ -175,6 +180,7 @@ const list = ref(
         item.$beforeValues = {};
       }
       props.rdh.keys.map((k) => {
+        const meta: RdhRow["meta"] = item["$meta"];
         item[k.name] = toValue(k, row.values[k.name]);
         if (item.$beforeValues) {
           item.$beforeValues[k.name] = item[k.name];
@@ -185,7 +191,6 @@ const list = ref(
           item.$resolvedLabels[k.name] = code?.values;
         }
         if (ruleViolationSummary) {
-          const meta: RdhRow["meta"] = item["$meta"];
           const rules = meta[k.name]?.filter((it) => it.type === "Rul") as RuleAnnotation[];
           if (rules && rules.length) {
             const marks: number[] = [];
@@ -201,6 +206,11 @@ const list = ref(
             }
           }
         }
+        // file
+        const fileAnnonation = meta[k.name]?.find((it) => it.type === "Fil") as FileAnnotation;
+        if (fileAnnonation) {
+          item.$fileValues[k.name] = fileAnnonation.values;
+        }
       });
       return item;
     })
@@ -212,6 +222,7 @@ const addRow = (): void => {
     $meta: {},
     $resolvedLabels: {},
     $ruleViolationMarks: {},
+    $fileValues: {},
   };
   props.rdh.keys.map((k) => {
     empty[k.name] = "";
@@ -342,6 +353,23 @@ const toEditTypeMark = (editType?: RowValues["editType"]): string => {
     case "del":
       return "-";
   }
+};
+
+const createImageUrl = (
+  stringValue: string,
+  annonationValues: FileAnnotation["values"]
+): string => {
+  if (annonationValues?.contentType?.toLocaleLowerCase() === "image/svg+xml") {
+    return `data:image/svg+xml,${encodeURIComponent(stringValue)}`;
+  }
+  return `data:${annonationValues?.contentType};base64,${stringValue}`;
+};
+
+const createDownloadText = (text: string | undefined | null): string => {
+  if (text === undefined || text === null || text === "") {
+    return "Download";
+  }
+  return text;
 };
 
 const copyToClipboard = (text: string) => {
@@ -538,33 +566,49 @@ defineExpose({
                 "
               ></VsCodeTextField>
               <template v-else>
-                <p
-                  :class="{ 'code-value': item.$resolvedLabels[key.name] }"
-                  :style="{ width: `${key.width}px` }"
-                >
-                  <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
-                    item.$ruleViolationMarks[key.name]
-                  }}</span
-                  >{{ item[key.name] }}
-                </p>
-                <span
-                  v-if="item.$resolvedLabels[key.name]"
-                  class="marker-box code-label"
-                  :class="{
-                    'marker-info': item.$resolvedLabels[key.name]?.isUndefined === false,
-                    'marker-error': item.$resolvedLabels[key.name]?.isUndefined,
-                  }"
-                  >{{ item.$resolvedLabels[key.name]?.label }}</span
-                >
-                <VsCodeButton
-                  v-if="
-                    item[key.name] !== undefined && item[key.name] !== null && item[key.name] !== ''
-                  "
-                  @click="copyToClipboard(item[key.name])"
-                  appearance="secondary"
-                  class="copy-to-clipboard"
-                  ><fa icon="clipboard"
-                /></VsCodeButton>
+                <template v-if="item.$fileValues[key.name]">
+                  <a :href="item.$fileValues[key.name].downloadUrl">
+                    <img
+                      v-if="item.$fileValues[key.name].image"
+                      class="thumbnail"
+                      :src="createImageUrl(item[key.name], item.$fileValues[key.name])"
+                    />
+                    <div v-else class="preview-text">
+                      <span v-text="createDownloadText(item[key.name])"></span>
+                    </div>
+                  </a>
+                </template>
+                <template v-else>
+                  <p
+                    :class="{ 'code-value': item.$resolvedLabels[key.name] }"
+                    :style="{ width: `${key.width}px` }"
+                  >
+                    <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
+                      item.$ruleViolationMarks[key.name]
+                    }}</span
+                    >{{ item[key.name] }}
+                  </p>
+                  <span
+                    v-if="item.$resolvedLabels[key.name]"
+                    class="marker-box code-label"
+                    :class="{
+                      'marker-info': item.$resolvedLabels[key.name]?.isUndefined === false,
+                      'marker-error': item.$resolvedLabels[key.name]?.isUndefined,
+                    }"
+                    >{{ item.$resolvedLabels[key.name]?.label }}</span
+                  >
+                  <VsCodeButton
+                    v-if="
+                      item[key.name] !== undefined &&
+                      item[key.name] !== null &&
+                      item[key.name] !== ''
+                    "
+                    @click="copyToClipboard(item[key.name])"
+                    appearance="secondary"
+                    class="copy-to-clipboard"
+                    ><fa icon="clipboard"
+                  /></VsCodeButton>
+                </template>
               </template>
             </td>
           </tr>
@@ -632,6 +676,23 @@ td {
 
   &.vcell {
     position: relative;
+
+    img.thumbnail {
+      max-height: 64px;
+      max-width: 208px;
+    }
+
+    div.preview-text {
+      position: relative;
+      display: inline-block;
+      margin: 5px 1px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      max-height: 64px;
+      min-height: 15px;
+      width: 208px;
+      max-width: 208px;
+    }
 
     & > .code-label {
       display: inline-block;

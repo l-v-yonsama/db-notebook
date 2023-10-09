@@ -519,7 +519,6 @@ export class MdhPanel {
       list2: afterList.map((it) => it!),
     };
     if (afterList.some((it) => it === undefined)) {
-      console.log("L353 no after list");
       return;
     }
     vscode.commands.executeCommand(SHOW_RDH_DIFF, diffParams);

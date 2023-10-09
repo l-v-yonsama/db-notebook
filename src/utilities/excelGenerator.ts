@@ -5,6 +5,7 @@ import {
   AnnotationType,
   CodeResolvedAnnotation,
   DiffResult,
+  FileAnnotation,
   GeneralColumnType,
   RdhHelper,
   RdhKey,
@@ -122,7 +123,13 @@ function createQueryResultListSheet(
         rows: rdh.meta.type === "select" ? rdh.rows.length : "-",
         time,
       });
-      const plusRows = createQueryResultSheet(sheet, rdh, baseRowNo, options.rdh.outputWithType);
+      const plusRows = createQueryResultSheet(
+        workbook,
+        sheet,
+        rdh,
+        baseRowNo,
+        options.rdh.outputWithType
+      );
       baseRowNo += plusRows + 2;
     });
   } else {
@@ -145,7 +152,7 @@ function createQueryResultListSheet(
         pageSetup: { paperSize: 9, orientation: "portrait" },
       });
       sheet.getColumn("A").width = 2;
-      createQueryResultSheet(sheet, rdh, baseRowNo, options?.rdh.outputWithType);
+      createQueryResultSheet(workbook, sheet, rdh, baseRowNo, options?.rdh.outputWithType);
     });
   }
 
@@ -153,6 +160,7 @@ function createQueryResultListSheet(
 }
 
 function createQueryResultSheet(
+  book: Excel.Workbook,
   sheet: Excel.Worksheet,
   rdh: ResultSetData,
   baseRowNo: number,
@@ -272,26 +280,50 @@ function createQueryResultSheet(
         let resolvedLabel: string | undefined = undefined;
 
         const v = values[column.name];
-        const ruleAnnonations = RowHelper.filterAnnotationByKeyOf<RuleAnnotation>(
+
+        const fileAnnonation = RowHelper.getFirstAnnotationOf<FileAnnotation>(
           rdhRow,
           column.name,
-          "Rul"
+          "Fil"
         );
-        let format = getCellFormat(column.type);
-        const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
-        let isHyperText = column.meta && column.meta.is_hyperlink === true;
-        if (ruleAnnonations.length) {
-          ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
-          fillCell(cell, "Rul");
-        }
-        if (rdh.meta.codeItems) {
-          resolvedLabel = RowHelper.getFirstAnnotationOf<CodeResolvedAnnotation>(
+        if (fileAnnonation) {
+          const { values } = fileAnnonation;
+          if (
+            (values?.size ?? 0) > 0 &&
+            values?.image &&
+            values.contentType?.toLocaleLowerCase() !== "image/svg+xml"
+          ) {
+            const base64 = v;
+            addImageInSheet(book, sheet, base64, "png", {
+              tl: { col: colIdx + 2, row: baseRowNo + plusNo - 1 },
+              br: { col: colIdx + 2 + 1, row: baseRowNo + plusNo },
+            } as any);
+          } else {
+            const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
+            setAnyValueByIndex(cell, values?.downloadUrl, { isHyperText: true });
+          }
+        } else {
+          const ruleAnnonations = RowHelper.filterAnnotationByKeyOf<RuleAnnotation>(
             rdhRow,
             column.name,
-            "Cod"
-          )?.values?.label;
+            "Rul"
+          );
+          let format = getCellFormat(column.type);
+          const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
+          let isHyperText = column.meta && column.meta.is_hyperlink === true;
+          if (ruleAnnonations.length) {
+            ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
+            fillCell(cell, "Rul");
+          }
+          if (rdh.meta.codeItems) {
+            resolvedLabel = RowHelper.getFirstAnnotationOf<CodeResolvedAnnotation>(
+              rdhRow,
+              column.name,
+              "Cod"
+            )?.values?.label;
+          }
+          setAnyValueByIndex(cell, v, { isHyperText, format, ruleMarker, resolvedLabel });
         }
-        setAnyValueByIndex(cell, v, { isHyperText, format, ruleMarker, resolvedLabel });
       });
       plusNo++;
     });
@@ -318,7 +350,7 @@ async function createBookFromRdh(rdh: ResultSetData, targetExcelPath: string): P
   var sheet = workbook.addWorksheet(sheetName, {
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
-  createQueryResultSheet(sheet, rdh, 1, "withType");
+  createQueryResultSheet(workbook, sheet, rdh, 1, "withType");
 
   return new Promise<string>((resolve, reject) => {
     try {

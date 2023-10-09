@@ -34,7 +34,7 @@ const currentComponentName = window.document.title as ComponentName;
 function messageListener(evt: MessageEvent<MessageEventData>) {
   const { data } = evt;
   const { command, componentName, value } = data;
-  console.log("[App.vue] at messageListener ", command, value);
+  // console.log("[App.vue] at messageListener ", command, value);
 
   switch (componentName) {
     case "DBFormView":

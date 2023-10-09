@@ -100,8 +100,8 @@ export type ScanTabItem = {
   rdh?: any;
   limit: ScanConditionItem;
   keyword: ScanConditionItem;
-  startTime: ScanConditionItem;
-  endTime: ScanConditionItem;
+  startDt: ScanConditionItem;
+  endDt: ScanConditionItem;
   multilineKeyword: boolean;
   parentTarget?: string;
   lastSearchParam?: ScanReqInput;
@@ -111,8 +111,8 @@ export type ScanReqInput = {
   tabId: string;
   keyword: string;
   limit?: number;
-  startTime?: any;
-  endTime?: any;
+  startTime?: number;
+  endTime?: number;
 };
 
 export type ScanPanelEventData = BaseMessageEventData<

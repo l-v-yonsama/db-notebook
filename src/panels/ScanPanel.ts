@@ -8,6 +8,7 @@ import {
   DbResource,
   RedisDriver,
   ResultSetData,
+  ScanParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { createBookFromRdh } from "../utilities/excelGenerator";
@@ -97,15 +98,12 @@ export class ScanPanel {
     const title = rootRes.name;
     const keyword = createCondition("Keyword", "");
     const limit = createCondition("Limit", 1000);
-    const startTime = createCondition(
-      "StartTime",
-      now.add(-2, "hour").format("YYYY-MM-DDTHH:mm:ss")
-    );
-    const endTime = createCondition("EndTime", now.format("YYYY-MM-DDTHH:mm:ss"));
+    const startDt = createCondition("StartDt", now.format("YYYY-MM-DD"));
+    const endDt = createCondition("EndDt", now.format("YYYY-MM-DD"));
     let multilineKeyword = false;
 
-    startTime.visible = false;
-    endTime.visible = false;
+    startDt.visible = false;
+    endDt.visible = false;
     switch (dbType) {
       case DBType.Redis:
         keyword.value = "*";
@@ -115,6 +113,10 @@ export class ScanPanel {
           case "Bucket":
             keyword.label = "Prefix";
             keyword.value = "";
+            startDt.label = "lastModified";
+            startDt.visible = true;
+            endDt.label = "〜";
+            endDt.visible = true;
             break;
           case "Queue":
             keyword.label = "Keyword";
@@ -123,15 +125,15 @@ export class ScanPanel {
             break;
           case "LogGroup":
             multilineKeyword = true;
-            startTime.visible = true;
-            endTime.visible = true;
+            startDt.visible = true;
+            endDt.visible = true;
             limit.value = 100;
             keyword.label = "Query";
             keyword.value =
               "fields @timestamp, @message, @logStream\n|  filter @message like /(?i)(exception|error)/ \n| sort @timestamp desc\n";
             break;
           case "LogStream":
-            startTime.visible = true;
+            startDt.visible = true;
             limit.value = 1000;
             keyword.label = "Highlight";
             break;
@@ -147,8 +149,8 @@ export class ScanPanel {
       rootRes,
       keyword,
       limit,
-      startTime,
-      endTime,
+      startDt,
+      endDt,
       multilineKeyword,
     };
     if (ctor) {
@@ -193,8 +195,6 @@ export class ScanPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
-    log(`${PREFIX} dispose`);
-
     ScanPanel.currentPanel = undefined;
     this._panel.dispose();
 
@@ -311,7 +311,11 @@ export class ScanPanel {
     }
   }
 
+  /**
+   * スキャンする
+   */
   private async search(data: ScanReqInput) {
+    log(`${PREFIX} search(${JSON.stringify(data)})`);
     const { tabId, keyword, limit, startTime, endTime } = data;
     const panelItem = this.items.find((it) => it.tabId === tabId);
     if (!panelItem) {
@@ -333,15 +337,17 @@ export class ScanPanel {
           scannable = awsDriver.getClientByResourceType(rootRes.resourceType);
         }
 
-        var input = {
+        var input: ScanParams = {
           targetResourceType: rootRes.resourceType,
           parentTarget,
           target: rootRes?.name ?? "",
           keyword: keyword,
-          limit,
+          limit: limit ?? 100,
           startTime: startTime ? dayjs(startTime).valueOf() : undefined,
           endTime: endTime ? dayjs(endTime).valueOf() : undefined,
-          withValue: "auto",
+          withValue: {
+            limitSize: 100_000,
+          },
         };
 
         return await scannable.scan(input);
@@ -407,7 +413,7 @@ export class ScanPanel {
       };
 
       panelItem = await this.renderSub(res, (item) => {
-        item.startTime.value = dayjs(startTime).format("YYYY-MM-DDTHH:mm:ss"); //  for input type datetime-local
+        item.startDt.value = dayjs(startTime).format("YYYY-MM-DD"); //  for input type datetime-local
       });
       if (!panelItem) {
         return;

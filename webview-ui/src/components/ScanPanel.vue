@@ -105,9 +105,9 @@ const resetSpPaneWrapperHeight = () => {
   // multi 420 => 236px ... 184
   if (sectionWrapper?.clientHeight) {
     if (getActiveTabItem()?.multilineKeyword) {
-      splitterHeight.value = sectionWrapper?.clientHeight - 183;
+      splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 191, 10);
     } else {
-      splitterHeight.value = sectionWrapper?.clientHeight - 80;
+      splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 88, 10);
     }
   }
   if (sectionWrapper?.clientWidth) {
@@ -122,7 +122,6 @@ onMounted(() => {
 });
 
 function getActiveTabItem(): ScanTabItem | undefined {
-  console.log("getActiveTabItem:", activeTabId.value);
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as ScanTabItem;
 }
@@ -132,13 +131,15 @@ function isActiveTabId(tabId: string): boolean {
   return tabId === id;
 }
 
+// startDt: 表示される日付はユーザーのブラウザーに設定されたロケールに基づいた書式
+// 解釈される value は常に yyyy-mm-dd の書式
 function search() {
   const tabItem = getActiveTabItem();
   if (!tabItem) {
     return;
   }
   inProgress.value = true;
-  const { tabId, limit, keyword, startTime, endTime } = tabItem;
+  const { tabId, limit, keyword, startDt, endDt } = tabItem;
 
   const action: SearchScanPanelActionCommand = {
     command: "search",
@@ -146,8 +147,8 @@ function search() {
       tabId,
       limit: limit.visible ? toNum(limit.value) : undefined,
       keyword: keyword.visible ? keyword.value : undefined,
-      startTime: toIso8601String(startTime),
-      endTime: toIso8601String(endTime),
+      startTime: toIso8601String(startDt, true),
+      endTime: toIso8601String(endDt, false),
     },
   };
   vscode.postCommand(action);
@@ -164,13 +165,15 @@ const toNum = (s: string): number | undefined => {
   return n;
 };
 
-const toIso8601String = (item: ScanConditionItem): string | undefined => {
-  if (!item.visible) {
+const toIso8601String = (item: ScanConditionItem, isStart: boolean): string | undefined => {
+  if (!item.visible || item.value === undefined || item.value === null || item.value === "") {
     return undefined;
   }
-  return dayjs(
-    item.value?.replace(/([0-9]+-[0-9]+-[0-9]+)[T ]([0-9]+:[0-9]+:[0-9]+(\.[0-9]+)?)/, "$1T$2")
-  ).toISOString();
+  const d = isStart
+    ? dayjs(item.value).hour(0).minute(0).second(0).millisecond(0)
+    : dayjs(item.value).hour(23).minute(59).second(59).millisecond(999);
+
+  return d.toISOString();
 };
 
 const showTab = (tabId: string) => {
@@ -228,11 +231,8 @@ const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData
 };
 
 const output = (params: Omit<OutputParams, "tabId">): void => {
-  console.log("output:", params);
   const tabItem = getActiveTabItem();
-  console.log("tabItem=", tabItem);
   if (!tabItem) {
-    console.log("No tab Item");
     return;
   }
 
@@ -248,11 +248,8 @@ const output = (params: Omit<OutputParams, "tabId">): void => {
 const onCellFocus = (params: CellFocusParams): void => {
   openLogStreamParams.value.canAction = false;
   deleteKeyParams.value.canAction = false;
-  console.log("onCellFocus:", params);
   const tabItem = getActiveTabItem();
-  console.log("tabItem=", tabItem);
   if (!tabItem) {
-    console.log("No tab Item");
     return;
   }
   const logGroupName = tabItem.title;
@@ -280,7 +277,6 @@ const onCellFocus = (params: CellFocusParams): void => {
 };
 
 const openStream = (): void => {
-  console.log("do emit");
   const action: OpenScanPanelActionCommand = {
     command: "openScanPanel",
     params: {
@@ -376,31 +372,30 @@ defineExpose({
           <div class="toolbar" :style="{ width: `${splitterWidth}px` }">
             <div v-if="isMultiLineKeyword" class="multiple">
               <div class="left">
-                <label v-if="tabItem.startTime.visible" for="startTime">{{
-                  tabItem.startTime.label
+                <label v-if="tabItem.startDt.visible" for="startTime">{{
+                  tabItem.startDt.label
                 }}</label
                 ><VsCodeTextField
-                  v-if="tabItem.startTime.visible"
+                  v-if="tabItem.startDt.visible"
                   id="startTime"
-                  v-model="tabItem.startTime.value"
-                  type="datetime-local"
-                  :title="tabItem.startTime.description"
+                  v-model="tabItem.startDt.value"
+                  type="date"
+                  :title="tabItem.startDt.description"
                 ></VsCodeTextField>
 
-                <label v-if="tabItem.endTime.visible" for="endTime">{{
-                  tabItem.endTime.label
-                }}</label
+                <label v-if="tabItem.endDt.visible" for="endTime">{{ tabItem.endDt.label }}</label
                 ><VsCodeTextField
-                  v-if="tabItem.endTime.visible"
+                  v-if="tabItem.endDt.visible"
                   id="endTime"
-                  v-model="tabItem.endTime.value"
-                  type="datetime-local"
-                  :title="tabItem.endTime.description"
+                  v-model="tabItem.endDt.value"
+                  type="date"
+                  :title="tabItem.endDt.description"
                 ></VsCodeTextField>
                 <label v-if="tabItem.limit.visible" for="limit">{{ tabItem.limit.label }}</label
                 ><VsCodeTextField
                   v-if="tabItem.limit.visible"
                   id="limit"
+                  style="width: 125px"
                   v-model="tabItem.limit.value"
                   type="number"
                   :min="0"
@@ -452,28 +447,29 @@ defineExpose({
                 <span class="codicon codicon-trash"></span>Delete key
               </VsCodeButton>
 
-              <label v-if="tabItem.startTime.visible" for="startTime">{{
-                tabItem.startTime.label
+              <label v-if="tabItem.startDt.visible" for="startTime">{{
+                tabItem.startDt.label
               }}</label
               ><VsCodeTextField
-                v-if="tabItem.startTime.visible"
+                v-if="tabItem.startDt.visible"
                 id="startTime"
-                v-model="tabItem.startTime.value"
-                type="datetime-local"
-                :title="tabItem.startTime.description"
+                v-model="tabItem.startDt.value"
+                type="date"
+                :title="tabItem.startDt.description"
               ></VsCodeTextField>
-              <label v-if="tabItem.endTime.visible" for="endTime">{{ tabItem.endTime.label }}</label
+              <label v-if="tabItem.endDt.visible" for="endTime">{{ tabItem.endDt.label }}</label
               ><VsCodeTextField
-                v-if="tabItem.endTime.visible"
+                v-if="tabItem.endDt.visible"
                 id="endTime"
-                v-model="tabItem.endTime.value"
-                type="datetime-local"
-                :title="tabItem.endTime.description"
+                v-model="tabItem.endDt.value"
+                type="date"
+                :title="tabItem.endDt.description"
               ></VsCodeTextField>
               <label v-if="tabItem.limit.visible" for="limit">{{ tabItem.limit.label }}</label
               ><VsCodeTextField
                 v-if="tabItem.limit.visible"
                 id="limit"
+                class="limit"
                 v-model="tabItem.limit.value"
                 type="number"
                 :min="0"
@@ -559,10 +555,8 @@ vscode-panel-view {
     column-gap: 5px;
     margin-bottom: 2px;
 
-    .deleteKey {
-      position: absolute;
-      left: 2px;
-      top: -1px;
+    .limit {
+      max-width: 100px;
     }
   }
 
