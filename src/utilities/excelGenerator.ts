@@ -291,10 +291,11 @@ function createQueryResultSheet(
           if (
             (values?.size ?? 0) > 0 &&
             values?.image &&
-            values.contentType?.toLocaleLowerCase() !== "image/svg+xml"
+            getImageTypeFromContentType(values.contentType) !== undefined
           ) {
             const base64 = v;
-            addImageInSheet(book, sheet, base64, "png", {
+            const extension = getImageTypeFromContentType(values.contentType)!;
+            addImageInSheet(book, sheet, base64, extension, {
               tl: { col: colIdx + 2, row: baseRowNo + plusNo - 1 },
               br: { col: colIdx + 2 + 1, row: baseRowNo + plusNo },
             } as any);
@@ -445,6 +446,24 @@ async function createBookFromList(
       reject(e.message);
     }
   });
+}
+
+function getImageTypeFromContentType(
+  contentType: string | undefined
+): "jpeg" | "png" | "gif" | undefined {
+  if (contentType === undefined) {
+    return undefined;
+  }
+  switch (contentType.toLocaleLowerCase()) {
+    case "image/jpg":
+    case "image/jpeg":
+      return "jpeg";
+    case "image/png":
+      return "png";
+    case "image/gif":
+      return "gif";
+  }
+  return undefined;
 }
 
 function createCommonHeader(sheet: Excel.Worksheet) {
