@@ -54,7 +54,6 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   }
 
   changeConnectionTreeData(conRes: DbConnection): void {
-    log(`${PREFIX} changeConnectionTreeData conRes.password=` + conRes.password);
     this._onDidChangeTreeData.fire(conRes);
     this._onDidChangeTreeData.fire();
   }

@@ -152,7 +152,6 @@ export class StateStorage {
   }
 
   getPasswordlessConnectionSettingList(): ConnectionSetting[] {
-    // log(`${PREFIX} getPasswordlessConnectionSettingList`);
     return this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
   }
 
