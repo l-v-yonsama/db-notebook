@@ -1,8 +1,8 @@
 import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetDataBuilder } from "@l-v-yonsama/multi-platform-database-drivers";
-import type { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
+import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
-export const copyRrm = (rrm: SQLRunResultMetadata): SQLRunResultMetadata => {
+export const copyRrm = (rrm: RunResultMetadata): RunResultMetadata => {
   const o = JSON.parse(JSON.stringify(rrm));
   if (rrm.rdh) {
     o.rdh = ResultSetDataBuilder.from(rrm.rdh).build();
@@ -13,7 +13,7 @@ export const copyRrm = (rrm: SQLRunResultMetadata): SQLRunResultMetadata => {
   return o;
 };
 
-const rrmToRdhList = (rrm: SQLRunResultMetadata): ResultSetData[] => {
+const rrmToRdhList = (rrm: RunResultMetadata): ResultSetData[] => {
   const o = copyRrm(rrm);
   const rdhList: ResultSetData[] = [];
   if (o.rdh) {
@@ -28,7 +28,7 @@ const rrmToRdhList = (rrm: SQLRunResultMetadata): ResultSetData[] => {
   return rdhList;
 };
 
-export const rrmListToRdhList = (rrmList: SQLRunResultMetadata[]): ResultSetData[] => {
+export const rrmListToRdhList = (rrmList: RunResultMetadata[]): ResultSetData[] => {
   const rdhList: ResultSetData[] = [];
   rrmList.forEach((rrm) => {
     rdhList.push(...rrmToRdhList(rrm));

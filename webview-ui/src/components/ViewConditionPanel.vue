@@ -123,7 +123,7 @@ const ok = (editable: boolean, preview: boolean) => {
   const params: ViewConditionParams = {
     conditions: JSON.parse(JSON.stringify(editorItem.value.conditions)),
     specfyCondition: specifyCondition.value,
-    limit: Number(limit.value),
+    limit: limit.value === "" ? 0 : Number(limit.value),
     editable,
     preview,
   };
@@ -178,6 +178,7 @@ defineExpose({
           type="number"
           title="number of rows returned"
           placeholder="number of rows returned"
+          @change="updateTextDocument()"
         >
         </VsCodeTextField>
       </div>

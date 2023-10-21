@@ -3,14 +3,16 @@
     :id="'tab-' + id"
     @mouseover="hovering = true"
     @mouseleave="hovering = false"
+    :aria-selected="isActive"
     @click="clicked"
   >
     {{ title }}
-    <div class="close-action">
+    <div v-if="closable" class="close-action">
       <VsCodeButton v-show="isActive || hovering" appearance="icon" @click="close($event)"
         ><span class="codicon codicon-chrome-close"></span
       ></VsCodeButton>
     </div>
+    <span v-else style="padding-right: 4px">&nbsp;</span>
   </vscode-panel-tab>
 </template>
 
@@ -25,6 +27,7 @@ const props = defineProps<{
   id: string | number;
   title: string;
   isActive: boolean;
+  closable: boolean;
 }>();
 
 const hovering = ref(false);

@@ -24,6 +24,7 @@ import type {
 } from "@/utilities/vscode";
 import dayjs from "dayjs";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
+import FileAnnotationView from "./base/FileAnnotationView.vue";
 import type {
   CodeResolvedAnnotation,
   ResultSetData,
@@ -169,7 +170,6 @@ const list = ref(
         $meta: row.meta,
         $resolvedLabels: {},
         $ruleViolationMarks: {},
-        $imageFileValues: {},
         $fileValues: {},
       };
       if (editable && compareKey) {
@@ -353,23 +353,6 @@ const toEditTypeMark = (editType?: RowValues["editType"]): string => {
     case "del":
       return "-";
   }
-};
-
-const createImageUrl = (
-  stringValue: string,
-  annonationValues: FileAnnotation["values"]
-): string => {
-  if (annonationValues?.contentType?.toLocaleLowerCase() === "image/svg+xml") {
-    return `data:image/svg+xml,${encodeURIComponent(stringValue)}`;
-  }
-  return `data:${annonationValues?.contentType};base64,${stringValue}`;
-};
-
-const createDownloadText = (text: string | undefined | null): string => {
-  if (text === undefined || text === null || text === "") {
-    return "Download";
-  }
-  return text;
 };
 
 const copyToClipboard = (text: string) => {
@@ -567,16 +550,10 @@ defineExpose({
               ></VsCodeTextField>
               <template v-else>
                 <template v-if="item.$fileValues[key.name]">
-                  <a :href="item.$fileValues[key.name].downloadUrl">
-                    <img
-                      v-if="item.$fileValues[key.name].image"
-                      class="thumbnail"
-                      :src="createImageUrl(item[key.name], item.$fileValues[key.name])"
-                    />
-                    <div v-else class="preview-text">
-                      <span v-text="createDownloadText(item[key.name])"></span>
-                    </div>
-                  </a>
+                  <FileAnnotationView
+                    :text="item[key.name]"
+                    :annotation="item.$fileValues[key.name]"
+                  />
                 </template>
                 <template v-else>
                   <p
@@ -677,21 +654,13 @@ td {
   &.vcell {
     position: relative;
 
-    img.thumbnail {
-      max-height: 64px;
-      max-width: 208px;
-    }
-
-    div.preview-text {
-      position: relative;
+    & > a.download-link {
       display: inline-block;
-      margin: 5px 1px;
-      text-overflow: ellipsis;
-      overflow: hidden;
-      max-height: 64px;
-      min-height: 15px;
-      width: 208px;
-      max-width: 208px;
+      position: absolute;
+      left: 4px;
+      top: 4px;
+      border-radius: 3px;
+      padding: 1px;
     }
 
     & > .code-label {

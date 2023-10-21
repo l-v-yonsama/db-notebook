@@ -301,6 +301,7 @@ defineExpose({
         :key="tabItem.tabId"
         :title="`${tabItem.title}(${tabItem.subTitle})`"
         :is-active="isActiveTabId(tabItem.tabId)"
+        :closable="true"
         @click="showTab(tabItem.tabId)"
         @close="removeTabItem(tabItem.tabId, true)"
       >

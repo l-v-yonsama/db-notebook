@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook.",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -517,9 +517,11 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.197",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.203",
+    "axios": "^1.5.1",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
+    "fast-json-stable-stringify": "^2.1.0",
     "short-unique-id": "^4.4.4",
     "store": "^2.0.12",
     "throttle-debounce": "^5.0.0",

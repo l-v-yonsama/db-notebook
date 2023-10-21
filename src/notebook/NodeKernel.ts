@@ -1,7 +1,7 @@
 import * as cp from "child_process";
 import * as path from "path";
 import { NotebookExecutionVariables, RunResult } from "../types/Notebook";
-import { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ConnectionSetting, abbr } from "@l-v-yonsama/multi-platform-database-drivers";
 import { log } from "../utilities/logger";
 import { NotebookCell, Uri } from "vscode";
 import {
@@ -12,6 +12,9 @@ import {
   winToLinuxPath,
   writeToResource,
 } from "../utilities/fsUtil";
+import { NodeRunAxiosResponse, RunResultMetadata } from "../shared/RunResultMetadata";
+import { URL } from "url";
+import dayjs = require("dayjs");
 
 const PREFIX = "  [notebook/NodeKernel]";
 
@@ -48,8 +51,24 @@ export class NodeKernel {
     return `
     (async () => {
       const myfs = require('fs');
+      const fstringify = require('${winToLinuxPath(
+        path.join(nodeModules, "fast-json-stable-stringify")
+      )}');
+      const axios = require('${winToLinuxPath(
+        path.join(nodeModules, "axios/dist/node/axios.cjs")
+      )}');
+      axios.interceptors.request.use( x => {
+        x.meta = x.meta || {}
+        x.meta.requestStartedAt = new Date().getTime();
+        return x;
+      });
+      axios.interceptors.response.use(x => {
+        x.config.meta.elapsedTime = new Date().getTime() - x.config.meta.requestStartedAt;
+        delete x.config.meta.requestStartedAt;
+        return x;
+      });
       const variables = require('${winToLinuxPath(path.join(nodeModules, "store"))}');
-      const {DBDriverResolver,ResultSetDataBuilder} = require('${winToLinuxPath(
+      const {DBDriverResolver,ResultSetDataBuilder,parseContentType} = require('${winToLinuxPath(
         path.join(nodeModules, "@l-v-yonsama/multi-platform-database-drivers")
       )}');
       const getConnectionSettingByName = (s) => {
@@ -68,6 +87,46 @@ export class NodeKernel {
         variables.set('_ResultSetData', rdh);
       };
 
+      const writeResponseData = (res) => {
+        const headerList = ['Server','Content-Type','Content-Length','Cache-Control','Content-Encoding'];
+        const headers = {};
+
+        Object.keys(res.headers).forEach(name => {
+          const lname = name.toLowerCase();
+          const normalizedName = headerList.find(it => it.toLowerCase() === lname);
+          if ( normalizedName ) {
+            headers[normalizedName] = res.headers[name];
+          } else {
+            headers[name] = res.headers[name];
+          }
+        });
+
+        let data = res.data;
+        const contentTypeInfo = parseContentType({contentType:headers['Content-Type']});
+        if (!contentTypeInfo.isTextValue) {
+          data = res.data.toString('base64');
+        }
+
+        const resData = {
+          data,
+          status: res.status,
+          statusText: res.statusText,
+          elapsedTime: res.config.meta?.elapsedTime,
+          headers,
+          contentTypeInfo,
+          config:{
+            url: res.config.url,
+            method: res.config.method,
+            baseURL: res.config.baseURL,
+            headers: res.config.headers,
+            params: res.config.params,
+            data: res.config.data,
+            timeout: res.config.timeout,
+          }
+        };
+        variables.set('_ResponseData', fstringify(resData));
+      };
+
       const _saveVariables = () => {
         const saveMap = {};
         variables.each(function(value, key) {
@@ -75,7 +134,7 @@ export class NodeKernel {
         });
         myfs.writeFileSync('${winToLinuxPath(
           this.variablesFile.fsPath
-        )}', JSON.stringify(saveMap), {encoding:'utf8'});
+        )}', fstringify(saveMap), {encoding:'utf8'});
       };
       const _skipSql = (b) => { variables.set('_skipSql', b); };
       try {
@@ -104,14 +163,13 @@ export class NodeKernel {
     this.scriptFile = Uri.joinPath(this.tmpDirectory, scriptName);
 
     const script = await this.createScript(cell);
-    console.log("script=", script);
     await writeToResource(this.scriptFile, script);
 
     this.child = cp.spawn("node", [this.scriptFile.fsPath]);
 
     let stdout = "";
     let stderr = "";
-    let metadata;
+    let metadata: RunResultMetadata = {};
 
     const promise = new Promise((resolve, reject) => {
       if (this.child) {
@@ -154,9 +212,19 @@ export class NodeKernel {
     if (this.variables["_ResultSetData"]) {
       const rdh = this.variables["_ResultSetData"];
       delete this.variables["_ResultSetData"];
-      metadata = {
-        rdh,
-      };
+      metadata.rdh = rdh;
+    }
+    if (this.variables["_ResponseData"]) {
+      const resString = this.variables["_ResponseData"];
+      delete this.variables["_ResponseData"];
+      const res = JSON.parse(resString) as NodeRunAxiosResponse;
+      let title = `${dayjs().format("HH:mm:ss.SSS")}[${res.status}]`;
+      if (res.config.url && res.config.method) {
+        const url = new URL(res.config.url);
+        title += `[${res.config.method}][${abbr(url.host + (url.pathname ?? ""), 16)}]`;
+      }
+      res.title = title;
+      metadata.res = res;
     }
 
     return {

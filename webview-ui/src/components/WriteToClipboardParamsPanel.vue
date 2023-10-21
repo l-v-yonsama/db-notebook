@@ -39,6 +39,7 @@ const previewText = ref("");
 const withType = ref(false);
 const withComment = ref(false);
 const limit = ref(10);
+const limitCell = ref(100);
 const withRowNo = ref(false);
 const withCodeLabel = ref(false);
 const withRuleViolation = ref(false);
@@ -62,6 +63,7 @@ const initialize = (v: InitParams): void => {
       break;
   }
   limit.value = v.params.limit ?? 10;
+  limitCell.value = v.params.limitCell ?? 100;
   withRowNo.value = v.params.withRowNo;
   withCodeLabel.value = v.params.withCodeLabel;
   withRuleViolation.value = v.params.withRuleViolation;
@@ -114,6 +116,7 @@ const handleChange = (refresh = true) => {
       fileType: fileType.value,
       outputWithType,
       limit: limit.value,
+      limitCell: limitCell.value,
       specifyDetail: refresh,
       withRowNo: withRowNo.value,
       withCodeLabel: withCodeLabel.value,
@@ -206,6 +209,20 @@ defineExpose({
             @change="handleChange(true)"
           ></VsCodeTextField>
         </td>
+        <th>Limit cell characters</th>
+        <td>
+          <VsCodeTextField
+            v-model="limitCell"
+            type="number"
+            :max="30000"
+            :min="0"
+            @change="handleChange(true)"
+          ></VsCodeTextField>
+        </td>
+      </tr>
+      <tr>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
         <td>
           <vscode-checkbox
             v-model="withCodeLabel"

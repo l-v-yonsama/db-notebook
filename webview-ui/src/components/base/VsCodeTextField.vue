@@ -46,7 +46,25 @@ const initialValue = props.modelValue ?? "";
 watch(
   () => props.modelValue,
   () => {
-    isError.value = props.required === true && (props.modelValue ?? "").toString().length === 0;
+    let error = false;
+    if (props.required && (props.modelValue ?? "").toString().length === 0) {
+      error = true;
+    }
+    const v = (props.modelValue ?? "").toString();
+    if (props.type === "number" && v.length > 0) {
+      const n = Number(v);
+      if (isNaN(n)) {
+        error = true;
+      } else {
+        if (props.min !== undefined && n < props.min) {
+          error = true;
+        }
+        if (props.max !== undefined && n > props.max) {
+          error = true;
+        }
+      }
+    }
+    isError.value = error;
   },
   {
     immediate: true,

@@ -69,7 +69,7 @@ export class ViewConditionPanel {
       ViewConditionPanel.currentPanel = new ViewConditionPanel(panel, extensionUri);
     }
     ViewConditionPanel.currentPanel.tableRes = tableRes;
-    ViewConditionPanel.currentPanel.numOfRows = numOfRows;
+    ViewConditionPanel.currentPanel.numOfRows = Math.min(1000, numOfRows);
     ViewConditionPanel.currentPanel.renderSub();
   }
 
@@ -84,7 +84,7 @@ export class ViewConditionPanel {
       value: {
         initialize: {
           tableRes: this.tableRes,
-          limit: Math.min(1000, this.numOfRows),
+          limit: this.numOfRows,
           numOfRows: this.numOfRows,
           previewSql,
         },
@@ -130,6 +130,7 @@ export class ViewConditionPanel {
         schemaName,
         toPositionedParameter: this.isPositionedParameterAvailable,
         conditions: specfyCondition ? conditions : undefined,
+        limit: this.numOfRows,
       });
       return query + "";
     } catch (_) {
@@ -152,6 +153,7 @@ export class ViewConditionPanel {
                 params as ViewConditionParams;
 
               if (preview) {
+                this.numOfRows = limit;
                 const previewSql = await this.getPreviewSql(conditions, specfyCondition);
                 // send to webview
                 const msg: ViewConditionPanelEventData = {
@@ -189,6 +191,7 @@ export class ViewConditionPanel {
                       schemaName,
                       toPositionedParameter: driver.isPositionedParameterAvailable(),
                       conditions: specfyCondition ? conditions : undefined,
+                      limit: this.numOfRows,
                     });
 
                     log(`${PREFIX} query:[${query}]`);
@@ -197,7 +200,6 @@ export class ViewConditionPanel {
                       sql: query,
                       conditions: {
                         binds,
-                        maxRows: limit,
                       },
                       meta: {
                         tableName: tableRes.name,

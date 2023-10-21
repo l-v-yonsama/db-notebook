@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, defineExpose, onMounted, nextTick } from "vue";
-import CompareKeySettings from "./CompareKeySettings.vue";
 import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
+import HttpResponseViewer from "./HttpResponseViewer.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import {
   vsCodePanels,
@@ -10,68 +10,45 @@ import {
   vsCodePanelTab,
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
-import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
-import RDHViewer from "./RDHViewer.vue";
 import type {
   CloseTabActionCommand,
-  CompareParams,
   OutputParams,
   WriteToClipboardParams,
-  MdhPanelEventData,
-  RdhTabItem,
+  HttpResponsesPanelEventData,
+  HttpResponseTabItem,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import type { DropdownItem, SecondaryItem } from "@/types/Components";
+import type { DropdownItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS, WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
+type NodeRunAxiosResponse = HttpResponseTabItem["list"][0];
+
 const activeTabId = ref("");
-const tabItems = ref([] as RdhTabItem[]);
+const tabItems = ref([] as HttpResponseTabItem[]);
 const inProgress = ref(false);
 const splitterWidth = ref(300);
 const splitterHeight = ref(300);
 const innerTabIndex = ref(-1);
 const innerTabItems = ref([] as DropdownItem[]);
-const activeInnerRdh = ref(null as any);
+const activeInnerResponse = ref(null as NodeRunAxiosResponse | null);
 const contentMode = ref("tab" as "tab" | "keys");
-const noCompareKeys = ref(false);
-const activeTabRdhList = ref([] as ResultSetData[]);
+const activeTabResList = ref([] as NodeRunAxiosResponse[]);
 
 // secondarySelections
 const outputDetailItems = OUTPUT_DETAIL_ITEMS;
 const writeToClipboardDetailItems = WRITE_TO_CLIP_BOARD_DETAIL_ITEMS;
 
-type CompareMoreOption = {
-  command: "compare" | "editCompareKeys";
-};
-const compareDetailItems = [
-  {
-    kind: "selection",
-    label: "Compare current contets with these",
-    value: { command: "compare" },
-  },
-  {
-    kind: "divider",
-  },
-  {
-    kind: "selection",
-    label: "Edit compare keys",
-    value: { command: "editCompareKeys" },
-  },
-] as SecondaryItem<CompareMoreOption>[];
-
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
 const resetSpPaneWrapperHeight = () => {
-  const sectionWrapper = window.document.querySelector("section.MdhPanel");
-  //351 => 272
-  // multi 420 => 236px ... 184
+  const sectionWrapper = window.document.querySelector("section.HttpResponsesPanel");
   if (sectionWrapper?.clientHeight) {
-    splitterHeight.value = sectionWrapper?.clientHeight - 41;
+    splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 41, 10);
   }
   if (sectionWrapper?.clientWidth) {
-    splitterWidth.value = sectionWrapper.clientWidth - 14;
+    splitterWidth.value = Math.max(sectionWrapper.clientWidth - 14, 10);
   }
 };
 
@@ -79,17 +56,11 @@ onMounted(() => {
   nextTick(resetSpPaneWrapperHeight);
 });
 
-const rdhViewerRef = ref<InstanceType<typeof RDHViewer>>();
-const setRdhViewerRef = (el: any) => {
-  rdhViewerRef.value = el;
-};
-
-const editable = ref(true);
 const refreshable = ref(false);
 
-function getActiveTabItem(): RdhTabItem | undefined {
+function getActiveTabItem(): HttpResponseTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
-  return tabItems.value.find((it) => it.tabId === tabId) as RdhTabItem;
+  return tabItems.value.find((it) => it.tabId === tabId) as HttpResponseTabItem;
 }
 
 function isActiveTabId(tabId: string): boolean {
@@ -104,35 +75,29 @@ const showTab = (tabId: string) => {
     return;
   }
   innerTabItems.value.splice(0, innerTabItems.value.length);
-  activeTabRdhList.value.splice(0, activeTabRdhList.value.length);
-  tabItem.list.forEach((rdh: ResultSetData, idx) => {
-    const { tableName, type } = rdh.meta;
-    const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
-    const label = `${idx + 1}:${sqlType}: ${tableName}`;
+  activeTabResList.value.splice(0, activeTabResList.value.length);
+  tabItem.list.forEach((res: NodeRunAxiosResponse, idx) => {
+    const label = res.title;
     innerTabItems.value.push({ value: idx, label });
-    activeTabRdhList.value.push(rdh);
+    activeTabResList.value.push(res);
   });
   innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
-  resetActiveInnerRdh();
+  resetactiveInnerResponse();
   vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
-const resetActiveInnerRdh = () => {
-  editable.value = false;
+const resetactiveInnerResponse = () => {
   refreshable.value = false;
-  noCompareKeys.value = true;
-  activeInnerRdh.value = null;
+  activeInnerResponse.value = null;
   const tabItem = getActiveTabItem();
   if (!tabItem || innerTabIndex.value < 0) {
     return;
   }
   const newRdh = tabItem.list[innerTabIndex.value];
-  editable.value = newRdh.meta?.editable === true;
-  refreshable.value = tabItem.refreshable;
+  //  refreshable.value = tabItem.refreshable;
 
   nextTick(() => {
-    noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
-    activeInnerRdh.value = newRdh;
+    activeInnerResponse.value = newRdh;
     vscode.postCommand({
       command: "selectInnerTab",
       params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
@@ -140,7 +105,7 @@ const resetActiveInnerRdh = () => {
   });
 };
 
-const addTabItem = (tabItem: RdhTabItem) => {
+const addTabItem = (tabItem: HttpResponseTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
@@ -166,7 +131,7 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
   }
 };
 
-const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData[] }) => {
+const setSearchResponse = ({ tabId, value }: { tabId: string; value: NodeRunAxiosResponse[] }) => {
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
@@ -175,16 +140,14 @@ const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData
   innerTabItems.value.splice(0, innerTabItems.value.length);
   nextTick(() => {
     tabItem.list.push(...value);
-    tabItem.list.forEach((rdh: ResultSetData, idx) => {
-      const { tableName, type } = rdh.meta;
-      const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
-      const label = `${idx + 1}:${sqlType}: ${tableName}`;
+    tabItem.list.forEach((res: NodeRunAxiosResponse, idx) => {
+      const label = res.title;
       innerTabItems.value.push({ value: idx, label });
     });
     innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
 
     inProgress.value = false;
-    resetActiveInnerRdh();
+    resetactiveInnerResponse();
     setTimeout(resetSpPaneWrapperHeight, 200);
   });
 };
@@ -197,31 +160,6 @@ function actionToolbar(command: string, inParams?: any) {
   const { tabId } = tabItem;
   let action = undefined;
   switch (command) {
-    case "saveValues":
-      {
-        const result = rdhViewerRef.value?.save();
-        if (result && result.ok) {
-          action = {
-            command,
-            params: {
-              tabId,
-              ...result,
-            },
-          };
-        } else {
-          vscode.postCommand({
-            command: "showError",
-            params: {
-              message: result.message,
-            },
-          });
-          return;
-        }
-      }
-      break;
-    case "compare":
-      compare(inParams);
-      return;
     case "refresh":
       action = {
         command,
@@ -242,20 +180,6 @@ function actionToolbar(command: string, inParams?: any) {
   vscode.postCommand(action);
 }
 
-const compare = (params: Omit<CompareParams, "tabId">): void => {
-  const tabItem = getActiveTabItem();
-  if (!tabItem) {
-    return;
-  }
-
-  vscode.postCommand({
-    command: "compare",
-    params: {
-      tabId: tabItem.tabId,
-      ...params,
-    },
-  });
-};
 const output = (params: Omit<OutputParams, "tabId">): void => {
   const tabItem = getActiveTabItem();
   if (!tabItem) {
@@ -286,42 +210,7 @@ const writeToClipboard = (params: Omit<WriteToClipboardParams, "tabId">): void =
   });
 };
 
-const selectedCompareMoreOptions = (v: CompareMoreOption): void => {
-  const { command } = v;
-  switch (command) {
-    case "compare": {
-      compare({});
-      return;
-    }
-    case "editCompareKeys": {
-      contentMode.value = "keys";
-      return;
-    }
-  }
-};
-
-const saveCompareKeys = (
-  values: {
-    index: number;
-    compareKeyNames: string[];
-  }[]
-): void => {
-  const tabItem = getActiveTabItem();
-  if (!tabItem) {
-    return;
-  }
-
-  vscode.postCommand({
-    command: "saveCompareKeys",
-    params: {
-      tabId: tabItem.tabId,
-      list: values,
-    },
-  });
-  contentMode.value = "tab";
-};
-
-const recieveMessage = (data: MdhPanelEventData) => {
+const recieveMessage = (data: HttpResponsesPanelEventData) => {
   const { command, value } = data;
 
   switch (command) {
@@ -330,11 +219,11 @@ const recieveMessage = (data: MdhPanelEventData) => {
         addTabItem(value.addTabItem);
       }
       break;
-    case "set-search-result":
-      if (value.searchResult === undefined) {
+    case "set-response":
+      if (value.searchResponse === undefined) {
         return;
       }
-      setSearchResult(value.searchResult);
+      setSearchResponse(value.searchResponse);
       break;
   }
 };
@@ -345,42 +234,20 @@ defineExpose({
 </script>
 
 <template>
-  <section class="MdhPanel">
+  <section class="HttpResponsesPanel">
     <div v-if="contentMode == 'tab'" class="tab-container-actions">
       <VsCodeDropdown
         v-if="innerTabItems.length > 1"
         v-model="innerTabIndex"
         :items="innerTabItems"
         style="z-index: 15"
-        @change="resetActiveInnerRdh"
+        @change="resetactiveInnerResponse"
       />
-      <button
-        v-if="editable"
-        @click="actionToolbar('saveValues', {})"
-        title="Save changes to table"
-        class="primary"
-      >
-        <fa icon="arrow-up" />
-      </button>
-      <button
-        v-if="!editable && refreshable"
-        @click="actionToolbar('compare', {})"
-        :disabled="inProgress || noCompareKeys"
-        :title="noCompareKeys ? 'No compare keys(Primary, Unique)' : 'Compare with current content'"
-      >
-        <fa icon="code-compare" />
-      </button>
-      <SecondarySelectionAction
-        v-if="!editable && refreshable"
-        :items="compareDetailItems"
-        title="Compare"
-        @onSelect="selectedCompareMoreOptions"
-      />
-      <button
+      <!-- <button
         v-if="refreshable"
         @click="actionToolbar('refresh', {})"
         :disabled="inProgress"
-        title="Search again"
+        title="Request again"
       >
         <fa icon="rotate" />
       </button>
@@ -415,14 +282,9 @@ defineExpose({
         :items="outputDetailItems"
         title="Output as Excel"
         @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
-      />
+      /> -->
     </div>
-    <CompareKeySettings
-      v-if="contentMode == 'keys'"
-      :rdhList="activeTabRdhList"
-      @cancel="contentMode = 'tab'"
-      @save="saveCompareKeys"
-    />
+
     <vscode-panels
       v-if="contentMode == 'tab'"
       class="tab-wrapper"
@@ -446,13 +308,11 @@ defineExpose({
         :key="tabItem.tabId"
       >
         <section :style="{ width: `${splitterWidth}px` }">
-          <div v-if="activeInnerRdh" class="spPaneWrapper">
-            <RDHViewer
-              :rdh="activeInnerRdh"
+          <div v-if="activeInnerResponse" class="spPaneWrapper">
+            <HttpResponseViewer
+              :res="activeInnerResponse"
               :width="splitterWidth"
               :height="splitterHeight"
-              :readonly="true"
-              :ref="setRdhViewerRef"
             />
           </div>
         </section>
@@ -462,7 +322,7 @@ defineExpose({
 </template>
 
 <style scoped>
-section.MdhPanel {
+section.HttpResponsesPanel {
   display: block;
   width: 100%;
   height: 100vh;

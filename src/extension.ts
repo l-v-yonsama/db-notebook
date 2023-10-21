@@ -17,6 +17,7 @@ import { initializePath } from "./utilities/fsUtil";
 import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
+import { HttpResponsesPanel } from "./panels/HttpResponsesPanel";
 
 const PREFIX = "[extension]";
 
@@ -31,6 +32,7 @@ export async function activate(context: ExtensionContext) {
   log(`${PREFIX} start activation.`);
   ScanPanel.setStateStorage(stateStorage);
   MdhPanel.setStateStorage(stateStorage);
+  HttpResponsesPanel.setStateStorage(stateStorage);
   DiffPanel.setStateStorage(stateStorage);
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);

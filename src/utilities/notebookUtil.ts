@@ -8,7 +8,7 @@ import {
   ResultSetData,
   stringConditionToJsonCondition,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
+import { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export const isSqlCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql";
@@ -22,7 +22,7 @@ export const isSelectOrShowSqlCell = (cell: NotebookCell): boolean => {
   if (!isSqlCell(cell) || cell.outputs.length === 0) {
     return false;
   }
-  const meta: SQLRunResultMetadata | undefined = cell.outputs[0].metadata;
+  const meta: RunResultMetadata | undefined = cell.outputs[0].metadata;
   if (!meta) {
     return false;
   }

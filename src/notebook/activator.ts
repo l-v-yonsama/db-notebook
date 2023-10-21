@@ -30,13 +30,15 @@ import {
   SHOW_ALL_VARIABLES,
   SPECIFY_CONNECTION_ALL,
   CELL_MARK_CELL_AS_SKIP,
+  CELL_OPEN_HTTP_RESPONSE,
 } from "../constant";
 import { isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { log } from "../utilities/logger";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
-import { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
+import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
+import { HttpResponsesPanel } from "../panels/HttpResponsesPanel";
 
 const PREFIX = "[notebook/activator]";
 
@@ -93,7 +95,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   context.subscriptions.push(
     commands.registerCommand(CELL_WRITE_TO_CLIPBOARD, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
-      const rrm: SQLRunResultMetadata | undefined = cell.outputs?.[0].metadata;
+      const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
       if (!isSqlCell(cell) || rrm === undefined) {
         return;
       }
@@ -112,7 +114,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   context.subscriptions.push(
     commands.registerCommand(CELL_OPEN_MDH, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
-      const rrm: SQLRunResultMetadata | undefined = cell.outputs?.[0].metadata;
+      const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
       if (
         rrm === undefined ||
         (rrm.rdh === undefined && rrm.explainRdh === undefined && rrm.analyzedRdh === undefined)
@@ -122,6 +124,17 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       const title = filePath ? path.basename(filePath) : rrm.tableName ?? "CELL" + cell.index;
       MdhPanel.render(context.extensionUri, title, rrmListToRdhList([rrm]));
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(CELL_OPEN_HTTP_RESPONSE, async (cell: NotebookCell) => {
+      const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
+      if (rrm === undefined || rrm.res === undefined) {
+        return;
+      }
+
+      const title = rrm.res.title;
+      HttpResponsesPanel.render(context.extensionUri, title, [rrm.res]);
     })
   );
   context.subscriptions.push(

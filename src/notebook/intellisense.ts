@@ -33,6 +33,7 @@ import {
 import { throttle } from "throttle-debounce";
 import { NOTEBOOK_TYPE } from "../constant";
 import { isSqlCell } from "../utilities/notebookUtil";
+import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 
 const PREFIX = "[notebook/intellisense]";
 
@@ -264,6 +265,9 @@ function createJsIntellisense() {
           list.push(item);
         });
 
+        // Axios
+        setNodeAxiosCompletionItems(list);
+
         // DBDriverResolver
         item = createDriverResolverCompletionItem({
           label: "workflow",
@@ -423,8 +427,16 @@ function createDriverResolverCompletionItem({
   return item;
 }
 
-function createDocumentation({ script, ext, uri }: { script: string; ext: string; uri?: string }) {
-  const doc = new MarkdownString("```" + ext + "\n" + script + "\n```");
+export function createDocumentation({
+  script,
+  ext,
+  uri,
+}: {
+  script: string;
+  ext: string;
+  uri?: string;
+}) {
+  const doc = new MarkdownString("```" + ext + "\n\n" + script + "\n```\n");
   if (uri) {
     doc.baseUri = Uri.parse(uri);
   }

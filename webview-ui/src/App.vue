@@ -4,6 +4,7 @@ import type { ComponentName, MessageEventData } from "./utilities/vscode";
 import { ref, onMounted } from "vue";
 
 import MdhPanel from "./components/MdhPanel.vue";
+import HttpResponsesPanel from "./components/HttpResponsesPanel.vue";
 import DBFormView from "./components/DBFormView.vue";
 import DiffPanel from "./components/DiffPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
@@ -19,6 +20,7 @@ import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
 
 const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
 const mdhPanelRef = ref<InstanceType<typeof MdhPanel>>();
+const httpResponsesPanelRef = ref<InstanceType<typeof HttpResponsesPanel>>();
 const diffPanelRef = ref<InstanceType<typeof DiffPanel>>();
 const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
 const viewConditionPanelRef = ref<InstanceType<typeof ViewConditionPanel>>();
@@ -42,6 +44,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "MdhPanel":
       mdhPanelRef.value?.recieveMessage(data);
+      break;
+    case "HttpResponsesPanel":
+      httpResponsesPanelRef.value?.recieveMessage(data);
       break;
     case "DiffPanel":
       diffPanelRef.value?.recieveMessage(data);
@@ -84,6 +89,11 @@ onMounted(() => {
     <DBFormView v-if="currentComponentName === 'DBFormView'" ref="dBFormViewRef" />
 
     <MdhPanel v-if="currentComponentName === 'MdhPanel'" ref="mdhPanelRef" />
+
+    <HttpResponsesPanel
+      v-if="currentComponentName === 'HttpResponsesPanel'"
+      ref="httpResponsesPanelRef"
+    />
 
     <DiffPanel v-if="currentComponentName === 'DiffPanel'" ref="diffPanelRef" />
 

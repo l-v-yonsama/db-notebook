@@ -290,11 +290,12 @@ function createQueryResultSheet(
           const { values } = fileAnnonation;
           if (
             (values?.size ?? 0) > 0 &&
-            values?.image &&
-            getImageTypeFromContentType(values.contentType) !== undefined
+            values?.contentTypeInfo.renderType === "Image" &&
+            v &&
+            getImageTypeFromContentType(values.contentTypeInfo.contentType) !== undefined
           ) {
             const base64 = v;
-            const extension = getImageTypeFromContentType(values.contentType)!;
+            const extension = getImageTypeFromContentType(values.contentTypeInfo.contentType)!;
             addImageInSheet(book, sheet, base64, extension, {
               tl: { col: colIdx + 2, row: baseRowNo + plusNo - 1 },
               br: { col: colIdx + 2 + 1, row: baseRowNo + plusNo },

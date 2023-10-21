@@ -8,7 +8,7 @@ export * from "../../../src/shared/CodeResolverParams";
 export * from "../../../src/shared/ViewConditionParams";
 export * from "../../../src/shared/SaveValuesInRdhParams";
 export * from "../../../src/shared/ComponentName";
-export * from "../../../src/shared/SQLRunResultMetadata";
+export * from "../../../src/shared/RunResultMetadata";
 export * from "../../../src/shared/MessageEventData";
 
 class VSCodeAPIWrapper {

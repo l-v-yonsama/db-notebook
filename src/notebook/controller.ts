@@ -5,6 +5,7 @@ import {
   CELL_SHOW_METADATA_SETTINGS,
   CELL_WRITE_TO_CLIPBOARD,
   CELL_MARK_CELL_AS_SKIP,
+  CELL_OPEN_HTTP_RESPONSE,
 } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
@@ -42,7 +43,8 @@ import {
 } from "../utilities/notebookUtil";
 import { jsonKernelRun } from "./JsonKernel";
 import { existsFileOnStorage } from "../utilities/fsUtil";
-import { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
+import { createResponseSummaryMarkdown, createResponseTitle } from "../utilities/axiosUtil";
+import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 const PREFIX = "[notebook/Controller]";
 
@@ -131,6 +133,10 @@ export class MainController {
 
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RdhProvider())
+    );
+
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new HttpResponseProvider())
     );
   }
 
@@ -234,13 +240,15 @@ export class MainController {
     let stdout = "";
     let stderr = "";
     let skipped = false;
-    let metadata = undefined;
+    let metadata: RunResultMetadata | undefined = undefined;
+
     try {
       const r = await this.run(notebook, cell);
       stdout = r.stdout;
       stderr = r.stderr;
       skipped = r.skipped;
       metadata = r.metadata;
+
       if (stdout.length) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
       }
@@ -250,66 +258,81 @@ export class MainController {
       }
       if (skipped) {
         outputs.push(
-          new NotebookCellOutput([NotebookCellOutputItem.text("### `SKIPPED!`", "text/markdown")])
-        );
-      }
-
-      if (metadata?.rdh) {
-        const cellMeta: CellMeta = cell.metadata;
-        const withComment = metadata.rdh.keys.some((it) => (it.comment ?? "").length);
-        outputs.push(
           new NotebookCellOutput(
-            [
-              NotebookCellOutputItem.text(
-                `\`[Query Result]\` ${metadata.rdh.summary?.info}\n` +
-                  ResultSetDataBuilder.from(metadata.rdh).toMarkdown({
-                    withComment,
-                    withRowNo: true,
-                    withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
-                    withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
-                  }),
-                "text/markdown"
-              ),
-            ],
+            [NotebookCellOutputItem.text("### `SKIPPED!`", "text/markdown")],
             metadata
           )
         );
       }
 
-      if (metadata?.explainRdh) {
-        const md = ResultSetDataBuilder.from(metadata.explainRdh).toMarkdown({
-          withComment: true,
-          withRowNo: false,
-        });
+      if (metadata) {
+        const { rdh, explainRdh, analyzedRdh, res } = metadata;
+        if (rdh) {
+          const cellMeta: CellMeta = cell.metadata;
+          const withComment = rdh.keys.some((it) => (it.comment ?? "").length);
+          outputs.push(
+            new NotebookCellOutput(
+              [
+                NotebookCellOutputItem.text(
+                  `\`[Query Result]\` ${rdh.summary?.info}\n` +
+                    ResultSetDataBuilder.from(rdh).toMarkdown({
+                      withComment,
+                      withRowNo: true,
+                      withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
+                      withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
+                    }),
+                  "text/markdown"
+                ),
+              ],
+              metadata
+            )
+          );
+        }
 
-        outputs.push(
-          new NotebookCellOutput(
-            [NotebookCellOutputItem.text(`\`[Explain plan]\`\n${md}`, "text/markdown")],
-            metadata
-          )
-        );
-      }
+        if (explainRdh) {
+          const md = ResultSetDataBuilder.from(explainRdh).toMarkdown({
+            withComment: true,
+            withRowNo: false,
+          });
 
-      if (metadata?.analyzedRdh) {
-        const md = ResultSetDataBuilder.from(metadata.analyzedRdh).toMarkdown({
-          withComment: false,
-          withRowNo: false,
-        });
+          outputs.push(
+            new NotebookCellOutput(
+              [NotebookCellOutputItem.text(`\`[Explain plan]\`\n${md}`, "text/markdown")],
+              metadata
+            )
+          );
+        }
+        if (analyzedRdh) {
+          const md = ResultSetDataBuilder.from(analyzedRdh).toMarkdown({
+            withComment: false,
+            withRowNo: false,
+          });
 
-        outputs.push(
-          new NotebookCellOutput(
-            [NotebookCellOutputItem.text(`\`[Explain analyze]\`\n${md}`, "text/markdown")],
-            metadata
-          )
-        );
+          outputs.push(
+            new NotebookCellOutput(
+              [NotebookCellOutputItem.text(`\`[Explain analyze]\`\n${md}`, "text/markdown")],
+              metadata
+            )
+          );
+        }
+        if (res) {
+          outputs.push(
+            new NotebookCellOutput(
+              [NotebookCellOutputItem.text(createResponseSummaryMarkdown(res), "text/markdown")],
+              metadata
+            )
+          );
+        }
       }
     } catch (err: any) {
       success = false;
       if (hasMessageField(err)) {
         stderr = err.message;
-        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stdout(err.message)]));
+        outputs.push(
+          new NotebookCellOutput([NotebookCellOutputItem.stdout(err.message)], metadata)
+        );
       } else {
-        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.error(err)]));
+        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.error(err)], metadata));
       }
     }
     execution.replaceOutput(outputs);
@@ -515,7 +538,7 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
 
 class WriteToClipboardProvider implements NotebookCellStatusBarItemProvider {
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    const rMetadata: SQLRunResultMetadata | undefined = cell.outputs[0]?.metadata;
+    const rMetadata: RunResultMetadata | undefined = cell.outputs[0]?.metadata;
     if (!rMetadata) {
       return;
     }
@@ -535,7 +558,7 @@ class WriteToClipboardProvider implements NotebookCellStatusBarItemProvider {
 
 class RdhProvider implements NotebookCellStatusBarItemProvider {
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    const rMetadata: SQLRunResultMetadata | undefined = cell.outputs[0]?.metadata;
+    const rMetadata: RunResultMetadata | undefined = cell.outputs[0]?.metadata;
     if (!rMetadata) {
       return;
     }
@@ -549,6 +572,26 @@ class RdhProvider implements NotebookCellStatusBarItemProvider {
     );
     item.command = CELL_OPEN_MDH;
     item.tooltip = "Open outputs in panel";
+    return item;
+  }
+}
+
+class HttpResponseProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    const rMetadata: RunResultMetadata | undefined = cell.outputs[0]?.metadata;
+    if (!rMetadata) {
+      return;
+    }
+    const { res } = rMetadata;
+    if (res === undefined) {
+      return;
+    }
+    const item = new NotebookCellStatusBarItem(
+      "$(table) Open response",
+      NotebookCellStatusBarAlignment.Right
+    );
+    item.command = CELL_OPEN_HTTP_RESPONSE;
+    item.tooltip = "Open response in panel";
     return item;
   }
 }

@@ -24,8 +24,11 @@ export const rdhListToText = (list: ResultSetData[], params: WriteToClipboardPar
 
 const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): string => {
   const maxPrintLines = params.limit ?? 10;
+  const maxCellValueLength = params.limitCell ?? 100;
+
   const outputDetail: ToStringParam = {
     maxPrintLines,
+    maxCellValueLength,
     withRowNo: params.withRowNo,
     withCodeLabel: params.withCodeLabel,
     withRuleViolation: params.withRuleViolation,

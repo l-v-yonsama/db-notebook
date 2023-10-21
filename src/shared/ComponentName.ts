@@ -3,6 +3,7 @@ export type ComponentName =
   | "DiffPanel"
   | "ScanPanel"
   | "VariablesPanel"
+  | "HttpResponsesPanel"
   | "ViewConditionPanel"
   | "WriteToClipboardParamsPanel"
   | "DBFormView"

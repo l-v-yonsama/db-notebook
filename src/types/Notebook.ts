@@ -1,5 +1,5 @@
 import type { NotebookCellKind } from "vscode";
-import type { SQLRunResultMetadata } from "../shared/SQLRunResultMetadata";
+import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export type CellMeta = {
   markAsSkip?: boolean;
@@ -38,5 +38,5 @@ export type RunResult = {
   stdout: string;
   stderr: string;
   skipped: boolean;
-  metadata?: SQLRunResultMetadata;
+  metadata?: RunResultMetadata;
 };

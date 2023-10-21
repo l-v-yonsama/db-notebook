@@ -25,6 +25,8 @@ import {
   faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import SshPre from "simple-syntax-highlighter";
+import "simple-syntax-highlighter/dist/sshpre.css";
 
 library.add(faArrowUp);
 library.add(faCheck);
@@ -50,5 +52,6 @@ app.component("fa", FontAwesomeIcon);
 app.use(VMask);
 app.use(vueClickOutsideElement);
 app.component("VirtualList", VirtualList);
+app.component("SshPre", SshPre);
 
 app.mount("#app");

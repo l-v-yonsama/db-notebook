@@ -180,6 +180,7 @@ export type WriteToClipboardParams<T = any> = TabIdParam & {
   withCodeLabel: boolean;
   withRuleViolation: boolean;
   limit?: number; // default:10
+  limitCell?: number; // default:100
   specifyDetail?: boolean;
   options?: T;
 };

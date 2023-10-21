@@ -13,10 +13,11 @@ import type { NameWithComment, WriteToClipboardParams } from "./ActionParams";
 import type { RecordRule } from "./RecordRule";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { CellMeta } from "../types/Notebook";
-import type { SQLRunResultMetadata } from "./SQLRunResultMetadata";
+import type { RunResultMetadata, NodeRunAxiosResponse } from "./RunResultMetadata";
 
 export type MessageEventData =
   | MdhPanelEventData
+  | HttpResponsesPanelEventData
   | DiffPanelEventData
   | ScanPanelEventData
   | ViewConditionPanelEventData
@@ -43,6 +44,12 @@ export type RdhTabItem = {
   list: ResultSetData[];
 };
 
+export type HttpResponseTabItem = {
+  tabId: string;
+  title: string;
+  list: NodeRunAxiosResponse[];
+};
+
 export type MdhPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand | "set-search-result" | "add-tab-item",
   "MdhPanel",
@@ -52,6 +59,18 @@ export type MdhPanelEventData = BaseMessageEventData<
       value: ResultSetData[];
     };
     addTabItem?: RdhTabItem;
+  }
+>;
+
+export type HttpResponsesPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-response" | "add-tab-item",
+  "HttpResponsesPanel",
+  {
+    searchResponse?: {
+      tabId: string;
+      value: NodeRunAxiosResponse[];
+    };
+    addTabItem?: HttpResponseTabItem;
   }
 >;
 
