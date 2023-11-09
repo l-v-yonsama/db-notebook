@@ -10,11 +10,16 @@ import * as AwsRegionConst from "@/types/lib/AwsRegion";
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
 import { AwsServiceType, AwsServiceTypeValues } from "@/types/lib/AwsServiceType";
 
-import type { AwsSetting, ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+import type {
+  AwsSetting,
+  ConnectionSetting,
+  IamSolutionSetting,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 
 import { vscode } from "@/utilities/vscode";
 import type { ModeType } from "@/utilities/vscode";
 import type { DropdownItem } from "@/types/Components";
+import { ElementSettingFactory } from "./factories/ElementSettingFactory";
 
 const supplyCredentialItems: DropdownItem[] = [
   {
@@ -33,96 +38,12 @@ type Props = {
   prohibitedNames: string[];
 };
 
-const isAwsSelected = computed((): boolean => DBTypeConst.isAws(dbType.value));
-const isAwsWithExplicitCredentials = computed(
-  (): boolean =>
-    DBTypeConst.isAws(dbType.value) && awsCredentialType.value == "Explicit in property"
-);
-const databasePlaceholder = computed((): string => {
-  return dbType.value === DBTypeConst.DBType.Redis ? "Index to use" : "Database name";
-});
-
-const visiblePort = computed((): boolean => {
-  switch (dbType.value) {
-    case DBTypeConst.DBType.Postgres:
-    case DBTypeConst.DBType.MySQL:
-    case DBTypeConst.DBType.Redis:
-      return true;
-  }
-  return false;
-});
-
-const visibleHostOrDatabase = computed((): boolean => {
-  switch (dbType.value) {
-    case DBTypeConst.DBType.Postgres:
-    case DBTypeConst.DBType.MySQL:
-    case DBTypeConst.DBType.Redis:
-      return true;
-  }
-  return false;
-});
-
-const visibleProfile = computed(
-  (): boolean =>
-    DBTypeConst.isAws(dbType.value) &&
-    awsCredentialType.value === SupplyCredentials.sharedCredentialsFile
-);
-
-const visibleUser = computed(
-  (): boolean =>
-    DBTypeConst.DBType.Redis != dbType.value &&
-    (!DBTypeConst.isAws(dbType.value) ||
-      awsCredentialType.value === SupplyCredentials.ExplicitInProperty)
-);
-
-const visiblePassword = computed(
-  (): boolean =>
-    !DBTypeConst.isAws(dbType.value) ||
-    awsCredentialType.value === SupplyCredentials.ExplicitInProperty
-);
-
-const visibleTimezone = computed((): boolean => DBTypeConst.isRDSType(dbType.value));
-
-const urlLabel = computed((): string => (DBTypeConst.isAws(dbType.value) ? "Endpoint url" : "URL"));
-
-const userLabel = computed((): string =>
-  DBTypeConst.isAws(dbType.value) ? `Access key ID` : "User"
-);
-
-const passwordLabel = computed((): string =>
-  DBTypeConst.isAws(dbType.value) ? `Secret access key` : "Password"
-);
-
 const acceptValues = computed((): boolean => {
-  if (name.value === "") {
+  const item = createItem();
+  if (!elmSettings.value.accept(item)) {
     return false;
   }
-  if (DBTypeConst.isAws(dbType.value)) {
-    // AWS
-    if (awsServiceSelected.value.length === 0) {
-      return false;
-    }
-    if (awsCredentialType.value === SupplyCredentials.ExplicitInProperty) {
-      if (password.value === "" || user.value === "") {
-        return false;
-      }
-    } else if (awsCredentialType.value === SupplyCredentials.sharedCredentialsFile) {
-      if (awsProfile.value === "") {
-        return false;
-      }
-    }
-  } else {
-    // RDS or Redis
-    if (database.value === "") {
-      return false;
-    }
-    // RDS
-    if (DBTypeConst.isRDSType(dbType.value)) {
-      if (user.value === "" || password.value === "") {
-        return false;
-      }
-    }
-  }
+
   if (props.mode === "duplicate" || props.mode === "create") {
     if (props.prohibitedNames.includes(name.value)) {
       return false;
@@ -172,6 +93,10 @@ const props = withDefaults(defineProps<Props>(), {
       supplyCredentialType: SupplyCredentials.ExplicitInProperty,
       region: "",
     },
+    iamSolution: {
+      clientId: "",
+      grantType: "password",
+    },
   }),
   prohibitedNames: () => [],
 });
@@ -203,19 +128,44 @@ const awsServiceItems = AwsServiceTypeValues.map((it) => ({
   disabled: props.mode === "show",
 }));
 
+const clientId = ref(props.item.iamSolution?.clientId ?? "");
+
+const elmSettings = computed(() => {
+  const it = ElementSettingFactory.create({
+    dbType: dbType.value,
+    awsCredentialType: awsCredentialType.value,
+  });
+  return it;
+});
+
+const urlNote = computed((): string => {
+  if (DBTypeConst.isIam(dbType.value)) {
+    return `Issuer: ${url.value}/realms/master`;
+  }
+  return "";
+});
+
 function createItem(): ConnectionSetting {
   let awsSetting: AwsSetting | undefined = undefined;
-  const aaa = awsServiceSelected.value.join(",");
-  const arr = aaa.split(",");
+  let iamSolution: IamSolutionSetting | undefined = undefined;
+
   if (DBTypeConst.isAws(dbType.value)) {
+    const awsServiceNames = awsServiceSelected.value.join(",").split(",");
     awsSetting = {
-      services: arr as AwsServiceType[],
+      services: awsServiceNames as AwsServiceType[],
       profile: awsProfile.value,
       supplyCredentialType: awsCredentialType.value,
       region: region.value,
     };
   }
-  const a = {
+  if (DBTypeConst.isIam(dbType.value)) {
+    iamSolution = {
+      clientId: clientId.value,
+      grantType: "password",
+    };
+  }
+
+  const a: ConnectionSetting = {
     name: name.value,
     host: host.value,
     port: port.value,
@@ -226,6 +176,7 @@ function createItem(): ConnectionSetting {
     timezone: timezone.value,
     url: url.value,
     awsSetting,
+    iamSolution,
   };
   return a;
 }
@@ -236,6 +187,7 @@ function save() {
     params: createItem(),
   });
 }
+
 function test() {
   isInProgress.value = true;
   vscode.postCommand({
@@ -243,30 +195,20 @@ function test() {
     params: createItem(),
   });
 }
+
 function setDefault() {
   if (props.mode !== "update") {
     name.value = dbType.value;
   }
 
-  host.value = "127.0.0.1";
+  host.value = elmSettings.value.getHost().defaultValue ?? "";
   user.value = "";
   password.value = "";
   timezone.value = "";
-  url.value = "";
-  switch (dbType.value) {
-    case DBTypeConst.DBType.Redis:
-      port.value = 6379;
-      database.value = "0";
-      break;
-    case DBTypeConst.DBType.Postgres:
-      port.value = 5432;
-      database.value = "postgres";
-      break;
-    case DBTypeConst.DBType.MySQL:
-      port.value = 3306;
-      database.value = "mysql";
-      break;
-  }
+  url.value = elmSettings.value.getUrl().defaultValue ?? "";
+  clientId.value = elmSettings.value.getIamClientId().defaultValue ?? "";
+  database.value = elmSettings.value.getDatabase().defaultValue ?? "";
+  port.value = elmSettings.value.getPort().defaultValue ?? 0;
 }
 
 const stopProgress = () => {
@@ -296,106 +238,147 @@ defineExpose({
     ></VsCodeTextField>
     <p v-if="isDuplicateName" class="marker-error">Duplicate name</p>
 
-    <label v-show="visibleHostOrDatabase" for="host">Host</label>
-    <p v-if="isShowMode" v-show="visibleHostOrDatabase" id="host">{{ host }}</p>
+    <label v-show="elmSettings.getHost().visible" for="host">Host</label>
+    <p v-if="isShowMode" v-show="elmSettings.getHost().visible" id="host">{{ host }}</p>
     <VsCodeTextField
       v-else
-      v-show="visibleHostOrDatabase"
+      v-show="elmSettings.getHost().visible"
       id="host"
       v-model="host"
       :maxlength="256"
     ></VsCodeTextField>
 
-    <label v-show="visiblePort" for="port">Port</label>
-    <p v-if="isShowMode" v-show="visiblePort" id="port">{{ port }}</p>
+    <label v-show="elmSettings.getPort().visible" for="port">Port</label>
+    <p v-if="isShowMode" v-show="elmSettings.getPort().visible" id="port">{{ port }}</p>
     <VsCodeTextField
       v-else
-      v-show="visiblePort"
+      v-show="elmSettings.getPort().visible"
       id="port"
       v-model="port"
       type="number"
     ></VsCodeTextField>
 
-    <label v-show="visibleHostOrDatabase" for="database">Database</label>
-    <p v-if="isShowMode" id="database">{{ database }}</p>
+    <label v-show="elmSettings.getDatabase().visible" for="database">{{
+      elmSettings.getDatabase().label
+    }}</label>
+    <p v-if="isShowMode" v-show="elmSettings.getDatabase().visible" id="database">{{ database }}</p>
     <VsCodeTextField
       v-else
-      v-show="visibleHostOrDatabase"
+      v-show="elmSettings.getDatabase().visible"
       id="database"
       v-model="database"
-      :placeholder="databasePlaceholder"
+      :placeholder="elmSettings.getDatabase().placeholder"
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="isAwsSelected" for="awsCredentialType">Aws credential type</label>
-    <p v-if="isShowMode && isAwsSelected" id="awsCredentialType">{{ awsCredentialType }}</p>
+    <label v-show="elmSettings.getIamClientId().visible" for="clientId">ClientId</label>
+    <p v-if="isShowMode" v-show="elmSettings.getIamClientId().visible" id="database">
+      {{ clientId }}
+    </p>
+    <VsCodeTextField
+      v-else
+      v-show="elmSettings.getIamClientId().visible"
+      id="clientId"
+      v-model="clientId"
+      :placeholder="elmSettings.getIamClientId().placeholder"
+      :maxlength="128"
+    ></VsCodeTextField>
+
+    <label v-show="elmSettings.getAwsCredentialType().visible" for="awsCredentialType"
+      >Aws credential type</label
+    >
+    <p v-if="isShowMode && elmSettings.getAwsCredentialType().visible" id="awsCredentialType">
+      {{ awsCredentialType }}
+    </p>
     <VsCodeRadioGroupVue
-      v-if="!isShowMode && isAwsSelected"
+      v-if="!isShowMode && elmSettings.getAwsCredentialType().visible"
       id="awsCredentialType"
       v-model="awsCredentialType"
       :items="supplyCredentialItems"
     ></VsCodeRadioGroupVue>
 
-    <label v-show="visibleProfile" for="profile">Profile name</label>
-    <p v-if="isShowMode && visibleProfile" id="profile">{{ awsProfile }}</p>
+    <label v-show="elmSettings.getProfile().visible" for="profile">Profile name</label>
+    <p v-if="isShowMode && elmSettings.getProfile().visible" id="profile">{{ awsProfile }}</p>
     <VsCodeTextField
-      v-show="!isShowMode && visibleProfile"
+      v-show="!isShowMode && elmSettings.getProfile().visible"
       id="profile"
       v-model="awsProfile"
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="visibleUser" for="user">{{ userLabel }}</label>
-    <p v-if="isShowMode && visibleUser" id="user">{{ maskedUser }}</p>
+    <label v-show="elmSettings.getUser().visible" for="user">{{
+      elmSettings.getUser().label
+    }}</label>
+    <p v-if="isShowMode && elmSettings.getUser().visible" id="user">{{ maskedUser }}</p>
     <VsCodeTextField
-      v-if="!isShowMode && visibleUser"
+      v-if="!isShowMode && elmSettings.getUser().visible"
       id="user"
       v-model="user"
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="visiblePassword" for="password">{{ passwordLabel }}</label>
-    <p v-if="isShowMode && visiblePassword" id="password">{{ maskedPassword }}</p>
+    <label v-show="elmSettings.getPassword().visible" for="password">{{
+      elmSettings.getPassword().label
+    }}</label>
+    <p v-if="isShowMode && elmSettings.getPassword().visible" id="password">{{ maskedPassword }}</p>
     <VsCodeTextField
-      v-if="!isShowMode && visiblePassword"
+      v-if="!isShowMode && elmSettings.getPassword().visible"
       id="password"
       v-model="password"
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="visibleTimezone" for="timezone">Timezone(Optional)</label>
-    <p v-if="isShowMode && visibleTimezone" id="timezone">{{ timezone }}</p>
+    <label v-show="elmSettings.getTimezone().visible" for="timezone">Timezone(Optional)</label>
+    <p v-if="isShowMode && elmSettings.getTimezone().visible" id="timezone">{{ timezone }}</p>
     <VsCodeTextField
-      v-if="!isShowMode && visibleTimezone"
+      v-if="!isShowMode && elmSettings.getTimezone().visible"
       id="timezone"
       v-model="timezone"
       :maxlength="128"
       placeholder="±00:00"
     ></VsCodeTextField>
 
-    <label v-show="isAwsWithExplicitCredentials" for="url">{{ urlLabel }}</label>
-    <p v-if="isShowMode && isAwsWithExplicitCredentials" id="url">{{ url }}</p>
+    <label v-show="elmSettings.getUrl().visible" for="url">{{ elmSettings.getUrl().label }}</label>
+    <p v-if="isShowMode && elmSettings.getUrl().visible" id="url">{{ url }}</p>
     <VsCodeTextField
       v-else
-      v-show="isAwsWithExplicitCredentials"
+      v-show="elmSettings.getUrl().visible"
       id="url"
       v-model="url"
       :type="'url'"
       :maxlength="256"
     ></VsCodeTextField>
+    <p v-if="elmSettings.getUrl().visible && urlNote">{{ urlNote }}</p>
 
-    <label v-show="isAwsWithExplicitCredentials" for="region">(Region)</label>
-    <p v-if="isShowMode && isAwsWithExplicitCredentials" id="region">{{ region }}</p>
+    <label
+      v-show="
+        elmSettings.getAwsCredentialType().visible && awsCredentialType == 'Explicit in property'
+      "
+      for="region"
+      >(Region)</label
+    >
+    <p
+      v-if="
+        isShowMode &&
+        elmSettings.getAwsCredentialType().visible &&
+        awsCredentialType == 'Explicit in property'
+      "
+      id="region"
+    >
+      {{ region }}
+    </p>
     <VsCodeDropdown
       v-else
-      v-show="isAwsWithExplicitCredentials"
+      v-show="
+        elmSettings.getAwsCredentialType().visible && awsCredentialType == 'Explicit in property'
+      "
       id="region"
       v-model="region"
       :items="regionItems"
     ></VsCodeDropdown>
 
     <VsCodeCheckboxGroup
-      v-show="isAwsSelected"
+      v-show="elmSettings.getAwsCredentialType().visible"
       legend="Services"
       :items="awsServiceItems"
       v-model="awsServiceSelected"

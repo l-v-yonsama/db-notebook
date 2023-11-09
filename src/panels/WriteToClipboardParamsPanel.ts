@@ -1,44 +1,59 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
+import { WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
-import { createWebviewContent } from "../utilities/webviewUtil";
 import { rdhListToText } from "../utilities/rdhToText";
 import { WriteToClipboardParamsPanelEventData } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
+import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[WriteToClipboardParamsPanel]";
 
-const componentName: ComponentName = "WriteToClipboardParamsPanel";
-
-export class WriteToClipboardParamsPanel {
+export class WriteToClipboardParamsPanel extends BasePanel {
   public static currentPanel: WriteToClipboardParamsPanel | undefined;
-  private readonly _panel: WebviewPanel;
-  private _disposables: Disposable[] = [];
   private list: ResultSetData[] = [];
   private params: WriteToClipboardParams | undefined;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
-    this._panel = panel;
-
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(
-      this._panel.webview,
-      extensionUri,
-      componentName
-    );
-    this._setWebviewMessageListener(this._panel.webview);
+    super(panel, extensionUri);
   }
 
   public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     WriteToClipboardParamsPanel.currentPanel = new WriteToClipboardParamsPanel(panel, extensionUri);
   }
 
+  getComponentName(): ComponentName {
+    return "WriteToClipboardParamsPanel";
+  }
+
+  protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
+    const { command, params } = message;
+
+    switch (command) {
+      case "writeToClipboard":
+        if (params.specifyDetail === true) {
+          this.params = params;
+          this.renderSub();
+        } else {
+          await vscode.env.clipboard.writeText(rdhListToText(this.list, params));
+          this.dispose();
+        }
+        return;
+      case "cancel":
+        this.dispose();
+        return;
+    }
+  }
+
+  protected preDispose(): void {
+    WriteToClipboardParamsPanel.currentPanel = undefined;
+  }
+
   public static render(extensionUri: Uri, list: ResultSetData[], params: WriteToClipboardParams) {
     log(`${PREFIX} render`);
     if (WriteToClipboardParamsPanel.currentPanel) {
-      WriteToClipboardParamsPanel.currentPanel._panel.reveal(ViewColumn.Two);
+      WriteToClipboardParamsPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.Two);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
@@ -82,47 +97,6 @@ export class WriteToClipboardParamsPanel {
       },
     };
 
-    this._panel.webview.postMessage(msg);
-  }
-
-  /**
-   * Cleans up and disposes of webview resources when the webview panel is closed.
-   */
-  public dispose() {
-    log(`${PREFIX} dispose`);
-
-    WriteToClipboardParamsPanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
-    }
-  }
-
-  private _setWebviewMessageListener(webview: Webview) {
-    webview.onDidReceiveMessage(
-      async (message: ActionCommand) => {
-        const { command, params } = message;
-        switch (command) {
-          case "writeToClipboard":
-            if (params.specifyDetail === true) {
-              this.params = params;
-              this.renderSub();
-            } else {
-              await vscode.env.clipboard.writeText(rdhListToText(this.list, params));
-              this.dispose();
-            }
-            return;
-          case "cancel":
-            this.dispose();
-            return;
-        }
-      },
-      undefined,
-      this._disposables
-    );
+    this.panel.webview.postMessage(msg);
   }
 }

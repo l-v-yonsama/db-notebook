@@ -73,14 +73,14 @@ watch(
 
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: string | number): void;
-  (event: "onCellFocus", modelValue: string | number): void;
+  (event: "onFocusCell", modelValue: string | number): void;
 }>();
 
 function handleOnInput(event: any) {
   emit("update:modelValue", event.target.value);
 }
 function handleOnFocus(event: any) {
-  emit("onCellFocus", event.target.value);
+  emit("onFocusCell", event.target.value);
 }
 function handleOnMouseOut(event: any) {
   if (props.changeOnMouseout === true && initialValue != event.target.value) {

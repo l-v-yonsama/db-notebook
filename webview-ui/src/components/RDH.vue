@@ -79,12 +79,14 @@ type ColKey = {
   inputSize: number;
   comment: string;
   required?: boolean;
+  align?: "left" | "center" | "right";
 };
 
+const selectedRowIndex = ref(-1);
 const editable = props.rdh.meta?.editable === true;
 
 const emit = defineEmits<{
-  (event: "onCellFocus", value: CellFocusParams): void;
+  (event: "onClickCell", value: CellFocusParams): void;
 }>();
 
 const visible = ref(true);
@@ -153,6 +155,7 @@ const columns = ref(
       width,
       inputSize: Math.ceil(width / 8),
       comment: k.comment,
+      align: k.align,
     };
     return key;
   })
@@ -266,7 +269,7 @@ function toValue(key: RdhKey, value: any): any {
   return value;
 }
 
-const onCellFocus = ({
+const onClickCell = ({
   rowPos,
   colPos,
   key,
@@ -285,7 +288,8 @@ const onCellFocus = ({
     rowValues,
     value,
   };
-  emit("onCellFocus", params);
+  selectedRowIndex.value = rowPos;
+  emit("onClickCell", params);
 };
 
 function hasAnyChangedAnnotation(meta: RdhRow["meta"]): boolean {
@@ -314,9 +318,13 @@ const hasAnnotationsOf = (meta: RdhRow["meta"], type: AnnotationType, key?: stri
 };
 
 const cellStyle = (p: any, keyInfo: ColKey): any => {
-  const styles: any = {
-    width: `${keyInfo.width}px`,
+  const styles: { [key: string]: any } = {
+    "width": `${keyInfo.width}px`,
+    "max-width": `${keyInfo.width}px`,
   };
+  if (keyInfo.align) {
+    styles["text-align"] = keyInfo.align;
+  }
   const meta: RdhRow["meta"] = p["$meta"];
   if (hasAnnotationsOf(meta, "Upd", keyInfo.name)) {
     styles["background-color"] = "rgba(112, 83, 255, 0.32) !important";
@@ -327,7 +335,7 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
   return styles;
 };
 
-const rowStyle = (p: any): any => {
+const rowStyle = (p: any, rowIndex: number): any => {
   const meta: RdhRow["meta"] = p["$meta"];
   if (hasAnnotationsOf(meta, "Add")) {
     return { "background-color": "rgba(195, 232, 141, 0.22) !important" };
@@ -337,6 +345,9 @@ const rowStyle = (p: any): any => {
     return { "background-color": "rgba(112, 83, 255, 0.17) !important" };
   } else if (hasAnnotationsOf(meta, "Rul")) {
     return { "background-color": "rgba(232, 232, 83, 0.09) !important" };
+  }
+  if (rowIndex === selectedRowIndex.value) {
+    return { "background-color": "rgba(232, 232, 232, 0.09) !important" };
   }
   return null;
 };
@@ -505,7 +516,7 @@ defineExpose({
           </thead>
         </template>
         <template #default="{ item, index }">
-          <tr :style="rowStyle(item)">
+          <tr :style="rowStyle(item, index)">
             <td v-if="editable" class="ctrl">
               <div>
                 <VsCodeButton
@@ -525,7 +536,10 @@ defineExpose({
                 /></VsCodeButton>
               </div>
             </td>
-            <td class="row">
+            <td
+              class="row"
+              @click="onClickCell({ rowPos: index, colPos: -1, key: '', rowValues: item })"
+            >
               {{ toEditTypeMark(item.editType) }}
               {{ index + 1 }}
             </td>
@@ -534,6 +548,7 @@ defineExpose({
               v-for="(key, idx) of columns"
               :key="idx"
               :style="cellStyle(item, key)"
+              @click="onClickCell({ rowPos: index, colPos: idx, key: key.name, rowValues: item })"
             >
               <VsCodeTextField
                 v-if="item.editType === 'ins' || item.editType === 'upd'"
@@ -544,9 +559,6 @@ defineExpose({
                 :maxlength="1000"
                 :size="key.inputSize"
                 style="width: 99%"
-                @onCellFocus="
-                  onCellFocus({ rowPos: index, colPos: idx, key: key.name, rowValues: item })
-                "
               ></VsCodeTextField>
               <template v-else>
                 <template v-if="item.$fileValues[key.name]">
@@ -558,12 +570,12 @@ defineExpose({
                 <template v-else>
                   <p
                     :class="{ 'code-value': item.$resolvedLabels[key.name] }"
-                    :style="{ width: `${key.width}px` }"
+                    :title="item[key.name]"
                   >
                     <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
                       item.$ruleViolationMarks[key.name]
-                    }}</span
-                    >{{ item[key.name] }}
+                    }}</span>
+                    <span>{{ item[key.name] }}</span>
                   </p>
                   <span
                     v-if="item.$resolvedLabels[key.name]"
@@ -580,7 +592,7 @@ defineExpose({
                       item[key.name] !== null &&
                       item[key.name] !== ''
                     "
-                    @click="copyToClipboard(item[key.name])"
+                    @click.stop="copyToClipboard(item[key.name])"
                     appearance="secondary"
                     class="copy-to-clipboard"
                     ><fa icon="clipboard"
@@ -615,7 +627,16 @@ th {
   border-right: calc(var(--border-width) * 1px) groove var(--dropdown-border);
   border-bottom: calc(var(--border-width) * 1px) groove var(--dropdown-border);
 
-  &.row,
+  &.row {
+    min-width: 55px;
+    width: 55px;
+    max-width: 55px;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--vscode-editorPane-background);
+  }
+
   &.ctrl {
     min-width: 80px;
     width: 80px;
@@ -624,9 +645,7 @@ th {
     left: 0;
     z-index: 1;
     background-color: var(--vscode-editorPane-background);
-  }
 
-  &.ctrl {
     & > div {
       display: none;
 
@@ -652,6 +671,9 @@ td {
   }
 
   &.vcell {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
     position: relative;
 
     & > a.download-link {
@@ -689,10 +711,11 @@ td {
 
     & > p {
       display: inline-block;
-      margin: 5px 1px;
-      text-overflow: ellipsis;
+      margin: 5px 2px;
       overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
+      width: 100%;
     }
 
     span.violation-mark {

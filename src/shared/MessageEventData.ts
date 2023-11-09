@@ -1,35 +1,45 @@
 import type {
   ConnectionSetting,
+  ContentTypeInfo,
   DBType,
   DbResource,
   DbSchema,
   DbTable,
   DiffResult,
+  ResourceType,
   ResultSetData,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ComponentName } from "./ComponentName";
 import type { ModeType } from "./ModeType";
-import type { NameWithComment, WriteToClipboardParams } from "./ActionParams";
+import type {
+  NameWithComment,
+  WriteToClipboardParams,
+  WriteHttpEventToClipboardParams,
+  SearchScanPanelParams,
+} from "./ActionParams";
 import type { RecordRule } from "./RecordRule";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { CellMeta } from "../types/Notebook";
-import type { RunResultMetadata, NodeRunAxiosResponse } from "./RunResultMetadata";
+import type { NodeRunAxiosEvent } from "./RunResultMetadata";
+import type { Har } from "har-format";
 
 export type MessageEventData =
   | MdhPanelEventData
-  | HttpResponsesPanelEventData
+  | HttpEventPanelEventData
+  | HarFilePanelEventData
   | DiffPanelEventData
   | ScanPanelEventData
   | ViewConditionPanelEventData
   | VariablesPanelEventData
   | WriteToClipboardParamsPanelEventData
+  | WriteHttpEventToClipboardParamsPanelEventData
   | NotebookCellMetadataPanelEventData
   | ERDiagramSettingsPanelEventData
   | RecordRuleEditorEventData
   | CodeResolverEditorEventData
   | DBFormEventData;
 
-export type BaseMessageEventDataCommand = "stop-progress" | "initialize";
+export type BaseMessageEventDataCommand = "stop-progress" | "loading" | "initialize";
 
 export type BaseMessageEventData<T, U = ComponentName, V = any> = {
   command: T;
@@ -47,7 +57,14 @@ export type RdhTabItem = {
 export type HttpResponseTabItem = {
   tabId: string;
   title: string;
-  list: NodeRunAxiosResponse[];
+  list: NodeRunAxiosEvent[];
+};
+
+export type HarFileTabItem = {
+  tabId: string;
+  title: string;
+  res: Har;
+  rdh: ResultSetData;
 };
 
 export type MdhPanelEventData = BaseMessageEventData<
@@ -62,15 +79,47 @@ export type MdhPanelEventData = BaseMessageEventData<
   }
 >;
 
-export type HttpResponsesPanelEventData = BaseMessageEventData<
+export type HttpEventPanelEventCodeBlocks = {
+  req: {
+    headers?: string;
+    params?: string;
+    contents?: string;
+    previewContentTypeInfo?: ContentTypeInfo;
+    cookies?: ResultSetData;
+  };
+  res: {
+    headers?: string;
+    contents?: string;
+    previewContentTypeInfo?: ContentTypeInfo;
+    cookies?: ResultSetData;
+  };
+};
+
+export type HttpEventPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "HttpEventPanel",
+  {
+    loading?: number;
+    initialize?: {
+      title: string;
+      value: NodeRunAxiosEvent;
+      codeBlocks: HttpEventPanelEventCodeBlocks;
+    };
+  }
+>;
+
+export type HarFilePanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand | "set-response" | "add-tab-item",
-  "HttpResponsesPanel",
+  "HarFilePanel",
   {
     searchResponse?: {
       tabId: string;
-      value: NodeRunAxiosResponse[];
+      value: {
+        res: Har;
+        rdh: ResultSetData;
+      };
     };
-    addTabItem?: HttpResponseTabItem;
+    addTabItem?: HarFileTabItem;
   }
 >;
 
@@ -108,11 +157,16 @@ export type ScanConditionItem = {
   value: any;
   visible: boolean;
   description?: string;
+  items?: {
+    label: string;
+    value: string;
+  }[];
 };
 
 export type ScanTabItem = {
   tabId: string;
   conName: string;
+  resourceType: ScanConditionItem;
   rootRes: DbResource;
   title: string;
   dbType: DBType;
@@ -123,16 +177,17 @@ export type ScanTabItem = {
   endDt: ScanConditionItem;
   multilineKeyword: boolean;
   parentTarget?: string;
-  lastSearchParam?: ScanReqInput;
+  targetName: string;
+  lastSearchParam?: SearchScanPanelParams;
 };
 
-export type ScanReqInput = {
-  tabId: string;
-  keyword: string;
-  limit?: number;
-  startTime?: number;
-  endTime?: number;
-};
+// export type ScanReqInput = {
+//   tabId: string;
+//   keyword: string;
+//   limit?: number;
+//   startTime?: number;
+//   endTime?: number;
+// };
 
 export type ScanPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "remove-tab-item",
@@ -181,6 +236,17 @@ export type WriteToClipboardParamsPanelEventData = BaseMessageEventData<
   {
     initialize?: {
       params: WriteToClipboardParams;
+      previewText: string;
+    };
+  }
+>;
+
+export type WriteHttpEventToClipboardParamsPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "WriteHttpEventToClipboardParamsPanel",
+  {
+    initialize?: {
+      params: WriteHttpEventToClipboardParams;
       previewText: string;
     };
   }

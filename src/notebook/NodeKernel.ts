@@ -12,9 +12,10 @@ import {
   winToLinuxPath,
   writeToResource,
 } from "../utilities/fsUtil";
-import { NodeRunAxiosResponse, RunResultMetadata } from "../shared/RunResultMetadata";
+import { NodeRunAxiosEvent, RunResultMetadata } from "../shared/RunResultMetadata";
 import { URL } from "url";
 import dayjs = require("dayjs");
+import { Entry } from "har-format";
 
 const PREFIX = "  [notebook/NodeKernel]";
 
@@ -57,6 +58,8 @@ export class NodeKernel {
       const axios = require('${winToLinuxPath(
         path.join(nodeModules, "axios/dist/node/axios.cjs")
       )}');
+      const _harTracker = require('${winToLinuxPath(path.join(nodeModules, "axios-har-tracker"))}');
+      const _axiosTracker = new _harTracker.AxiosHarTracker(axios); 
       axios.interceptors.request.use( x => {
         x.meta = x.meta || {}
         x.meta.requestStartedAt = new Date().getTime();
@@ -67,6 +70,7 @@ export class NodeKernel {
         delete x.config.meta.requestStartedAt;
         return x;
       });
+
       const variables = require('${winToLinuxPath(path.join(nodeModules, "store"))}');
       const {DBDriverResolver,ResultSetDataBuilder,parseContentType} = require('${winToLinuxPath(
         path.join(nodeModules, "@l-v-yonsama/multi-platform-database-drivers")
@@ -88,43 +92,40 @@ export class NodeKernel {
       };
 
       const writeResponseData = (res) => {
-        const headerList = ['Server','Content-Type','Content-Length','Cache-Control','Content-Encoding'];
-        const headers = {};
+        try {
+          const har = _axiosTracker.getGeneratedHar();
+          const rc = res.config;
+          const entry = har.log.entries.find(it => it.request.url===rc.url && it.request.method === rc.method && it.response.status === res.status);
+    
+          if(entry){
+            if(res.config.baseURL) {
+              entry.request.url = res.config.baseURL + res.config.url;
+            }
 
-        Object.keys(res.headers).forEach(name => {
-          const lname = name.toLowerCase();
-          const normalizedName = headerList.find(it => it.toLowerCase() === lname);
-          if ( normalizedName ) {
-            headers[normalizedName] = res.headers[name];
-          } else {
-            headers[name] = res.headers[name];
-          }
-        });
+            const realMimeType = entry.response.headers.find(it=>it.name.toLowerCase()==='content-type')?.value;
+            if( realMimeType !==  undefined){
+              entry.response.content.mimeType = realMimeType;
+            }
+            
+            if( entry.response.content.mimeType.startsWith('text/') && res.data !== undefined && typeof(res.data)==='string' ){
+              const size = res.data.length;
+              entry.response.bodySize = size;
+              entry.response.content.size = size;
+              entry.response.content.text = res.data;
+            }
 
-        let data = res.data;
-        const contentTypeInfo = parseContentType({contentType:headers['Content-Type']});
-        if (!contentTypeInfo.isTextValue) {
-          data = res.data.toString('base64');
+            if(res.data && Buffer.isBuffer(res.data)){
+              entry.response.content.text = res.data.toString('base64');
+              entry.response.content.encoding = 'base64';
+            }
+
+            entry.time = res.config.meta?.elapsedTime;
+            entry.response.time = res.config.meta?.elapsedTime;
+            variables.set('_ResponseData', fstringify(entry));  
+          }  
+        } catch(e){
+          console.error(e);
         }
-
-        const resData = {
-          data,
-          status: res.status,
-          statusText: res.statusText,
-          elapsedTime: res.config.meta?.elapsedTime,
-          headers,
-          contentTypeInfo,
-          config:{
-            url: res.config.url,
-            method: res.config.method,
-            baseURL: res.config.baseURL,
-            headers: res.config.headers,
-            params: res.config.params,
-            data: res.config.data,
-            timeout: res.config.timeout,
-          }
-        };
-        variables.set('_ResponseData', fstringify(resData));
       };
 
       const _saveVariables = () => {
@@ -217,14 +218,24 @@ export class NodeKernel {
     if (this.variables["_ResponseData"]) {
       const resString = this.variables["_ResponseData"];
       delete this.variables["_ResponseData"];
-      const res = JSON.parse(resString) as NodeRunAxiosResponse;
-      let title = `${dayjs().format("HH:mm:ss.SSS")}[${res.status}]`;
-      if (res.config.url && res.config.method) {
-        const url = new URL(res.config.url);
-        title += `[${res.config.method}][${abbr(url.host + (url.pathname ?? ""), 16)}]`;
+      const entry = JSON.parse(resString) as Entry;
+
+      let title = `${dayjs().format("HH:mm:ss.SSS")}[${entry.response.status}]`;
+      if (entry.request.url) {
+        let urlString = entry.request.url;
+        try {
+          const url = new URL(entry.request.url);
+          urlString = url.host + (url.pathname ?? "");
+        } catch (_) {}
+        if (entry.request.method) {
+          title += `[${entry.request.method}][${abbr(urlString, 22)}]`;
+        }
       }
-      res.title = title;
-      metadata.res = res;
+
+      metadata.axiosEvent = {
+        title,
+        entry,
+      };
     }
 
     return {
@@ -254,5 +265,18 @@ export class NodeKernel {
     // log(`${PREFIX} dispose`);
     this.child = undefined;
     await deleteResource(this.tmpDirectory, { recursive: true });
+  }
+
+  queryStringToJSON(queryString: string): { [key: string]: any } | undefined {
+    if (queryString.length === 0) {
+      return undefined;
+    }
+    var pairs = queryString.split("&");
+    var result: { [key: string]: any } = {};
+    pairs.forEach((pair) => {
+      const p = pair.split("=");
+      result[p[0]] = decodeURIComponent(p[1] || "");
+    });
+    return result;
   }
 }

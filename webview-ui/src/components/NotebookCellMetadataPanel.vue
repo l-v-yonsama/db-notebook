@@ -135,7 +135,7 @@ defineExpose({
           >
         </div>
       </fieldset>
-      <fieldset style="margin-bottom: 0">
+      <fieldset>
         <legend>Execute SQL mode</legend>
         <div>
           <div>

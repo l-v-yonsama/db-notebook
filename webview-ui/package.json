@@ -12,17 +12,15 @@
     "@fortawesome/fontawesome-svg-core": "^6.4.0",
     "@fortawesome/free-solid-svg-icons": "^6.4.0",
     "@fortawesome/vue-fontawesome": "^3.0.0-5",
-    "@ssibrahimbas/v-mask": "^1.0.0",
     "@virtual-list/vue": "^1.2.0",
     "@vscode/codicons": "^0.0.32",
     "@vscode/webview-ui-toolkit": "^1.2.1",
-    "simple-syntax-highlighter": "^3.0.2",
     "splitpanes": "^3.1.5",
     "vue": "^3.2.33",
     "vue-click-outside-element": "^3.1.2"
   },
   "devDependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.203",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.213",
     "@types/node": "^16.11.27",
     "@types/splitpanes": "^2.2.1",
     "@types/vscode-webview": "^1.57.0",

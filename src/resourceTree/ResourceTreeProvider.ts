@@ -135,6 +135,9 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.AwsDatabase:
         iconFile = "database.svg";
         break;
+      case ResourceType.KeycloakDatabase:
+        iconFile = "database.svg";
+        break;
       case ResourceType.RedisDatabase:
         iconFile = "database.svg";
         description = `${(resource as RedisDatabase).numOfKeys} keys`;
@@ -158,6 +161,14 @@ export class DBDatabaseItem extends vscode.TreeItem {
         break;
       case ResourceType.LogGroup:
         iconFile = "list-ordered.svg";
+        scannable = true;
+        break;
+      case ResourceType.IamRealm:
+        iconFile = "inbox.svg";
+        scannable = true;
+        break;
+      case ResourceType.IamGroup:
+        iconFile = "build.svg";
         scannable = true;
         break;
       case ResourceType.Column:

@@ -7,6 +7,7 @@ import {
   DbLogStream,
   DbResource,
   RedisDriver,
+  ResourceType,
   ResultSetData,
   ScanParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -16,16 +17,11 @@ import { StateStorage } from "../utilities/StateStorage";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
 import { createHash } from "crypto";
-import { ActionCommand } from "../shared/ActionParams";
+import { ActionCommand, SearchScanPanelParams } from "../shared/ActionParams";
 import { OutputParams } from "../shared/ActionParams";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { log } from "../utilities/logger";
-import {
-  ScanPanelEventData,
-  ScanTabItem,
-  ScanConditionItem,
-  ScanReqInput,
-} from "../shared/MessageEventData";
+import { ScanPanelEventData, ScanTabItem, ScanConditionItem } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
 
 const PREFIX = "[ScanPanel]";
@@ -59,6 +55,9 @@ export class ScanPanel {
   }
 
   public static render(extensionUri: Uri, rootRes: DbResource) {
+    if (rootRes === null || rootRes === undefined) {
+      throw new Error("rootRes must be defined");
+    }
     if (ScanPanel.currentPanel) {
       // If the webview panel already exists reveal it
       ScanPanel.currentPanel._panel.reveal(ViewColumn.One);
@@ -100,13 +99,45 @@ export class ScanPanel {
     const limit = createCondition("Limit", 1000);
     const startDt = createCondition("StartDt", now.format("YYYY-MM-DD"));
     const endDt = createCondition("EndDt", now.format("YYYY-MM-DD"));
+    const resourceType = createCondition("resourceType", rootRes.resourceType);
+    let parentTarget: string | undefined = undefined;
+    let targetName = rootRes.name;
+
     let multilineKeyword = false;
 
     startDt.visible = false;
     endDt.visible = false;
+    resourceType.visible = false;
+
     switch (dbType) {
       case DBType.Redis:
         keyword.value = "*";
+        break;
+      case DBType.Keycloak:
+        resourceType.visible = true;
+        switch (rootRes.resourceType) {
+          case "IamRealm":
+            resourceType.value = "IamGroup";
+            resourceType.items = [
+              ResourceType.IamRealm,
+              ResourceType.IamGroup,
+              ResourceType.IamRole,
+              ResourceType.IamUser,
+            ].map((it) => ({
+              label: it.substring(3),
+              value: it,
+            }));
+            break;
+          case "IamGroup":
+            parentTarget = rootRes.id;
+            targetName = rootRes.meta.realmName;
+            resourceType.value = "IamUser";
+            resourceType.items = [ResourceType.IamUser].map((it) => ({
+              label: it.substring(3),
+              value: it,
+            }));
+            break;
+        }
         break;
       case DBType.Aws:
         switch (rootRes.resourceType) {
@@ -142,8 +173,11 @@ export class ScanPanel {
     }
 
     const item = {
+      parentTarget,
+      targetName,
       tabId: rootRes.id,
       conName,
+      resourceType,
       title,
       dbType,
       rootRes,
@@ -314,9 +348,9 @@ export class ScanPanel {
   /**
    * スキャンする
    */
-  private async search(data: ScanReqInput) {
+  private async search(data: SearchScanPanelParams) {
     log(`${PREFIX} search(${JSON.stringify(data)})`);
-    const { tabId, keyword, limit, startTime, endTime } = data;
+    const { tabId, keyword, limit, startTime, endTime, resourceType } = data;
     const panelItem = this.items.find((it) => it.tabId === tabId);
     if (!panelItem) {
       return;
@@ -326,7 +360,11 @@ export class ScanPanel {
     if (!setting) {
       return;
     }
-    const { rootRes, parentTarget } = panelItem;
+    const { rootRes, parentTarget, targetName } = panelItem;
+
+    resourceType;
+
+    const targetResourceType = resourceType;
 
     const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
       setting,
@@ -334,13 +372,13 @@ export class ScanPanel {
         let scannable: any = driver;
         if (driver instanceof AwsDriver) {
           const awsDriver = driver as AwsDriver;
-          scannable = awsDriver.getClientByResourceType(rootRes.resourceType);
+          scannable = awsDriver.getClientByResourceType(targetResourceType);
         }
 
         var input: ScanParams = {
-          targetResourceType: rootRes.resourceType,
+          targetResourceType,
           parentTarget,
-          target: rootRes?.name ?? "",
+          target: targetName ?? "",
           keyword: keyword,
           limit: limit ?? 100,
           startTime: startTime ? dayjs(startTime).valueOf() : undefined,
@@ -429,6 +467,7 @@ export class ScanPanel {
         limit: 1000,
         keyword: "",
         startTime,
+        resourceType: "LogStream",
       });
     }, 100);
   }

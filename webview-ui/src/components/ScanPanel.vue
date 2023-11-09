@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextArea from "./base/VsCodeTextArea.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
+import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import {
@@ -27,7 +28,6 @@ import type {
 import { vscode } from "@/utilities/vscode";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import type { SecondaryItem } from "@/types/Components";
-// import type { DBType } from "@/types/lib/DBType";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -53,28 +53,6 @@ const outputDetailItems = ref([
     value: "both",
   },
 ] as SecondaryItem[]);
-
-// type ConditionItem = {
-//   label: string;
-//   value: any;
-//   visible: boolean;
-//   description?: string;
-// };
-
-// type TabItem = {
-//   tabId: string;
-//   conName: string;
-//   rootRes: DbResource;
-//   title: string;
-//   dbType: DBType;
-//   rdh: any;
-//   limit: ConditionItem;
-//   keyword: ConditionItem;
-//   startTime: ConditionItem;
-//   endTime: ConditionItem;
-//   multilineKeyword: boolean;
-//   parentTarget?: string;
-// };
 
 const activeTabId = ref("");
 const tabItems = ref([] as ScanTabItem[]);
@@ -141,6 +119,11 @@ function search() {
   inProgress.value = true;
   const { tabId, limit, keyword, startDt, endDt } = tabItem;
 
+  let resourceType = tabItem.resourceType.value;
+  if (tabItem.resourceType.visible) {
+    resourceType = tabItem.resourceType.value;
+  }
+
   const action: SearchScanPanelActionCommand = {
     command: "search",
     params: {
@@ -149,6 +132,7 @@ function search() {
       keyword: keyword.visible ? keyword.value : undefined,
       startTime: toIso8601String(startDt, true),
       endTime: toIso8601String(endDt, false),
+      resourceType,
     },
   };
   vscode.postCommand(action);
@@ -245,7 +229,7 @@ const output = (params: Omit<OutputParams, "tabId">): void => {
   });
 };
 
-const onCellFocus = (params: CellFocusParams): void => {
+const onClickCell = (params: CellFocusParams): void => {
   openLogStreamParams.value.canAction = false;
   deleteKeyParams.value.canAction = false;
   const tabItem = getActiveTabItem();
@@ -448,6 +432,15 @@ defineExpose({
                 <span class="codicon codicon-trash"></span>Delete key
               </VsCodeButton>
 
+              <label v-if="tabItem.resourceType.visible" for="resource-type">Resource type</label>
+              <VsCodeRadioGroupVue
+                v-if="tabItem.resourceType.visible"
+                id="resource-type"
+                v-model="tabItem.resourceType.value"
+                :items="tabItem.resourceType.items"
+                style="z-index: 15"
+              />
+
               <label v-if="tabItem.startDt.visible" for="startTime">{{
                 tabItem.startDt.label
               }}</label
@@ -499,7 +492,7 @@ defineExpose({
               :width="splitterWidth"
               :height="splitterHeight"
               :readonly="true"
-              @onCellFocus="onCellFocus"
+              @onClickCell="onClickCell"
             />
           </div>
         </section>
@@ -518,34 +511,6 @@ section.ScanPanel {
 
 vscode-panel-view {
   padding: 7px 4px;
-}
-
-.tab-container-actions {
-  position: absolute;
-  right: 2px;
-  top: 1px;
-  display: flex;
-  height: 28px;
-  border-radius: 1px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 0 8px 0 4px;
-  align-items: center;
-
-  & > button {
-    width: 26px;
-    height: 26px;
-    background: transparent;
-    border: none;
-    color: var(--foreground);
-    outline: none;
-    font-size: var(--type-ramp-base-font-size);
-    fill: currentcolor;
-    cursor: pointer;
-
-    &:hover {
-      background-color: var(--vscode-toolbar-hoverBackground);
-    }
-  }
 }
 
 .toolbar {

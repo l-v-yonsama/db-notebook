@@ -1,3 +1,30 @@
+@media (prefers-color-scheme: light) {
+  .shiki.dark-plus {
+    display: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .shiki.light-plus {
+    display: none;
+  }
+}
+
+:root {
+  --one-color: var(--vscode-focusBorder);
+  --shiki-color-text: var(--vscode-editor-foreground);
+  --shiki-color-background: var(--vscode-editor-background);
+  --shiki-token-constant: var(--vscode-charts-blue);
+  --shiki-token-string: var(--vscode-charts-blue);
+  --shiki-token-comment: var(--vscode-charts-lines);
+  --shiki-token-keyword: var(--vscode-charts-purple);
+  --shiki-token-parameter: var(--vscode-charts-purple);
+  --shiki-token-function: var(--vscode-charts-blue);
+  --shiki-token-string-expression: var(--vscode-charts-blue);
+  --shiki-token-punctuation: var(--vscode-charts-orange);
+  --shiki-token-link: var(--vscode-charts-blue);
+}
+
 main {
   display: flex;
   flex-direction: column;
@@ -85,4 +112,32 @@ div.tool-right {
 .marker-error {
   border-color: var(--vscode-editorError-border) !important;
   color: var(--vscode-editorError-foreground) !important;
+}
+
+.tab-container-actions {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  display: flex;
+  height: 28px;
+  border-radius: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0 8px 0 4px;
+  align-items: center;
+
+  & > button {
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: none;
+    color: var(--foreground);
+    outline: none;
+    font-size: var(--type-ramp-base-font-size);
+    fill: currentcolor;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--vscode-toolbar-hoverBackground);
+    }
+  }
 }

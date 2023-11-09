@@ -1,4 +1,4 @@
-import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ConnectionSetting, ResourceType } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ModeType } from "./ModeType";
 import type { ERDiagramSettingParams } from "./ERDiagram";
 import type { CodeResolverParams } from "./CodeResolverParams";
@@ -32,10 +32,12 @@ export type ActionCommand =
   | CreateERDiagramActionCommand
   | CreateCodeResolverEditorActionCommand
   | CreateUndoChangeSqlActionCommand
+  | CreateRequestScriptActionCommand
   | SaveCompareKeysActionCommand
   | SaveNotebookCellMetadataActionCommand
   | OutputActionCommand
   | WriteToClipboardActionCommand
+  | WriteHttpEventToClipboardActionCommand
   | OpenScanPanelActionCommand
   | CloseScanPanelActionCommand
   | SearchScanPanelActionCommand
@@ -152,6 +154,8 @@ export type SaveNotebookCellMetadataActionCommand = BaseActionCommand<
 
 export type CreateUndoChangeSqlActionCommand = BaseActionCommand<"createUndoChangeSql", TabIdParam>;
 
+export type CreateRequestScriptActionCommand = BaseActionCommand<"createRequestScript">;
+
 export type SaveValuesActionCommand = {
   command: "saveValues";
   params: SaveValuesParams;
@@ -185,6 +189,21 @@ export type WriteToClipboardParams<T = any> = TabIdParam & {
   options?: T;
 };
 
+export type WriteHttpEventToClipboardActionCommand = {
+  command: "writeHttpEventToClipboard";
+  params: WriteHttpEventToClipboardParams;
+};
+
+export type WriteHttpEventToClipboardParams = {
+  fileType: "markdown" | "text";
+  withRequest: boolean;
+  withResponse: boolean;
+  withCookies: boolean;
+  withBase64: boolean;
+  limitCell?: number; // default:1000
+  specifyDetail?: boolean;
+};
+
 export type OpenScanPanelParams = {
   parentTabId: string;
   logGroupName: string;
@@ -208,6 +227,7 @@ export type SearchScanPanelParams = {
   limit?: number;
   startTime?: any;
   endTime?: any;
+  resourceType: ResourceType;
 };
 
 export type SearchScanPanelActionCommand = {

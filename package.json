@@ -245,6 +245,18 @@
           "command": "database-notebook.refresh-resources",
           "when": "view == ResultSetsType",
           "group": "navigation"
+        },
+        {
+          "command": "database-notebook.show-har-file",
+          "when": "resourceExtname == .har",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "database-notebook.show-har-file",
+          "when": "resourceExtname == .har",
+          "group": "navigation"
         }
       ],
       "notebook/toolbar": [
@@ -490,6 +502,11 @@
         "title": "Specify connection in all SQL Cells",
         "shortTitle": "Specify connection in all",
         "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "database-notebook.show-har-file",
+        "title": "Preview har file",
+        "category": "DB Notebook HAR Viewer"
       }
     ]
   },
@@ -504,8 +521,12 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
+    "@types/bytes": "^3.1.3",
     "@types/glob": "^7.1.3",
+    "@types/humanize-duration": "^3.27.2",
+    "@types/jmespath": "^0.15.1",
     "@types/node": "14.14.0",
+    "@types/qs": "^6.9.9",
     "@types/throttle-debounce": "^5.0.0",
     "@types/vscode": "^1.46.0",
     "@typescript-eslint/eslint-plugin": "^4.14.1",
@@ -517,11 +538,18 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.203",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.213",
+    "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
+    "axios-har-tracker": "^0.5.1",
+    "bytes": "^3.1.2",
     "dayjs": "^1.11.7",
     "exceljs": "^4.3.0",
     "fast-json-stable-stringify": "^2.1.0",
+    "humanize-duration": "^3.30.0",
+    "jmespath": "^0.16.0",
+    "qs": "^6.11.2",
+    "shiki": "^0.14.5",
     "short-unique-id": "^4.4.4",
     "store": "^2.0.12",
     "throttle-debounce": "^5.0.0",

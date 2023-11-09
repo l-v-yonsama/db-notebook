@@ -8,6 +8,7 @@ import {
   NotebookCellData,
   NotebookData,
   NotebookEdit,
+  Uri,
   WorkspaceEdit,
   commands,
   window,
@@ -31,6 +32,7 @@ import {
   SPECIFY_CONNECTION_ALL,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
+  SHOW_HAR,
 } from "../constant";
 import { isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
@@ -38,7 +40,8 @@ import { log } from "../utilities/logger";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
-import { HttpResponsesPanel } from "../panels/HttpResponsesPanel";
+import { HttpEventPanel } from "../panels/HttpEventPanel";
+import { HarFilePanel } from "../panels/HarFilePanel";
 
 const PREFIX = "[notebook/activator]";
 
@@ -129,12 +132,17 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   context.subscriptions.push(
     commands.registerCommand(CELL_OPEN_HTTP_RESPONSE, async (cell: NotebookCell) => {
       const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
-      if (rrm === undefined || rrm.res === undefined) {
+      if (rrm === undefined || rrm.axiosEvent === undefined) {
         return;
       }
 
-      const title = rrm.res.title;
-      HttpResponsesPanel.render(context.extensionUri, title, [rrm.res]);
+      const title = rrm.axiosEvent.title;
+      HttpEventPanel.render(context.extensionUri, title, rrm.axiosEvent);
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(SHOW_HAR, async (harUri: Uri) => {
+      HarFilePanel.render(context.extensionUri, harUri);
     })
   );
   context.subscriptions.push(

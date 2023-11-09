@@ -4,13 +4,15 @@ import type { ComponentName, MessageEventData } from "./utilities/vscode";
 import { ref, onMounted } from "vue";
 
 import MdhPanel from "./components/MdhPanel.vue";
-import HttpResponsesPanel from "./components/HttpResponsesPanel.vue";
+import HttpEventPanel from "./components/HttpEventPanel.vue";
+import HarFilePanel from "./components/HarFilePanel.vue";
 import DBFormView from "./components/DBFormView.vue";
 import DiffPanel from "./components/DiffPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ViewConditionPanel from "./components/ViewConditionPanel.vue";
 import WriteToClipboardParamsPanel from "./components/WriteToClipboardParamsPanel.vue";
+import WriteHttpEventToClipboardParamsPanel from "./components/WriteHttpEventToClipboardParamsPanel.vue";
 import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
 
 import ERDiagramSettings from "./components/ERDiagramSettings.vue";
@@ -20,12 +22,15 @@ import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
 
 const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
 const mdhPanelRef = ref<InstanceType<typeof MdhPanel>>();
-const httpResponsesPanelRef = ref<InstanceType<typeof HttpResponsesPanel>>();
+const httpEventPanelRef = ref<InstanceType<typeof HttpEventPanel>>();
+const harFilePanelRef = ref<InstanceType<typeof HarFilePanel>>();
 const diffPanelRef = ref<InstanceType<typeof DiffPanel>>();
 const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
 const viewConditionPanelRef = ref<InstanceType<typeof ViewConditionPanel>>();
 const variablesPanelRef = ref<InstanceType<typeof VariablesPanel>>();
 const writeToClipboardParamsPanelRef = ref<InstanceType<typeof WriteToClipboardParamsPanel>>();
+const writeHttpEventToClipboardParamsPanelRef =
+  ref<InstanceType<typeof WriteHttpEventToClipboardParamsPanel>>();
 const notebookCellMetadataPanelRef = ref<InstanceType<typeof NotebookCellMetadataPanel>>();
 const eRDiagramSettingsPanelRef = ref<InstanceType<typeof ERDiagramSettingsVue>>();
 const recordRuleEditorRef = ref<InstanceType<typeof RecordRuleEditor>>();
@@ -45,8 +50,11 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     case "MdhPanel":
       mdhPanelRef.value?.recieveMessage(data);
       break;
-    case "HttpResponsesPanel":
-      httpResponsesPanelRef.value?.recieveMessage(data);
+    case "HarFilePanel":
+      harFilePanelRef.value?.recieveMessage(data);
+      break;
+    case "HttpEventPanel":
+      httpEventPanelRef.value?.recieveMessage(data);
       break;
     case "DiffPanel":
       diffPanelRef.value?.recieveMessage(data);
@@ -62,6 +70,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "WriteToClipboardParamsPanel":
       writeToClipboardParamsPanelRef.value?.recieveMessage(data);
+      break;
+    case "WriteHttpEventToClipboardParamsPanel":
+      writeHttpEventToClipboardParamsPanelRef.value?.recieveMessage(data);
       break;
     case "NotebookCellMetadataPanel":
       notebookCellMetadataPanelRef.value?.recieveMessage(data);
@@ -90,10 +101,9 @@ onMounted(() => {
 
     <MdhPanel v-if="currentComponentName === 'MdhPanel'" ref="mdhPanelRef" />
 
-    <HttpResponsesPanel
-      v-if="currentComponentName === 'HttpResponsesPanel'"
-      ref="httpResponsesPanelRef"
-    />
+    <HttpEventPanel v-if="currentComponentName === 'HttpEventPanel'" ref="httpEventPanelRef" />
+
+    <HarFilePanel v-if="currentComponentName === 'HarFilePanel'" ref="harFilePanelRef" />
 
     <DiffPanel v-if="currentComponentName === 'DiffPanel'" ref="diffPanelRef" />
 
@@ -109,6 +119,11 @@ onMounted(() => {
     <WriteToClipboardParamsPanel
       v-if="currentComponentName === 'WriteToClipboardParamsPanel'"
       ref="writeToClipboardParamsPanelRef"
+    />
+
+    <WriteHttpEventToClipboardParamsPanel
+      v-if="currentComponentName === 'WriteHttpEventToClipboardParamsPanel'"
+      ref="writeHttpEventToClipboardParamsPanelRef"
     />
 
     <ERDiagramSettings

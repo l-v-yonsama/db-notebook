@@ -1,6 +1,5 @@
 import { createApp } from "vue";
 import App from "./App.vue";
-import VMask from "@ssibrahimbas/v-mask";
 import VirtualList from "@virtual-list/vue";
 import { Splitpanes, Pane } from "splitpanes";
 import vueClickOutsideElement from "vue-click-outside-element";
@@ -25,8 +24,6 @@ import {
   faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
-import SshPre from "simple-syntax-highlighter";
-import "simple-syntax-highlighter/dist/sshpre.css";
 
 library.add(faArrowUp);
 library.add(faCheck);
@@ -49,9 +46,7 @@ const app = createApp(App);
 app.component("Splitpanes", Splitpanes);
 app.component("Pane", Pane);
 app.component("fa", FontAwesomeIcon);
-app.use(VMask);
 app.use(vueClickOutsideElement);
 app.component("VirtualList", VirtualList);
-app.component("SshPre", SshPre);
 
 app.mount("#app");

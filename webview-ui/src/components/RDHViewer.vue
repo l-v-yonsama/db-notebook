@@ -20,7 +20,7 @@ const setRdhRef = (el: any) => {
 };
 
 const emit = defineEmits<{
-  (event: "onCellFocus", value: CellFocusParams): void;
+  (event: "onClickCell", value: CellFocusParams): void;
 }>();
 
 // function refresh() {
@@ -29,8 +29,8 @@ const emit = defineEmits<{
 // function exportFile(type: string) {
 //   emit("postMessageToExtension", { command: "export", data: { type } });
 // }
-function onCellFocus(params: CellFocusParams) {
-  emit("onCellFocus", params);
+function onClickCell(params: CellFocusParams) {
+  emit("onClickCell", params);
 }
 
 const save = (): any => {
@@ -56,7 +56,7 @@ defineExpose({
           :readonly="false"
           :showOnlyChanged="showOnlyChanged"
           :withComment="rdh.keys.some((it) => it.comment?.length)"
-          @onCellFocus="onCellFocus"
+          @onClickCell="onClickCell"
           :ref="setRdhRef"
         >
         </RDH>

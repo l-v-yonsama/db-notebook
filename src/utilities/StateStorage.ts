@@ -8,6 +8,8 @@ import {
   DbSQSQueue,
   DbSchema,
   GeneralResult,
+  IamGroup,
+  IamRealm,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ExtensionContext, SecretStorage } from "vscode";
@@ -126,6 +128,21 @@ export class StateStorage {
               conName: conRes.name,
             };
           });
+        // for iam resource ---------
+        dbRes.findChildren<IamRealm>({ resourceType: ResourceType.IamRealm }).forEach((realm) => {
+          realm.meta = {
+            conName: conRes.name,
+          };
+          realm
+            .findChildren<IamGroup>({ resourceType: ResourceType.IamGroup, recursively: true })
+            .forEach((it) => {
+              it.meta = {
+                conName: conRes.name,
+                groupId: dbRes.id,
+                realmName: realm.name,
+              };
+            });
+        });
       }
       this.resMap.set(connectionName, { isInProgress: false, res: result });
       ret.result = result;

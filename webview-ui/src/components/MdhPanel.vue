@@ -477,31 +477,4 @@ vscode-panel-view {
   color: var(--button-primary-foreground) !important;
   background: var(--button-primary-background) !important;
 }
-
-.tab-container-actions {
-  position: absolute;
-  right: 2px;
-  top: 1px;
-  display: flex;
-  height: 28px;
-  border-radius: 1px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 0 8px 0 4px;
-  align-items: center;
-}
-.tab-container-actions > button {
-  width: 26px;
-  height: 26px;
-  background: transparent;
-  border: none;
-  color: var(--foreground);
-  outline: none;
-  font-size: var(--type-ramp-base-font-size);
-  fill: currentcolor;
-  cursor: pointer;
-}
-
-.tab-container-actions > button:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-}
 </style>

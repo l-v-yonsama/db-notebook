@@ -43,7 +43,7 @@ import {
 } from "../utilities/notebookUtil";
 import { jsonKernelRun } from "./JsonKernel";
 import { existsFileOnStorage } from "../utilities/fsUtil";
-import { createResponseSummaryMarkdown, createResponseTitle } from "../utilities/axiosUtil";
+import { createResponseBodyMarkdown } from "../utilities/httpUtil";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 const PREFIX = "[notebook/Controller]";
@@ -266,7 +266,7 @@ export class MainController {
       }
 
       if (metadata) {
-        const { rdh, explainRdh, analyzedRdh, res } = metadata;
+        const { rdh, explainRdh, analyzedRdh, axiosEvent } = metadata;
         if (rdh) {
           const cellMeta: CellMeta = cell.metadata;
           const withComment = rdh.keys.some((it) => (it.comment ?? "").length);
@@ -315,10 +315,15 @@ export class MainController {
             )
           );
         }
-        if (res) {
+        if (axiosEvent) {
           outputs.push(
             new NotebookCellOutput(
-              [NotebookCellOutputItem.text(createResponseSummaryMarkdown(res), "text/markdown")],
+              [
+                NotebookCellOutputItem.text(
+                  createResponseBodyMarkdown(axiosEvent),
+                  "text/markdown"
+                ),
+              ],
               metadata
             )
           );
@@ -582,8 +587,8 @@ class HttpResponseProvider implements NotebookCellStatusBarItemProvider {
     if (!rMetadata) {
       return;
     }
-    const { res } = rMetadata;
-    if (res === undefined) {
+    const { axiosEvent } = rMetadata;
+    if (axiosEvent === undefined) {
       return;
     }
     const item = new NotebookCellStatusBarItem(
