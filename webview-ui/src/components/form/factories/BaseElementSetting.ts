@@ -11,6 +11,8 @@ export abstract class BaseElementSetting {
 
   abstract getIamClientId(): ElementSetting;
 
+  abstract getIamClientSecret(): ElementSetting;
+
   abstract getHost(): ElementSetting;
 
   abstract getPort(): ElementSetting<number>;

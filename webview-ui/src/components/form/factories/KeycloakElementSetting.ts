@@ -37,6 +37,10 @@ export class KeycloakElementSetting extends BaseElementSetting {
     };
   }
 
+  getIamClientSecret(): ElementSetting {
+    return { visible: false };
+  }
+
   getHost(): ElementSetting {
     return { visible: false };
   }
@@ -62,12 +66,13 @@ export class KeycloakElementSetting extends BaseElementSetting {
   }
 
   accept(setting: ConnectionSetting): boolean {
-    const { name, database, user, password, url } = setting;
-    if (name === "") {
+    const { name, database, user, password, url, iamSolution } = setting;
+    if (name === "" || iamSolution === undefined) {
       return false;
     }
+    const { clientId } = iamSolution;
 
-    if (database === "" || user === "" || password === "" || url === "") {
+    if (database === "" || user === "" || password === "" || url === "" || clientId === "") {
       return false;
     }
 

@@ -74,6 +74,7 @@ const maskedString = (s: string): string => {
 
 const maskedUser = computed((): string => maskedString(user.value ?? ""));
 const maskedPassword = computed((): string => maskedString(password.value ?? ""));
+const maskedClientSecret = computed((): string => maskedString(clientSecret.value ?? ""));
 
 const props = withDefaults(defineProps<Props>(), {
   mode: "create",
@@ -129,6 +130,7 @@ const awsServiceItems = AwsServiceTypeValues.map((it) => ({
 }));
 
 const clientId = ref(props.item.iamSolution?.clientId ?? "");
+const clientSecret = ref(props.item.iamSolution?.clientSecret ?? "");
 
 const elmSettings = computed(() => {
   const it = ElementSettingFactory.create({
@@ -161,7 +163,8 @@ function createItem(): ConnectionSetting {
   if (DBTypeConst.isIam(dbType.value)) {
     iamSolution = {
       clientId: clientId.value,
-      grantType: "password",
+      clientSecret: clientSecret.value,
+      grantType: dbType.value === "Keycloak" ? "password" : "client_credentials",
     };
   }
 
@@ -207,6 +210,7 @@ function setDefault() {
   timezone.value = "";
   url.value = elmSettings.value.getUrl().defaultValue ?? "";
   clientId.value = elmSettings.value.getIamClientId().defaultValue ?? "";
+  clientSecret.value = elmSettings.value.getIamClientSecret().defaultValue ?? "";
   database.value = elmSettings.value.getDatabase().defaultValue ?? "";
   port.value = elmSettings.value.getPort().defaultValue ?? 0;
 }
@@ -238,13 +242,16 @@ defineExpose({
     ></VsCodeTextField>
     <p v-if="isDuplicateName" class="marker-error">Duplicate name</p>
 
-    <label v-show="elmSettings.getHost().visible" for="host">Host</label>
+    <label v-show="elmSettings.getHost().visible" for="host">{{
+      elmSettings.getHost().label ?? "Host"
+    }}</label>
     <p v-if="isShowMode" v-show="elmSettings.getHost().visible" id="host">{{ host }}</p>
     <VsCodeTextField
       v-else
       v-show="elmSettings.getHost().visible"
       id="host"
       v-model="host"
+      :placeholder="elmSettings.getHost().placeholder"
       :maxlength="256"
     ></VsCodeTextField>
 
@@ -271,8 +278,8 @@ defineExpose({
       :maxlength="128"
     ></VsCodeTextField>
 
-    <label v-show="elmSettings.getIamClientId().visible" for="clientId">ClientId</label>
-    <p v-if="isShowMode" v-show="elmSettings.getIamClientId().visible" id="database">
+    <label v-show="elmSettings.getIamClientId().visible" for="clientId">Client-id</label>
+    <p v-if="isShowMode" v-show="elmSettings.getIamClientId().visible" id="clientId">
       {{ clientId }}
     </p>
     <VsCodeTextField
@@ -281,6 +288,21 @@ defineExpose({
       id="clientId"
       v-model="clientId"
       :placeholder="elmSettings.getIamClientId().placeholder"
+      :maxlength="128"
+    ></VsCodeTextField>
+
+    <label v-show="elmSettings.getIamClientSecret().visible" for="clientSecret"
+      >Client-secret</label
+    >
+    <p v-if="isShowMode" v-show="elmSettings.getIamClientSecret().visible" id="clientSecret">
+      {{ maskedClientSecret }}
+    </p>
+    <VsCodeTextField
+      v-else
+      v-show="elmSettings.getIamClientSecret().visible"
+      id="clientSecret"
+      v-model="clientSecret"
+      :placeholder="elmSettings.getIamClientSecret().placeholder"
       :maxlength="128"
     ></VsCodeTextField>
 

@@ -52,4 +52,9 @@ function handleOnChange(event: any) {
   emit("change", event);
 }
 </script>
-<style></style>
+<style>
+vscode-radio-group {
+  margin-top: 1px;
+  margin-bottom: 1px;
+}
+</style>

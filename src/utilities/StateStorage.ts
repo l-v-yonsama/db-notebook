@@ -1,5 +1,6 @@
 import ShortUniqueId from "short-unique-id";
 import {
+  Auth0Database,
   ConnectionSetting,
   DBDriverResolver,
   DbDatabase,
@@ -9,8 +10,10 @@ import {
   DbSchema,
   GeneralResult,
   IamGroup,
+  IamOrganization,
   IamRealm,
   ResourceType,
+  sleep,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
@@ -27,7 +30,7 @@ type DbResInfo = {
   res?: DbDatabase[];
 };
 
-export const sleep = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
+type SecretParamName = "password" | "clientSecret";
 
 export class StateStorage {
   private resMap = new Map<string, DbResInfo>();
@@ -128,7 +131,7 @@ export class StateStorage {
               conName: conRes.name,
             };
           });
-        // for iam resource ---------
+        // for Keycloak resource ---------
         dbRes.findChildren<IamRealm>({ resourceType: ResourceType.IamRealm }).forEach((realm) => {
           realm.meta = {
             conName: conRes.name,
@@ -143,6 +146,23 @@ export class StateStorage {
               };
             });
         });
+        // for auth0 resource ---------
+        if (dbRes instanceof Auth0Database) {
+          dbRes.meta = {
+            conName: conRes.name,
+          };
+          dbRes
+            .findChildren<IamOrganization>({
+              resourceType: ResourceType.IamOrganization,
+              recursively: true,
+            })
+            .forEach((it) => {
+              it.meta = {
+                conName: conRes.name,
+                organizationId: dbRes.id,
+              };
+            });
+        }
       }
       this.resMap.set(connectionName, { isInProgress: false, res: result });
       ret.result = result;
@@ -162,7 +182,10 @@ export class StateStorage {
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
     for (const it of list) {
       if (it.id) {
-        it.password = await this.getSecret(it.id);
+        it.password = await this.getSecret(it.id, "password");
+        if (it.dbType === "Auth0" && it.iamSolution) {
+          it.iamSolution.clientSecret = await this.getSecret(it.id, "clientSecret");
+        }
       }
     }
     return list;
@@ -178,7 +201,10 @@ export class StateStorage {
     const setting = list.find((it) => it.name === name);
     if (setting) {
       if (setting.id) {
-        setting.password = await this.getSecret(setting.id);
+        setting.password = await this.getSecret(setting.id, "password");
+        if (setting.dbType === "Auth0" && setting.iamSolution) {
+          setting.iamSolution.clientSecret = await this.getSecret(setting.id, "clientSecret");
+        }
       }
       return setting;
     }
@@ -204,6 +230,7 @@ export class StateStorage {
       setting.id = uid.randomUUID(8);
     }
     await this.removePasswordAndStoreOnSecret(setting);
+    await this.removeClientSecretAndStoreOnSecret(setting);
     list.push(setting);
     await this.context.globalState.update(STORAGE_KEY, list);
     return true;
@@ -219,6 +246,7 @@ export class StateStorage {
       setting.id = uid.randomUUID(8);
     }
     await this.removePasswordAndStoreOnSecret(setting);
+    await this.removeClientSecretAndStoreOnSecret(setting);
 
     list.splice(idx, 1, setting);
     await this.context.globalState.update(STORAGE_KEY, list);
@@ -234,8 +262,11 @@ export class StateStorage {
       return false;
     }
     const removed = list.splice(idx, 1);
-    if (removed && removed[0].password) {
-      await this.deleteSecret(removed[0].password);
+    if (removed && removed[0].id) {
+      await this.deleteSecret(removed[0].id, "password");
+      if (removed[0].dbType === "Auth0" && removed[0].iamSolution) {
+        await this.deleteSecret(removed[0].id, "clientSecret");
+      }
     }
     await this.context.globalState.update(STORAGE_KEY, list);
     this.resMap.delete(name);
@@ -243,21 +274,32 @@ export class StateStorage {
   }
 
   private async removePasswordAndStoreOnSecret(setting: ConnectionSetting): Promise<void> {
-    if (setting.id && setting.password) {
-      await this.storeSecret(setting.id, setting.password);
+    if (setting.id) {
+      if (setting.password) {
+        await this.storeSecret(setting.id, "password", setting.password);
+      }
+      setting.password = undefined;
     }
-    setting.password = undefined;
   }
 
-  private async getSecret(key: string): Promise<string | undefined> {
-    return await this.secretStorage.get(key);
+  private async removeClientSecretAndStoreOnSecret(setting: ConnectionSetting): Promise<void> {
+    if (setting.id) {
+      if (setting.dbType === "Auth0" && setting.iamSolution && setting.iamSolution.clientSecret) {
+        await this.storeSecret(setting.id, "clientSecret", setting.iamSolution.clientSecret);
+        setting.iamSolution.clientSecret = undefined;
+      }
+    }
   }
 
-  private async storeSecret(key: string, value: string): Promise<void> {
-    await this.secretStorage.store(key, value);
+  private async getSecret(key: string, paramName: SecretParamName): Promise<string | undefined> {
+    return await this.secretStorage.get(`${key}+${paramName}`);
   }
 
-  private async deleteSecret(key: string): Promise<void> {
-    await this.secretStorage.delete(key);
+  private async storeSecret(key: string, paramName: SecretParamName, value: string): Promise<void> {
+    await this.secretStorage.store(`${key}+${paramName}`, value);
+  }
+
+  private async deleteSecret(key: string, paramName: SecretParamName): Promise<void> {
+    await this.secretStorage.delete(`${key}+${paramName}`);
   }
 }

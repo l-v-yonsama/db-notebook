@@ -1,13 +1,17 @@
 import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 import { BaseElementSetting, type ElementSetting } from "./BaseElementSetting";
 
-export class RedisElementSetting extends BaseElementSetting {
+export class Auth0ElementSetting extends BaseElementSetting {
   getUser(): ElementSetting {
-    return { visible: false };
+    return {
+      visible: false,
+    };
   }
 
   getPassword(): ElementSetting {
-    return { visible: true, label: "Password" };
+    return {
+      visible: false,
+    };
   }
 
   getTimezone(): ElementSetting {
@@ -16,34 +20,42 @@ export class RedisElementSetting extends BaseElementSetting {
 
   getDatabase(): ElementSetting {
     return {
-      visible: true,
-      placeholder: "Index to use",
-      label: "Index to use",
-      defaultValue: "0",
+      visible: false,
     };
   }
 
   getIamClientId(): ElementSetting {
-    return { visible: false };
-  }
-
-  getIamClientSecret(): ElementSetting {
-    return { visible: false };
-  }
-
-  getHost(): ElementSetting {
-    return { visible: true };
-  }
-
-  getPort(): ElementSetting<number> {
     return {
       visible: true,
-      defaultValue: 6379,
+      placeholder: "client-id",
+      defaultValue: "",
     };
   }
 
-  getUrl(): ElementSetting {
+  getIamClientSecret(): ElementSetting {
+    return {
+      visible: true,
+      placeholder: "client-secret",
+      defaultValue: "",
+    };
+  }
+
+  getHost(): ElementSetting {
+    return {
+      visible: true,
+      label: "Domain",
+      placeholder: "xxx.xxx.auth0.com",
+    };
+  }
+
+  getPort(): ElementSetting<number> {
     return { visible: false };
+  }
+
+  getUrl(): ElementSetting {
+    return {
+      visible: false,
+    };
   }
 
   // for aws
@@ -55,12 +67,14 @@ export class RedisElementSetting extends BaseElementSetting {
   }
 
   accept(setting: ConnectionSetting): boolean {
-    const { name, database } = setting;
-    if (name === "") {
+    const { name, host, iamSolution } = setting;
+    if (name === "" || iamSolution === undefined) {
       return false;
     }
 
-    if (database === "") {
+    const { clientId, clientSecret } = iamSolution;
+
+    if (clientId === "" || clientSecret === "" || host === "") {
       return false;
     }
 

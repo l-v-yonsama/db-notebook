@@ -35,6 +35,10 @@ export class AwsElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getIamClientSecret(): ElementSetting {
+    return { visible: false };
+  }
+
   getHost(): ElementSetting {
     return { visible: false };
   }

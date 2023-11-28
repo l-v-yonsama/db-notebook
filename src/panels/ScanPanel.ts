@@ -113,6 +113,32 @@ export class ScanPanel {
       case DBType.Redis:
         keyword.value = "*";
         break;
+      case DBType.Auth0:
+        resourceType.visible = true;
+        switch (rootRes.resourceType) {
+          case "Auth0Database":
+            resourceType.value = "IamOrganization";
+            resourceType.items = [
+              ResourceType.IamClient,
+              ResourceType.IamOrganization,
+              ResourceType.IamRole,
+              ResourceType.IamUser,
+            ].map((it) => ({
+              label: it.substring(3),
+              value: it,
+            }));
+            break;
+          case "IamOrganization":
+            parentTarget = rootRes.id;
+            targetName = "";
+            resourceType.value = "IamUser";
+            resourceType.items = [ResourceType.IamUser].map((it) => ({
+              label: it.substring(3),
+              value: it,
+            }));
+            break;
+        }
+        break;
       case DBType.Keycloak:
         resourceType.visible = true;
         switch (rootRes.resourceType) {

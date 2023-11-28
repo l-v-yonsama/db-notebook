@@ -4,6 +4,7 @@ import { AwsElementSetting } from "./AwsElementSetting";
 import { RedisElementSetting } from "./RedisElementSetting";
 import { KeycloakElementSetting } from "./KeycloakElementSetting";
 import type { BaseElementSetting } from "./BaseElementSetting";
+import { Auth0ElementSetting } from "./Auth0ElementSetting";
 
 export class ElementSettingFactory {
   public static create({
@@ -18,6 +19,8 @@ export class ElementSettingFactory {
         return new AwsElementSetting({ awsCredentialType });
       case "Redis":
         return new RedisElementSetting();
+      case "Auth0":
+        return new Auth0ElementSetting();
       case "Keycloak":
         return new KeycloakElementSetting();
       case "MySQL":

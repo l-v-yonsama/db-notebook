@@ -83,9 +83,9 @@ const resetSpPaneWrapperHeight = () => {
   // multi 420 => 236px ... 184
   if (sectionWrapper?.clientHeight) {
     if (getActiveTabItem()?.multilineKeyword) {
-      splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 191, 10);
+      splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 192, 10);
     } else {
-      splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 88, 10);
+      splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 89, 10);
     }
   }
   if (sectionWrapper?.clientWidth) {
