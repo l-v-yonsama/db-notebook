@@ -48,9 +48,14 @@ export class SqlKernel {
       };
     }
 
+    const resolver = DBDriverResolver.getInstance();
+    const toPositionedParameter = resolver
+      .createDriver<RDSBaseDriver>(connectionSetting)
+      .isPositionedParameterAvailable();
     const { query, binds } = normalizeQuery({
       query: cell.document.getText(),
       bindParams: variables,
+      toPositionedParameter,
     });
     log(`${PREFIX} query:` + query);
     log(`${PREFIX} binds:` + JSON.stringify(binds));
@@ -58,7 +63,7 @@ export class SqlKernel {
     let metadata: RunResult["metadata"] = {};
 
     if (markWithExplainAnalyze) {
-      const { message } = await DBDriverResolver.getInstance().flowTransaction<RDSBaseDriver>(
+      const { message } = await resolver.flowTransaction<RDSBaseDriver>(
         connectionSetting,
         async (driver) => {
           this.driver = driver;
@@ -80,7 +85,7 @@ export class SqlKernel {
     }
 
     if (markWithExplain) {
-      const { message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+      const { message } = await resolver.workflow<RDSBaseDriver>(
         connectionSetting,
         async (driver) => {
           this.driver = driver;
@@ -98,18 +103,18 @@ export class SqlKernel {
     }
 
     if (markWithinQuery !== false) {
-      const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
-        RDSBaseDriver,
-        ResultSetData
-      >(connectionSetting, async (driver) => {
-        this.driver = driver;
-        return await driver.requestSql({
-          sql: query,
-          conditions: {
-            binds,
-          },
-        });
-      });
+      const { ok, message, result } = await resolver.workflow<RDSBaseDriver, ResultSetData>(
+        connectionSetting,
+        async (driver) => {
+          this.driver = driver;
+          return await driver.requestSql({
+            sql: query,
+            conditions: {
+              binds,
+            },
+          });
+        }
+      );
       if (ok && result) {
         if (!result.meta.tableName) {
           result.meta.tableName = `CELL${cell.index + 1}`;

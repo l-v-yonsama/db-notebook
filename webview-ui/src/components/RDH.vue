@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, computed } from "vue";
-import type { CellFocusParams } from "@/types/RdhEvents";
+import type { CellFocusParams, ShowCellDetailParams } from "@/types/RdhEvents";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import {
   isNumericLike,
@@ -34,6 +34,7 @@ import type {
   RuleAnnotation,
   CompareKey,
   FileAnnotation,
+  GeneralColumnType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
@@ -73,6 +74,8 @@ type RowValues = {
 
 type ColKey = {
   name: string;
+  gtype: GeneralColumnType;
+  visibleDetailPane: boolean;
   type: string;
   typeClass: string;
   width: number;
@@ -87,6 +90,7 @@ const editable = props.rdh.meta?.editable === true;
 
 const emit = defineEmits<{
   (event: "onClickCell", value: CellFocusParams): void;
+  (event: "onShowDetailPane", value: ShowCellDetailParams): void;
 }>();
 
 const visible = ref(true);
@@ -149,6 +153,8 @@ const columns = ref(
 
     const key: ColKey = {
       name: k.name,
+      gtype: k.type,
+      visibleDetailPane: isTextLike(k.type) || isJsonLike(k.type),
       type,
       typeClass,
       required: k.required,
@@ -168,7 +174,7 @@ const list = ref(
         props.showOnlyChanged === false ||
         hasAnyChangedAnnotation(it.meta)
     )
-    .map((row) => {
+    .map((row): RowValues => {
       const item: RowValues = {
         $meta: row.meta,
         $resolvedLabels: {},
@@ -364,6 +370,18 @@ const toEditTypeMark = (editType?: RowValues["editType"]): string => {
     case "del":
       return "-";
   }
+};
+
+const showDetail = (item: RowValues, key: ColKey, value: any) => {
+  const params: ShowCellDetailParams = {
+    name: key.name,
+    gtype: key.gtype,
+    type: key.type,
+    comment: key.comment,
+    required: key.required,
+    value,
+  };
+  emit("onShowDetailPane", params);
 };
 
 const copyToClipboard = (text: string) => {
@@ -586,17 +604,28 @@ defineExpose({
                     }"
                     >{{ item.$resolvedLabels[key.name]?.label }}</span
                   >
-                  <VsCodeButton
+                  <div
+                    class="cell-actions"
                     v-if="
                       item[key.name] !== undefined &&
                       item[key.name] !== null &&
                       item[key.name] !== ''
                     "
-                    @click.stop="copyToClipboard(item[key.name])"
-                    appearance="secondary"
-                    class="copy-to-clipboard"
-                    ><fa icon="clipboard"
-                  /></VsCodeButton>
+                  >
+                    <VsCodeButton
+                      v-if="key.visibleDetailPane"
+                      @click="showDetail(item, key, item[key.name])"
+                      appearance="secondary"
+                      class="show-detail"
+                      ><fa icon="eye"
+                    /></VsCodeButton>
+                    <VsCodeButton
+                      @click.stop="copyToClipboard(item[key.name])"
+                      appearance="secondary"
+                      class="copy-to-clipboard"
+                      ><fa icon="clipboard"
+                    /></VsCodeButton>
+                  </div>
                 </template>
               </template>
             </td>
@@ -675,6 +704,7 @@ td {
     overflow: hidden;
     white-space: nowrap;
     position: relative;
+    padding-right: 2px;
 
     & > a.download-link {
       display: inline-block;
@@ -698,20 +728,19 @@ td {
       display: none;
     }
 
-    & > .copy-to-clipboard {
+    & > .cell-actions {
       display: none;
       position: absolute;
-      right: 4px;
-      top: 4px;
+      right: 1px;
+      top: 2px;
     }
-
-    &:hover > .copy-to-clipboard {
+    &:hover > .cell-actions {
       display: inline-block;
     }
 
     & > p {
       display: inline-block;
-      margin: 5px 2px;
+      margin: 5px 0px 5px 2px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
