@@ -40,6 +40,10 @@ export class Auth0ElementSetting extends BaseElementSetting {
     };
   }
 
+  getIamRetrieveResources(): ElementSetting {
+    return { visible: true };
+  }
+
   getHost(): ElementSetting {
     return {
       visible: true,

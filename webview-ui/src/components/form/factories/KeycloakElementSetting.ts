@@ -41,6 +41,10 @@ export class KeycloakElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getIamRetrieveResources(): ElementSetting {
+    return { visible: true };
+  }
+
   getHost(): ElementSetting {
     return { visible: false };
   }

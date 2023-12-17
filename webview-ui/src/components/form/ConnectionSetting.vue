@@ -11,6 +11,7 @@ import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
 import { AwsServiceType, AwsServiceTypeValues } from "@/types/lib/AwsServiceType";
 
 import type {
+  ResourceType,
   AwsSetting,
   ConnectionSetting,
   IamSolutionSetting,
@@ -128,6 +129,18 @@ const awsServiceItems = AwsServiceTypeValues.map((it) => ({
   value: it,
   disabled: props.mode === "show",
 }));
+const resourceTypeItemsForIam = ["Client", "Group"].map((it) => ({
+  label: it,
+  value: it,
+  disabled: props.mode === "show",
+}));
+const resourceTypeSelectedForIam = ref([] as string[]);
+if (props.item.iamSolution?.retrieveClientResOnConnection) {
+  resourceTypeSelectedForIam.value.push("Client");
+}
+if (props.item.iamSolution?.retrieveGroupOrOrgResOnConnection) {
+  resourceTypeSelectedForIam.value.push("Group");
+}
 
 const clientId = ref(props.item.iamSolution?.clientId ?? "");
 const clientSecret = ref(props.item.iamSolution?.clientSecret ?? "");
@@ -161,10 +174,16 @@ function createItem(): ConnectionSetting {
     };
   }
   if (DBTypeConst.isIam(dbType.value)) {
+    const resourceTypeNames = resourceTypeSelectedForIam.value.join(",").split(",");
+    let retrieveClientResOnConnection = resourceTypeNames.includes("Client");
+    let retrieveGroupOrOrgResOnConnection = resourceTypeNames.includes("Group");
+
     iamSolution = {
       clientId: clientId.value,
       clientSecret: clientSecret.value,
       grantType: dbType.value === "Keycloak" ? "password" : "client_credentials",
+      retrieveClientResOnConnection,
+      retrieveGroupOrOrgResOnConnection,
     };
   }
 
@@ -404,6 +423,13 @@ defineExpose({
       legend="Services"
       :items="awsServiceItems"
       v-model="awsServiceSelected"
+    ></VsCodeCheckboxGroup>
+
+    <VsCodeCheckboxGroup
+      v-show="elmSettings.getIamRetrieveResources().visible"
+      legend="Retrieve resources on connection"
+      :items="resourceTypeItemsForIam"
+      v-model="resourceTypeSelectedForIam"
     ></VsCodeCheckboxGroup>
 
     <div v-if="!isShowMode" class="commands">

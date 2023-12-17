@@ -9,6 +9,7 @@ import {
   DbSQSQueue,
   DbSchema,
   GeneralResult,
+  IamClient,
   IamGroup,
   IamOrganization,
   IamRealm,
@@ -136,6 +137,15 @@ export class StateStorage {
           realm.meta = {
             conName: conRes.name,
           };
+          realm
+            .findChildren<IamClient>({ resourceType: ResourceType.IamClient, recursively: true })
+            .forEach((it) => {
+              it.meta = {
+                conName: conRes.name,
+                realmName: realm.name,
+                scannable: true,
+              };
+            });
           realm
             .findChildren<IamGroup>({ resourceType: ResourceType.IamGroup, recursively: true })
             .forEach((it) => {

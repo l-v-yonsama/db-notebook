@@ -149,7 +149,17 @@ export class ScanPanel {
               ResourceType.IamGroup,
               ResourceType.IamRole,
               ResourceType.IamUser,
+              ResourceType.IamSession,
             ].map((it) => ({
+              label: it.substring(3),
+              value: it,
+            }));
+            break;
+          case "IamClient":
+            parentTarget = rootRes.id; // clientUUID: parentTarget
+            targetName = rootRes.meta.realmName;
+            resourceType.value = "IamSession";
+            resourceType.items = [ResourceType.IamSession].map((it) => ({
               label: it.substring(3),
               value: it,
             }));

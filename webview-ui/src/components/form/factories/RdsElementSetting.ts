@@ -25,6 +25,10 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getIamRetrieveResources(): ElementSetting {
+    return { visible: false };
+  }
+
   getHost(): ElementSetting {
     return {
       visible: true,

@@ -13,6 +13,8 @@ export abstract class BaseElementSetting {
 
   abstract getIamClientSecret(): ElementSetting;
 
+  abstract getIamRetrieveResources(): ElementSetting;
+
   abstract getHost(): ElementSetting;
 
   abstract getPort(): ElementSetting<number>;

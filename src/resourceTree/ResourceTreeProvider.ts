@@ -6,6 +6,7 @@ import {
   DbColumn,
   DbConnection,
   DbResource,
+  IamClient,
   RedisDatabase,
   ResourceType,
   isArray,
@@ -146,7 +147,6 @@ export class DBDatabaseItem extends vscode.TreeItem {
         iconFile = "database.svg";
         description = `${(resource as RedisDatabase).numOfKeys} keys`;
         scannable = true;
-
         break;
       case ResourceType.Schema:
       case ResourceType.Owner:
@@ -166,6 +166,24 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.LogGroup:
         iconFile = "list-ordered.svg";
         scannable = true;
+        break;
+      case ResourceType.IamClient:
+        {
+          iconFile = "hubot.svg";
+          const client = resource as IamClient;
+          if (client.meta?.scannable) {
+            // Keycloak
+            scannable = true;
+          } else {
+            // Auth0
+          }
+          if (client.numOfUserSessions !== undefined) {
+            description += ` userSessions:${client.numOfUserSessions}`;
+          }
+          if (client.numOfOfflineSessions !== undefined) {
+            description += ` offlineSessions:${client.numOfOfflineSessions}`;
+          }
+        }
         break;
       case ResourceType.IamRealm:
         iconFile = "inbox.svg";

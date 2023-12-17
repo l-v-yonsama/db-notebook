@@ -538,7 +538,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.220",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.221",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.5.1",
