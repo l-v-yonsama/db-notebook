@@ -33,6 +33,10 @@ export const isJsonCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "json";
 };
 
+export const isPreExecution = (cell: NotebookCell): boolean => {
+  return isJsonCell(cell) && (cell.metadata as CellMeta).markAsPreExecution === true;
+};
+
 export const readRuleFile = async (
   cell: NotebookCell,
   rdh: ResultSetData

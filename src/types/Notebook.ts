@@ -3,6 +3,7 @@ import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export type CellMeta = {
   markAsSkip?: boolean;
+  markAsPreExecution?: boolean;
   connectionName?: string;
   showComment?: boolean;
   ruleFile?: string;

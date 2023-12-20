@@ -33,6 +33,7 @@ import {
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
   SHOW_HAR,
+  CELL_MARK_CELL_AS_PRE_EXECUTION,
 } from "../constant";
 import { isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
@@ -222,6 +223,23 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         metadata.markAsSkip = false;
       } else {
         metadata.markAsSkip = true;
+      }
+      const edit = new WorkspaceEdit();
+      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+      edit.set(cell.notebook.uri, [nbEdit]);
+
+      await workspace.applyEdit(edit);
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(CELL_MARK_CELL_AS_PRE_EXECUTION, async (cell: NotebookCell) => {
+      const metadata: CellMeta = {
+        ...cell.metadata,
+      };
+      if (metadata.markAsPreExecution === true) {
+        metadata.markAsPreExecution = false;
+      } else {
+        metadata.markAsPreExecution = true;
       }
       const edit = new WorkspaceEdit();
       const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);

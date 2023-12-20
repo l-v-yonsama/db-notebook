@@ -44,6 +44,7 @@ export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
 export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
 export const SPECIFY_CONNECTION_ALL = `${EXTENSION_NAME}.specify-connection-all`;
 export const CELL_MARK_CELL_AS_SKIP = `${EXTENSION_NAME}.cell.mark-cell-as-skip`;
+export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;
 export const CELL_SHOW_METADATA_SETTINGS = `${EXTENSION_NAME}.cell.show-metadata-setting`;
 
 //---------------------------------------------------

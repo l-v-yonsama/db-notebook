@@ -478,6 +478,11 @@
         "icon": "$(debug-step-over)"
       },
       {
+        "command": "database-notebook.cell.mark-cell-as-pre-execution",
+        "title": "Mark cell as Pre-execution",
+        "icon": "$(debug-step-into)"
+      },
+      {
         "command": "database-notebook.cell.show-metadata-setting",
         "title": "Show settings",
         "icon": "$(gear)"

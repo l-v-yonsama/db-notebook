@@ -6,6 +6,7 @@ import {
   CELL_WRITE_TO_CLIPBOARD,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
+  CELL_MARK_CELL_AS_PRE_EXECUTION,
 } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
@@ -29,6 +30,11 @@ import {
   NotebookCellStatusBarItemProvider,
   NotebookController,
   NotebookDocument,
+  NotebookEdit,
+  Position,
+  Range,
+  TextEdit,
+  WorkspaceEdit,
   commands,
   notebooks,
   workspace,
@@ -37,6 +43,7 @@ import { log } from "../utilities/logger";
 import { SqlKernel } from "./sqlKernel";
 import {
   isJsonCell,
+  isPreExecution,
   isSqlCell,
   readCodeResolverFile,
   readRuleFile,
@@ -108,6 +115,10 @@ export class MainController {
         NOTEBOOK_TYPE,
         new MarkCellAsSkipProvider()
       )
+    );
+
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new PreExecutionProvider())
     );
 
     context.subscriptions.push(
@@ -191,7 +202,7 @@ export class MainController {
   }
 
   private async _executeAll(
-    cells: NotebookCell[],
+    iCells: NotebookCell[],
     notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
@@ -207,7 +218,12 @@ export class MainController {
     this.noteSessions.set(notebook.uri.path, noteSession);
     this.noteVariables.set(notebook.uri.path, kernel.getStoredVariables());
 
-    for (let cell of cells) {
+    const preExecCells = notebook.getCells().filter((it) => isPreExecution(it));
+
+    const targetCells = preExecCells;
+    targetCells.push(...iCells.filter((it) => !isPreExecution(it)));
+
+    for (let cell of targetCells) {
       if (noteSession.interrupted) {
         break;
       }
@@ -266,7 +282,7 @@ export class MainController {
       }
 
       if (metadata) {
-        const { rdh, explainRdh, analyzedRdh, axiosEvent } = metadata;
+        const { rdh, explainRdh, analyzedRdh, axiosEvent, updateCellJSONValue } = metadata;
         if (rdh) {
           const cellMeta: CellMeta = cell.metadata;
           const withComment = rdh.keys.some((it) => (it.comment ?? "").length);
@@ -327,6 +343,33 @@ export class MainController {
               metadata
             )
           );
+        }
+
+        if (updateCellJSONValue) {
+          const { cellIndex, key, value } = updateCellJSONValue;
+          const jsonCells = notebook.getCells().filter((it) => isJsonCell(it));
+          if (cellIndex < jsonCells.length) {
+            const jsonCell = jsonCells[cellIndex];
+            const doc = jsonCell.document;
+            const st = doc.positionAt(0);
+            const ed = doc.positionAt(doc.getText().length);
+            const range = new Range(st, ed);
+
+            let edit;
+            if (key !== undefined) {
+              const jsonObj = JSON.parse(doc.getText());
+              jsonObj[key] = value;
+              edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
+            } else {
+              edit = new TextEdit(range, JSON.stringify(value, null, 2));
+            }
+
+            var formatEdit = new WorkspaceEdit();
+            formatEdit.set(doc.uri, [edit]);
+            await workspace.applyEdit(formatEdit);
+          } else {
+            log(`${PREFIX} cellIndex[${cellIndex}] is out of range[${jsonCells.length}]`);
+          }
         }
       }
     } catch (err: any) {
@@ -597,6 +640,29 @@ class HttpResponseProvider implements NotebookCellStatusBarItemProvider {
     );
     item.command = CELL_OPEN_HTTP_RESPONSE;
     item.tooltip = "Open response in panel";
+    return item;
+  }
+}
+
+class PreExecutionProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isJsonCell(cell)) {
+      return undefined;
+    }
+
+    const { markAsPreExecution }: CellMeta = cell.metadata;
+    let tooltip = "";
+    let text = "";
+    if (markAsPreExecution === true) {
+      tooltip = "Mark as Pre-execution";
+      text = "$(debug-step-into) Pre-execution";
+    } else {
+      tooltip = "-";
+      text = "$(debug-step-into) - ";
+    }
+    const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_MARK_CELL_AS_PRE_EXECUTION;
+    item.tooltip = tooltip;
     return item;
   }
 }

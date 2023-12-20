@@ -128,6 +128,14 @@ export class NodeKernel {
         }
       };
 
+      const setKeyValueOnJsonCell = (cellIndex, key, value) => {
+        variables.set('_CellJSONKeyValue', fstringify({cellIndex, key, value}));  
+      };
+
+      const replaceAllOnJsonCell = (cellIndex, value) => {
+        variables.set('_CellJSONValue', fstringify({cellIndex, value}));  
+      };
+
       const _saveVariables = () => {
         const saveMap = {};
         variables.each(function(value, key) {
@@ -236,6 +244,21 @@ export class NodeKernel {
         title,
         entry,
       };
+    }
+
+    if (this.variables["_CellJSONKeyValue"]) {
+      const cellJsonValue = this.variables["_CellJSONKeyValue"];
+      delete this.variables["_CellJSONKeyValue"];
+      const v = JSON.parse(cellJsonValue);
+      if (v.key) {
+        metadata.updateCellJSONValue = v;
+      }
+    }
+
+    if (this.variables["_CellJSONValue"]) {
+      const cellJsonValue = this.variables["_CellJSONValue"];
+      delete this.variables["_CellJSONValue"];
+      metadata.updateCellJSONValue = JSON.parse(cellJsonValue);
     }
 
     return {

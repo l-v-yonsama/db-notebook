@@ -32,7 +32,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { throttle } from "throttle-debounce";
 import { NOTEBOOK_TYPE } from "../constant";
-import { isSqlCell } from "../utilities/notebookUtil";
+import { isJsCell, isJsonCell, isSqlCell } from "../utilities/notebookUtil";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
@@ -191,9 +191,7 @@ function getStoreKeys(): string[] {
     return [];
   }
   const cells = window.activeNotebookEditor?.notebook?.getCells() ?? [];
-  const texts = cells
-    .filter((it) => it.kind === NotebookCellKind.Code && it.document.languageId === "javascript")
-    .map((it) => it.document.getText());
+  const texts = cells.filter((it) => isJsCell(it)).map((it) => it.document.getText());
   const keys = new Set<string>();
   texts.forEach((text) => {
     const lines = toLines(text);
@@ -206,6 +204,13 @@ function getStoreKeys(): string[] {
         });
       });
   });
+  cells
+    .filter((it) => isJsonCell(it))
+    .forEach((it) => {
+      try {
+        Object.keys(JSON.parse(it.document.getText())).forEach((k) => keys.add(k));
+      } catch (_) {}
+    });
   return [...keys];
 }
 
@@ -239,7 +244,11 @@ function createJsIntellisense() {
         list.push(item);
 
         item = new CompletionItem("variables.get(key)");
-        item.insertText = new SnippetString("variables.get('${1|" + storeKeyNames + "|}');");
+        if (storeKeyNames) {
+          item.insertText = new SnippetString("variables.get('${1|" + storeKeyNames + "|}');");
+        } else {
+          item.insertText = new SnippetString("variables.get('${1}');");
+        }
         item.kind = CompletionItemKind.Function;
         item.detail = "Get value";
         list.push(item);
@@ -256,6 +265,24 @@ function createJsIntellisense() {
           item.detail = "Stored key";
           list.push(item);
         });
+
+        item = new CompletionItem("setKeyValueOnJsonCell(jsonCellIndex, key, value)");
+        if (storeKeyNames) {
+          item.insertText = new SnippetString(
+            "setKeyValueOnJsonCell(0, '${1|" + storeKeyNames + "|}', ${2});"
+          );
+        } else {
+          item.insertText = new SnippetString("setKeyValueOnJsonCell(0, '${1}', ${2});");
+        }
+        item.kind = CompletionItemKind.Function;
+        item.detail = "Set key's value at the index of json-cell";
+        list.push(item);
+
+        item = new CompletionItem("replaceAllOnJsonCell(jsonCellIndex, newJsonObject)");
+        item.insertText = new SnippetString("replaceAllOnJsonCell(0, ${1});");
+        item.kind = CompletionItemKind.Function;
+        item.detail = "Replace jsonObject at the index of json-cell";
+        list.push(item);
 
         const conSettings = storage.getPasswordlessConnectionSettingList();
         const conNamesString = conSettings.map((it) => it.name).join(",");
