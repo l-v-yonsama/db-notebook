@@ -34,7 +34,14 @@ export const isJsonCell = (cell: NotebookCell): boolean => {
 };
 
 export const isPreExecution = (cell: NotebookCell): boolean => {
-  return isJsonCell(cell) && (cell.metadata as CellMeta).markAsPreExecution === true;
+  if (!isJsonCell(cell)) {
+    return false;
+  }
+  const meta = cell.metadata as CellMeta;
+  if (meta.markAsRunInOrderAtJsonCell === true) {
+    return false;
+  }
+  return true;
 };
 
 export const readRuleFile = async (

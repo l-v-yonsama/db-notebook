@@ -35,7 +35,7 @@ import {
   SHOW_HAR,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
 } from "../constant";
-import { isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
+import { isPreExecution, isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { log } from "../utilities/logger";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
@@ -236,10 +236,10 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       const metadata: CellMeta = {
         ...cell.metadata,
       };
-      if (metadata.markAsPreExecution === true) {
-        metadata.markAsPreExecution = false;
+      if (metadata.markAsRunInOrderAtJsonCell === true) {
+        metadata.markAsRunInOrderAtJsonCell = false;
       } else {
-        metadata.markAsPreExecution = true;
+        metadata.markAsRunInOrderAtJsonCell = true;
       }
       const edit = new WorkspaceEdit();
       const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);

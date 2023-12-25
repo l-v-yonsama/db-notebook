@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import type { ResultSetData, FileAnnotation } from "@l-v-yonsama/multi-platform-database-drivers";
 import FileAnnotationView from "./base/FileAnnotationView.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
@@ -25,6 +25,8 @@ const setRdhRef = (el: any) => {
 const showDetailPane = ref(props.showDetailPane ?? false);
 const detailText = ref("");
 const detailFileAnnotationValue = ref(undefined as FileAnnotation["values"] | undefined);
+
+const contentHeight = computed(() => Math.max(props.height - 44, 50));
 
 const emit = defineEmits<{
   (event: "onClickCell", value: CellFocusParams): void;
@@ -102,7 +104,7 @@ defineExpose({
               ><span class="codicon codicon-chrome-close"></span
             ></VsCodeButton>
           </div>
-          <div class="contents">
+          <div class="contents" :style="{ height: `${contentHeight}px` }">
             <p v-if="detailText">{{ detailText }}</p>
           </div>
         </section>
@@ -121,7 +123,11 @@ section {
   }
   .contents {
     padding: 0px 2px;
-    white-space: pre-wrap;
+    overflow-y: auto;
+    p {
+      margin: 0;
+      white-space: pre-wrap;
+    }
   }
 }
 </style>

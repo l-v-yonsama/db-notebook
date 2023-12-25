@@ -98,11 +98,17 @@ export class MainController {
 
     context.subscriptions.push(
       workspace.onDidChangeNotebookDocument((e) => {
+        if (e.notebook.notebookType !== NOTEBOOK_TYPE) {
+          return;
+        }
         this.setActiveContext(e.notebook);
       })
     );
     context.subscriptions.push(
       workspace.onDidOpenNotebookDocument((notebook) => {
+        if (notebook.notebookType !== NOTEBOOK_TYPE) {
+          return;
+        }
         this.setActiveContext(notebook);
       })
     );
@@ -650,15 +656,15 @@ class PreExecutionProvider implements NotebookCellStatusBarItemProvider {
       return undefined;
     }
 
-    const { markAsPreExecution }: CellMeta = cell.metadata;
+    const { markAsRunInOrderAtJsonCell }: CellMeta = cell.metadata;
     let tooltip = "";
     let text = "";
-    if (markAsPreExecution === true) {
-      tooltip = "Mark as Pre-execution";
-      text = "$(debug-step-into) Pre-execution";
+    if (markAsRunInOrderAtJsonCell === true) {
+      tooltip = "Mark as 'Run in order'";
+      text = "$(circle-small) Run in order";
     } else {
-      tooltip = "-";
-      text = "$(debug-step-into) - ";
+      tooltip = "Mark as 'Pre execution'";
+      text = "$(debug-step-into) Pre-execution";
     }
     const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_MARK_CELL_AS_PRE_EXECUTION;
