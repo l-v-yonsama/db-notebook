@@ -18,6 +18,7 @@ import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 import { HttpEventPanel } from "./panels/HttpEventPanel";
+import { HelpProvider } from "./help/HelpProvider";
 
 const PREFIX = "[extension]";
 
@@ -37,6 +38,15 @@ export async function activate(context: ExtensionContext) {
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
+
+  const helpTreeView = window.createTreeView("database-notebook-helpfeedback", {
+    treeDataProvider: new HelpProvider(),
+  });
+  helpTreeView.onDidChangeSelection((e) => {
+    e.selection.forEach((item) => {
+      item.handleClick();
+    });
+  });
 
   connectionSettingViewProvider = activateFormProvider(context, stateStorage);
 

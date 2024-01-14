@@ -118,10 +118,10 @@
         },
         {
           "id": "database-notebook-helpfeedback",
-          "name": "Help and Feedback",
+          "name": "Help",
           "visibility": "collapsed",
           "icon": "media/logo.png",
-          "contextualTitle": "Help and Feedback"
+          "contextualTitle": "Help"
         }
       ]
     },
