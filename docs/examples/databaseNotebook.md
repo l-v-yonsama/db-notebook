@@ -4,24 +4,24 @@ This page shows an example of the use of the VS code extension "Database Noteboo
 
 ## TOC
 
-- 1. [Query examples](#QueryExamples)
-- 2. [Axios use cases](#AxiosUseCases)
-  - 2.1. [GET Method](#GetMethod)
-    - 2.1.1. [Simple GET request](#SimpleGetRequest)
-    - 2.1.2. [Request with authorisation header](#RequestWithAuthorisationHeader)
-    - 2.1.3. [GET image](#GetImage)
-  - 2.2. [POST Method](#PostMethod)
-  - 2.3. [PUT Method](#PutMethod)
-  - 2.4. [DELETE Method](#DeleteMethod)
-  - 2.7. [Handling JWT Access and Refresh Token](#HandlingJWTAccessAndRefreshTokenUsingAxios)
+- 1. [Query examples](#1-query-examples)
+- 2. [Axios use cases](#2-axios-use-cases)
+  - 2.1. [GET Method](#21-get-method)
+    - 2.1.1. [Simple GET request](#211-simple-get-request)
+    - 2.1.2. [Request with authorisation header](#212-request-with-authorisation-header)
+    - 2.1.3. [GET image](#213-get-image)
+  - 2.2. [POST Method](#22-post-method)
+  - 2.3. [PUT Method](#23-put-method)
+  - 2.4. [DELETE Method](#24-delete-method)
+  - 2.5. [Handling JWT Access and Refresh Token](#25-handling-jwt-access-and-refresh-token)
 
-## 1. <a name='QueryExamples'></a>Query examples
+## 1. Query examples
 
-## 2. <a name='AxiosUseCases'></a>Axios use cases
+## 2. Axios use cases
 
-### 2.1. <a name='GetMethod'></a>Get Method
+### 2.1. Get Method
 
-#### 2.1.1. <a name='SimpleGetRequest'></a>Simple GET request
+#### 2.1.1. Simple GET request
 
 ##### Define cells.
 
@@ -45,7 +45,7 @@ writeResponseData(res);
 }
 ```
 
-#### 2.1.2. <a name='RequestWithAuthorisationHeader'></a>Request with authorisation header
+#### 2.1.2. Request with authorisation header
 
 ##### Define cells.
 
@@ -73,7 +73,7 @@ writeResponseData(res);
 }
 ```
 
-#### 2.1.3. <a name='GetImage'></a>Get Image
+#### 2.1.3. Get Image
 
 ##### Define cells.
 
@@ -95,15 +95,15 @@ writeResponseData(res);
 
 <img style='max-width:128px;max-height:64px;' src='https://www.gstatic.com/webp/gallery/1.webp'>
 
-### 2.2. <a name='PostMethod'></a>Post Method
+### 2.2. Post Method
 
-### 2.3. <a name='PutMethod'></a>Put Method
+### 2.3. Put Method
 
-### 2.4. <a name='DeleteMethod'></a>Delete Method
+### 2.4. Delete Method
 
-### 2.7. <a name='HandlingJWTAccessAndRefreshToken'></a>Handling JWT Access and Refresh Token
+### 2.5. Handling JWT Access and Refresh Token
 
-#### 2.7.1. Define cells.
+#### 2.5.1. Define cells.
 
 Cell[1] Defines the shared values within the notebook in the "JSON" language.
 
@@ -183,7 +183,7 @@ if (res.status === 200 && res.data?.access_token) {
 }
 ```
 
-#### 2.7.2. Execution Result.
+#### 2.5.2. Execution Result.
 
 Cell[1] (JSON variables cell)
 
