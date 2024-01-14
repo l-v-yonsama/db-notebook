@@ -7,7 +7,6 @@ import {
   ExtensionContext,
   MarkdownString,
   NotebookCell,
-  NotebookCellKind,
   Position,
   Range,
   SnippetString,
@@ -22,7 +21,6 @@ import {
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
 import {
-  DbSchema,
   ProposalKind,
   RdsDatabase,
   abbr,
@@ -36,6 +34,8 @@ import { isJsCell, isJsonCell, isSqlCell } from "../utilities/notebookUtil";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
+import { setNodeExecaCompletionItems } from "./intellisenses/nodeExeca";
+import { setNodeVariablesCompletionItems } from "./intellisenses/nodeVariables";
 
 const PREFIX = "[notebook/intellisense]";
 
@@ -232,57 +232,26 @@ function createJsIntellisense() {
         const linePrefix = document.lineAt(position).text.substr(0, position.character);
         const lastChar = linePrefix.length > 0 ? linePrefix.substring(linePrefix.length - 1) : "";
 
-        let item = new CompletionItem("variables");
-        item.kind = CompletionItemKind.Variable;
-        item.detail = "variables";
+        let item: CompletionItem;
+
+        item = new CompletionItem({ label: "decodeJwt", description: "accessToken" });
+        item.kind = CompletionItemKind.Function;
+        item.detail = "decodeJwt(token: string): JwtPayload";
+        item.documentation = new MarkdownString("", true);
+        item.documentation.appendCodeblock(
+          `interface decodeJwt(token: string): {header:JwtHeader, payload:JwtPayload}`,
+          "typescript"
+        );
         list.push(item);
 
-        item = new CompletionItem("variables.set(key, value)");
-        item.insertText = new SnippetString("variables.set('${1}', ${2});");
-        item.kind = CompletionItemKind.Function;
-        item.detail = "Store value";
-        list.push(item);
-
-        item = new CompletionItem("variables.get(key)");
-        if (storeKeyNames) {
-          item.insertText = new SnippetString("variables.get('${1|" + storeKeyNames + "|}');");
-        } else {
-          item.insertText = new SnippetString("variables.get('${1}');");
-        }
-        item.kind = CompletionItemKind.Function;
-        item.detail = "Get value";
-        list.push(item);
-
-        item = new CompletionItem("variables.each(function)");
-        item.insertText = new SnippetString("variables.each((val, key) => console.log(key, val));");
-        item.kind = CompletionItemKind.Function;
-        item.detail = "Loop over all stored values";
-        list.push(item);
+        setNodeVariablesCompletionItems(list, storeKeyNames);
 
         storeKeys.forEach((key) => {
-          item = new CompletionItem(key);
+          item = new CompletionItem({ label: key, description: "variables" });
           item.kind = CompletionItemKind.Variable;
           item.detail = "Stored key";
           list.push(item);
         });
-
-        item = new CompletionItem("setKeyValueOnJsonCell(jsonCellIndex, key, value)");
-        if (storeKeyNames) {
-          item.insertText = new SnippetString(
-            "setKeyValueOnJsonCell(0, '${1|" + storeKeyNames + "|}', ${2});"
-          );
-        } else {
-          item.insertText = new SnippetString("setKeyValueOnJsonCell(0, '${1}', ${2});");
-        }
-        item.kind = CompletionItemKind.Function;
-        item.detail = "Set key's value at the index of json-cell";
-        list.push(item);
-
-        item = new CompletionItem("replaceAllOnJsonCell(jsonCellIndex, newJsonObject)");
-        item.insertText = new SnippetString("replaceAllOnJsonCell(0, ${1});");
-        item.kind = CompletionItemKind.Function;
-        item.detail = "Replace jsonObject at the index of json-cell";
-        list.push(item);
 
         const conSettings = storage.getPasswordlessConnectionSettingList();
         const conNamesString = conSettings.map((it) => it.name).join(",");
@@ -293,6 +262,9 @@ function createJsIntellisense() {
           item.documentation = `DB type:${it.dbType}`;
           list.push(item);
         });
+
+        // Execa
+        setNodeExecaCompletionItems(list);
 
         // Axios
         setNodeAxiosCompletionItems(list);
@@ -307,15 +279,23 @@ function createJsIntellisense() {
 }
 
 export function createDocumentation({
-  script,
+  example,
+  spec,
   ext,
   uri,
 }: {
-  script: string;
+  example: string;
+  spec: string;
   ext: string;
   uri?: string;
 }) {
-  const doc = new MarkdownString("```" + ext + "\n\n" + script + "\n```\n");
+  const doc = new MarkdownString("", true);
+  if (example) {
+    doc.appendCodeblock(example, ext);
+  }
+  if (spec) {
+    doc.appendCodeblock(spec, ext);
+  }
   if (uri) {
     doc.baseUri = Uri.parse(uri);
   }
@@ -368,7 +348,7 @@ function createSQLIntellisense() {
 
           if (rdsDatabase) {
             getProposals({ db: rdsDatabase, sql, keyword, lastChar, parentWord }).forEach((s) => {
-              const item = new CompletionItem(s.label);
+              const item = new CompletionItem({ label: s.label, description: "DB resources" });
               item.kind =
                 s.kind === ProposalKind.ReservedWord
                   ? CompletionItemKind.Keyword

@@ -12,7 +12,7 @@ import {
   winToLinuxPath,
   writeToResource,
 } from "../utilities/fsUtil";
-import { NodeRunAxiosEvent, RunResultMetadata } from "../shared/RunResultMetadata";
+import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { URL } from "url";
 import dayjs = require("dayjs");
 import { Entry } from "har-format";
@@ -52,6 +52,7 @@ export class NodeKernel {
     return `
     (async () => {
       const myfs = require('fs');
+      const execa = require('${winToLinuxPath(path.join(nodeModules, "execa"))}');
       const fstringify = require('${winToLinuxPath(
         path.join(nodeModules, "fast-json-stable-stringify")
       )}');
@@ -72,7 +73,7 @@ export class NodeKernel {
       });
 
       const variables = require('${winToLinuxPath(path.join(nodeModules, "store"))}');
-      const {DBDriverResolver,ResultSetDataBuilder,parseContentType} = require('${winToLinuxPath(
+      const {DBDriverResolver,ResultSetDataBuilder,parseContentType,decodeJwt} = require('${winToLinuxPath(
         path.join(nodeModules, "@l-v-yonsama/multi-platform-database-drivers")
       )}');
       const getConnectionSettingByName = (s) => {
@@ -128,13 +129,29 @@ export class NodeKernel {
         }
       };
 
-      const setKeyValueOnJsonCell = (cellIndex, key, value) => {
-        variables.set('_CellJSONKeyValue', fstringify({cellIndex, key, value}));  
-      };
-
-      const replaceAllOnJsonCell = (cellIndex, value) => {
-        variables.set('_CellJSONValue', fstringify({cellIndex, value}));  
-      };
+      class variablesCell {
+        static setKeyValueAtFirst(key, value) {
+          if ( typeof key !== 'string' ) {
+            throw new Error('the key type must be "string".');
+          }
+          variablesCell.setKeyValueAt(0, key, value);
+        }
+  
+        static replaceAllAtFirst(value) {
+          variablesCell.replaceAllAt(0, value);
+        }
+  
+        static setKeyValueAt(cellIndex, key, value) {
+          if ( typeof key !== 'string' ) {
+            throw new Error('the key type must be "string".');
+          }
+          variables.set('_CellJSONKeyValue', fstringify({cellIndex, key, value}));  
+        }
+  
+        static replaceAllAt(cellIndex, value) {
+          variables.set('_CellJSONValue', fstringify({cellIndex, value}));  
+        }
+      }
 
       const _saveVariables = () => {
         const saveMap = {};
@@ -160,7 +177,20 @@ export class NodeKernel {
         ;
         _saveVariables();
       } catch(e) {
-        console.error(e);
+        if (e.isAxiosError) {
+          const {config,request,response, ...others} = e;
+          if ( response ) {
+            others.response = {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+              data: response.data
+            };  
+          }
+          console.error(others);
+        } else {
+          console.error(e);
+        }
       }
     })();
     `;

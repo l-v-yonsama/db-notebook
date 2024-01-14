@@ -1,27 +1,35 @@
 import { CompletionItem, CompletionItemKind, SnippetString } from "vscode";
+import { createDocumentation } from "../intellisense";
 
 export const setSqlStatementCompletionItems = (list: CompletionItem[]): void => {
-  let item = new CompletionItem("select");
-  item.insertText = new SnippetString("SELECT ${2} \nFROM ${1} \nLIMIT 100");
-  item.kind = CompletionItemKind.Function;
-  item.detail = "SELECT STATEMENT";
-  list.push(item);
+  let example = "SELECT ${2} \nFROM ${1} \nLIMIT 100";
+  list.push(createCompletionItem({ label: "select", example }));
 
-  item = new CompletionItem("insert");
-  item.insertText = new SnippetString("INSERT INTO ${1}\n ($2)\n VALUES ()");
-  item.kind = CompletionItemKind.Function;
-  item.detail = "INSERT STATEMENT";
-  list.push(item);
+  example = "INSERT INTO ${1}\n ($2)\n VALUES ()";
+  list.push(createCompletionItem({ label: "insert", example }));
 
-  item = new CompletionItem("update");
-  item.insertText = new SnippetString("UPDATE ${1} SET\n ($2)");
-  item.kind = CompletionItemKind.Function;
-  item.detail = "UPDATE STATEMENT";
-  list.push(item);
+  example = "UPDATE ${1} SET\n $2";
+  list.push(createCompletionItem({ label: "update", example }));
 
-  item = new CompletionItem("delete");
-  item.insertText = new SnippetString("DELETE FROM ${1} \nWHERE\n ($2)");
+  example = "DELETE FROM ${1} \nWHERE\n $2";
+  list.push(createCompletionItem({ label: "delete", example }));
+
+  example = "TRUNCATE TABLE ${1}";
+  list.push(createCompletionItem({ label: "truncate", example }));
+};
+
+const createCompletionItem = ({
+  label,
+  example,
+}: {
+  label: string;
+  example: string;
+}): CompletionItem => {
+  const item = new CompletionItem({ label, description: "sql" });
+
+  item.insertText = new SnippetString(example);
   item.kind = CompletionItemKind.Function;
-  item.detail = "DELETE STATEMENT";
-  list.push(item);
+  item.detail = `${label} statement`;
+  item.documentation = createDocumentation({ example, spec: "", ext: "sql" });
+  return item;
 };

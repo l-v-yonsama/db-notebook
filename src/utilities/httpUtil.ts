@@ -80,14 +80,27 @@ export const createResponseBodyMarkdown = (res: NodeRunAxiosEvent): string => {
     });
 
     if (response.content.text) {
+      const MAX_CHARS = 256;
+      const NOTICE = 'Abbreviated. Push "Open response" button to show all without abbreviation.';
       if (renderType === "Text") {
         if (shortLang === "json") {
           const textBody = JSON.stringify(JSON.parse(response.content.text), null, 2);
-          return `${title}\n\`\`\`json\n${abbr(textBody, 256)}\n\`\`\``;
+          if (textBody.length < MAX_CHARS) {
+            return `${title}\n\`\`\`json\n${textBody}\n\`\`\``;
+          }
+          return `${title}\n\`\`\`json\n${textBody.substring(0, MAX_CHARS)}...\n\nℹ️ (256/${
+            textBody.length
+          }) ${NOTICE}\n\`\`\``;
         }
         let lang = shortLang ?? "sh";
         let textBody = response.content.text + "";
-        return `${title}\n\`\`\`${lang}\n${abbr(textBody, 256)}\n\`\`\``;
+        if (textBody.length < MAX_CHARS) {
+          return `${title}\n\`\`\`${lang}\n${textBody}\n\`\`\``;
+        }
+        return `${title}\n\`\`\`${lang}\nℹ️ (256/${textBody.length}) ${abbr(
+          textBody,
+          MAX_CHARS
+        )}\n\n${NOTICE}\n\`\`\``;
       } else if (renderType === "Image") {
         return `${title}\n\n\<img style='max-width:128px;max-height:64px;' src='${createImageUrl(
           response.content.text,

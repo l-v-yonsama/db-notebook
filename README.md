@@ -28,6 +28,10 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
 ## Examples
 
+- [Database Notebook file examples](/docs/examples/databaseNotebook.md)
+
+## Screenshots
+
 - Setup connection settings, access to Mysql through the Side-panel
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/01_setup.gif)

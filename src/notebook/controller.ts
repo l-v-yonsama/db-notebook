@@ -11,7 +11,6 @@ import {
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
 import {
-  ResultSetData,
   ResultSetDataBuilder,
   runRuleEngine,
   resolveCodeLabel,
@@ -374,7 +373,7 @@ export class MainController {
             formatEdit.set(doc.uri, [edit]);
             await workspace.applyEdit(formatEdit);
           } else {
-            log(`${PREFIX} cellIndex[${cellIndex}] is out of range[${jsonCells.length}]`);
+            throw new Error(`JSON cell index[${cellIndex}] is out of range[${jsonCells.length}]`);
           }
         }
       }
@@ -502,7 +501,7 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
     }
 
     if (markAsSkip !== true) {
-      tooltip += ` $(send) Execution(${sqlMode})`;
+      tooltip += `: SQL mode(${sqlMode})`;
     }
 
     if (codeResolverFile) {
@@ -550,11 +549,11 @@ class MarkCellAsSkipProvider implements NotebookCellStatusBarItemProvider {
     let tooltip = "";
     let text = "";
     if (markAsSkip === true) {
-      tooltip = "Mark cell as enabled";
-      text = "$(debug-step-over) Enabled";
+      tooltip = "Mark cell as Enabled";
+      text = "$(debug-step-over) Skip";
     } else {
       tooltip = "Mark cell as skip";
-      text = "$(debug-step-over) Skip";
+      text = "$(circle-small-filled) Enabled";
     }
     const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_MARK_CELL_AS_SKIP;
