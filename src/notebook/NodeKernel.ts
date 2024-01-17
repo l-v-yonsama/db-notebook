@@ -145,11 +145,25 @@ export class NodeKernel {
           if ( typeof key !== 'string' ) {
             throw new Error('the key type must be "string".');
           }
-          variables.set('_CellJSONKeyValue', fstringify({cellIndex, key, value}));  
+          const arr = JSON.parse(variables.get('_UpdateJSONCellValues') ?? '[]');
+          let meta = arr.find(it => it.cellIndex === cellIndex);
+          if ( meta === undefined ) {
+            meta = { cellIndex, replaceAll: false, data: {} };
+            arr.push(meta);
+          }
+          meta.data[key] = value;
+          variables.set('_UpdateJSONCellValues', fstringify(arr));  
         }
   
         static replaceAllAt(cellIndex, value) {
-          variables.set('_CellJSONValue', fstringify({cellIndex, value}));  
+          const arr = JSON.parse(variables.get('_UpdateJSONCellValues') ?? '[]');
+          if ( meta === undefined ) {
+            meta = { cellIndex, replaceAll: true, data: {} };
+            arr.push(meta);
+          }
+          meta.replaceAll = true;
+          meta.data = value;
+          variables.set('_UpdateJSONCellValues', fstringify(arr)); 
         }
       }
 
@@ -276,19 +290,13 @@ export class NodeKernel {
       };
     }
 
-    if (this.variables["_CellJSONKeyValue"]) {
-      const cellJsonValue = this.variables["_CellJSONKeyValue"];
-      delete this.variables["_CellJSONKeyValue"];
+    if (this.variables["_UpdateJSONCellValues"]) {
+      const cellJsonValue = this.variables["_UpdateJSONCellValues"];
+      delete this.variables["_UpdateJSONCellValues"];
       const v = JSON.parse(cellJsonValue);
-      if (v.key) {
-        metadata.updateCellJSONValue = v;
+      if (v && v.length > 0) {
+        metadata.updateJSONCellValues = v;
       }
-    }
-
-    if (this.variables["_CellJSONValue"]) {
-      const cellJsonValue = this.variables["_CellJSONValue"];
-      delete this.variables["_CellJSONValue"];
-      metadata.updateCellJSONValue = JSON.parse(cellJsonValue);
     }
 
     return {

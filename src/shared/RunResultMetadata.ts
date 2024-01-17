@@ -6,10 +6,12 @@ export type NodeRunAxiosEvent = {
   entry: Entry;
 };
 
-export type UpdateCellJSONValue = {
+export type JSONCellValues = {
   cellIndex: number;
-  key?: string;
-  value: any;
+  replaceAll: boolean;
+  data: {
+    [key: string]: any;
+  };
 };
 
 export type RunResultMetadata = {
@@ -19,6 +21,6 @@ export type RunResultMetadata = {
   explainRdh?: ResultSetData;
   analyzedRdh?: ResultSetData;
   axiosEvent?: NodeRunAxiosEvent;
-  updateCellJSONValue?: UpdateCellJSONValue;
+  updateJSONCellValues?: JSONCellValues[];
   [key: string]: any;
 };

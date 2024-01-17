@@ -19,17 +19,6 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
   - Output in Excel file format
 - Create and execute "Undo changes sql statements"
 
-## Getting started
-
-- Setup connection settings
-- Access to database
-  - through the SidePanel
-  - through the Notebook
-
-## Examples
-
-- [Database Notebook file examples](/docs/examples/databaseNotebook.md)
-
 ## Screenshots
 
 - Setup connection settings, access to Mysql through the Side-panel
@@ -61,6 +50,10 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 - Verify records comply with a rule ( `Create a new blank DB record rule` )
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/07_record_rule.gif)
+
+## Examples
+
+- [Database Notebook file examples](/docs/examples/databaseNotebook.md)
 
 ## Requirements
 

@@ -287,7 +287,7 @@ export class MainController {
       }
 
       if (metadata) {
-        const { rdh, explainRdh, analyzedRdh, axiosEvent, updateCellJSONValue } = metadata;
+        const { rdh, explainRdh, analyzedRdh, axiosEvent, updateJSONCellValues } = metadata;
         if (rdh) {
           const cellMeta: CellMeta = cell.metadata;
           const withComment = rdh.keys.some((it) => (it.comment ?? "").length);
@@ -350,30 +350,34 @@ export class MainController {
           );
         }
 
-        if (updateCellJSONValue) {
-          const { cellIndex, key, value } = updateCellJSONValue;
-          const jsonCells = notebook.getCells().filter((it) => isJsonCell(it));
-          if (cellIndex < jsonCells.length) {
-            const jsonCell = jsonCells[cellIndex];
-            const doc = jsonCell.document;
-            const st = doc.positionAt(0);
-            const ed = doc.positionAt(doc.getText().length);
-            const range = new Range(st, ed);
+        if (updateJSONCellValues) {
+          for (const updateJsonCell of updateJSONCellValues) {
+            const { cellIndex, replaceAll, data } = updateJsonCell;
+            const jsonCells = notebook.getCells().filter((it) => isJsonCell(it));
+            if (cellIndex < jsonCells.length) {
+              const jsonCell = jsonCells[cellIndex];
+              const doc = jsonCell.document;
+              const st = doc.positionAt(0);
+              const ed = doc.positionAt(doc.getText().length);
+              const range = new Range(st, ed);
 
-            let edit;
-            if (key !== undefined) {
-              const jsonObj = JSON.parse(doc.getText());
-              jsonObj[key] = value;
-              edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
+              let edit;
+              if (replaceAll) {
+                edit = new TextEdit(range, JSON.stringify(data, null, 2));
+              } else {
+                const jsonObj = JSON.parse(doc.getText());
+                Object.keys(data).forEach((key) => {
+                  jsonObj[key] = data[key];
+                });
+                edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
+              }
+
+              var formatEdit = new WorkspaceEdit();
+              formatEdit.set(doc.uri, [edit]);
+              await workspace.applyEdit(formatEdit);
             } else {
-              edit = new TextEdit(range, JSON.stringify(value, null, 2));
+              throw new Error(`JSON cell index[${cellIndex}] is out of range[${jsonCells.length}]`);
             }
-
-            var formatEdit = new WorkspaceEdit();
-            formatEdit.set(doc.uri, [edit]);
-            await workspace.applyEdit(formatEdit);
-          } else {
-            throw new Error(`JSON cell index[${cellIndex}] is out of range[${jsonCells.length}]`);
           }
         }
       }
