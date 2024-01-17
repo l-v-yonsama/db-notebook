@@ -1,0 +1,36 @@
+{
+  "name": "hello-world",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --port 5050",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.4.0",
+    "@fortawesome/free-solid-svg-icons": "^6.4.0",
+    "@fortawesome/vue-fontawesome": "^3.0.0-5",
+    "@virtual-list/vue": "^1.2.0",
+    "@vscode/codicons": "^0.0.32",
+    "@vscode/webview-ui-toolkit": "^1.2.1",
+    "splitpanes": "^3.1.5",
+    "vue": "^3.2.33",
+    "vue-click-outside-element": "^3.1.2"
+  },
+  "devDependencies": {
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.223",
+    "@types/node": "^16.11.27",
+    "@types/splitpanes": "^2.2.1",
+    "@types/vscode-webview": "^1.57.0",
+    "@vitejs/plugin-vue": "^2.3.1",
+    "@vue/tsconfig": "^0.1.3",
+    "css-declaration-sorter": "^7.0.3",
+    "postcss": "^8.4.27",
+    "sass": "^1.64.2",
+    "typescript": "~4.6.3",
+    "vite": "^2.9.13",
+    "vue-tsc": "^0.34.7"
+  }
+}
