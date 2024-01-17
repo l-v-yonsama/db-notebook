@@ -23,6 +23,7 @@ webview-ui/node_modules/**
 
 # Ignore Misc
 .yarnrc
+.DS_Store
 vsc-extension-quickstart.md
 **/.gitignore
 **/tsconfig.json
@@ -32,5 +33,4 @@ vsc-extension-quickstart.md
 **/*.ts
 
 misc/**
-todo.md
 docs/images/**
