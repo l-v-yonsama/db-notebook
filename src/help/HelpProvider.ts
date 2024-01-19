@@ -10,7 +10,7 @@ const HELP_ITEMS = [
   },
   {
     name: "Examples",
-    uri: "https://l-v-yonsama.github.io/db-notebook/examples/databaseNotebook.html",
+    uri: "https://l-v-yonsama.github.io/db-notebook/docs/examples/databaseNotebook.html",
     iconFile: "info.svg",
   },
 ];
