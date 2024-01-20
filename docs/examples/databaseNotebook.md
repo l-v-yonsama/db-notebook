@@ -6,16 +6,18 @@ This page shows an example of the use of the VS code extension "Database Noteboo
 
 - 1. [Query examples](#1-query-examples)
   - 1.1. [Bind parameters in query](#11-bind-parameters-in-query)
-- 2. [Axios use cases](#2-axios-use-cases)
-  - 2.1. [GET Method](#21-get-method)
-    - 2.1.1. [Simple GET request](#211-simple-get-request)
-    - 2.1.2. [Request with authorisation header](#212-request-with-authorisation-header)
-    - 2.1.3. [GET image](#213-get-image)
-  - 2.2. [POST Method](#22-post-method)
-  - 2.3. [PUT Method](#23-put-method)
-  - 2.4. [DELETE Method](#24-delete-method)
-  - 2.5. [Handling JWT Access and Refresh Token](#25-handling-jwt-access-and-refresh-token)
-  - 2.6. [Handling JWT Access Token and Introspection](#26-handling-jwt-access-token-and-introspection)
+- 2. [Controlling the Database with Javascript](#2-controlling-the-database-with-javascript)
+  - 2.1. [Inserting parent and child records in the same transaction](#21-inserting-parent-and-child-records-in-the-same-transaction)
+- 3. [Axios use cases](#3-axios-use-cases)
+  - 3.1. [GET Method](#31-get-method)
+    - 3.1.1. [Simple GET request](#311-simple-get-request)
+    - 3.1.2. [Request with authorisation header](#312-request-with-authorisation-header)
+    - 3.1.3. [GET image](#313-get-image)
+  - 3.2. [POST Method](#32-post-method)
+  - 3.3. [PUT Method](#33-put-method)
+  - 3.4. [DELETE Method](#34-delete-method)
+  - 3.5. [Handling JWT Access and Refresh Token](#35-handling-jwt-access-and-refresh-token)
+  - 3.6. [Handling JWT Access Token and Introspection](#36-handling-jwt-access-token-and-introspection)
 
 ## 1. Query examples
 
@@ -72,11 +74,60 @@ Cell[2] (SQL cell)
 | 1 | 7698 | 30 |
 | 2 | 7782 | 20 |
 
-## 2. Axios use cases
+## 2. Controlling the Database with Javascript
 
-### 2.1. Get Method
+### 2.1. Inserting parent and child records in the same transaction
 
-#### 2.1.1. Simple GET request
+#### Define cells.
+
+```js
+// Get a connection definition by specifying the "Connection name" defined in the "DB Explorer".
+const connectionSetting = getConnectionSettingByName("localPostgres");
+
+// https://github.com/l-v-yonsama/db-drivers/blob/main/doc/classes/DBDriverResolver.md#flowtransaction
+const { ok, message, result } = await DBDriverResolver.getInstance().flowTransaction(
+  connectionSetting,
+  async (driver) => {
+    // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/classes/RDSBaseDriver.md#requestsql
+    const { rows } = await driver.requestSql({
+      sql: "INSERT INTO order1 (customer_no, order_date, amount) VALUES (10, '2024-01-01', 300) RETURNING order_no AS inserted_no",
+    });
+    const orderNo = rows[0].values["inserted_no"];
+
+    for (let i = 1; i <= 3; i++) {
+      // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/modules.md#normalizequery
+      const { query, binds } = normalizeQuery({
+        query:
+          "INSERT INTO order_detail (order_no, detail_no, item_no, amount) VALUES (:order_no, :detail_no, :item_no, :amount)",
+        bindParams: { order_no: orderNo, detail_no: i, item_no: i * 50, amount: 100 },
+        toPositionedParameter: driver.isPositionedParameterAvailable(),
+      });
+      await driver.requestSql({ sql: query, conditions: { binds } });
+    }
+
+    return `Inserted order_no is ${orderNo}`;
+  },
+  { transactionControlType: "rollbackOnError" }
+);
+
+console.log("ok", ok);
+console.log("message", message);
+console.log("result", result);
+```
+
+#### Execution Result.
+
+```text
+ok true
+message
+result Inserted order_no is 25
+```
+
+## 3. Axios use cases
+
+### 3.1. Get Method
+
+#### 3.1.1. Simple GET request
 
 ##### Define cells.
 
@@ -100,7 +151,7 @@ writeResponseData(res);
 }
 ```
 
-#### 2.1.2. Request with authorisation header
+#### 3.1.2. Request with authorisation header
 
 ##### Define cells.
 
@@ -128,7 +179,7 @@ writeResponseData(res);
 }
 ```
 
-#### 2.1.3. Get Image
+#### 3.1.3. Get Image
 
 ##### Define cells.
 
@@ -150,7 +201,7 @@ writeResponseData(res);
 
 <img style='max-width:128px;max-height:64px;' src='https://www.gstatic.com/webp/gallery/1.webp'>
 
-### 2.2. Post Method
+### 3.2. Post Method
 
 ##### Define cells.
 
@@ -188,7 +239,7 @@ writeResponseData(res);
 ℹ️ (256/511) Abbreviated. Push "Open response" button to show all without abbreviation.
 ```
 
-### 2.3. Put Method
+### 3.3. Put Method
 
 ##### Define cells.
 
@@ -226,7 +277,7 @@ writeResponseData(res);
 ℹ️ (256/510) Abbreviated. Push "Open response" button to show all without abbreviation.
 ```
 
-### 2.4. Delete Method
+### 3.4. Delete Method
 
 ##### Define cells.
 
@@ -262,7 +313,7 @@ writeResponseData(res);
 ℹ️ (256/436) Abbreviated. Push "Open response" button to show all without abbreviation.
 ```
 
-### 2.5. Handling JWT Access and Refresh Token
+### 3.5. Handling JWT Access and Refresh Token
 
 #### 2.5.1. Define cells.
 
@@ -404,9 +455,9 @@ Cell[3] (Javascript cell)
 ℹ️ (256/3362) Abbreviated. Push "Open resource" button to show all without abbreviation.
 ```
 
-### 2.6. Handling JWT Access Token and Introspection
+### 3.6. Handling JWT Access Token and Introspection
 
-#### 2.6.1. Define cells.
+#### 3.6.1. Define cells.
 
 Cell[1] Defines the shared values within the notebook in the "JSON" language.
 
@@ -478,7 +529,7 @@ const res = await axios.post(url, body, { auth, headers });
 writeResponseData(res);
 ```
 
-#### 2.6.2. Execution Result.
+#### 3.6.2. Execution Result.
 
 Cell[1] (JSON variables cell)
 
