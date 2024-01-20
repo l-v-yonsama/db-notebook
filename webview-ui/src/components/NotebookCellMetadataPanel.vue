@@ -4,6 +4,7 @@ import { vscode } from "@/utilities/vscode";
 import type { NotebookCellMetadataPanelEventData } from "@/utilities/vscode";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeTextField from "./base/VsCodeTextField.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
 import type { DropdownItem } from "@/types/Components";
 
@@ -19,15 +20,18 @@ const ruleFile = ref("");
 const markWithinQuery = ref(true);
 const markWithExplain = ref(false);
 const markWithExplainAnalyze = ref(false);
+const savingSharedVariables = ref(false);
+const sharedVariableName = ref("");
 
 const initialized = ref(false);
 const sectionHeight = ref(300);
 
 const errorMessage = computed(() => {
-  if (markWithinQuery.value || markWithExplain.value || markWithExplainAnalyze.value) {
-    return "";
+  if (!markWithinQuery.value && !markWithExplain.value && !markWithExplainAnalyze.value) {
+    return "Please select at least one.";
   }
-  return "Please select at least one.";
+
+  return "";
 });
 
 const resetSpPaneWrapperHeight = () => {
@@ -59,6 +63,9 @@ const initialize = (v: NotebookCellMetadataPanelEventData["value"]["initialize"]
       ruleFileItems.push({ label: it.label, value: it.value });
     });
 
+    savingSharedVariables.value = v.metadata.savingSharedVariables === true;
+    sharedVariableName.value = v.metadata.sharedVariableName ?? "";
+
     initialized.value = true;
   });
 };
@@ -87,6 +94,8 @@ const save = () => {
         markWithinQuery: markWithinQuery.value,
         markWithExplain: markWithExplain.value,
         markWithExplainAnalyze: markWithExplainAnalyze.value,
+        savingSharedVariables: savingSharedVariables.value,
+        sharedVariableName: sharedVariableName.value,
       },
     },
   });
@@ -104,6 +113,12 @@ const recieveMessage = (data: NotebookCellMetadataPanelEventData) => {
   }
 };
 
+const disabledSaveButton = computed(
+  () =>
+    errorMessage.value.length > 0 ||
+    (savingSharedVariables.value && sharedVariableName.value.length === 0)
+);
+
 defineExpose({
   recieveMessage,
 });
@@ -117,7 +132,7 @@ defineExpose({
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel"
           ><fa icon="times" />Cancel</VsCodeButton
         >
-        <VsCodeButton :disabled="errorMessage.length > 0" @click="save" title="Save cell metadata"
+        <VsCodeButton :disabled="disabledSaveButton" @click="save" title="Save cell metadata"
           ><fa icon="plus" />Save</VsCodeButton
         >
       </div>
@@ -180,6 +195,32 @@ defineExpose({
           <VsCodeDropdown id="ruleFileItems" v-model="ruleFile" :items="ruleFileItems" />
         </div>
       </fieldset>
+      <fieldset>
+        <legend>Saving execution results in shared variables</legend>
+        <div>
+          <div>
+            <vscode-checkbox
+              :checked="savingSharedVariables"
+              @change="($e:any) => savingSharedVariables =$e.target.checked"
+              style="margin-right: auto"
+              >Save</vscode-checkbox
+            >
+          </div>
+          <div v-if="savingSharedVariables">
+            <label for="sharedVariableName">shared variable name:</label>
+            <VsCodeTextField
+              id="sharedVariableName"
+              v-model="sharedVariableName"
+              :required="true"
+              :maxlength="50"
+              :transparent="true"
+              :change-on-mouseout="true"
+              title="Shared variable name"
+            >
+            </VsCodeTextField>
+          </div>
+        </div>
+      </fieldset>
     </section>
   </section>
 </template>
@@ -201,5 +242,9 @@ fieldset {
 }
 .scroll-wrapper {
   overflow: auto;
+}
+
+#sharedVariableName {
+  margin-left: 5px;
 }
 </style>

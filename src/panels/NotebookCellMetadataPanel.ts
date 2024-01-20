@@ -180,6 +180,13 @@ export class NotebookCellMetadataPanel {
                 delete newMetadata.markWithExplainAnalyze;
               }
 
+              if (newMetadata.savingSharedVariables === false) {
+                delete newMetadata.savingSharedVariables;
+              }
+              if (newMetadata.sharedVariableName === "") {
+                delete newMetadata.sharedVariableName;
+              }
+
               const edit = new WorkspaceEdit();
               const nbEdit = NotebookEdit.updateCellMetadata(this.cell.index, {
                 ...newMetadata,

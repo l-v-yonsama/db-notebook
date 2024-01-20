@@ -57,7 +57,7 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
 ## Requirements
 
-- node.js >= 16
+- node.js >= 18
 
 ## Recommended Extensions
 

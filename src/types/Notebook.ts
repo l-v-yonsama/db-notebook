@@ -10,6 +10,8 @@ export type CellMeta = {
   codeResolverFile?: string;
   markWithinQuery?: boolean;
   markWithExplain?: boolean;
+  savingSharedVariables?: boolean;
+  sharedVariableName?: string;
   readonly [key: string]: any;
 };
 

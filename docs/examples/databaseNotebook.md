@@ -5,6 +5,7 @@ This page shows an example of the use of the VS code extension "Database Noteboo
 ## TOC
 
 - 1. [Query examples](#1-query-examples)
+  - 1.1. [Bind parameters in query](#11-bind-parameters-in-query)
 - 2. [Axios use cases](#2-axios-use-cases)
   - 2.1. [GET Method](#21-get-method)
     - 2.1.1. [Simple GET request](#211-simple-get-request)
@@ -17,6 +18,59 @@ This page shows an example of the use of the VS code extension "Database Noteboo
   - 2.6. [Handling JWT Access Token and Introspection](#26-handling-jwt-access-token-and-introspection)
 
 ## 1. Query examples
+
+SQL statements can be issued by specifying "SQL" as the language of the cell.
+
+### Define cells.
+
+```sql
+SELECT customer_no, age FROM customer WHERE age IN (10, 20, 30) ORDER BY customer_no
+```
+
+### Execution Result.
+
+`[Query Result]` 3 rows in set (0.00 sec)
+| ROW | customer_no | age |
+| ---: | ---: | ---: |
+| 1 | 7566 | 10 |
+| 2 | 7698 | 30 |
+| 3 | 7782 | 20 |
+
+### 1.1. Bind parameters in query
+
+#### Define cells.
+
+Cell[1] Defines the shared values within the notebook in the "JSON" language.
+
+```json
+{
+  "customer_no": 7600,
+  "age_list": [10, 20, 30]
+}
+```
+
+Cell[2] Defines the query within the notebook in the "SQL" language.
+
+Colon + variable name to specify bind variables.
+
+```sql
+SELECT customer_no, age FROM customer
+WHERE age IN ( :age_list ) AND customer_no > :customer_no
+```
+
+### Execution Result.
+
+Cell[1] (JSON variables cell)
+
+OK: updated 2 variables
+
+Cell[2] (SQL cell)
+
+`[Query Result]` 2 rows in set (0.00 sec)
+| ROW | customer_no | age |
+| ---: | ---: | ---: |
+| 1 | 7698 | 30 |
+| 2 | 7782 | 20 |
 
 ## 2. Axios use cases
 

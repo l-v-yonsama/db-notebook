@@ -262,6 +262,7 @@ export class MainController {
     let stderr = "";
     let skipped = false;
     let metadata: RunResultMetadata | undefined = undefined;
+    const cellMeta: CellMeta = cell.metadata;
 
     try {
       const r = await this.run(notebook, cell);
@@ -289,7 +290,6 @@ export class MainController {
       if (metadata) {
         const { rdh, explainRdh, analyzedRdh, axiosEvent, updateJSONCellValues } = metadata;
         if (rdh) {
-          const cellMeta: CellMeta = cell.metadata;
           const withComment = rdh.keys.some((it) => (it.comment ?? "").length);
           outputs.push(
             new NotebookCellOutput(
@@ -394,8 +394,9 @@ export class MainController {
     }
     execution.replaceOutput(outputs);
     execution.end(success, Date.now());
-    if (noteSession.kernel) {
-      noteSession.kernel.updateVariable(`$cell${noteSession.executionOrder}`, {
+
+    if (noteSession.kernel && cellMeta.savingSharedVariables && cellMeta.sharedVariableName) {
+      noteSession.kernel.updateVariable(cellMeta.sharedVariableName, {
         success,
         stdout,
         stderr,
@@ -482,6 +483,8 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
       markWithExplain,
       markWithExplainAnalyze,
       markAsSkip,
+      savingSharedVariables,
+      sharedVariableName,
     }: CellMeta = cell.metadata;
     let tooltip = "";
 
@@ -530,6 +533,10 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
       } else {
         tooltip += " $(warning) Missing Rule " + abbr(displayFileName, 18);
       }
+    }
+
+    if (savingSharedVariables && sharedVariableName) {
+      tooltip += " $(symbol-variable) " + abbr(sharedVariableName, 18);
     }
 
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
