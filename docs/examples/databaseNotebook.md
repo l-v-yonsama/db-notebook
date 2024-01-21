@@ -89,10 +89,16 @@ const { ok, message, result } = await DBDriverResolver.getInstance().flowTransac
   connectionSetting,
   async (driver) => {
     // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/classes/RDSBaseDriver.md#requestsql
+
+    // for PostgreSQL
     const { rows } = await driver.requestSql({
       sql: "INSERT INTO order1 (customer_no, order_date, amount) VALUES (10, '2024-01-01', 300) RETURNING order_no AS inserted_no",
     });
     const orderNo = rows[0].values["inserted_no"];
+
+    // for MySQL
+    // const { summary } = await driver.requestSql({sql:"INSERT INTO testdb.order (customer_no, order_date, amount) VALUES (10, '2024-01-01', 300)"});
+    // const orderNo = summary.insertId;
 
     for (let i = 1; i <= 3; i++) {
       // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/modules.md#normalizequery
