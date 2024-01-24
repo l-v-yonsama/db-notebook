@@ -7,7 +7,7 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 ## Features
 
 - Various databases accesss in Notebooks, Sidebars and panels UI
-  - MySQL, Postgres, Redis, AWS, Keycloak, Auth0
+  - MySQL, PostgreSQL, Redis, AWS, Keycloak, Auth0
 - Run & stop SQL, JavaScript code in node.js
 - Variable sharing between notebook cells
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)

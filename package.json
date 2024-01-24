@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -18,6 +18,18 @@
   "categories": [
     "Notebooks",
     "Visualization"
+  ],
+  "keywords": [
+    "MySQL",
+    "PostgreSQL",
+    "Redis",
+    "AWS",
+    "Keycloak",
+    "Auth0",
+    "editor",
+    "viewer",
+    "table",
+    "diff"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
