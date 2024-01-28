@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, computed } from "vue";
 import dayjs from "dayjs";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextArea from "./base/VsCodeTextArea.vue";
@@ -13,7 +13,7 @@ import {
   vsCodePanelTab,
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
-import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ResourceType, ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import RDHViewer from "./RDHViewer.vue";
 import type {
   CloseScanPanelActionCommand,
@@ -201,12 +201,22 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
   }
 };
 
-const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData }) => {
+const setSearchResult = ({
+  tabId,
+  value,
+  resourceType,
+}: {
+  tabId: string;
+  value: ResultSetData;
+  resourceType: ResourceType;
+}) => {
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
   }
   tabItem.rdh = undefined;
+  tabItem.prevResourceTypeValue = resourceType;
+
   nextTick(() => {
     tabItem.rdh = value;
     inProgress.value = false;
@@ -314,6 +324,64 @@ const recieveMessage = (data: ScanPanelEventData) => {
       stopProgress();
       break;
   }
+};
+
+const comparable = computed((): boolean => {
+  if (inProgress.value) {
+    return false;
+  }
+  const tabItem = getActiveTabItem();
+  if (!tabItem) {
+    return false;
+  }
+
+  if (tabItem.dbType != "Keycloak" && tabItem.dbType != "Auth0") {
+    return false;
+  }
+
+  let currentResourceType = tabItem.resourceType.value;
+  if (tabItem.resourceType.visible && tabItem.prevResourceTypeValue != currentResourceType) {
+    return false;
+  }
+
+  return true;
+});
+
+const compareDetailItems = [
+  {
+    kind: "selection",
+    label: "Search again, Compare current contets with these",
+    value: { command: "compare" },
+  },
+] as SecondaryItem[];
+
+const compare = (): void => {
+  const tabItem = getActiveTabItem();
+  if (!tabItem) {
+    return;
+  }
+
+  inProgress.value = true;
+  const { tabId, limit, keyword, startDt, endDt } = tabItem;
+
+  let resourceType = tabItem.resourceType.value;
+  if (tabItem.resourceType.visible) {
+    resourceType = tabItem.resourceType.value;
+  }
+
+  const action: SearchScanPanelActionCommand = {
+    command: "search",
+    params: {
+      tabId,
+      limit: limit.visible ? toNum(limit.value) : undefined,
+      keyword: keyword.visible ? keyword.value : undefined,
+      startTime: toIso8601String(startDt, true),
+      endTime: toIso8601String(endDt, false),
+      resourceType,
+      execComparativeProcess: true,
+    },
+  };
+  vscode.postCommand(action);
 };
 
 defineExpose({
@@ -483,6 +551,12 @@ defineExpose({
               <VsCodeButton @click="search" :disabled="inProgress" title="scan">
                 <fa icon="search" />Search
               </VsCodeButton>
+              <SecondarySelectionAction
+                :items="compareDetailItems"
+                :disabled="!comparable"
+                title="Compare"
+                @onSelect="(v:any) => compare()"
+              />
             </div>
           </div>
           <div class="spPaneWrapper">

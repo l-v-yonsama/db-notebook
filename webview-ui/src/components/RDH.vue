@@ -614,7 +614,7 @@ defineExpose({
                   >
                     <VsCodeButton
                       v-if="key.visibleDetailPane"
-                      @click="showDetail(item, key, item[key.name])"
+                      @click.stop="showDetail(item, key, item[key.name])"
                       appearance="secondary"
                       class="show-detail"
                       ><fa icon="eye"

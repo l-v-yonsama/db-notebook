@@ -228,6 +228,7 @@ export type SearchScanPanelParams = {
   startTime?: any;
   endTime?: any;
   resourceType: ResourceType;
+  execComparativeProcess?: boolean;
 };
 
 export type SearchScanPanelActionCommand = {

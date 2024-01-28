@@ -48,6 +48,11 @@ button[disabled] {
   cursor: not-allowed !important;
 }
 
+a[disabled="true"] {
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
 .splitpanes.default-theme .splitpanes__pane {
   background-color: inherit !important;
 }

@@ -515,6 +515,8 @@ export class MdhPanel {
     );
     const diffParams: DiffTabParam = {
       title: tabItem.title,
+      comparable: true,
+      undoable: true,
       list1: beforeList,
       list2: afterList.map((it) => it!),
     };

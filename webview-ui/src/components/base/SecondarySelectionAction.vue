@@ -1,7 +1,7 @@
 <template>
   <div class="dropdown-action-container">
     <div class="monaco-dropdown">
-      <div class="dropdown-label">
+      <div class="dropdown-label" :disabled="disabled">
         <a
           class="action-label codicon"
           :class="{ 'codicon-chevron-down': isChevron, 'codicon-ellipsis': isMore }"
@@ -10,6 +10,7 @@
           aria-expanded="false"
           :title="title"
           :aria-label="title"
+          :disabled="disabled"
           @click="toggle"
         ></a>
       </div>
@@ -19,7 +20,7 @@
         <p v-if="item.kind == 'selection' && visibleItem(item)">
           <a @click="clickItem(item.value)">{{ item.label }}</a>
         </p>
-        <hr class="hr" v-else />
+        <hr v-if="item.kind == 'divider'" class="hr" />
       </template>
       <slot></slot>
     </section>
@@ -33,6 +34,7 @@ import type { SecondaryItem, SecondaryItemSelection } from "@/types/Components";
 const props = defineProps<{
   title: string;
   items: SecondaryItem[];
+  disabled?: boolean;
 }>();
 
 const isChevron = ref(props.title != "more");
@@ -70,15 +72,22 @@ function clickItem(value: any) {
   close();
 }
 </script>
-<style scoped>
+<style lang="scss" scoped>
 hr.hr {
   width: 100%;
 }
 a {
   color: inherit;
 }
+.dropdown-action-container {
+  position: relative;
+}
 .dropdown-label {
   cursor: pointer;
+
+  &[disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 .dropdown-list {
   position: absolute;

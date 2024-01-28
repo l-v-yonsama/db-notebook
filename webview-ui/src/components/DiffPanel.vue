@@ -36,6 +36,7 @@ const activeInnerRdh1 = ref(null as any);
 const activeInnerRdh2 = ref(null as any);
 const displayOnlyChanged = ref(false);
 const hasUndoChangeSql = ref(false);
+const comparable = ref(false);
 
 const outputDetailItems = OUTPUT_DETAIL_ITEMS;
 const compareDetailItems = [
@@ -106,6 +107,7 @@ const showTab = (tabId: string) => {
     return;
   }
   hasUndoChangeSql.value = tabItem.hasUndoChangeSql;
+  comparable.value = tabItem.comparable;
   innerTabItems.value.splice(0, innerTabItems.value.length);
   innerTabVisible.value = false;
   tabItem.list.forEach((item: DiffTabInnerItem, idx) => {
@@ -263,12 +265,17 @@ defineExpose({
       ></VsCodeDropdown>
       <button
         @click="compare({ base: 'before' })"
-        :disabled="inProgress"
+        :disabled="inProgress || !comparable"
         title="Compare with before content"
       >
         <fa icon="code-compare" />
       </button>
-      <SecondarySelectionAction :items="compareDetailItems" title="Compare" @onSelect="compare" />
+      <SecondarySelectionAction
+        :disabled="inProgress || !comparable"
+        :items="compareDetailItems"
+        title="Compare"
+        @onSelect="compare"
+      />
       <button
         @click="output({ fileType: 'excel', outputWithType: 'withComment' })"
         :disabled="inProgress"

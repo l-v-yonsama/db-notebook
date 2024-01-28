@@ -136,6 +136,8 @@ export type DiffTabItem = {
   tabId: string;
   title: string;
   subTitle: string;
+  comparable: boolean;
+  undoable: boolean;
   hasUndoChangeSql: boolean;
   list: DiffTabInnerItem[];
 };
@@ -167,6 +169,7 @@ export type ScanTabItem = {
   tabId: string;
   conName: string;
   resourceType: ScanConditionItem;
+  prevResourceTypeValue?: ResourceType;
   rootRes: DbResource;
   title: string;
   dbType: DBType;
@@ -196,6 +199,7 @@ export type ScanPanelEventData = BaseMessageEventData<
     searchResult?: {
       tabId: string;
       value: ResultSetData;
+      resourceType: ResourceType;
     };
     addTabItem?: ScanTabItem;
     removeTabItem?: {

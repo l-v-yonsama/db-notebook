@@ -9,6 +9,7 @@ import {
   RedisDriver,
   ResourceType,
   ResultSetData,
+  ResultSetDataBuilder,
   ScanParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
@@ -23,6 +24,8 @@ import { createWebviewContent } from "../utilities/webviewUtil";
 import { log } from "../utilities/logger";
 import { ScanPanelEventData, ScanTabItem, ScanConditionItem } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
+import { DiffTabParam } from "./DiffPanel";
+import { SHOW_RDH_DIFF } from "../constant";
 
 const PREFIX = "[ScanPanel]";
 
@@ -96,7 +99,7 @@ export class ScanPanel {
     const now = dayjs();
     const title = rootRes.name;
     const keyword = createCondition("Keyword", "");
-    const limit = createCondition("Limit", 1000);
+    const limit = createCondition("Limit", 100);
     const startDt = createCondition("StartDt", now.format("YYYY-MM-DD"));
     const endDt = createCondition("EndDt", now.format("YYYY-MM-DD"));
     const resourceType = createCondition("resourceType", rootRes.resourceType);
@@ -194,7 +197,6 @@ export class ScanPanel {
             multilineKeyword = true;
             startDt.visible = true;
             endDt.visible = true;
-            limit.value = 100;
             keyword.label = "Query";
             keyword.value =
               "fields @timestamp, @message, @logStream\n|  filter @message like /(?i)(exception|error)/ \n| sort @timestamp desc\n";
@@ -386,7 +388,8 @@ export class ScanPanel {
    */
   private async search(data: SearchScanPanelParams) {
     log(`${PREFIX} search(${JSON.stringify(data)})`);
-    const { tabId, keyword, limit, startTime, endTime, resourceType } = data;
+    const { tabId, keyword, limit, startTime, endTime, resourceType, execComparativeProcess } =
+      data;
     const panelItem = this.items.find((it) => it.tabId === tabId);
     if (!panelItem) {
       return;
@@ -397,8 +400,6 @@ export class ScanPanel {
       return;
     }
     const { rootRes, parentTarget, targetName } = panelItem;
-
-    resourceType;
 
     const targetResourceType = resourceType;
 
@@ -430,6 +431,7 @@ export class ScanPanel {
 
     if (ok && result) {
       const rdh = result as ResultSetData;
+      let prevRdh = panelItem.rdh;
       panelItem.rdh = rdh;
       if (!rdh.meta?.tableName) {
         rdh.meta.tableName = rootRes.name;
@@ -442,10 +444,20 @@ export class ScanPanel {
           searchResult: {
             tabId,
             value: rdh,
+            resourceType: targetResourceType,
           },
         },
       };
       this._panel.webview.postMessage(msg);
+
+      if (
+        execComparativeProcess &&
+        prevRdh &&
+        panelItem.prevResourceTypeValue === targetResourceType
+      ) {
+        await this.compare(targetResourceType, prevRdh, rdh);
+      }
+      panelItem.prevResourceTypeValue = targetResourceType;
     } else {
       vscode.window.showErrorMessage(message);
       const msg2: ScanPanelEventData = {
@@ -455,6 +467,23 @@ export class ScanPanel {
       };
       this._panel.webview.postMessage(msg2);
     }
+  }
+
+  private async compare(title: string, rdh1: ResultSetData, rdh2: ResultSetData) {
+    const beforeList = [ResultSetDataBuilder.from(rdh1).build()];
+    const afterList = [ResultSetDataBuilder.from(rdh2).build()];
+
+    const diffParams: DiffTabParam = {
+      title,
+      comparable: false,
+      undoable: false,
+      list1: beforeList,
+      list2: afterList.map((it) => it!),
+    };
+    if (afterList.some((it) => it === undefined)) {
+      return;
+    }
+    vscode.commands.executeCommand(SHOW_RDH_DIFF, diffParams);
   }
 
   private async openLogStreamScanPanel(data: any) {

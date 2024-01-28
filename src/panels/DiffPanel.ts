@@ -50,6 +50,8 @@ const componentName = "DiffPanel";
 
 export type DiffTabParam = {
   title: string;
+  comparable: boolean;
+  undoable: boolean;
   list1: ResultSetData[];
   list2: ResultSetData[];
 };
@@ -109,6 +111,8 @@ export class DiffPanel {
 
   private async createTabItem(
     title: string,
+    comparable: boolean,
+    undoable: boolean,
     list1: ResultSetData[],
     list2: ResultSetData[]
   ): Promise<DiffTabItem> {
@@ -132,6 +136,8 @@ export class DiffPanel {
       tabId,
       title,
       subTitle,
+      comparable,
+      undoable,
       hasUndoChangeSql: false,
       list: [],
     };
@@ -172,7 +178,7 @@ export class DiffPanel {
           const { tableName, schemaName } = rdh1.meta;
 
           let undoChangeStatements: string[] | undefined = undefined;
-          if (tableName) {
+          if (tableName && undoable) {
             const undoChangeResult = diffToUndoChanges(rdh1, rdh2);
             const list = createUndoChangeSQL({
               schemaName,
@@ -217,11 +223,11 @@ export class DiffPanel {
   }
 
   async renderSub(params: DiffTabParam): Promise<DiffTabItem | undefined> {
-    const { title, list1, list2 } = params;
+    const { title, list1, comparable, undoable, list2 } = params;
     let item = this.getTabByTitle(title);
     if (item) {
       // Reset
-      const tmpItem = await this.createTabItem("tmp", list1, list2);
+      const tmpItem = await this.createTabItem("tmp", comparable, undoable, list1, list2);
       item.list = tmpItem.list;
       item.subTitle = tmpItem.subTitle;
 
@@ -239,7 +245,7 @@ export class DiffPanel {
       return item;
     }
 
-    item = await this.createTabItem(title, list1, list2);
+    item = await this.createTabItem(title, comparable, undoable, list1, list2);
     this.items.push(item);
 
     const msg2: DiffPanelEventData = {
@@ -502,6 +508,8 @@ export class DiffPanel {
 
     const diffParams: DiffTabParam = {
       title: tabItem.title,
+      comparable: tabItem.comparable,
+      undoable: tabItem.undoable,
       list1: beforeList,
       list2: afterList.map((it) => it!),
     };

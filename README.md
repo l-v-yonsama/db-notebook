@@ -51,6 +51,10 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/07_record_rule.gif)
 
+- Access to the Keycloak from the side panel to display changes in user information.
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/08_keycloak.gif)
+
 ## Examples
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
