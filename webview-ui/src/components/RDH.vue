@@ -15,6 +15,7 @@ import {
   isJsonLike,
   isTextLike,
   isYear,
+  isUUIDType,
 } from "@/utilities/GeneralColumnUtil";
 import type {
   EditRowInsertValues,
@@ -125,6 +126,8 @@ const columns = ref(
       if (isYear(k.type)) {
         width = 55;
       }
+    } else if (isUUIDType(k.type)) {
+      width = 265;
     } else if (isDateTimeOrDateOrTime(k.type)) {
       typeClass = "codicon-calendar";
       width = 160;

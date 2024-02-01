@@ -11,7 +11,7 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 - Run & stop SQL, JavaScript code in node.js
 - Variable sharing between notebook cells
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
-- Provide IntelliSense using DB resource names and coments
+- Provide IntelliSense using DB resource names and comments
 - Convenient visualization of result sets
   - Difference display using comparison key (Primary or Unique key)
   - Label display using code label resolver

@@ -73,6 +73,10 @@ export const GeneralColumnTypeConst = {
   UNKNOWN: "unknown",
 } as const;
 
+export function isUUIDType(type: GeneralColumnType): boolean {
+  return type === GeneralColumnTypeConst.UUID;
+}
+
 export function isNumericLike(type: any): boolean {
   switch (type) {
     // number

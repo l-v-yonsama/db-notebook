@@ -191,10 +191,13 @@ export class DBDatabaseItem extends vscode.TreeItem {
         break;
       case ResourceType.IamGroup:
         iconFile = "build.svg";
-        scannable = true;
+        // for Keycloak's group.
+        // can't search by keyword.
+        // scannable = true;
         break;
       case ResourceType.IamOrganization:
         iconFile = "build.svg";
+        // for Auth0's group.
         scannable = true;
         break;
       case ResourceType.Column:

@@ -8,6 +8,7 @@ import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import {
+  vsCodeCheckbox,
   vsCodePanels,
   vsCodePanelView,
   vsCodePanelTab,
@@ -29,7 +30,12 @@ import { vscode } from "@/utilities/vscode";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import type { SecondaryItem } from "@/types/Components";
 
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
+provideVSCodeDesignSystem().register(
+  vsCodeCheckbox(),
+  vsCodePanels(),
+  vsCodePanelView(),
+  vsCodePanelTab()
+);
 
 const outputDetailItems = ref([
   {
@@ -117,7 +123,7 @@ function search() {
     return;
   }
   inProgress.value = true;
-  const { tabId, limit, keyword, startDt, endDt } = tabItem;
+  const { tabId, limit, jsonExpansion, keyword, startDt, endDt } = tabItem;
 
   let resourceType = tabItem.resourceType.value;
   if (tabItem.resourceType.visible) {
@@ -129,6 +135,7 @@ function search() {
     params: {
       tabId,
       limit: limit.visible ? toNum(limit.value) : undefined,
+      jsonExpansion: jsonExpansion.visible ? jsonExpansion.value === true : undefined,
       keyword: keyword.visible ? keyword.value : undefined,
       startTime: toIso8601String(startDt, true),
       endTime: toIso8601String(endDt, false),
@@ -362,7 +369,7 @@ const compare = (): void => {
   }
 
   inProgress.value = true;
-  const { tabId, limit, keyword, startDt, endDt } = tabItem;
+  const { tabId, limit, jsonExpansion, keyword, startDt, endDt } = tabItem;
 
   let resourceType = tabItem.resourceType.value;
   if (tabItem.resourceType.visible) {
@@ -374,6 +381,7 @@ const compare = (): void => {
     params: {
       tabId,
       limit: limit.visible ? toNum(limit.value) : undefined,
+      jsonExpansion: jsonExpansion.visible ? jsonExpansion.value === true : undefined,
       keyword: keyword.visible ? keyword.value : undefined,
       startTime: toIso8601String(startDt, true),
       endTime: toIso8601String(endDt, false),
@@ -538,6 +546,13 @@ defineExpose({
                 :size="9"
                 :title="tabItem.limit.description"
               ></VsCodeTextField>
+              <vscode-checkbox
+                v-if="tabItem.jsonExpansion.visible"
+                :checked="tabItem.jsonExpansion.value === true"
+                @change="($e:any) => tabItem.jsonExpansion.value = ($e.target.checked==true)"
+                style="margin-right: auto"
+                >JSON expansion</vscode-checkbox
+              >
               <label v-if="tabItem.keyword.visible" for="keyword">{{ tabItem.keyword.label }}</label
               ><VsCodeTextField
                 v-if="tabItem.keyword.visible"
@@ -546,6 +561,7 @@ defineExpose({
                 :maxlength="128"
                 :title="tabItem.keyword.description"
                 placeholder="Enter a keyword"
+                style="max-width: 120px"
               >
               </VsCodeTextField>
               <VsCodeButton @click="search" :disabled="inProgress" title="scan">

@@ -175,6 +175,7 @@ export type ScanTabItem = {
   dbType: DBType;
   rdh?: any;
   limit: ScanConditionItem;
+  jsonExpansion: ScanConditionItem;
   keyword: ScanConditionItem;
   startDt: ScanConditionItem;
   endDt: ScanConditionItem;

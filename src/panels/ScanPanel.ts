@@ -100,6 +100,7 @@ export class ScanPanel {
     const title = rootRes.name;
     const keyword = createCondition("Keyword", "");
     const limit = createCondition("Limit", 100);
+    const jsonExpansion = createCondition("JsonExpansion", false);
     const startDt = createCondition("StartDt", now.format("YYYY-MM-DD"));
     const endDt = createCondition("EndDt", now.format("YYYY-MM-DD"));
     const resourceType = createCondition("resourceType", rootRes.resourceType);
@@ -111,6 +112,7 @@ export class ScanPanel {
     startDt.visible = false;
     endDt.visible = false;
     resourceType.visible = false;
+    jsonExpansion.visible = false;
 
     switch (dbType) {
       case DBType.Redis:
@@ -118,6 +120,7 @@ export class ScanPanel {
         break;
       case DBType.Auth0:
         resourceType.visible = true;
+        jsonExpansion.visible = true;
         switch (rootRes.resourceType) {
           case "Auth0Database":
             resourceType.value = "IamOrganization";
@@ -144,6 +147,7 @@ export class ScanPanel {
         break;
       case DBType.Keycloak:
         resourceType.visible = true;
+        jsonExpansion.visible = true;
         switch (rootRes.resourceType) {
           case "IamRealm":
             resourceType.value = "IamGroup";
@@ -221,6 +225,7 @@ export class ScanPanel {
       rootRes,
       keyword,
       limit,
+      jsonExpansion,
       startDt,
       endDt,
       multilineKeyword,
@@ -388,8 +393,16 @@ export class ScanPanel {
    */
   private async search(data: SearchScanPanelParams) {
     log(`${PREFIX} search(${JSON.stringify(data)})`);
-    const { tabId, keyword, limit, startTime, endTime, resourceType, execComparativeProcess } =
-      data;
+    const {
+      tabId,
+      keyword,
+      limit,
+      jsonExpansion,
+      startTime,
+      endTime,
+      resourceType,
+      execComparativeProcess,
+    } = data;
     const panelItem = this.items.find((it) => it.tabId === tabId);
     if (!panelItem) {
       return;
@@ -418,6 +431,7 @@ export class ScanPanel {
           target: targetName ?? "",
           keyword: keyword,
           limit: limit ?? 100,
+          jsonExpansion,
           startTime: startTime ? dayjs(startTime).valueOf() : undefined,
           endTime: endTime ? dayjs(endTime).valueOf() : undefined,
           withValue: {
@@ -487,7 +501,6 @@ export class ScanPanel {
   }
 
   private async openLogStreamScanPanel(data: any) {
-    console.log("🔸ScanPanel L315:called openLogStreamScanPanel", data);
     const { parentTabId, logStream, startTime } = data;
     const parentItem = this.items.find((it) => it.tabId === parentTabId);
 

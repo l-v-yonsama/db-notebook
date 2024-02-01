@@ -225,6 +225,7 @@ export type SearchScanPanelParams = {
   tabId: string;
   keyword: string;
   limit?: number;
+  jsonExpansion?: boolean;
   startTime?: any;
   endTime?: any;
   resourceType: ResourceType;
