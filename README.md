@@ -55,6 +55,10 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/08_keycloak.gif)
 
+- Expand and display JSON items in columns.
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/09_json_expansion.gif)
+
 ## Examples
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
