@@ -127,7 +127,7 @@ const columns = ref(
         width = 55;
       }
     } else if (isUUIDType(k.type)) {
-      width = 265;
+      width = 280;
     } else if (isDateTimeOrDateOrTime(k.type)) {
       typeClass = "codicon-calendar";
       width = 160;

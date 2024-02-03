@@ -508,7 +508,7 @@ defineExpose({
                 <span class="codicon codicon-trash"></span>Delete key
               </VsCodeButton>
 
-              <label v-if="tabItem.resourceType.visible" for="resource-type">Resource type</label>
+              <label v-if="tabItem.resourceType.visible" for="resource-type">Resource</label>
               <VsCodeRadioGroupVue
                 v-if="tabItem.resourceType.visible"
                 id="resource-type"

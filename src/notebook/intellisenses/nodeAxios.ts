@@ -5,7 +5,7 @@ export const setNodeAxiosCompletionItems = (list: CompletionItem[]): void => {
   // GET
 
   let example =
-    "const url = '${1|https://httpbin.org/ip|};'\n" +
+    "const url = '${1|https://httpbin.org/ip|}';\n" +
     "const res = await axios.get(url);\n\n" +
     "// Save the contents of the HttpResponse as cell output data.\n" +
     "writeResponseData(res);";
