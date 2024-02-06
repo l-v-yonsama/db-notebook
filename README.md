@@ -2,6 +2,8 @@
 
 Database Notebook is a Visual Studio Code extension that allows access to various databases through the VSCODE Notebook interface.
 
+It also provides a CSV and Har file preview feature.
+
 ![logo](./media/logo128.png)
 
 ## Features
@@ -17,7 +19,11 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
   - Label display using code label resolver
   - Verify result sets comply with a rule.
   - Output in Excel file format
+  - Generate descriptive statistics
 - Create and execute "Undo changes sql statements"
+- File preview
+  - CSV file preview
+  - Har file preview
 
 ## Screenshots
 
@@ -58,6 +64,18 @@ Database Notebook is a Visual Studio Code extension that allows access to variou
 - Expand and display JSON items in columns.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/09_json_expansion.gif)
+
+### Screenshots ( File viewer )
+
+- Csv file viewer.
+
+  - After previewing the CSV file, descriptive statistics were displayed according to its content.
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/10_csv_viewer.gif)
+
+- Har file viewer.
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/11_har_viewer.gif)
 
 ## Examples
 
