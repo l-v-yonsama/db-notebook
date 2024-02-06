@@ -43,7 +43,7 @@ window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 const resetSpPaneWrapperHeight = () => {
   const sectionWrapper = window.document.querySelector("section.HarFilePanel");
   if (sectionWrapper?.clientHeight) {
-    splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 51, 10);
+    splitterHeight.value = Math.max(sectionWrapper?.clientHeight - 79, 10);
   }
   if (sectionWrapper?.clientWidth) {
     splitterWidth.value = Math.max(sectionWrapper.clientWidth - 14, 10);

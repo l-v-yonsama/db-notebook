@@ -3,6 +3,7 @@ export type ComponentName =
   | "DiffPanel"
   | "ScanPanel"
   | "VariablesPanel"
+  | "CsvParseSettingPanel"
   | "HarFilePanel"
   | "HttpEventPanel"
   | "ViewConditionPanel"

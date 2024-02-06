@@ -26,7 +26,7 @@ import {
 } from "../utilities/httpUtil";
 import { WriteHttpEventToClipboardParamsPanel } from "./WriteHttpEventToClipboardParamsPanel";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
-import axios, { AxiosRequestConfig } from "axios";
+import { AxiosRequestConfig } from "axios";
 import * as qs from "qs";
 
 const PREFIX = "[HttpEventPanel]";

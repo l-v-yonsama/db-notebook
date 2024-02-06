@@ -68,14 +68,18 @@ export class HarFilePanel {
   }
 
   private createTabItem(title: string, res: Har): HarFileTabItem {
+    const type = GeneralColumnType.TEXT;
+    const meta = { disabledDetailPane: true };
+
     const rdb = new ResultSetDataBuilder([
-      createRdhKey({ name: "url", type: GeneralColumnType.TEXT, width: 500, align: "left" }),
+      createRdhKey({ name: "url", type, width: 500, align: "left" }),
       createRdhKey({ name: "status", type: GeneralColumnType.INTEGER, width: 60 }),
-      createRdhKey({ name: "method", type: GeneralColumnType.TEXT, width: 60 }),
-      createRdhKey({ name: "contentType", type: GeneralColumnType.TEXT, width: 100 }),
-      createRdhKey({ name: "size", type: GeneralColumnType.TEXT, width: 60, align: "right" }),
-      createRdhKey({ name: "time", type: GeneralColumnType.TEXT, width: 60, align: "right" }),
+      createRdhKey({ name: "method", type, width: 60, meta }),
+      createRdhKey({ name: "contentType", type, width: 100, meta }),
+      createRdhKey({ name: "size", type, width: 60, align: "right", meta }),
+      createRdhKey({ name: "time", type, width: 60, align: "right", meta }),
     ]);
+
     res.log.entries.forEach((entry) => {
       const { url, method } = entry.request;
       const { status } = entry.response;

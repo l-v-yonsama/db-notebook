@@ -1,6 +1,7 @@
 import type {
   ConnectionSetting,
   ContentTypeInfo,
+  CsvParseOptions,
   DBType,
   DbResource,
   DbSchema,
@@ -16,6 +17,7 @@ import type {
   WriteToClipboardParams,
   WriteHttpEventToClipboardParams,
   SearchScanPanelParams,
+  SaveCsvOptionParams,
 } from "./ActionParams";
 import type { RecordRule } from "./RecordRule";
 import type { CodeResolverParams } from "./CodeResolverParams";
@@ -26,6 +28,7 @@ import type { Har } from "har-format";
 export type MessageEventData =
   | MdhPanelEventData
   | HttpEventPanelEventData
+  | CsvParseSettingPanelEventData
   | HarFilePanelEventData
   | DiffPanelEventData
   | ScanPanelEventData
@@ -222,6 +225,16 @@ export type ViewConditionPanelEventData = BaseMessageEventData<
     setPreviewSql?: {
       previewSql: string;
     };
+  }
+>;
+
+export type CsvParseSettingPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-preview-rdh",
+  "CsvParseSettingPanel",
+  {
+    initialize?: SaveCsvOptionParams;
+    rdh: ResultSetData | null;
+    message?: string;
   }
 >;
 

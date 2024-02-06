@@ -27,6 +27,7 @@ const displayReqSwitch = ref("res" as "req" | "res" | "cookies");
 const isLoading = ref(true);
 const loadingRate = ref(0);
 const noRequest = ref(true);
+const saveButtonEnabled = ref(false);
 
 const displayReqItems = [
   { label: "Request", value: "req" },
@@ -119,11 +120,18 @@ const initialize = (params: HttpEventPanelEventData["value"]["initialize"]) => {
   title.value = "";
   axiosEvent.value = null;
 
+  const { previewContentTypeInfo } = params.codeBlocks.res;
+  const resContent = params.value?.entry?.response?.content;
+
   nextTick(() => {
     title.value = params.title;
     axiosEvent.value = params.value;
     codeBlocks.value = params.codeBlocks;
     setTimeout(resetSpPaneWrapperHeight, 200);
+    saveButtonEnabled.value =
+      previewContentTypeInfo !== undefined &&
+      previewContentTypeInfo.renderType !== "Unknown" &&
+      (resContent?.text ?? "").length > 0;
 
     let noRequestVal = true;
     if (params.value.entry.request) {
@@ -139,6 +147,31 @@ const initialize = (params: HttpEventPanelEventData["value"]["initialize"]) => {
       }
     }
     noRequest.value = noRequestVal;
+
+    if (previewContentTypeInfo?.renderType === "Font" && resContent?.text) {
+      document.head.querySelectorAll("style.har-font-preview-style").forEach((it) => {
+        it.remove();
+      });
+
+      let format = "woff";
+      if (previewContentTypeInfo.contentType.toLocaleLowerCase().includes("woff2")) {
+        format = "woff2";
+      }
+      var newStyle = document.createElement("style");
+      newStyle.setAttribute("class", "har-font-preview-style");
+
+      const { text } = resContent;
+      newStyle.appendChild(
+        document.createTextNode(
+          `@font-face {
+          font-family: 'harFontPreview';
+          src: url('data:application/x-font-woff;charset=utf-8;base64,${text}') format("${format}");
+      }`
+        )
+      );
+
+      document.head.appendChild(newStyle);
+    }
   });
 };
 
@@ -180,6 +213,44 @@ const selectedMoreOptions = (params: WriteHttpEventToClipboardParams): void => {
       ...params,
     },
   });
+};
+
+const downloadBase64File = (): void => {
+  const content = axiosEvent.value?.entry?.response?.content;
+  const { previewContentTypeInfo } = codeBlocks.value.res;
+  if (!previewContentTypeInfo || !content || !content.text) {
+    return;
+  }
+  const { renderType, contentType, fileName } = previewContentTypeInfo;
+
+  let linkSource: string = "";
+
+  switch (renderType) {
+    case "Text":
+      {
+        const blob = new Blob([content.text], { type: "text/plain" });
+        linkSource = URL.createObjectURL(blob);
+      }
+      break;
+    case "Image":
+      {
+        if (contentType === "image/svg+xml") {
+          // imgSrc.value = `data:image/svg+xml,${encodeURIComponent(content.text)}`;
+        } else {
+          linkSource = `data:${contentType};base64,${content.text}`;
+        }
+      }
+      break;
+    default:
+      {
+        linkSource = `data:${contentType};base64,${content.text}`;
+      }
+      break;
+  }
+  const downloadLink = document.createElement("a");
+  downloadLink.href = linkSource;
+  downloadLink.download = fileName;
+  downloadLink.click();
 };
 
 defineExpose({
@@ -227,6 +298,9 @@ defineExpose({
         title="..."
         @onSelect="selectedMoreOptions"
       />
+      <button :disabled="!saveButtonEnabled" @click="downloadBase64File()" title="Save as a file">
+        <fa icon="save" />
+      </button>
     </div>
 
     <section class="contents" :style="{ width: `${splitterWidth}px` }">
@@ -247,6 +321,7 @@ defineExpose({
           :header-code-block="codeBlocks.res.headers ?? ''"
           :contents-code-block="codeBlocks.res.contents ?? ''"
           :preview-content-type-info="codeBlocks.res.previewContentTypeInfo"
+          :url="axiosEvent.entry.request?.url"
           :width="splitterWidth"
           :height="splitterHeight"
         />

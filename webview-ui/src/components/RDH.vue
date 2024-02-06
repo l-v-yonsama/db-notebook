@@ -44,6 +44,7 @@ type Props = {
   height: number;
   readonly: boolean;
   withComment: boolean;
+  withType?: boolean;
   showOnlyChanged?: boolean;
 };
 
@@ -119,6 +120,7 @@ const columns = ref(
     let type = "string";
     let typeClass = "codicon-circle-outline";
     let width = k.width ?? 100;
+    const disabledDetailPane = ((k.meta ?? {}) as any)["disabledDetailPane"] === true;
 
     if (isNumericLike(k.type)) {
       typeClass = "codicon-symbol-numeric";
@@ -157,7 +159,7 @@ const columns = ref(
     const key: ColKey = {
       name: k.name,
       gtype: k.type,
-      visibleDetailPane: isTextLike(k.type) || isJsonLike(k.type),
+      visibleDetailPane: (isTextLike(k.type) || isJsonLike(k.type)) && !disabledDetailPane,
       type,
       typeClass,
       required: k.required,
@@ -532,6 +534,20 @@ defineExpose({
                 :title="key.comment"
               >
                 {{ key.comment }}
+              </th>
+            </tr>
+            <tr v-if="withType || editable">
+              <th v-if="editable" class="ctrl">
+                <div style="display: flex !important"></div>
+              </th>
+              <th class="row">[TYPE]</th>
+              <th
+                v-for="(key, idx) of columns"
+                :key="idx"
+                :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }"
+                :title="key.gtype"
+              >
+                {{ key.gtype }}
               </th>
             </tr>
           </thead>

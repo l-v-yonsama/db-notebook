@@ -23,6 +23,7 @@ import type {
 import { vscode } from "@/utilities/vscode";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { OUTPUT_DETAIL_ITEMS, WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
+import { isNumericLike } from "@/utilities/GeneralColumnUtil";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -86,6 +87,7 @@ const setRdhViewerRef = (el: any) => {
 
 const editable = ref(true);
 const refreshable = ref(false);
+const describable = ref(false);
 
 function getActiveTabItem(): RdhTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
@@ -129,6 +131,8 @@ const resetActiveInnerRdh = () => {
   const newRdh = tabItem.list[innerTabIndex.value];
   editable.value = newRdh.meta?.editable === true;
   refreshable.value = tabItem.refreshable;
+  describable.value =
+    newRdh.keys.some((it) => isNumericLike(it.type)) && tabItem.title != "Statistics";
 
   nextTick(() => {
     noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
@@ -234,6 +238,12 @@ function actionToolbar(command: string, inParams?: any) {
     case "output":
       output(inParams);
       return;
+    case "describe":
+      action = {
+        command,
+        params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
+      };
+      break;
     default:
       console.error("command naiyo");
       return;
@@ -416,6 +426,14 @@ defineExpose({
         title="Output as Excel"
         @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
       />
+      <button
+        v-if="describable"
+        @click="actionToolbar('describe', {})"
+        :disabled="inProgress"
+        title="Generate descriptive statistics"
+      >
+        <fa icon="magnifying-glass-chart" />
+      </button>
     </div>
     <CompareKeySettings
       v-if="contentMode == 'keys'"

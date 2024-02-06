@@ -185,6 +185,18 @@ export class MdhPanel {
               hideStatusMessage();
             }
             break;
+          case "describe":
+            {
+              const { tabId, innerIndex } = params;
+              const tabItem = this.getTabItemById(tabId);
+              if (!tabItem) {
+                return;
+              }
+              const rdh = tabItem.list[innerIndex];
+              const ss = ResultSetDataBuilder.from(rdh).describe();
+              MdhPanel.render(this.extensionUri, "Statistics", [ss]);
+            }
+            break;
           case "selectInnerTab":
             {
               const { tabId, innerIndex } = params;

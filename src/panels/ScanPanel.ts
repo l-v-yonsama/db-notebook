@@ -520,7 +520,7 @@ export class ScanPanel {
         },
       },
     };
-    console.log(msg);
+
     this._panel.webview.postMessage(msg);
 
     setTimeout(async () => {

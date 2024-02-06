@@ -1,4 +1,8 @@
-import type { ConnectionSetting, ResourceType } from "@l-v-yonsama/multi-platform-database-drivers";
+import type {
+  ConnectionSetting,
+  ResourceType,
+  CsvParseOptions,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ModeType } from "./ModeType";
 import type { ERDiagramSettingParams } from "./ERDiagram";
 import type { CodeResolverParams } from "./CodeResolverParams";
@@ -15,6 +19,10 @@ export type CompareParams = TabIdParam & {
 
 export type SaveCompareKeysParams = TabIdParam & {
   list: { index: number; compareKeyNames: string[] }[];
+};
+
+export type SaveCsvOptionParams = CsvParseOptions & {
+  preview: boolean;
 };
 
 export type SaveValuesParams = TabIdParam & SaveValuesInRdhParams;
@@ -38,6 +46,7 @@ export type ActionCommand =
   | OutputActionCommand
   | WriteToClipboardActionCommand
   | WriteHttpEventToClipboardActionCommand
+  | DescribeActionCommand
   | OpenScanPanelActionCommand
   | CloseScanPanelActionCommand
   | SearchScanPanelActionCommand
@@ -254,6 +263,13 @@ export type SelectTabActionCommand = {
 
 export type SelectInnerTabActionCommand = {
   command: "selectInnerTab";
+  params: TabIdParam & {
+    innerIndex: number;
+  };
+};
+
+export type DescribeActionCommand = {
+  command: "describe";
   params: TabIdParam & {
     innerIndex: number;
   };

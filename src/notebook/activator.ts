@@ -32,16 +32,18 @@ import {
   SPECIFY_CONNECTION_ALL,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
+  SHOW_CSV,
   SHOW_HAR,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
 } from "../constant";
-import { isPreExecution, isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
+import { isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { log } from "../utilities/logger";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
+import { CsvParseSettingPanel } from "../panels/CsvParseSettingPanel";
 import { HarFilePanel } from "../panels/HarFilePanel";
 
 const PREFIX = "[notebook/activator]";
@@ -139,6 +141,11 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       const title = rrm.axiosEvent.title;
       HttpEventPanel.render(context.extensionUri, title, rrm.axiosEvent);
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(SHOW_CSV, async (csvUri: Uri) => {
+      CsvParseSettingPanel.render(context.extensionUri, csvUri);
     })
   );
   context.subscriptions.push(

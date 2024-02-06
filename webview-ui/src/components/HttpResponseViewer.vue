@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
-import VsCodeTextArea from "./base/VsCodeTextArea.vue";
 import {
   vsCodePanels,
   vsCodePanelView,
@@ -19,6 +18,7 @@ type Props = {
   width: number;
   height: number;
   res: NodeRunAxiosEvent;
+  url: string;
   headerCodeBlock: string;
   contentsCodeBlock: string;
   previewContentTypeInfo: ContentTypeInfo | undefined;
@@ -29,6 +29,8 @@ const props = defineProps<Props>();
 const width = Math.max(10, props.width - 4);
 const height = Math.max(10, props.height - 83);
 const imgSrc = ref("");
+const visibleFontPreview = ref(false);
+const fontPreviewText = ref("Hello world\nこんにちは　世界\n0123456789\n!@#$%^&*()-=");
 
 const status = ref(
   `${props.res.entry.response.status} ${props.res.entry.response.statusText} ${
@@ -76,6 +78,14 @@ if (props.previewContentTypeInfo) {
     } else {
       imgSrc.value = `data:${contentType};base64,${text}`;
     }
+  } else if (renderType === "Font" && props.res.entry.response.content.text) {
+    tabItems.value.push({
+      tabId: "preview",
+      title: "Preview",
+      isCode: false,
+    });
+
+    visibleFontPreview.value = true;
   }
 }
 </script>
@@ -115,12 +125,13 @@ if (props.previewContentTypeInfo) {
       </div>
     </vscode-panel-view>
     <vscode-panel-view id="view-preview">
-      <div v-if="activeTabId === 'preview'" :style="{ height: `${height}px` }">
+      <div class="preview-pane" v-if="activeTabId === 'preview'" :style="{ height: `${height}px` }">
         <img
           v-if="imgSrc"
           :style="{ 'max-height': `${height}px`, 'max-width': `${width}px` }"
           :src="imgSrc"
         />
+        <p v-else-if="visibleFontPreview" class="fontPreview" rows="6">{{ fontPreviewText }}</p>
       </div>
     </vscode-panel-view>
   </section>
@@ -154,6 +165,15 @@ section.HttpResponseViewer {
       width: 100%;
       overflow: auto;
       white-space: pre;
+    }
+  }
+
+  .preview-pane {
+    width: 100%;
+    .fontPreview {
+      font-family: harFontPreview;
+      font-size: xx-large;
+      white-space: pre-wrap;
     }
   }
 }

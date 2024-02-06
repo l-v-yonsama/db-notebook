@@ -14,6 +14,7 @@ type Props = {
   readonly: boolean;
   showOnlyChanged?: boolean;
   showDetailPane?: boolean;
+  withType?: boolean;
 };
 
 const props = defineProps<Props>();
@@ -85,6 +86,7 @@ defineExpose({
           :readonly="false"
           :showOnlyChanged="showOnlyChanged"
           :withComment="rdh.keys.some((it) => it.comment?.length)"
+          :withType="withType"
           @onClickCell="onClickCell"
           @onShowDetailPane="onShowDetailPane"
           :ref="setRdhRef"

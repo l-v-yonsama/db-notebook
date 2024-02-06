@@ -31,7 +31,7 @@ export const createWebviewContent = (
               webview.cspSource
             }; font-src ${
     webview.cspSource
-  }; img-src * data:; media-src * data:; script-src 'nonce-${nonce}';">
+  } data:; img-src * data:; media-src * data:; script-src 'nonce-${nonce}';">
             <link rel="stylesheet" type="text/css" href="${stylesUri}">
             <link href="${codiconsUri}" rel="stylesheet" />
             <title>${componentName ?? ""}</title>

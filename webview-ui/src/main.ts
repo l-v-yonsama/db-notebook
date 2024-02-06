@@ -15,10 +15,12 @@ import {
   faFileExcel,
   faFloppyDisk,
   faLeaf,
+  faMagnifyingGlassChart,
   faPencil,
   faPlus,
   faRotate,
   faRotateLeft,
+  faSave,
   faSearch,
   faTrash,
   faTimes,
@@ -34,10 +36,12 @@ library.add(faEye);
 library.add(faFileExcel);
 library.add(faFloppyDisk);
 library.add(faLeaf);
+library.add(faMagnifyingGlassChart);
 library.add(faPencil);
 library.add(faPlus);
 library.add(faRotate);
 library.add(faRotateLeft);
+library.add(faSave);
 library.add(faSearch);
 library.add(faTrash);
 library.add(faTimes);
