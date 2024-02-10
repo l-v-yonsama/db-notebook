@@ -1,6 +1,8 @@
 import type { NotebookCellKind } from "vscode";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
+export type SQLMode = "Query" | "Explain" | "ExplainAnalyze";
+
 export type CellMeta = {
   markAsSkip?: boolean;
   markAsRunInOrderAtJsonCell?: boolean;
@@ -8,9 +10,6 @@ export type CellMeta = {
   showComment?: boolean;
   ruleFile?: string;
   codeResolverFile?: string;
-  markWithinQuery?: boolean;
-  markWithExplain?: boolean;
-  savingSharedVariables?: boolean;
   sharedVariableName?: string;
   readonly [key: string]: any;
 };

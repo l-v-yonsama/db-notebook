@@ -48,6 +48,14 @@ export const CELL_MARK_CELL_AS_SKIP = `${EXTENSION_NAME}.cell.mark-cell-as-skip`
 export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;
 export const CELL_SHOW_METADATA_SETTINGS = `${EXTENSION_NAME}.cell.show-metadata-setting`;
 
+// NOTEBOOK CELL EXECUTE
+export const CELL_EXECUTE_QUERY = `${EXTENSION_NAME}.cell-execute-query`;
+export const CELL_EXECUTE_EXPLAIN = `${EXTENSION_NAME}.cell-execute-explain`;
+export const CELL_EXECUTE_EXPLAIN_ANALYZE = `${EXTENSION_NAME}.cell-execute-explain-analyze`;
+
+// NOTEBOOK CELL TITLE (CELL TOOLBAR-ACTION)
+export const CELL_TOOLBAR_FORMAT = `${EXTENSION_NAME}.cell-toolbar-format`;
+
 //---------------------------------------------------
 // RECORD RULE EDITOR
 //---------------------------------------------------

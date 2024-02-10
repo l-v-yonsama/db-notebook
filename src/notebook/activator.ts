@@ -8,6 +8,8 @@ import {
   NotebookCellData,
   NotebookData,
   NotebookEdit,
+  Range,
+  TextEdit,
   Uri,
   WorkspaceEdit,
   commands,
@@ -35,8 +37,12 @@ import {
   SHOW_CSV,
   SHOW_HAR,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
+  CELL_TOOLBAR_FORMAT,
+  CELL_EXECUTE_QUERY,
+  CELL_EXECUTE_EXPLAIN,
+  CELL_EXECUTE_EXPLAIN_ANALYZE,
 } from "../constant";
-import { isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
+import { isJsonCell, isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { log } from "../utilities/logger";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
@@ -45,6 +51,7 @@ import { rrmListToRdhList } from "../utilities/rrmUtil";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
 import { CsvParseSettingPanel } from "../panels/CsvParseSettingPanel";
 import { HarFilePanel } from "../panels/HarFilePanel";
+import sqlFormatter from "sql-formatter-plus";
 
 const PREFIX = "[notebook/activator]";
 
@@ -168,6 +175,29 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       VariablesPanel.render(context.extensionUri, variables);
     })
   );
+
+  context.subscriptions.push(
+    commands.registerCommand(CELL_TOOLBAR_FORMAT, async (cell: NotebookCell) => {
+      const doc = cell.document;
+      const st = doc.positionAt(0);
+      const ed = doc.positionAt(doc.getText().length);
+      const range = new Range(st, ed);
+      let edit: TextEdit;
+
+      if (isSqlCell(cell)) {
+        edit = new TextEdit(range, sqlFormatter.format(doc.getText()));
+      } else if (isJsonCell(cell)) {
+        const jsonObj = JSON.parse(doc.getText());
+        edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
+      } else {
+        return;
+      }
+      var formatEdit = new WorkspaceEdit();
+      formatEdit.set(doc.uri, [edit]);
+      await workspace.applyEdit(formatEdit);
+    })
+  );
+
   context.subscriptions.push(
     commands.registerCommand(SHOW_ALL_SELECT_RDH, async () => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath ?? "";
@@ -261,5 +291,47 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       NotebookCellMetadataPanel.render(context.extensionUri, cell);
     })
   );
+
+  // NOTEBOOK CELL EXECUTE
+  context.subscriptions.push(
+    commands.registerCommand(CELL_EXECUTE_QUERY, async (cell: NotebookCell) => {
+      controller.setSqlMode("Query");
+      // Perform command issuance to activate the interrupt button.
+      commands.executeCommand("notebook.cell.execute", {
+        ranges: [{ start: cell.index, end: cell.index + 1 }],
+        document: cell.notebook.uri,
+      });
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(CELL_EXECUTE_EXPLAIN, async (cell: NotebookCell) => {
+      controller.setSqlMode("Explain");
+      console.log(cell.index);
+      // Perform command issuance to activate the interrupt button.
+      commands.executeCommand("notebook.cell.execute", {
+        ranges: [{ start: cell.index, end: cell.index + 1 }],
+        document: cell.notebook.uri,
+      });
+    })
+  );
+  context.subscriptions.push(
+    commands.registerCommand(CELL_EXECUTE_EXPLAIN_ANALYZE, async (cell: NotebookCell) => {
+      controller.setSqlMode("ExplainAnalyze");
+      // Perform command issuance to activate the interrupt button.
+      commands.executeCommand("notebook.cell.execute", {
+        ranges: [{ start: cell.index, end: cell.index + 1 }],
+        document: cell.notebook.uri,
+      });
+    })
+  );
+
+  // NOTEBOOK CELL TITLE (CELL TOOLBAR-ACTION)
+  context.subscriptions.push(
+    window.onDidChangeNotebookEditorSelection((e) => {
+      const cell = e.notebookEditor.notebook.cellAt(e.selections[0]?.start);
+      commands.executeCommand("setContext", "cellLangId", cell.document.languageId);
+    })
+  );
+
   log(`${PREFIX} end activateNotebook.`);
 }

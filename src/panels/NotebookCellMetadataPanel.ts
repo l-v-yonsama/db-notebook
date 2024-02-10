@@ -173,12 +173,6 @@ export class NotebookCellMetadataPanel {
               if (newMetadata.showComment === false) {
                 delete newMetadata.showComment;
               }
-              if (newMetadata.markWithExplain === false) {
-                delete newMetadata.markWithExplain;
-              }
-              if (newMetadata.markWithExplainAnalyze === false) {
-                delete newMetadata.markWithExplainAnalyze;
-              }
 
               if (newMetadata.savingSharedVariables === false) {
                 delete newMetadata.savingSharedVariables;

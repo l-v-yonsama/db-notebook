@@ -17,22 +17,11 @@ const ruleFileItems: DropdownItem[] = [];
 const showComment = ref(false);
 const codeResolverFile = ref("");
 const ruleFile = ref("");
-const markWithinQuery = ref(true);
-const markWithExplain = ref(false);
-const markWithExplainAnalyze = ref(false);
 const savingSharedVariables = ref(false);
 const sharedVariableName = ref("");
 
 const initialized = ref(false);
 const sectionHeight = ref(300);
-
-const errorMessage = computed(() => {
-  if (!markWithinQuery.value && !markWithExplain.value && !markWithExplainAnalyze.value) {
-    return "Please select at least one.";
-  }
-
-  return "";
-});
 
 const resetSpPaneWrapperHeight = () => {
   const sectionWrapper = window.document.querySelector("section.root");
@@ -49,9 +38,6 @@ const initialize = (v: NotebookCellMetadataPanelEventData["value"]["initialize"]
 
   nextTick(() => {
     showComment.value = v.metadata.showComment === true;
-    markWithinQuery.value = v.metadata.markWithinQuery === true;
-    markWithExplain.value = v.metadata.markWithExplain === true;
-    markWithExplainAnalyze.value = v.metadata.markWithExplainAnalyze === true;
 
     codeResolverFile.value = v.metadata.codeResolverFile ?? "";
     ruleFile.value = v.metadata.ruleFile ?? "";
@@ -91,9 +77,6 @@ const save = () => {
         showComment: showComment.value,
         codeResolverFile: codeResolverFile.value,
         ruleFile: ruleFile.value,
-        markWithinQuery: markWithinQuery.value,
-        markWithExplain: markWithExplain.value,
-        markWithExplainAnalyze: markWithExplainAnalyze.value,
         savingSharedVariables: savingSharedVariables.value,
         sharedVariableName: sharedVariableName.value,
       },
@@ -114,9 +97,7 @@ const recieveMessage = (data: NotebookCellMetadataPanelEventData) => {
 };
 
 const disabledSaveButton = computed(
-  () =>
-    errorMessage.value.length > 0 ||
-    (savingSharedVariables.value && sharedVariableName.value.length === 0)
+  () => savingSharedVariables.value && sharedVariableName.value.length === 0
 );
 
 defineExpose({
@@ -148,37 +129,6 @@ defineExpose({
             style="margin-right: auto"
             >Display comments after each resource</vscode-checkbox
           >
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Execute SQL mode</legend>
-        <div>
-          <div>
-            <vscode-checkbox
-              :checked="markWithinQuery"
-              @change="($e:any) => markWithinQuery =$e.target.checked"
-              style="margin-right: auto"
-              >Execute query</vscode-checkbox
-            >
-          </div>
-          <div>
-            <vscode-checkbox
-              :checked="markWithExplain"
-              @change="($e:any) => markWithExplain =$e.target.checked"
-              style="margin-right: auto"
-              >Execute explain (Devises a query plan)</vscode-checkbox
-            >
-          </div>
-          <div>
-            <vscode-checkbox
-              :checked="markWithExplainAnalyze"
-              @change="($e:any) => markWithExplainAnalyze =$e.target.checked"
-              style="margin-right: auto"
-              >Execute explain analyze (Displays actual execution time and
-              statistics)</vscode-checkbox
-            >
-          </div>
-          <p v-text="errorMessage" class="marker-error"></p>
         </div>
       </fieldset>
       <fieldset>

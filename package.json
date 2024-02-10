@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -302,6 +302,30 @@
           "group": "navigation/execute@1",
           "when": "notebookType == 'database-notebook-type' && hasSql"
         }
+      ],
+      "notebook/cell/execute": [
+        {
+          "command": "database-notebook.cell-execute-query",
+          "group": "navigation/cell1/execute@1",
+          "when": "notebookType == 'database-notebook-type' && cellLangId == 'sql'"
+        },
+        {
+          "command": "database-notebook.cell-execute-explain",
+          "group": "navigation/cell2/execute@2",
+          "when": "notebookType == 'database-notebook-type' && cellLangId == 'sql'"
+        },
+        {
+          "command": "database-notebook.cell-execute-explain-analyze",
+          "group": "navigation/cell2/execute@3",
+          "when": "notebookType == 'database-notebook-type' && cellLangId == 'sql'"
+        }
+      ],
+      "notebook/cell/title": [
+        {
+          "command": "database-notebook.cell-toolbar-format",
+          "group": "inline",
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
+        }
       ]
     },
     "customEditors": [
@@ -536,6 +560,30 @@
         "icon": "$(debug-disconnect)"
       },
       {
+        "command": "database-notebook.cell-execute-query",
+        "title": "Execute query (Default)",
+        "shortTitle": "Execute query",
+        "icon": "$(play)"
+      },
+      {
+        "command": "database-notebook.cell-execute-explain",
+        "title": "Execute explain (Devises a query plan)",
+        "shortTitle": "Explain",
+        "icon": "$(debug-alt-small)"
+      },
+      {
+        "command": "database-notebook.cell-execute-explain-analyze",
+        "title": "Execute explain analyze (Displays actual execution time and statistics)",
+        "shortTitle": "Explain analyze",
+        "icon": "$(debug-alt-small)"
+      },
+      {
+        "command": "database-notebook.cell-toolbar-format",
+        "title": "Format this document",
+        "shortTitle": "Format",
+        "icon": "$(word-wrap)"
+      },
+      {
         "command": "database-notebook.show-csv-file",
         "title": "Preview CSV file",
         "category": "DB Notebook CSV Viewer"
@@ -575,7 +623,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.241",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.242",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",
@@ -590,6 +638,7 @@
     "shelljs": "^0.8.5",
     "shiki": "^0.14.5",
     "short-unique-id": "^4.4.4",
+    "sql-formatter-plus": "^1.3.6",
     "store": "^2.0.12",
     "throttle-debounce": "^5.0.0",
     "ts-node": "^10.9.1"

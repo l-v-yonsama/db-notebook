@@ -73,7 +73,7 @@ export class MdhPanel {
   }
 
   public static render(extensionUri: Uri, title: string, list: ResultSetData[]) {
-    // log(`${PREFIX} render title:[${title}]`);
+    log(`${PREFIX} render title:[${title}]`);
     if (MdhPanel.currentPanel) {
       MdhPanel.currentPanel._panel.reveal(ViewColumn.One);
     } else {

@@ -553,7 +553,7 @@ defineExpose({
           </thead>
         </template>
         <template #default="{ item, index }">
-          <tr :style="rowStyle(item, index)">
+          <tr :style="rowStyle(item, index)" :class="{ selectedRow: index === selectedRowIndex }">
             <td v-if="editable" class="ctrl">
               <div>
                 <VsCodeButton
@@ -662,12 +662,22 @@ defineExpose({
   width: 100%;
 }
 </style>
+
 <style lang="scss" scoped>
 thead {
   position: sticky;
   top: 0;
   z-index: 2;
   background-color: var(--vscode-editorPane-background);
+}
+
+tr {
+  &.selectedRow {
+    td.ctrl,
+    td.row {
+      background-color: var(--vscode-editorGroupHeader-tabsBackground);
+    }
+  }
 }
 
 td,

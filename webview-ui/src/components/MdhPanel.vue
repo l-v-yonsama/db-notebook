@@ -99,7 +99,7 @@ function isActiveTabId(tabId: string): boolean {
   return tabId === id;
 }
 
-const showTab = (tabId: string) => {
+const showTab = async (tabId: string) => {
   activeTabId.value = `tab-${tabId}`;
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
@@ -115,33 +115,36 @@ const showTab = (tabId: string) => {
     activeTabRdhList.value.push(rdh);
   });
   innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
-  resetActiveInnerRdh();
   vscode.postCommand({ command: "selectTab", params: { tabId } });
+  resetActiveInnerRdh();
 };
 
-const resetActiveInnerRdh = () => {
+const resetActiveInnerRdh = async () => {
   editable.value = false;
   refreshable.value = false;
   noCompareKeys.value = true;
   activeInnerRdh.value = null;
+
   const tabItem = getActiveTabItem();
   if (!tabItem || innerTabIndex.value < 0) {
     return;
   }
+
   const newRdh = tabItem.list[innerTabIndex.value];
   editable.value = newRdh.meta?.editable === true;
   refreshable.value = tabItem.refreshable;
   describable.value =
     newRdh.keys.some((it) => isNumericLike(it.type)) && tabItem.title != "Statistics";
 
-  nextTick(() => {
+  // await nextTick();
+  setTimeout(() => {
     noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
     activeInnerRdh.value = newRdh;
     vscode.postCommand({
       command: "selectInnerTab",
       params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
     });
-  });
+  }, 100);
 };
 
 const addTabItem = (tabItem: RdhTabItem) => {
@@ -176,19 +179,19 @@ const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData
     return;
   }
   tabItem.list.splice(0, tabItem.list.length);
-  innerTabItems.value.splice(0, innerTabItems.value.length);
+  // innerTabItems.value.splice(0, innerTabItems.value.length);
   nextTick(() => {
     tabItem.list.push(...value);
-    tabItem.list.forEach((rdh: ResultSetData, idx) => {
-      const { tableName, type } = rdh.meta;
-      const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
-      const label = `${idx + 1}:${sqlType}: ${tableName}`;
-      innerTabItems.value.push({ value: idx, label });
-    });
-    innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
-
+    // tabItem.list.forEach((rdh: ResultSetData, idx) => {
+    //   const { tableName, type } = rdh.meta;
+    //   const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
+    //   const label = `${idx + 1}:${sqlType}: ${tableName}`;
+    //   innerTabItems.value.push({ value: idx, label });
+    // });
+    // innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+    showTab(tabId);
     inProgress.value = false;
-    resetActiveInnerRdh();
+    // resetActiveInnerRdh();
     setTimeout(resetSpPaneWrapperHeight, 200);
   });
 };

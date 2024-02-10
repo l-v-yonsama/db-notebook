@@ -16,7 +16,7 @@ import {
   resolveCodeLabel,
   abbr,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { CellMeta, RunResult } from "../types/Notebook";
+import { CellMeta, RunResult, SQLMode } from "../types/Notebook";
 import { setupDbResource } from "./intellisense";
 import {
   ExtensionContext,
@@ -78,6 +78,7 @@ export class MainController {
   private readonly _controller: NotebookController;
   private readonly noteSessions = new Map<string, NoteSession>();
   private readonly noteVariables = new Map<string, { [key: string]: any }>();
+  private sqlMode: SQLMode | undefined = undefined;
 
   constructor(private context: ExtensionContext, private stateStorage: StateStorage) {
     this._controller = notebooks.createNotebookController(
@@ -156,6 +157,10 @@ export class MainController {
     );
   }
 
+  setSqlMode(sqlMode: SQLMode): void {
+    this.sqlMode = sqlMode;
+  }
+
   setActiveContext(notebook: NotebookDocument) {
     const cells = notebook?.getCells() ?? [];
     const visibleVariables = cells.some((cell) => cell.outputs.length > 0);
@@ -204,6 +209,11 @@ export class MainController {
         log(`${PREFIX} interruptHandler Error:${e.message}`);
       }
     }
+    this.sqlMode = undefined;
+  }
+
+  async execute(cell: NotebookCell) {
+    await this._executeAll([cell], cell.notebook, this._controller);
   }
 
   private async _executeAll(
@@ -424,7 +434,12 @@ export class MainController {
     }
     if (isSqlCell(cell)) {
       noteSession.sqlKernel = new SqlKernel(this.stateStorage);
-      const r = await noteSession.sqlKernel.run(cell, noteSession.kernel.getStoredVariables());
+      const r = await noteSession.sqlKernel.run(
+        cell,
+        noteSession.kernel.getStoredVariables(),
+        this.sqlMode ?? "Query"
+      );
+      this.sqlMode = undefined;
       noteSession.sqlKernel = undefined;
       if (r.metadata?.rdh?.meta?.type === "select") {
         const { rdh } = r.metadata;
@@ -479,9 +494,6 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
     const {
       ruleFile,
       codeResolverFile,
-      markWithinQuery,
-      markWithExplain,
-      markWithExplainAnalyze,
       markAsSkip,
       savingSharedVariables,
       sharedVariableName,
@@ -489,27 +501,6 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
     let tooltip = "";
 
     tooltip = "$(gear) Show metadata";
-
-    let sqlMode = "";
-    if (markWithinQuery !== false) {
-      sqlMode += "Query";
-    }
-    if (markWithExplain) {
-      if (sqlMode.length > 0) {
-        sqlMode += ",";
-      }
-      sqlMode += "Explain";
-    }
-    if (markWithExplainAnalyze) {
-      if (sqlMode.length > 0) {
-        sqlMode += ",";
-      }
-      sqlMode += "Analyze";
-    }
-
-    if (markAsSkip !== true) {
-      tooltip += `: SQL mode(${sqlMode})`;
-    }
 
     if (codeResolverFile) {
       let displayFileName = codeResolverFile;

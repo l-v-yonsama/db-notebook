@@ -6,7 +6,7 @@ import {
   ResultSetData,
   normalizeQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { CellMeta, RunResult, NotebookExecutionVariables } from "../types/Notebook";
+import { CellMeta, RunResult, NotebookExecutionVariables, SQLMode } from "../types/Notebook";
 import { NotebookCell } from "vscode";
 import { log } from "../utilities/logger";
 import * as os from "os";
@@ -17,12 +17,15 @@ export class SqlKernel {
   driver: RDSBaseDriver | undefined;
   constructor(private stateStorage: StateStorage) {}
 
-  public async run(cell: NotebookCell, variables: NotebookExecutionVariables): Promise<RunResult> {
+  public async run(
+    cell: NotebookCell,
+    variables: NotebookExecutionVariables,
+    sqlMode: SQLMode
+  ): Promise<RunResult> {
     let stdout = "";
     let stderrs: string[] = [];
     let connectionSetting: ConnectionSetting | undefined = undefined;
-    const { connectionName, markWithExplain, markWithExplainAnalyze, markWithinQuery }: CellMeta =
-      cell.metadata;
+    const { connectionName }: CellMeta = cell.metadata;
 
     if (variables._skipSql === true) {
       return {
@@ -62,7 +65,7 @@ export class SqlKernel {
 
     let metadata: RunResult["metadata"] = {};
 
-    if (markWithExplainAnalyze) {
+    if (sqlMode === "ExplainAnalyze") {
       const { message } = await resolver.flowTransaction<RDSBaseDriver>(
         connectionSetting,
         async (driver) => {
@@ -84,7 +87,7 @@ export class SqlKernel {
       }
     }
 
-    if (markWithExplain) {
+    if (sqlMode === "Explain") {
       const { message } = await resolver.workflow<RDSBaseDriver>(
         connectionSetting,
         async (driver) => {
@@ -102,7 +105,7 @@ export class SqlKernel {
       }
     }
 
-    if (markWithinQuery !== false) {
+    if (sqlMode === "Query") {
       const { ok, message, result } = await resolver.workflow<RDSBaseDriver, ResultSetData>(
         connectionSetting,
         async (driver) => {

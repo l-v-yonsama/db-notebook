@@ -10,7 +10,11 @@ It also provides a CSV and Har file preview feature.
 
 - Various databases accesss in Notebooks, Sidebars and panels UI
   - MySQL, PostgreSQL, Redis, AWS, Keycloak, Auth0
-- Run & stop SQL, JavaScript code in node.js
+- Execute & stop SQL, JavaScript code in node.js
+- Execute SQL mode
+  - Execute query (Default)
+  - Execute explain plan (Devises a query plan)
+  - Execute explain analyze (Displays actual execution time and statistics)
 - Variable sharing between notebook cells
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
 - Provide IntelliSense using DB resource names and comments
@@ -35,6 +39,13 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/02_notebook.gif)
 
+- Execute SQL mode
+
+  - Execute query (Default)
+  - Execute explain plan (Devises a query plan)
+  - Execute explain analyze (Displays actual
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/13_sql_mode.gif)
+
 - Variable sharing between notebook cells
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/03_variable_sharing.gif)
@@ -43,39 +54,63 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/04_er_diagram.gif)
 
-- Difference display using comparison key (Primary or Unique key)
+- Format SQL statement
 
-  - Create and execute "Undo changes sql statements"
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/12_format.gif)
 
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/05_diff.gif)
+<details>
 
-- Label display using code label resolver ( `Create a new blank Code label resolver` )
+<summary>Screenshots ( Convenient visualization of result sets )</summary>
 
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/06_label_display.gif)
+### Difference display using comparison key (Primary or Unique key)
 
-- Verify records comply with a rule ( `Create a new blank DB record rule` )
+- Create and execute "Undo changes sql statements"
 
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/07_record_rule.gif)
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/05_diff.gif)
 
-- Access to the Keycloak from the side panel to display changes in user information.
+### Label display using code label resolver ( `Create a new blank Code label resolver` )
 
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/08_keycloak.gif)
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/06_label_display.gif)
 
-- Expand and display JSON items in columns.
+### Verify records comply with a rule ( `Create a new blank DB record rule` )
 
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/09_json_expansion.gif)
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/07_record_rule.gif)
 
-### Screenshots ( File viewer )
+### Generate descriptive statistics
 
-- Csv file viewer.
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/14_describe.gif)
 
-  - After previewing the CSV file, descriptive statistics were displayed according to its content.
+</details>
 
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/10_csv_viewer.gif)
+<details>
 
-- Har file viewer.
+<summary>Screenshots ( Access to the Keycloak from the side panel )</summary>
 
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/11_har_viewer.gif)
+### Access to the Keycloak from the side panel to display changes in user information.
+
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/08_keycloak.gif)
+
+### Expand and display JSON items in columns.
+
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/09_json_expansion.gif)
+
+</details>
+
+<details>
+
+<summary>Screenshots ( File viewer )</summary>
+
+### Csv file viewer
+
+- After previewing the CSV file, descriptive statistics were displayed according to its content.
+
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/10_csv_viewer.gif)
+
+### Har file viewer
+
+- ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/11_har_viewer.gif)
+
+</details>
 
 ## Examples
 
