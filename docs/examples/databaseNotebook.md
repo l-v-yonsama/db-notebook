@@ -8,7 +8,7 @@ This page shows an example of the use of the VS code extension "Database Noteboo
   - 1.1. [Bind parameters in query](#11-bind-parameters-in-query)
 - 2. [Controlling the Database with Javascript](#2-controlling-the-database-with-javascript)
   - 2.1. [Inserting parent and child records in the same transaction](#21-inserting-parent-and-child-records-in-the-same-transaction)
-- 3. [Axios use cases](#3-axios-use-cases)
+- 3. [Axios (Rest client) use cases](#3-axios-use-cases)
   - 3.1. [GET Method](#31-get-method)
     - 3.1.1. [Simple GET request](#311-simple-get-request)
     - 3.1.2. [Request with authorisation header](#312-request-with-authorisation-header)
@@ -18,6 +18,10 @@ This page shows an example of the use of the VS code extension "Database Noteboo
   - 3.4. [DELETE Method](#34-delete-method)
   - 3.5. [Handling JWT Access and Refresh Token](#35-handling-jwt-access-and-refresh-token)
   - 3.6. [Handling JWT Access Token and Introspection](#36-handling-jwt-access-token-and-introspection)
+
+<details>
+
+<summary>1. Query examples</summary>
 
 ## 1. Query examples
 
@@ -74,6 +78,12 @@ Cell[2] (SQL cell)
 | 1 | 7698 | 30 |
 | 2 | 7782 | 20 |
 
+</details>
+
+<details>
+
+<summary>2. Controlling the Database with Javascript</summary>
+
 ## 2. Controlling the Database with Javascript
 
 ### 2.1. Inserting parent and child records in the same transaction
@@ -128,6 +138,12 @@ ok true
 message
 result Inserted order_no is 25
 ```
+
+</details>
+
+<details>
+
+<summary>3. Axios use cases</summary>
 
 ## 3. Axios use cases
 
@@ -571,3 +587,5 @@ Cell[3] (Javascript cell)
 
 ℹ️ (256/703) Abbreviated. Push "Open response" button to show all without abbreviation.
 ```
+
+</details>

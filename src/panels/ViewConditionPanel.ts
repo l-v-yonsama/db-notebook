@@ -48,7 +48,6 @@ export class ViewConditionPanel {
   }
 
   public static render(extensionUri: Uri, tableRes: DbTable, numOfRows: number) {
-    log(`${PREFIX} render`);
     if (ViewConditionPanel.currentPanel) {
       ViewConditionPanel.currentPanel._panel.reveal(ViewColumn.One);
     } else {
@@ -95,7 +94,6 @@ export class ViewConditionPanel {
   }
 
   public dispose() {
-    log(`${PREFIX} dispose`);
     ViewConditionPanel.currentPanel = undefined;
     this._panel.dispose();
 
@@ -142,7 +140,6 @@ export class ViewConditionPanel {
     webview.onDidReceiveMessage(
       async (message: ActionCommand) => {
         const { command, params } = message;
-        // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
         switch (command) {
           case "cancel":
             this.dispose();

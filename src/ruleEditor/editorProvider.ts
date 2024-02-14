@@ -52,8 +52,6 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
     );
 
     const updateWebview = async () => {
-      log(`${PREFIX} updateWebview`);
-
       const recordRule = this.parseDoc(document);
       const connectionSettingNames = this.stateStorage.getConnectionSettingNames();
       let schema: DbSchema | undefined = undefined;
@@ -96,15 +94,12 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
 
     const changeViewStateSubscription = webviewPanel.onDidChangeViewState((e) => {
       if (e.webviewPanel.visible) {
-        log(`${PREFIX} onDidChangeViewState ${e}`);
         updateWebview();
       }
     });
 
     // Make sure we get rid of the listener when our editor is closed.
     webviewPanel.onDidDispose(() => {
-      log(`${PREFIX} webviewPanel.onDidDispose`);
-
       this.scrollPos = 0;
       changeDocumentSubscription.dispose();
       changeViewStateSubscription.dispose();

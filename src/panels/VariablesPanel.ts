@@ -34,7 +34,6 @@ export class VariablesPanel {
   }
 
   public static render(extensionUri: Uri, variables: { [key: string]: any }) {
-    log(`${PREFIX} render`);
     if (VariablesPanel.currentPanel) {
       VariablesPanel.currentPanel._panel.reveal(ViewColumn.Two);
     } else {
@@ -74,8 +73,6 @@ export class VariablesPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
-    log(`${PREFIX} dispose`);
-
     VariablesPanel.currentPanel = undefined;
     this._panel.dispose();
 

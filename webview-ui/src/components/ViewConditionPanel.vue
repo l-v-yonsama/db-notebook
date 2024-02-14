@@ -104,11 +104,6 @@ const cancel = () => {
 const handleSpecifyConditionOnChange = (newVal: boolean) => {
   specifyCondition.value = newVal;
 
-  console.log("visibleCondition", visibleCondition.value);
-  console.log("specifyCondition", specifyCondition.value);
-  console.log("editorItem.conditions", editorItem);
-  console.log("columnItems", columnItems.value);
-
   ok(false, true);
 };
 const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {

@@ -66,7 +66,6 @@ export class WriteHttpEventToClipboardParamsPanel extends BasePanel {
     item: NodeRunAxiosEvent,
     params: WriteHttpEventToClipboardParams
   ) {
-    log(`${PREFIX} render`);
     if (WriteHttpEventToClipboardParamsPanel.currentPanel) {
       WriteHttpEventToClipboardParamsPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.Two);
     } else {

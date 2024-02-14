@@ -179,9 +179,8 @@ export class MainController {
   }
 
   dispose(): void {
-    log(`${PREFIX} dispose`);
+    // log(`${PREFIX} dispose`);
     this._controller.dispose();
-    log(`${PREFIX} disposed`);
   }
 
   private getNoteSession(notebook: NotebookDocument): NoteSession | undefined {
@@ -189,7 +188,7 @@ export class MainController {
   }
 
   private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
-    log(`${PREFIX} interruptHandler`);
+    // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
     if (noteSession) {
       const { kernel, sqlKernel } = noteSession;
@@ -198,12 +197,12 @@ export class MainController {
         if (kernel) {
           kernel.interrupt();
         } else {
-          log(`${PREFIX} No NodeKernel`);
+          // log(`${PREFIX} No NodeKernel`);
         }
         if (sqlKernel) {
           sqlKernel.interrupt();
         } else {
-          log(`${PREFIX} No sqlKernel`);
+          // log(`${PREFIX} No sqlKernel`);
         }
       } catch (e: any) {
         log(`${PREFIX} interruptHandler Error:${e.message}`);
@@ -448,10 +447,10 @@ export class MainController {
           const rrule = await readRuleFile(cell, rdh);
           if (rrule) {
             rdh.meta.tableRule = rrule.tableRule;
-            log(`${PREFIX} rrule.tableRule:${JSON.stringify(rrule.tableRule, null, 1)}`);
+            // log(`${PREFIX} rrule.tableRule:${JSON.stringify(rrule.tableRule, null, 1)}`);
             try {
               const runRuleEngineResult = await runRuleEngine(rdh);
-              log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
+              // log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
             } catch (e) {
               throw new Error(
                 `RuleEngineError:${(e as Error).message}. Unuse or review the following file. ${
@@ -466,7 +465,7 @@ export class MainController {
           if (codeResolver) {
             rdh.meta.codeItems = codeResolver.items;
             const resolveCodeLabelResult = await resolveCodeLabel(rdh);
-            log(`${PREFIX} resolveCodeLabel:${resolveCodeLabelResult}`);
+            // log(`${PREFIX} resolveCodeLabel:${resolveCodeLabelResult}`);
           }
         }
       }

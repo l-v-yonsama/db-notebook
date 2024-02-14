@@ -57,7 +57,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
     );
 
     const updateWebview = async () => {
-      log(`${PREFIX} updateWebview`);
+      // log(`${PREFIX} updateWebview`);
 
       const resolver = this.parseDoc(document);
 
@@ -88,15 +88,12 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
 
     const changeViewStateSubscription = webviewPanel.onDidChangeViewState((e) => {
       if (e.webviewPanel.visible) {
-        log(`${PREFIX} onDidChangeViewState ${e}`);
         updateWebview();
       }
     });
 
     // Make sure we get rid of the listener when our editor is closed.
     webviewPanel.onDidDispose(() => {
-      log(`${PREFIX} webviewPanel.onDidDispose`);
-
       this.scrollPos = 0;
       changeDocumentSubscription.dispose();
       changeViewStateSubscription.dispose();
@@ -227,12 +224,11 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
       new Range(0, 0, document.lineCount, 0),
       JSON.stringify(codeResolver, null, 1)
     );
-    log(`${PREFIX} applyEdit forSave`);
+
     return workspace.applyEdit(edit);
   }
 
   private async initDbResourceParams(connectionName?: string) {
-    log(`${PREFIX} initDbResourceParams connectionName:${connectionName}`);
     this.tableNameList = [];
     this.columnNameList = [];
     if (connectionName) {

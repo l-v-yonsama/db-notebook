@@ -306,7 +306,6 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   context.subscriptions.push(
     commands.registerCommand(CELL_EXECUTE_EXPLAIN, async (cell: NotebookCell) => {
       controller.setSqlMode("Explain");
-      console.log(cell.index);
       // Perform command issuance to activate the interrupt button.
       commands.executeCommand("notebook.cell.execute", {
         ranges: [{ start: cell.index, end: cell.index + 1 }],

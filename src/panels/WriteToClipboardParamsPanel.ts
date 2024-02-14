@@ -51,7 +51,6 @@ export class WriteToClipboardParamsPanel extends BasePanel {
   }
 
   public static render(extensionUri: Uri, list: ResultSetData[], params: WriteToClipboardParams) {
-    log(`${PREFIX} render`);
     if (WriteToClipboardParamsPanel.currentPanel) {
       WriteToClipboardParamsPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.Two);
     } else {

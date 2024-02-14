@@ -51,7 +51,6 @@ export class NotebookCellMetadataPanel {
   }
 
   public static render(extensionUri: Uri, cell: NotebookCell) {
-    log(`${PREFIX} render`);
     if (NotebookCellMetadataPanel.currentPanel) {
       NotebookCellMetadataPanel.currentPanel._panel.reveal(ViewColumn.Two);
     } else {
@@ -136,8 +135,6 @@ export class NotebookCellMetadataPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
-    log(`${PREFIX} dispose`);
-
     NotebookCellMetadataPanel.currentPanel = undefined;
     this._panel.dispose();
 
