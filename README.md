@@ -15,6 +15,7 @@ It also provides a CSV and Har file preview feature.
   - Execute query (Default)
   - Execute explain plan (Devises a query plan)
   - Execute explain analyze (Displays actual execution time and statistics)
+- SQL history management
 - Variable sharing between notebook cells
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
 - Provide IntelliSense using DB resource names and comments
