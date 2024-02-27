@@ -18,6 +18,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
+import { SQLHistory } from "../types/SQLHistory";
 import { log } from "./logger";
 
 const uid = new ShortUniqueId();
@@ -25,6 +26,7 @@ const uid = new ShortUniqueId();
 const PREFIX = "[StateStorage]";
 
 export const STORAGE_KEY = `${EXTENSION_NAME}-settings`;
+export const SQL_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
 
 type DbResInfo = {
   isInProgress: boolean;
@@ -186,6 +188,50 @@ export class StateStorage {
   }
 
   constructor(private context: ExtensionContext, private secretStorage: SecretStorage) {}
+
+  async getSQLHistoryList(): Promise<SQLHistory[]> {
+    return this.context.globalState.get<SQLHistory[]>(SQL_HISTORY_STORAGE_KEY, []);
+  }
+
+  async addSQLHistory(history: Omit<SQLHistory, "id">): Promise<boolean> {
+    const list = await this.getSQLHistoryList();
+
+    const newTrimedSql = history.sqlDoc.trim();
+    if (
+      list.some(
+        (it) => it.sqlDoc.trim() === newTrimedSql && it.connectionName === history.connectionName
+      )
+    ) {
+      return false;
+    }
+
+    list.unshift({ ...history, id: uid.randomUUID(8) });
+
+    const maxHistory = 50;
+    // 5: 5, 5-5=0
+    // 6:, 5, 6-5=1
+    if (list.length > maxHistory) {
+      list.splice(maxHistory, list.length - maxHistory);
+    }
+    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+    return true;
+  }
+
+  async deleteSQLHistoryByID(id: string): Promise<boolean> {
+    const list = await this.getSQLHistoryList();
+    const idx = list.findIndex((it) => it.id === id);
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+      return true;
+    }
+    return false;
+  }
+
+  async deleteAllSQLHistories(): Promise<boolean> {
+    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, []);
+    return true;
+  }
 
   async getConnectionSettingList(): Promise<ConnectionSetting[]> {
     // log(`${PREFIX} getConnectionSettingList`);

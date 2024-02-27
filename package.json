@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -134,6 +134,13 @@
           "visibility": "visible"
         },
         {
+          "id": "database-notebook-histories",
+          "name": "SQL histories",
+          "visibility": "visible",
+          "icon": "media/logo.png",
+          "contextualTitle": "Histories"
+        },
+        {
           "id": "database-notebook-helpfeedback",
           "name": "Help",
           "visibility": "collapsed",
@@ -238,6 +245,21 @@
           "command": "database-notebook.flush-db",
           "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Redis.*/",
           "group": "db-resourc@2"
+        },
+        {
+          "command": "database-notebook.histories.execute",
+          "when": "view == database-notebook-histories",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.histories.open",
+          "when": "view == database-notebook-histories",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.histories.delete",
+          "when": "view == database-notebook-histories",
+          "group": "inline"
         }
       ],
       "view/title": [
@@ -254,6 +276,16 @@
         {
           "command": "database-notebook.refresh-resources",
           "when": "view == ResultSetsType",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.refresh-sql-histories",
+          "when": "view == database-notebook-histories",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.delete-all-sql-histories",
+          "when": "view == database-notebook-histories",
           "group": "navigation"
         }
       ],
@@ -592,8 +624,67 @@
         "command": "database-notebook.show-har-file",
         "title": "Preview har file",
         "category": "DB Notebook HAR Viewer"
+      },
+      {
+        "command": "database-notebook.refresh-sql-histories",
+        "title": "Refresh SQL histories",
+        "shortTitle": "Refresh",
+        "icon": {
+          "dark": "media/dark/refresh.svg",
+          "light": "media/light/refresh.svg"
+        }
+      },
+      {
+        "command": "database-notebook.delete-all-sql-histories",
+        "title": "Delete all SQL histories",
+        "shortTitle": "Delete all",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "database-notebook.histories.execute",
+        "title": "Execute selected sql",
+        "shortTitle": "Execute",
+        "icon": "$(play)"
+      },
+      {
+        "command": "database-notebook.histories.open",
+        "title": "Open selected sql",
+        "shortTitle": "Open",
+        "icon": "$(book)"
+      },
+      {
+        "command": "database-notebook.histories.delete",
+        "title": "Delete selected sql",
+        "shortTitle": "Delete",
+        "icon": "$(trash)"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Database notebook",
+      "properties": {
+        "sql-formatter.uppercase": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": false,
+          "description": "Converts reserved keywords to uppercase"
+        },
+        "sql-formatter.linesBetweenQueries": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 1,
+          "default": 2,
+          "description": "How many newlines to insert between queries"
+        },
+        "sql-formatter.tabWidth": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 1,
+          "default": 2,
+          "description": "Amount of indentation to use"
+        }
+      }
+    }
   },
   "scripts": {
     "install:all": "npm install && cd webview-ui && npm install",
@@ -623,7 +714,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.242",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.243",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

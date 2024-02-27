@@ -31,6 +31,15 @@ export const CREATE_ER_DIAGRAM_WITH_SETTINGS = `${EXTENSION_NAME}.create-er-diag
 export const WRITE_ER_DIAGRAM_TO_CLIPBOARD = `${EXTENSION_NAME}.write-er-diagram-to-clipboard`;
 
 //---------------------------------------------------
+// SQL HISTORIES TREE
+//---------------------------------------------------
+export const REFRESH_SQL_HISTORIES = `${EXTENSION_NAME}.refresh-sql-histories`;
+export const DELETE_ALL_SQL_HISTORY = `${EXTENSION_NAME}.delete-all-sql-histories`;
+export const EXECUTE_SQL_HISTORY = `${EXTENSION_NAME}.histories.execute`;
+export const OPEN_SQL_HISTORY = `${EXTENSION_NAME}.histories.open`;
+export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;
+
+//---------------------------------------------------
 // NOTE BOOK
 //---------------------------------------------------
 export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;

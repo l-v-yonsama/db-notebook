@@ -1,5 +1,6 @@
 import { ExtensionContext, commands, window } from "vscode";
 import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
+import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { StateStorage } from "./utilities/StateStorage";
 import { DBDriverResolver } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -17,8 +18,8 @@ import { initializePath } from "./utilities/fsUtil";
 import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
-import { HttpEventPanel } from "./panels/HttpEventPanel";
 import { HelpProvider } from "./help/HelpProvider";
+import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
 
 const PREFIX = "[extension]";
 
@@ -28,6 +29,7 @@ export async function activate(context: ExtensionContext) {
   initializePath(context);
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
+  const historyTreeProvider = new HistoryTreeProvider(context, stateStorage);
 
   activateLogger(context, EXTENSION_NAME);
   log(`${PREFIX} start activation.`);
@@ -38,6 +40,7 @@ export async function activate(context: ExtensionContext) {
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
+  window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
 
   const helpTreeView = window.createTreeView("database-notebook-helpfeedback", {
     treeDataProvider: new HelpProvider(),
@@ -55,6 +58,12 @@ export async function activate(context: ExtensionContext) {
     stateStorage,
     dbResourceTree,
     connectionSettingViewProvider,
+  });
+
+  registerHistoryTreeCommand({
+    context,
+    stateStorage,
+    historyTreeProvider,
   });
 
   // Notebook

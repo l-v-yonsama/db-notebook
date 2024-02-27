@@ -7,6 +7,7 @@ import {
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
+  REFRESH_SQL_HISTORIES,
 } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
@@ -29,8 +30,6 @@ import {
   NotebookCellStatusBarItemProvider,
   NotebookController,
   NotebookDocument,
-  NotebookEdit,
-  Position,
   Range,
   TextEdit,
   WorkspaceEdit,
@@ -440,9 +439,9 @@ export class MainController {
       );
       this.sqlMode = undefined;
       noteSession.sqlKernel = undefined;
+      const metadata: CellMeta = cell.metadata;
       if (r.metadata?.rdh?.meta?.type === "select") {
         const { rdh } = r.metadata;
-        const metadata: CellMeta = cell.metadata;
         if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
           const rrule = await readRuleFile(cell, rdh);
           if (rrule) {
@@ -468,6 +467,17 @@ export class MainController {
             // log(`${PREFIX} resolveCodeLabel:${resolveCodeLabelResult}`);
           }
         }
+      }
+
+      if (r.metadata?.rdh && metadata.connectionName) {
+        await this.stateStorage.addSQLHistory({
+          connectionName: metadata.connectionName,
+          sqlDoc: cell.document.getText(),
+          variables: noteSession.kernel.getStoredVariables(),
+          meta: r.metadata?.rdh.meta,
+          summary: r.metadata?.rdh.summary,
+        });
+        commands.executeCommand(REFRESH_SQL_HISTORIES);
       }
 
       return r;

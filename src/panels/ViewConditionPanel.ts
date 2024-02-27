@@ -1,8 +1,10 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
+import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn, commands } from "vscode";
 import {
   DBDriverResolver,
   DbTable,
   RDSBaseDriver,
+  ResultSetData,
+  toViewDataNormalizedQuery,
   toViewDataQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { StateStorage } from "../utilities/StateStorage";
@@ -13,6 +15,7 @@ import { MdhPanel } from "./MdhPanel";
 import { ViewConditionParams } from "../shared/ViewConditionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { ViewConditionPanelEventData } from "../shared/MessageEventData";
+import { REFRESH_SQL_HISTORIES } from "../constant";
 
 const PREFIX = "[ViewConditionPanel]";
 
@@ -123,7 +126,7 @@ export class ViewConditionPanel {
       this.isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
     }
     try {
-      const { query } = toViewDataQuery({
+      const { query } = toViewDataNormalizedQuery({
         tableRes,
         schemaName,
         toPositionedParameter: this.isPositionedParameterAvailable,
@@ -179,37 +182,51 @@ export class ViewConditionPanel {
                 return;
               }
 
-              const { ok, message, result } =
-                await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
-                  setting,
-                  async (driver) => {
-                    const { query, binds } = toViewDataQuery({
-                      tableRes,
-                      schemaName,
-                      toPositionedParameter: driver.isPositionedParameterAvailable(),
-                      conditions: specfyCondition ? conditions : undefined,
-                      limit: this.numOfRows,
-                    });
+              const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+                RDSBaseDriver,
+                ResultSetData
+              >(setting, async (driver) => {
+                const { query, binds } = toViewDataNormalizedQuery({
+                  tableRes,
+                  schemaName,
+                  toPositionedParameter: driver.isPositionedParameterAvailable(),
+                  conditions: specfyCondition ? conditions : undefined,
+                  limit: this.numOfRows,
+                });
 
-                    log(`${PREFIX} query:[${query}]`);
-                    log(`${PREFIX} binds:[${binds}]`);
-                    return await driver.requestSql({
-                      sql: query,
-                      conditions: {
-                        binds,
-                      },
-                      meta: {
-                        tableName: tableRes.name,
-                        compareKeys: tableRes.getCompareKeys(),
-                        comment: tableRes.comment,
-                        editable,
-                      },
-                    });
-                  }
-                );
+                log(`${PREFIX} query:[${query}]`);
+                log(`${PREFIX} binds:[${binds}]`);
+                return await driver.requestSql({
+                  sql: query,
+                  conditions: {
+                    binds,
+                  },
+                  meta: {
+                    tableName: tableRes.name,
+                    compareKeys: tableRes.getCompareKeys(),
+                    comment: tableRes.comment,
+                    editable,
+                  },
+                });
+              });
 
               if (ok && result) {
                 MdhPanel.render(this.extensionUri, tableRes.name, [result]);
+
+                const { query, binds } = toViewDataQuery({
+                  tableRes,
+                  schemaName,
+                  conditions: specfyCondition ? conditions : undefined,
+                  limit: this.numOfRows,
+                });
+                await ViewConditionPanel.stateStorage.addSQLHistory({
+                  connectionName: conName,
+                  sqlDoc: query,
+                  variables: binds,
+                  meta: result.meta,
+                  summary: result.summary,
+                });
+                commands.executeCommand(REFRESH_SQL_HISTORIES);
               } else {
                 window.showErrorMessage(message);
               }

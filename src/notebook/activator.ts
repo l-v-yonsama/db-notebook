@@ -52,6 +52,7 @@ import { HttpEventPanel } from "../panels/HttpEventPanel";
 import { CsvParseSettingPanel } from "../panels/CsvParseSettingPanel";
 import { HarFilePanel } from "../panels/HarFilePanel";
 import sqlFormatter from "sql-formatter-plus";
+import { getFormatterConfig } from "../utilities/configUtil";
 
 const PREFIX = "[notebook/activator]";
 
@@ -77,6 +78,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         NOTEBOOK_TYPE,
         new NotebookData(cells ?? [])
       );
+
       window.showNotebookDocument(newNotebook);
     })
   );
@@ -185,7 +187,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       let edit: TextEdit;
 
       if (isSqlCell(cell)) {
-        edit = new TextEdit(range, sqlFormatter.format(doc.getText()));
+        edit = new TextEdit(range, sqlFormatter.format(doc.getText(), getFormatterConfig()));
       } else if (isJsonCell(cell)) {
         const jsonObj = JSON.parse(doc.getText());
         edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
