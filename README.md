@@ -63,6 +63,8 @@ It also provides a CSV and Har file preview feature.
 
 <summary>Screenshots ( Convenient visualization of result sets )</summary>
 
+<div>
+
 ### Difference display using comparison key (Primary or Unique key)
 
 - Create and execute "Undo changes sql statements"
@@ -81,11 +83,15 @@ It also provides a CSV and Har file preview feature.
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/14_describe.gif)
 
+</div>
+
 </details>
 
 <details>
 
 <summary>Screenshots ( Access to the Keycloak from the side panel )</summary>
+
+<div>
 
 ### Access to the Keycloak from the side panel to display changes in user information.
 
@@ -95,11 +101,15 @@ It also provides a CSV and Har file preview feature.
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/09_json_expansion.gif)
 
+</div>
+
 </details>
 
 <details>
 
 <summary>Screenshots ( File viewer )</summary>
+
+<div>
 
 ### Csv file viewer
 
@@ -110,6 +120,8 @@ It also provides a CSV and Har file preview feature.
 ### Har file viewer
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/11_har_viewer.gif)
+
+</div>
 
 </details>
 
