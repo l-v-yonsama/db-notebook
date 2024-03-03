@@ -13,8 +13,9 @@ import {
   CsvParseOptions,
   ResultSetDataBuilder,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { MdhPanel } from "./MdhPanel";
 import { basename } from "path";
+import { MdhViewParams } from "../types/views";
+import { OPEN_MDH_VIEWER } from "../constant";
 
 const PREFIX = "[CsvParseSettingPanel]";
 
@@ -154,7 +155,9 @@ export class CsvParseSettingPanel {
               const { toLine, ...others } = this.csvOptions!;
               const rdb = await this.parseCsv(this.csvUri.fsPath, { ...others });
               const title = basename(this.csvUri.fsPath);
-              MdhPanel.render(this.extensionUri, title, [rdb.build()]);
+
+              const commandParam: MdhViewParams = { title, list: [rdb.build()] };
+              vscode.commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
             }
             this.dispose();
             return;

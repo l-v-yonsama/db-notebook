@@ -17,7 +17,7 @@ import type {
   CompareParams,
   OutputParams,
   WriteToClipboardParams,
-  MdhPanelEventData,
+  MdhViewEventData,
   RdhTabItem,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
@@ -65,7 +65,7 @@ const compareDetailItems = [
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
 const resetSpPaneWrapperHeight = () => {
-  const sectionWrapper = window.document.querySelector("section.MdhPanel");
+  const sectionWrapper = window.document.querySelector("section.MdhView");
   //351 => 272
   // multi 420 => 236px ... 184
   if (sectionWrapper?.clientHeight) {
@@ -99,14 +99,29 @@ function isActiveTabId(tabId: string): boolean {
   return tabId === id;
 }
 
-const showTab = async (tabId: string) => {
+const showTab = async (tabId: string, innerIndex?: number) => {
   activeTabId.value = `tab-${tabId}`;
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
+
   if (!tabItem) {
     return;
   }
+
+  if (innerIndex === undefined) {
+    innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+  } else {
+    if (innerIndex > tabItem.list.length - 1 || innerIndex < 0) {
+      innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+    } else {
+      innerTabIndex.value = tabItem.list.length > 0 ? innerIndex : -1;
+    }
+  }
+
   innerTabItems.value.splice(0, innerTabItems.value.length);
   activeTabRdhList.value.splice(0, activeTabRdhList.value.length);
+
+  await nextTick();
+
   tabItem.list.forEach((rdh: ResultSetData, idx) => {
     const { tableName, type } = rdh.meta;
     const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
@@ -114,7 +129,7 @@ const showTab = async (tabId: string) => {
     innerTabItems.value.push({ value: idx, label });
     activeTabRdhList.value.push(rdh);
   });
-  innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+
   vscode.postCommand({ command: "selectTab", params: { tabId } });
   resetActiveInnerRdh();
 };
@@ -136,15 +151,22 @@ const resetActiveInnerRdh = async () => {
   describable.value =
     newRdh.keys.some((it) => isNumericLike(it.type)) && tabItem.title != "Statistics";
 
-  // await nextTick();
-  setTimeout(() => {
-    noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
-    activeInnerRdh.value = newRdh;
-    vscode.postCommand({
-      command: "selectInnerTab",
-      params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
-    });
-  }, 100);
+  await nextTick();
+
+  noCompareKeys.value = (newRdh.meta?.compareKeys?.length ?? 0) === 0;
+  activeInnerRdh.value = newRdh;
+  vscode.postCommand({
+    command: "selectInnerTab",
+    params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
+  });
+};
+
+const init = (params: MdhViewEventData["value"]["init"]) => {
+  tabItems.value.splice(0, tabItems.value.length);
+  params?.tabItems.forEach((it) => tabItems.value.unshift(it));
+  if (params?.currentTabId) {
+    showTab(params?.currentTabId, params?.currentInnerIndex);
+  }
 };
 
 const addTabItem = (tabItem: RdhTabItem) => {
@@ -179,19 +201,12 @@ const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData
     return;
   }
   tabItem.list.splice(0, tabItem.list.length);
-  // innerTabItems.value.splice(0, innerTabItems.value.length);
+
   nextTick(() => {
     tabItem.list.push(...value);
-    // tabItem.list.forEach((rdh: ResultSetData, idx) => {
-    //   const { tableName, type } = rdh.meta;
-    //   const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
-    //   const label = `${idx + 1}:${sqlType}: ${tableName}`;
-    //   innerTabItems.value.push({ value: idx, label });
-    // });
-    // innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+
     showTab(tabId);
     inProgress.value = false;
-    // resetActiveInnerRdh();
     setTimeout(resetSpPaneWrapperHeight, 200);
   });
 };
@@ -204,28 +219,6 @@ function actionToolbar(command: string, inParams?: any) {
   const { tabId } = tabItem;
   let action = undefined;
   switch (command) {
-    case "saveValues":
-      {
-        const result = rdhViewerRef.value?.save();
-        if (result && result.ok) {
-          action = {
-            command,
-            params: {
-              tabId,
-              ...result,
-            },
-          };
-        } else {
-          vscode.postCommand({
-            command: "showError",
-            params: {
-              message: result.message,
-            },
-          });
-          return;
-        }
-      }
-      break;
     case "compare":
       compare(inParams);
       return;
@@ -334,7 +327,7 @@ const saveCompareKeys = (
   contentMode.value = "tab";
 };
 
-const recieveMessage = (data: MdhPanelEventData) => {
+const recieveMessage = (data: MdhViewEventData) => {
   const { command, value } = data;
 
   switch (command) {
@@ -349,6 +342,9 @@ const recieveMessage = (data: MdhPanelEventData) => {
       }
       setSearchResult(value.searchResult);
       break;
+    case "init":
+      init(value.init);
+      break;
   }
 };
 
@@ -358,7 +354,7 @@ defineExpose({
 </script>
 
 <template>
-  <section class="MdhPanel">
+  <section class="MdhView">
     <div v-if="contentMode == 'tab'" class="tab-container-actions">
       <VsCodeDropdown
         v-if="innerTabItems.length > 1"
@@ -367,14 +363,7 @@ defineExpose({
         style="z-index: 15"
         @change="resetActiveInnerRdh"
       />
-      <button
-        v-if="editable"
-        @click="actionToolbar('saveValues', {})"
-        title="Save changes to table"
-        class="primary"
-      >
-        <fa icon="arrow-up" />
-      </button>
+
       <button
         v-if="!editable && refreshable"
         @click="actionToolbar('compare', {})"
@@ -483,7 +472,7 @@ defineExpose({
 </template>
 
 <style scoped>
-section.MdhPanel {
+section.MdhView {
   display: block;
   width: 100%;
   height: 100vh;

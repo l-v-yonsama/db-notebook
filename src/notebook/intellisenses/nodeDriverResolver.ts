@@ -25,6 +25,23 @@ export const setNodeDriverResolverCompletionItems = (
 
   appendCompletionItem({
     list,
+    label: "request transactional sql with binds",
+    conNamesString,
+    bodyScript:
+      "  const { query, binds } = normalizeQuery({\n" +
+      "    query: 'INSERT INTO test_table (id, title) VALUES (:id, :title)',\n" +
+      "    bindParams: { id: 1, title: 'hello' },\n" +
+      "    toPositionedParameter: driver.isPositionedParameterAvailable(),\n" +
+      "  });\n" +
+      "  return await driver.requestSql({ sql: query, conditions: { binds } });\n",
+    detail: "Execute flowTransaction",
+    docString: DOCUMENT_OF_WORKFLOW,
+    resultAsRdh: true,
+    flowTransaction: true,
+  });
+
+  appendCompletionItem({
+    list,
     label: "scanLogGroup",
     conNamesString,
     bodyScript:
@@ -129,6 +146,7 @@ function appendCompletionItem({
   detail,
   docString,
   resultAsRdh,
+  flowTransaction,
 }: {
   list: CompletionItem[];
   label: string;
@@ -137,17 +155,19 @@ function appendCompletionItem({
   detail: string;
   docString: string;
   resultAsRdh?: boolean;
+  flowTransaction?: boolean;
 }) {
   const description = "DBDriverResolver";
   let item = new CompletionItem({ label, description });
   const example =
     "const { ok, message, result } = await DBDriverResolver\n" +
     ".getInstance()\n" +
-    ".workflow(getConnectionSettingByName('${1|" +
+    `${flowTransaction === true ? ".flowTransaction" : ".workflow"}` +
+    "(getConnectionSettingByName('${1|" +
     conNamesString +
     "|}'), async (driver) => {\n" +
     bodyScript +
-    "\n});\n" +
+    `\n}${flowTransaction ? ", { transactionControlType: 'rollbackOnError' }" : ""});\n` +
     "console.log('ok', ok);\n" +
     "console.log('message', message);\n" +
     (resultAsRdh === true

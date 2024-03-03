@@ -3,12 +3,12 @@ import "./assets/scss/main.scss";
 import type { ComponentName, MessageEventData } from "./utilities/vscode";
 import { ref, onMounted } from "vue";
 
-import MdhPanel from "./components/MdhPanel.vue";
+import MdhView from "./components/MdhView.vue";
 import HttpEventPanel from "./components/HttpEventPanel.vue";
 import CsvParseSettingPanel from "./components/CsvParseSettingPanel.vue";
 import HarFilePanel from "./components/HarFilePanel.vue";
 import DBFormView from "./components/DBFormView.vue";
-import DiffPanel from "./components/DiffPanel.vue";
+import DiffMdhView from "./components/DiffMdhView.vue";
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ViewConditionPanel from "./components/ViewConditionPanel.vue";
@@ -22,11 +22,11 @@ import CodeResolverEditor from "./components/CodeResolverEditor.vue";
 import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
 
 const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
-const mdhPanelRef = ref<InstanceType<typeof MdhPanel>>();
+const MdhViewRef = ref<InstanceType<typeof MdhView>>();
 const csvParseSettingPanelRef = ref<InstanceType<typeof CsvParseSettingPanel>>();
 const httpEventPanelRef = ref<InstanceType<typeof HttpEventPanel>>();
 const harFilePanelRef = ref<InstanceType<typeof HarFilePanel>>();
-const diffPanelRef = ref<InstanceType<typeof DiffPanel>>();
+const diffMdhViewRef = ref<InstanceType<typeof DiffMdhView>>();
 const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
 const viewConditionPanelRef = ref<InstanceType<typeof ViewConditionPanel>>();
 const variablesPanelRef = ref<InstanceType<typeof VariablesPanel>>();
@@ -43,14 +43,14 @@ const currentComponentName = window.document.title as ComponentName;
 function messageListener(evt: MessageEvent<MessageEventData>) {
   const { data } = evt;
   const { command, componentName, value } = data;
-  // console.log("[App.vue] at messageListener ", command, value);
+  console.log("[App.vue] at messageListener ", command, value);
 
   switch (componentName) {
     case "DBFormView":
       dBFormViewRef.value?.recieveMessage(data);
       break;
-    case "MdhPanel":
-      mdhPanelRef.value?.recieveMessage(data);
+    case "MdhView":
+      MdhViewRef.value?.recieveMessage(data);
       break;
     case "CsvParseSettingPanel":
       csvParseSettingPanelRef.value?.recieveMessage(data);
@@ -61,8 +61,8 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     case "HttpEventPanel":
       httpEventPanelRef.value?.recieveMessage(data);
       break;
-    case "DiffPanel":
-      diffPanelRef.value?.recieveMessage(data);
+    case "DiffMdhView":
+      diffMdhViewRef.value?.recieveMessage(data);
       break;
     case "ScanPanel":
       scanPanelRef.value?.recieveMessage(data);
@@ -104,7 +104,7 @@ onMounted(() => {
   <main>
     <DBFormView v-if="currentComponentName === 'DBFormView'" ref="dBFormViewRef" />
 
-    <MdhPanel v-if="currentComponentName === 'MdhPanel'" ref="mdhPanelRef" />
+    <MdhView v-if="currentComponentName === 'MdhView'" ref="MdhViewRef" />
 
     <HttpEventPanel v-if="currentComponentName === 'HttpEventPanel'" ref="httpEventPanelRef" />
 
@@ -115,7 +115,7 @@ onMounted(() => {
 
     <HarFilePanel v-if="currentComponentName === 'HarFilePanel'" ref="harFilePanelRef" />
 
-    <DiffPanel v-if="currentComponentName === 'DiffPanel'" ref="diffPanelRef" />
+    <DiffMdhView v-if="currentComponentName === 'DiffMdhView'" ref="diffMdhViewRef" />
 
     <ScanPanel v-if="currentComponentName === 'ScanPanel'" ref="scanPanelRef" />
 

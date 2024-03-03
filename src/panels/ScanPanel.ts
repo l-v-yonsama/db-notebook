@@ -24,8 +24,8 @@ import { createWebviewContent } from "../utilities/webviewUtil";
 import { log } from "../utilities/logger";
 import { ScanPanelEventData, ScanTabItem, ScanConditionItem } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
-import { DiffTabParam } from "./DiffPanel";
-import { SHOW_RDH_DIFF } from "../constant";
+import { DiffMdhViewTabParam } from "../types/views";
+import { OPEN_DIFF_MDH_VIEWER } from "../constant";
 
 const PREFIX = "[ScanPanel]";
 
@@ -487,7 +487,7 @@ export class ScanPanel {
     const beforeList = [ResultSetDataBuilder.from(rdh1).build()];
     const afterList = [ResultSetDataBuilder.from(rdh2).build()];
 
-    const diffParams: DiffTabParam = {
+    const diffParams: DiffMdhViewTabParam = {
       title,
       comparable: false,
       undoable: false,
@@ -497,7 +497,7 @@ export class ScanPanel {
     if (afterList.some((it) => it === undefined)) {
       return;
     }
-    vscode.commands.executeCommand(SHOW_RDH_DIFF, diffParams);
+    vscode.commands.executeCommand(OPEN_DIFF_MDH_VIEWER, diffParams);
   }
 
   private async openLogStreamScanPanel(data: any) {

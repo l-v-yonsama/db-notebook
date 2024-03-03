@@ -13,7 +13,7 @@ import RDHViewer from "./RDHViewer.vue";
 import type {
   CloseTabActionCommand,
   CompareParams,
-  DiffPanelEventData,
+  DiffMdhViewEventData,
   DiffTabInnerItem,
   DiffTabItem,
   OutputParams,
@@ -74,7 +74,7 @@ const moreDetailItems = [
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
 const resetSpPaneWrapperHeight = () => {
-  const sectionWrapper = window.document.querySelector("section.MdhPanel");
+  const sectionWrapper = window.document.querySelector("section.MdhView");
   //351 => 272
   // multi 420 => 236px ... 184
   if (sectionWrapper?.clientHeight) {
@@ -99,13 +99,24 @@ function isActiveTabId(tabId: string): boolean {
   return tabId === id;
 }
 
-const showTab = (tabId: string) => {
+const showTab = (tabId: string, innerIndex?: number) => {
   hasUndoChangeSql.value = false;
   activeTabId.value = `tab-${tabId}`;
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
   }
+
+  if (innerIndex === undefined) {
+    innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+  } else {
+    if (innerIndex > tabItem.list.length - 1 || innerIndex < 0) {
+      innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+    } else {
+      innerTabIndex.value = tabItem.list.length > 0 ? innerIndex : -1;
+    }
+  }
+
   hasUndoChangeSql.value = tabItem.hasUndoChangeSql;
   comparable.value = tabItem.comparable;
   innerTabItems.value.splice(0, innerTabItems.value.length);
@@ -116,12 +127,13 @@ const showTab = (tabId: string) => {
     const label = `${idx + 1}:${sqlType}: ${item.title}`;
     innerTabItems.value.push({ value: idx, label });
   });
-  innerTabIndex.value = tabItem.list.length > 0 ? 0 : -1;
+
+  vscode.postCommand({ command: "selectTab", params: { tabId } });
+
   nextTick(() => {
     innerTabVisible.value = tabItem.list.length > 0;
     resetActiveInnerRdh();
   });
-  vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
 const resetActiveInnerRdh = () => {
@@ -139,6 +151,14 @@ const resetActiveInnerRdh = () => {
       params: { tabId: tabItem.tabId, innerIndex: innerTabIndex.value },
     });
   });
+};
+
+const init = (params: DiffMdhViewEventData["value"]["init"]) => {
+  tabItems.value.splice(0, tabItems.value.length);
+  params?.tabItems.forEach((it) => tabItems.value.unshift(it));
+  if (params?.currentTabId) {
+    showTab(params?.currentTabId, params?.currentInnerIndex);
+  }
 };
 
 const addTabItem = (tabItem: DiffTabItem) => {
@@ -228,7 +248,7 @@ const selectedMoreOptions = (v: MoreOption): void => {
   resetActiveInnerRdh();
 };
 
-const recieveMessage = (data: DiffPanelEventData) => {
+const recieveMessage = (data: DiffMdhViewEventData) => {
   const { command, value } = data;
 
   switch (command) {
@@ -244,6 +264,9 @@ const recieveMessage = (data: DiffPanelEventData) => {
       }
       setSearchResult(value.searchResult);
       break;
+    case "init":
+      init(value.init);
+      break;
   }
 };
 
@@ -254,7 +277,7 @@ defineExpose({
 </script>
 
 <template>
-  <section class="MdhPanel">
+  <section class="MdhView">
     <div class="tab-container-actions">
       <VsCodeDropdown
         v-if="innerTabVisible"
@@ -355,7 +378,7 @@ defineExpose({
 </template>
 
 <style scoped>
-section.MdhPanel {
+section.MdhView {
   display: block;
   width: 100%;
   height: 100vh;

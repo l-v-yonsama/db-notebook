@@ -8,14 +8,18 @@ import type {
 } from "@/utilities/vscode";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
-
+import RDHViewer from "./RDHViewer.vue";
 import type { DropdownItem } from "@/types/Components";
 import TopLevelConditionVue from "./TopLevelCondition.vue";
 
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const sectionHeight = ref(300);
+const sectionWidth = ref(300);
+const rdhForUpdate = ref(null as any);
+const visibleSettingsMode = ref(true);
 
 window.addEventListener("resize", () => resetSectionHeight());
 
@@ -24,11 +28,19 @@ const resetSectionHeight = () => {
   if (sectionWrapper?.clientHeight) {
     sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 35, 100);
   }
+  if (sectionWrapper?.clientWidth) {
+    sectionWidth.value = Math.max(sectionWrapper.clientWidth - 14, 100);
+  }
 };
 
 onMounted(() => {
   nextTick(resetSectionHeight);
 });
+
+const rdhViewerRef = ref<InstanceType<typeof RDHViewer>>();
+const setRdhViewerRef = (el: any) => {
+  rdhViewerRef.value = el;
+};
 
 const specifyCondition = ref(false);
 const previewSql = ref("");
@@ -128,6 +140,25 @@ const ok = (editable: boolean, preview: boolean) => {
   });
 };
 
+const saveValues = () => {
+  const result = rdhViewerRef.value?.save();
+  if (result && result.ok) {
+    vscode.postCommand({
+      command: "saveValues",
+      params: {
+        ...result,
+      },
+    });
+  } else {
+    vscode.postCommand({
+      command: "showError",
+      params: {
+        message: result.message,
+      },
+    });
+  }
+};
+
 const setPreviewSql = (sql: string): void => {
   previewSql.value = sql;
 };
@@ -147,6 +178,10 @@ const recieveMessage = (data: ViewConditionPanelEventData) => {
       }
       setPreviewSql(value.setPreviewSql.previewSql);
       break;
+    case "set-rdh-for-update":
+      rdhForUpdate.value = value.rdhForUpdate;
+      visibleSettingsMode.value = false;
+      break;
   }
 };
 
@@ -163,9 +198,10 @@ defineExpose({
         <span id="tableName">{{ tableNameWithComment }}</span>
         <label for="numOfRows">Current rows:</label>
         <span id="numOfRows">{{ numOfRows }}</span>
-        <label for="limit">Limit:</label>
+        <label v-if="visibleSettingsMode" for="limit">Limit:</label>
         <VsCodeTextField
           id="limit"
+          v-if="visibleSettingsMode"
           v-model="limit"
           :min="0"
           :max="limitMax"
@@ -186,103 +222,104 @@ defineExpose({
           ><fa icon="times" />Cancel</VsCodeButton
         >
         <VsCodeButton
+          v-if="visibleSettingsMode"
           @click="ok(true, false)"
           appearance="secondary"
           title="Retlieve in editable mode"
           style="margin-right: 5px"
           ><fa icon="pencil" />Retlieve in editable mode</VsCodeButton
         >
-        <VsCodeButton @click="ok(false, false)" title="Retlieve"
+        <VsCodeButton v-if="visibleSettingsMode" @click="ok(false, false)" title="Retlieve"
           ><fa icon="check" />Retlieve</VsCodeButton
+        >
+        <VsCodeButton
+          v-if="!visibleSettingsMode"
+          @click="saveValues()"
+          title="Save changes to table"
+          ><fa icon="save" />Save changes to table</VsCodeButton
         >
       </div>
     </div>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
-      <div class="editor">
-        <fieldset class="conditions">
-          <legend>
-            <span style="margin-right: 30px">Conditions</span>
+      <div v-if="visibleSettingsMode" class="settings">
+        <div class="editor">
+          <fieldset class="conditions">
+            <legend>
+              <span style="margin-right: 30px">Conditions</span>
 
-            <vscode-checkbox
-              :checked="specifyCondition === true"
-              @change="($e:any) => handleSpecifyConditionOnChange($e.target.checked)"
-              style="margin-right: auto"
-              >Specify</vscode-checkbox
-            >
-          </legend>
-          <TopLevelConditionVue
-            v-if="visibleCondition && specifyCondition"
-            v-model="editorItem.conditions"
-            :columnItems="columnItems"
-            :rule-base-mode="false"
-            :lv="0"
-            @change="updateTextDocument()"
-          />
+              <vscode-checkbox
+                :checked="specifyCondition === true"
+                @change="($e:any) => handleSpecifyConditionOnChange($e.target.checked)"
+                style="margin-right: auto"
+                >Specify</vscode-checkbox
+              >
+            </legend>
+            <TopLevelConditionVue
+              v-if="visibleCondition && specifyCondition"
+              v-model="editorItem.conditions"
+              :columnItems="columnItems"
+              :rule-base-mode="false"
+              :lv="0"
+              @change="updateTextDocument()"
+            />
+          </fieldset>
+        </div>
+        <fieldset class="conditions">
+          <legend>Preview</legend>
+          <p class="preview" v-text="previewSql"></p>
         </fieldset>
       </div>
-      <fieldset class="conditions">
-        <legend>Preview</legend>
-        <p class="preview" v-text="previewSql"></p>
-      </fieldset>
+      <div v-else class="spread">
+        <RDHViewer
+          :rdh="rdhForUpdate"
+          :width="sectionWidth"
+          :height="sectionHeight"
+          :readonly="true"
+          :ref="setRdhViewerRef"
+        />
+      </div>
     </div>
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 section.view-conditional-root {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-section.view-conditional-root > div {
-  margin: 5px;
-}
-div.toolbar {
-  margin-bottom: 20px !important;
-}
 
-.tool-left label {
-  margin-left: 25px;
-  margin-right: 5px;
-}
-.tool-left span {
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  max-width: 180px;
-}
+  & > div {
+    margin: 5px;
 
-.scroll-wrapper {
-  overflow: auto;
-}
-table {
-  width: 100%;
-}
-.ctl {
-  width: 80px;
-  max-width: 80px;
-}
-.col {
-  width: 320px;
-}
+    & .toolbar {
+      margin-bottom: 20px !important;
 
-.ope {
-  width: 122px;
-  max-width: 122px;
-  text-align: center;
-}
-.eg {
-  width: 122px;
-  max-width: 122px;
-  text-align: center;
-}
+      .tool-left {
+        label {
+          margin-left: 25px;
+          margin-right: 5px;
+        }
+        span {
+          text-overflow: ellipsis;
+          overflow: hidden;
+          white-space: nowrap;
+          max-width: 180px;
+        }
+      }
+    }
 
-fieldset.conditions {
-  margin-top: 15px;
-}
-p.preview {
-  margin: 5px;
-  white-space: pre-wrap;
+    & .scroll-wrapper {
+      overflow: auto;
+
+      fieldset.conditions {
+        margin-top: 15px;
+      }
+      p.preview {
+        margin: 5px;
+        white-space: pre-wrap;
+      }
+    }
+  }
 }
 </style>

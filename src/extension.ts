@@ -1,4 +1,4 @@
-import { ExtensionContext, commands, window } from "vscode";
+import { ExtensionContext, Uri, commands, window } from "vscode";
 import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
 import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
@@ -6,13 +6,18 @@ import { StateStorage } from "./utilities/StateStorage";
 import { DBDriverResolver } from "@l-v-yonsama/multi-platform-database-drivers";
 
 import { ScanPanel } from "./panels/ScanPanel";
-import { MdhPanel } from "./panels/MdhPanel";
 import { activateNotebook } from "./notebook/activator";
 import { activateLogger, log, setupDisposeLogger } from "./utilities/logger";
-import { DiffPanel } from "./panels/DiffPanel";
-import { DiffTabParam } from "./panels/DiffPanel";
 import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
-import { EXTENSION_NAME, SHOW_RDH_DIFF } from "./constant";
+import {
+  BOTTOM_DIFF_MDH_VIEWID,
+  BOTTOM_MDH_VIEWID,
+  EXTENSION_NAME,
+  OPEN_MDH_VIEWER,
+  SHOW_CSV,
+  SHOW_HAR,
+  OPEN_DIFF_MDH_VIEWER,
+} from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
 import { initializePath } from "./utilities/fsUtil";
 import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
@@ -20,12 +25,26 @@ import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 import { HelpProvider } from "./help/HelpProvider";
 import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
+import { MdhViewProvider } from "./views/MdhViewProvider";
+import { HarFilePanel } from "./panels/HarFilePanel";
+import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
+import { DiffMdhViewTabParam, MdhViewParams } from "./types/views";
+import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
 
 const PREFIX = "[extension]";
 
 let connectionSettingViewProvider: SQLConfigurationViewProvider;
 
 export async function activate(context: ExtensionContext) {
+  const registerDisposableCommand = (
+    command: string,
+    callback: (...args: any[]) => any,
+    thisArg?: any
+  ) => {
+    const disposable = commands.registerCommand(command, callback, thisArg);
+    context.subscriptions.push(disposable);
+  };
+
   initializePath(context);
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
@@ -34,14 +53,13 @@ export async function activate(context: ExtensionContext) {
   activateLogger(context, EXTENSION_NAME);
   log(`${PREFIX} start activation.`);
   ScanPanel.setStateStorage(stateStorage);
-  MdhPanel.setStateStorage(stateStorage);
-  DiffPanel.setStateStorage(stateStorage);
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
 
+  // VIEWS
   const helpTreeView = window.createTreeView("database-notebook-helpfeedback", {
     treeDataProvider: new HelpProvider(),
   });
@@ -51,6 +69,7 @@ export async function activate(context: ExtensionContext) {
     });
   });
 
+  // Connection view
   connectionSettingViewProvider = activateFormProvider(context, stateStorage);
 
   registerResourceTreeCommand({
@@ -74,10 +93,40 @@ export async function activate(context: ExtensionContext) {
   // Code resolver editor
   activateCodeResolverEditor(context, stateStorage);
 
-  // DIFF
-  commands.registerCommand(SHOW_RDH_DIFF, (params: DiffTabParam) => {
-    DiffPanel.render(context.extensionUri, params);
-  });
+  //  Viewer
+  {
+    registerDisposableCommand(SHOW_CSV, async (csvUri: Uri) => {
+      CsvParseSettingPanel.render(context.extensionUri, csvUri);
+    });
+
+    registerDisposableCommand(SHOW_HAR, async (harUri: Uri) => {
+      HarFilePanel.render(context.extensionUri, harUri);
+    });
+
+    // Mdh View
+    const mdhViewProvider = new MdhViewProvider(BOTTOM_MDH_VIEWID, context, stateStorage);
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(mdhViewProvider.viewId, mdhViewProvider)
+    );
+
+    registerDisposableCommand(OPEN_MDH_VIEWER, async (params: MdhViewParams) => {
+      mdhViewProvider.render(params);
+    });
+
+    // Diff Mdh View
+    const diffMdhViewProvider = new DiffMdhViewProvider(
+      BOTTOM_DIFF_MDH_VIEWID,
+      context,
+      stateStorage
+    );
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(diffMdhViewProvider.viewId, diffMdhViewProvider)
+    );
+    commands.registerCommand(OPEN_DIFF_MDH_VIEWER, (params: DiffMdhViewTabParam) => {
+      diffMdhViewProvider.render(params);
+    });
+  }
+
   log(`${PREFIX} end activation.`);
   setupDisposeLogger(context);
 

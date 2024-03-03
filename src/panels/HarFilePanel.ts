@@ -3,9 +3,9 @@ import * as vscode from "vscode";
 
 import { createHash } from "crypto";
 import { ActionCommand } from "../shared/ActionParams";
-import { log, logError } from "../utilities/logger";
+import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
-import { hideStatusMessage, showStatusMessage } from "../statusBar";
+import { hideStatusMessage } from "../statusBar";
 import { ComponentName } from "../shared/ComponentName";
 import { HarFilePanelEventData, HarFileTabItem } from "../shared/MessageEventData";
 import { getIconPath, readResource } from "../utilities/fsUtil";
@@ -13,7 +13,6 @@ import type { Har } from "har-format";
 import {
   GeneralColumnType,
   ResultSetDataBuilder,
-  abbr,
   createRdhKey,
   prettyFileSize,
   prettyTime,

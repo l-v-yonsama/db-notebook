@@ -6,7 +6,7 @@ export const createWebviewContent = (
   webview: Webview,
   extensionUri: Uri,
   componentName: string
-) => {
+): string => {
   // The CSS file from the Vue build output
   const stylesUri = getUri(webview, extensionUri, ["webview-ui", "build", "assets", "index.css"]);
   // The JS file from the Vue build output

@@ -244,6 +244,17 @@ function createJsIntellisense() {
         );
         list.push(item);
 
+        item = new CompletionItem({ label: "writeResultSetData", description: "rdh" });
+        item.kind = CompletionItemKind.Function;
+        item.insertText = new SnippetString("writeResultSetData('${1|title|}', ${2|rdh|});");
+        item.detail = "Write ResultSetData with a title";
+        item.documentation = new MarkdownString("", true);
+        item.documentation.appendCodeblock(
+          "function writeResultSetData(title: string, rdh: ResultSetData);",
+          "typescript"
+        );
+        list.push(item);
+
         setNodeVariablesCompletionItems(list, storeKeyNames);
 
         storeKeys.forEach((key) => {

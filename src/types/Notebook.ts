@@ -1,4 +1,4 @@
-import type { NotebookCellKind } from "vscode";
+import type { NotebookCellKind, Uri } from "vscode";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export type SQLMode = "Query" | "Explain" | "ExplainAnalyze";
@@ -41,4 +41,9 @@ export type RunResult = {
   stderr: string;
   skipped: boolean;
   metadata?: RunResultMetadata;
+};
+
+export type NotebookToolbarClickEvent = {
+  notebookEditor: { notebookUri: Uri };
+  ui: boolean;
 };

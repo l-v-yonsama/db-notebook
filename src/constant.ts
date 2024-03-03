@@ -3,12 +3,12 @@ export const mediaDir = path.join(__filename, "..", "..", "media");
 
 export const EXTENSION_NAME = "database-notebook";
 
-export const SHOW_RDH_DIFF = `${EXTENSION_NAME}.show-rdh-diff`;
-
 //---------------------------------------------------
 // CONNECTION SETTING FORM
 //---------------------------------------------------
 export const CONNECTION_SETTING_FORM_VIEWID = `${EXTENSION_NAME}.connectionForm`;
+export const BOTTOM_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.mdh`;
+export const BOTTOM_DIFF_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.diff-mdh`;
 
 //---------------------------------------------------
 // RESOURCE TREE
@@ -40,22 +40,32 @@ export const OPEN_SQL_HISTORY = `${EXTENSION_NAME}.histories.open`;
 export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;
 
 //---------------------------------------------------
+// OPEN VIEWERS
+//---------------------------------------------------
+export const SHOW_CSV = `${EXTENSION_NAME}.show-csv-file`;
+export const SHOW_HAR = `${EXTENSION_NAME}.show-har-file`;
+export const OPEN_MDH_VIEWER = `${EXTENSION_NAME}.open-mdh-viewer`;
+export const OPEN_DIFF_MDH_VIEWER = `${EXTENSION_NAME}.open-diff-mdh-viewer`;
+
+//---------------------------------------------------
 // NOTE BOOK
 //---------------------------------------------------
 export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;
 export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
+
+// NOTEBOOK TOOL-BAR COMMANDS
+export const SHOW_NOTEBOOK_ALL_VARIABLES = `${EXTENSION_NAME}.toolbar.show-all-variables`;
+export const SHOW_NOTEBOOK_ALL_RDH = `${EXTENSION_NAME}.toolbar.show-all-rdh`;
+export const SPECIFY_CONNECTION_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-connection-all`;
+
+// NOTEBOOK CELL STATUS-BAR COMMANDS
+export const CELL_MARK_CELL_AS_SKIP = `${EXTENSION_NAME}.cell.mark-cell-as-skip`;
+export const CELL_SHOW_METADATA_SETTINGS = `${EXTENSION_NAME}.cell.show-metadata-setting`;
 export const CELL_SPECIFY_CONNECTION_TO_USE = `${EXTENSION_NAME}.cell.specify-connection-to-use`;
+export const CELL_WRITE_TO_CLIPBOARD = `${EXTENSION_NAME}.cell.write-to-clipboard`;
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
 export const CELL_OPEN_HTTP_RESPONSE = `${EXTENSION_NAME}.cell.open-http-response`;
-export const SHOW_CSV = `${EXTENSION_NAME}.show-csv-file`;
-export const SHOW_HAR = `${EXTENSION_NAME}.show-har-file`;
-export const CELL_WRITE_TO_CLIPBOARD = `${EXTENSION_NAME}.cell.write-to-clipboard`;
-export const SHOW_ALL_VARIABLES = `${EXTENSION_NAME}.show-all-variables`;
-export const SHOW_ALL_RDH = `${EXTENSION_NAME}.show-all-rdh`;
-export const SPECIFY_CONNECTION_ALL = `${EXTENSION_NAME}.specify-connection-all`;
-export const CELL_MARK_CELL_AS_SKIP = `${EXTENSION_NAME}.cell.mark-cell-as-skip`;
 export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;
-export const CELL_SHOW_METADATA_SETTINGS = `${EXTENSION_NAME}.cell.show-metadata-setting`;
 
 // NOTEBOOK CELL EXECUTE
 export const CELL_EXECUTE_QUERY = `${EXTENSION_NAME}.cell-execute-query`;

@@ -1,6 +1,5 @@
 import { DBNotebookSerializer } from "./serializer";
 import { MainController } from "./controller";
-import { MdhPanel } from "../panels/MdhPanel";
 import { StateStorage } from "../utilities/StateStorage";
 import {
   ExtensionContext,
@@ -10,15 +9,13 @@ import {
   NotebookEdit,
   Range,
   TextEdit,
-  Uri,
   WorkspaceEdit,
   commands,
   window,
   workspace,
 } from "vscode";
-import { CellMeta } from "../types/Notebook";
+import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { activateIntellisense } from "./intellisense";
-import { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as path from "path";
 import { VariablesPanel } from "../panels/VariablesPanel";
 import { activateStatusBar } from "../statusBar";
@@ -29,30 +26,33 @@ import {
   CELL_WRITE_TO_CLIPBOARD,
   CREATE_NEW_NOTEBOOK,
   NOTEBOOK_TYPE,
-  SHOW_ALL_RDH as SHOW_ALL_SELECT_RDH,
-  SHOW_ALL_VARIABLES,
-  SPECIFY_CONNECTION_ALL,
+  SHOW_NOTEBOOK_ALL_RDH,
+  SHOW_NOTEBOOK_ALL_VARIABLES,
+  SPECIFY_CONNECTION_TO_ALL_CELLS,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
-  SHOW_CSV,
-  SHOW_HAR,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
   CELL_TOOLBAR_FORMAT,
   CELL_EXECUTE_QUERY,
   CELL_EXECUTE_EXPLAIN,
   CELL_EXECUTE_EXPLAIN_ANALYZE,
+  OPEN_MDH_VIEWER,
 } from "../constant";
-import { isJsonCell, isSelectOrShowSqlCell, isSqlCell } from "../utilities/notebookUtil";
+import {
+  getToolbarButtonClickedNotebookEditor,
+  isJsonCell,
+  hasAnyRdhOutputCell,
+  isSqlCell,
+} from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { log } from "../utilities/logger";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
-import { CsvParseSettingPanel } from "../panels/CsvParseSettingPanel";
-import { HarFilePanel } from "../panels/HarFilePanel";
 import sqlFormatter from "sql-formatter-plus";
 import { getFormatterConfig } from "../utilities/configUtil";
+import { MdhViewParams } from "../types/views";
 
 const PREFIX = "[notebook/activator]";
 
@@ -71,20 +71,109 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   controller = new MainController(context, stateStorage);
   context.subscriptions.push(controller);
 
-  // Commands
-  context.subscriptions.push(
-    commands.registerCommand(CREATE_NEW_NOTEBOOK, async (cells?: NotebookCellData[]) => {
+  const registerDisposableCommand = (
+    command: string,
+    callback: (...args: any[]) => any,
+    thisArg?: any
+  ) => {
+    const disposable = commands.registerCommand(command, callback, thisArg);
+    context.subscriptions.push(disposable);
+  };
+
+  // Notebook commands
+  {
+    registerDisposableCommand(CREATE_NEW_NOTEBOOK, async (cells?: NotebookCellData[]) => {
       const newNotebook = await workspace.openNotebookDocument(
         NOTEBOOK_TYPE,
         new NotebookData(cells ?? [])
       );
 
       window.showNotebookDocument(newNotebook);
-    })
-  );
+    });
+  }
 
-  context.subscriptions.push(
-    commands.registerCommand(CELL_SPECIFY_CONNECTION_TO_USE, async (cell: NotebookCell) => {
+  // Notebook toolbar commands
+  {
+    registerDisposableCommand(SHOW_NOTEBOOK_ALL_VARIABLES, async (e: NotebookToolbarClickEvent) => {
+      const notebookEditor = getToolbarButtonClickedNotebookEditor(e);
+
+      if (!notebookEditor) {
+        return;
+      }
+      const cells = notebookEditor?.notebook.getCells();
+      if (!cells) {
+        return;
+      }
+
+      const variables = controller.getVariables(notebookEditor.notebook);
+      if (!variables) {
+        return;
+      }
+      VariablesPanel.render(context.extensionUri, variables);
+    });
+
+    registerDisposableCommand(SHOW_NOTEBOOK_ALL_RDH, async (e: NotebookToolbarClickEvent) => {
+      const { notebookUri } = e.notebookEditor;
+      const filePath = notebookUri.fsPath ?? "";
+      const notebookEditor = getToolbarButtonClickedNotebookEditor(e);
+
+      const cells = notebookEditor?.notebook.getCells();
+      if (!cells) {
+        return;
+      }
+
+      const rrmList = cells
+        .filter((it) => hasAnyRdhOutputCell(it))
+        .map((it) => it.outputs[0].metadata as RunResultMetadata);
+      const title = path.basename(filePath);
+      const commandParam: MdhViewParams = { title, list: rrmListToRdhList(rrmList) };
+      commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+    });
+
+    registerDisposableCommand(
+      SPECIFY_CONNECTION_TO_ALL_CELLS,
+      async (e: NotebookToolbarClickEvent) => {
+        const notebookEditor = getToolbarButtonClickedNotebookEditor(e);
+
+        const cells = notebookEditor?.notebook.getCells();
+        if (!cells) {
+          return;
+        }
+        if (cells.every((it) => !isSqlCell(it))) {
+          return;
+        }
+        const conSettings = await stateStorage.getConnectionSettingList();
+        const items = conSettings.map((it) => ({
+          label: it.name,
+          description: it.dbType,
+        }));
+        const result = await window.showQuickPick(items);
+        if (result) {
+          for (const cell of cells) {
+            if (!isSqlCell(cell)) {
+              continue;
+            }
+            if (cell.metadata?.connectionName === result.label) {
+              continue;
+            }
+            const metadata: CellMeta = {
+              ...cell.metadata,
+            };
+            metadata.connectionName = result.label;
+            const edit = new WorkspaceEdit();
+            const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+            edit.set(cell.notebook.uri, [nbEdit]);
+
+            await workspace.applyEdit(edit);
+          }
+        }
+      }
+    );
+  }
+
+  // Notebook cell statusbar commands
+  {
+    registerDisposableCommand(CELL_SPECIFY_CONNECTION_TO_USE, async (cell: NotebookCell) => {
       const conSettings = await stateStorage.getConnectionSettingList();
       const items = conSettings.map((it) => ({
         label: it.name,
@@ -105,10 +194,9 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
         await workspace.applyEdit(edit);
       }
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(CELL_WRITE_TO_CLIPBOARD, async (cell: NotebookCell) => {
+    });
+
+    registerDisposableCommand(CELL_WRITE_TO_CLIPBOARD, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
       const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
       if (!isSqlCell(cell) || rrm === undefined) {
@@ -124,10 +212,8 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         withRuleViolation: true,
         limit: 10,
       });
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(CELL_OPEN_MDH, async (cell: NotebookCell) => {
+    });
+    registerDisposableCommand(CELL_OPEN_MDH, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
       const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
       if (
@@ -138,11 +224,14 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       }
 
       const title = filePath ? path.basename(filePath) : rrm.tableName ?? "CELL" + cell.index;
-      MdhPanel.render(context.extensionUri, title, rrmListToRdhList([rrm]));
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(CELL_OPEN_HTTP_RESPONSE, async (cell: NotebookCell) => {
+      const commandParam: MdhViewParams = {
+        title,
+        list: rrmListToRdhList([rrm]),
+      };
+      commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+    });
+
+    registerDisposableCommand(CELL_OPEN_HTTP_RESPONSE, async (cell: NotebookCell) => {
       const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
       if (rrm === undefined || rrm.axiosEvent === undefined) {
         return;
@@ -150,36 +239,46 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       const title = rrm.axiosEvent.title;
       HttpEventPanel.render(context.extensionUri, title, rrm.axiosEvent);
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(SHOW_CSV, async (csvUri: Uri) => {
-      CsvParseSettingPanel.render(context.extensionUri, csvUri);
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(SHOW_HAR, async (harUri: Uri) => {
-      HarFilePanel.render(context.extensionUri, harUri);
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(SHOW_ALL_VARIABLES, async () => {
-      const notebook = window.activeNotebookEditor?.notebook;
-      const cells = notebook?.getCells();
-      if (!cells) {
-        return;
+    });
+    registerDisposableCommand(CELL_MARK_CELL_AS_SKIP, async (cell: NotebookCell) => {
+      const metadata: CellMeta = {
+        ...cell.metadata,
+      };
+      if (metadata.markAsSkip === true) {
+        metadata.markAsSkip = false;
+      } else {
+        metadata.markAsSkip = true;
       }
+      const edit = new WorkspaceEdit();
+      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+      edit.set(cell.notebook.uri, [nbEdit]);
 
-      const variables = controller.getVariables(notebook!);
-      if (!variables) {
-        return;
+      await workspace.applyEdit(edit);
+    });
+    registerDisposableCommand(CELL_MARK_CELL_AS_PRE_EXECUTION, async (cell: NotebookCell) => {
+      const metadata: CellMeta = {
+        ...cell.metadata,
+      };
+      if (metadata.markAsRunInOrderAtJsonCell === true) {
+        metadata.markAsRunInOrderAtJsonCell = false;
+      } else {
+        metadata.markAsRunInOrderAtJsonCell = true;
       }
-      VariablesPanel.render(context.extensionUri, variables);
-    })
-  );
+      const edit = new WorkspaceEdit();
+      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+      edit.set(cell.notebook.uri, [nbEdit]);
 
-  context.subscriptions.push(
-    commands.registerCommand(CELL_TOOLBAR_FORMAT, async (cell: NotebookCell) => {
+      await workspace.applyEdit(edit);
+    });
+
+    registerDisposableCommand(CELL_SHOW_METADATA_SETTINGS, async (cell: NotebookCell) => {
+      NotebookCellMetadataPanel.render(context.extensionUri, cell);
+    });
+  }
+
+  // Notebook cell-toolbar commands
+  {
+    registerDisposableCommand(CELL_TOOLBAR_FORMAT, async (cell: NotebookCell) => {
       const doc = cell.document;
       const st = doc.positionAt(0);
       const ed = doc.positionAt(doc.getText().length);
@@ -197,134 +296,36 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       var formatEdit = new WorkspaceEdit();
       formatEdit.set(doc.uri, [edit]);
       await workspace.applyEdit(formatEdit);
-    })
-  );
-
-  context.subscriptions.push(
-    commands.registerCommand(SHOW_ALL_SELECT_RDH, async () => {
-      const filePath = window.activeNotebookEditor?.notebook.uri.fsPath ?? "";
-      const cells = window.activeNotebookEditor?.notebook.getCells();
-      if (!cells) {
-        return;
-      }
-      const rdhList: ResultSetData[] = [];
-      cells
-        .filter((it) => isSelectOrShowSqlCell(it) && it.outputs[0].metadata?.rdh !== undefined)
-        .forEach((it) => {
-          rdhList.push(it.outputs[0].metadata!.rdh);
-        });
-      const title = path.basename(filePath);
-      MdhPanel.render(context.extensionUri, title, rdhList);
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(SPECIFY_CONNECTION_ALL, async () => {
-      const cells = window.activeNotebookEditor?.notebook.getCells();
-      if (!cells) {
-        return;
-      }
-      if (cells.every((it) => !isSqlCell(it))) {
-        return;
-      }
-      const conSettings = await stateStorage.getConnectionSettingList();
-      const items = conSettings.map((it) => ({
-        label: it.name,
-        description: it.dbType,
-      }));
-      const result = await window.showQuickPick(items);
-      if (result) {
-        for (const cell of cells) {
-          if (!isSqlCell(cell)) {
-            continue;
-          }
-          if (cell.metadata?.connectionName === result.label) {
-            continue;
-          }
-          const metadata: CellMeta = {
-            ...cell.metadata,
-          };
-          metadata.connectionName = result.label;
-          const edit = new WorkspaceEdit();
-          const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-          edit.set(cell.notebook.uri, [nbEdit]);
-
-          await workspace.applyEdit(edit);
-        }
-      }
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(CELL_MARK_CELL_AS_SKIP, async (cell: NotebookCell) => {
-      const metadata: CellMeta = {
-        ...cell.metadata,
-      };
-      if (metadata.markAsSkip === true) {
-        metadata.markAsSkip = false;
-      } else {
-        metadata.markAsSkip = true;
-      }
-      const edit = new WorkspaceEdit();
-      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-      edit.set(cell.notebook.uri, [nbEdit]);
-
-      await workspace.applyEdit(edit);
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(CELL_MARK_CELL_AS_PRE_EXECUTION, async (cell: NotebookCell) => {
-      const metadata: CellMeta = {
-        ...cell.metadata,
-      };
-      if (metadata.markAsRunInOrderAtJsonCell === true) {
-        metadata.markAsRunInOrderAtJsonCell = false;
-      } else {
-        metadata.markAsRunInOrderAtJsonCell = true;
-      }
-      const edit = new WorkspaceEdit();
-      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-      edit.set(cell.notebook.uri, [nbEdit]);
-
-      await workspace.applyEdit(edit);
-    })
-  );
-
-  context.subscriptions.push(
-    commands.registerCommand(CELL_SHOW_METADATA_SETTINGS, async (cell: NotebookCell) => {
-      NotebookCellMetadataPanel.render(context.extensionUri, cell);
-    })
-  );
+    });
+  }
 
   // NOTEBOOK CELL EXECUTE
-  context.subscriptions.push(
-    commands.registerCommand(CELL_EXECUTE_QUERY, async (cell: NotebookCell) => {
+  {
+    registerDisposableCommand(CELL_EXECUTE_QUERY, async (cell: NotebookCell) => {
       controller.setSqlMode("Query");
       // Perform command issuance to activate the interrupt button.
       commands.executeCommand("notebook.cell.execute", {
         ranges: [{ start: cell.index, end: cell.index + 1 }],
         document: cell.notebook.uri,
       });
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(CELL_EXECUTE_EXPLAIN, async (cell: NotebookCell) => {
+    });
+    registerDisposableCommand(CELL_EXECUTE_EXPLAIN, async (cell: NotebookCell) => {
       controller.setSqlMode("Explain");
       // Perform command issuance to activate the interrupt button.
       commands.executeCommand("notebook.cell.execute", {
         ranges: [{ start: cell.index, end: cell.index + 1 }],
         document: cell.notebook.uri,
       });
-    })
-  );
-  context.subscriptions.push(
-    commands.registerCommand(CELL_EXECUTE_EXPLAIN_ANALYZE, async (cell: NotebookCell) => {
+    });
+    registerDisposableCommand(CELL_EXECUTE_EXPLAIN_ANALYZE, async (cell: NotebookCell) => {
       controller.setSqlMode("ExplainAnalyze");
       // Perform command issuance to activate the interrupt button.
       commands.executeCommand("notebook.cell.execute", {
         ranges: [{ start: cell.index, end: cell.index + 1 }],
         document: cell.notebook.uri,
       });
-    })
-  );
+    });
+  }
 
   // NOTEBOOK CELL TITLE (CELL TOOLBAR-ACTION)
   context.subscriptions.push(

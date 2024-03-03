@@ -197,11 +197,12 @@ export class StateStorage {
     const list = await this.getSQLHistoryList();
 
     const newTrimedSql = history.sqlDoc.trim();
-    if (
-      list.some(
-        (it) => it.sqlDoc.trim() === newTrimedSql && it.connectionName === history.connectionName
-      )
-    ) {
+    const sameHistoryIndex = list.findIndex(
+      (it) => it.sqlDoc.trim() === newTrimedSql && it.connectionName === history.connectionName
+    );
+    if (sameHistoryIndex >= 0) {
+      list.splice(sameHistoryIndex, 1, { ...history, id: uid.randomUUID(8) });
+      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
       return false;
     }
 

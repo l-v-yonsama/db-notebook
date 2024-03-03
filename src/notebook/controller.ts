@@ -35,11 +35,13 @@ import {
   WorkspaceEdit,
   commands,
   notebooks,
+  window,
   workspace,
 } from "vscode";
 import { log } from "../utilities/logger";
 import { SqlKernel } from "./sqlKernel";
 import {
+  hasAnyRdhOutputCell,
   isJsonCell,
   isPreExecution,
   isSqlCell,
@@ -95,8 +97,22 @@ export class MainController {
       this.noteVariables.delete(e.uri.path);
     });
 
+    window.onDidChangeActiveNotebookEditor((notebookEditor) => {
+      log(
+        PREFIX +
+          " onDidChangeActiveNotebookEditor notebookEditor.notebookType:" +
+          notebookEditor?.notebook?.notebookType
+      );
+      if (notebookEditor?.notebook) {
+        this.setActiveContext(notebookEditor.notebook);
+      }
+    });
+
     context.subscriptions.push(
       workspace.onDidChangeNotebookDocument((e) => {
+        log(
+          PREFIX + " onDidChangeNotebookDocument e.notebook.notebookType:" + e.notebook.notebookType
+        );
         if (e.notebook.notebookType !== NOTEBOOK_TYPE) {
           return;
         }
@@ -105,6 +121,7 @@ export class MainController {
     );
     context.subscriptions.push(
       workspace.onDidOpenNotebookDocument((notebook) => {
+        log(PREFIX + " onDidOpenNotebookDocument e.notebook.notebookType:" + notebook.notebookType);
         if (notebook.notebookType !== NOTEBOOK_TYPE) {
           return;
         }
@@ -163,10 +180,7 @@ export class MainController {
   setActiveContext(notebook: NotebookDocument) {
     const cells = notebook?.getCells() ?? [];
     const visibleVariables = cells.some((cell) => cell.outputs.length > 0);
-    const visibleRdh = cells.some(
-      (cell) =>
-        isSqlCell(cell) && cell.outputs.length > 0 && cell.outputs[0].metadata?.rdh !== undefined
-    );
+    const visibleRdh = cells.some((cell) => hasAnyRdhOutputCell(cell));
     const hasSql = cells.some((cell) => isSqlCell(cell));
     commands.executeCommand("setContext", "visibleVariables", visibleVariables);
     commands.executeCommand("setContext", "visibleRdh", visibleRdh);
@@ -443,7 +457,7 @@ export class MainController {
       if (r.metadata?.rdh?.meta?.type === "select") {
         const { rdh } = r.metadata;
         if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
-          const rrule = await readRuleFile(cell, rdh);
+          const rrule = await readRuleFile(metadata, rdh);
           if (rrule) {
             rdh.meta.tableRule = rrule.tableRule;
             // log(`${PREFIX} rrule.tableRule:${JSON.stringify(rrule.tableRule, null, 1)}`);
@@ -460,7 +474,7 @@ export class MainController {
           }
         }
         if (metadata.codeResolverFile && (await existsFileOnStorage(metadata.codeResolverFile))) {
-          const codeResolver = await readCodeResolverFile(cell);
+          const codeResolver = await readCodeResolverFile(metadata);
           if (codeResolver) {
             rdh.meta.codeItems = codeResolver.items;
             const resolveCodeLabelResult = await resolveCodeLabel(rdh);
@@ -476,6 +490,8 @@ export class MainController {
           variables: noteSession.kernel.getStoredVariables(),
           meta: r.metadata?.rdh.meta,
           summary: r.metadata?.rdh.summary,
+          codeResolverFile: metadata.codeResolverFile,
+          ruleFile: metadata.ruleFile,
         });
         commands.executeCommand(REFRESH_SQL_HISTORIES);
       }

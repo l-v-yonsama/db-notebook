@@ -18,7 +18,6 @@ import {
   RedisDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResourceTreeProvider } from "./ResourceTreeProvider";
-import { MdhPanel } from "../panels/MdhPanel";
 import { ScanPanel } from "../panels/ScanPanel";
 import {
   DUPLICATE_CONNECTION_SETTING,

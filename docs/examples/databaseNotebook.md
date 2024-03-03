@@ -19,10 +19,6 @@ This page shows an example of the use of the VS code extension "Database Noteboo
   - 3.5. [Handling JWT Access and Refresh Token](#35-handling-jwt-access-and-refresh-token)
   - 3.6. [Handling JWT Access Token and Introspection](#36-handling-jwt-access-token-and-introspection)
 
-<details>
-
-<summary>1. Query examples</summary>
-
 ## 1. Query examples
 
 SQL statements can be issued by specifying "SQL" as the language of the cell.
@@ -78,12 +74,6 @@ Cell[2] (SQL cell)
 | 1 | 7698 | 30 |
 | 2 | 7782 | 20 |
 
-</details>
-
-<details>
-
-<summary>2. Controlling the Database with Javascript</summary>
-
 ## 2. Controlling the Database with Javascript
 
 ### 2.1. Inserting parent and child records in the same transaction
@@ -138,12 +128,6 @@ ok true
 message
 result Inserted order_no is 25
 ```
-
-</details>
-
-<details>
-
-<summary>3. Axios use cases</summary>
 
 ## 3. Axios use cases
 
@@ -587,5 +571,3 @@ Cell[3] (Javascript cell)
 
 ℹ️ (256/703) Abbreviated. Push "Open response" button to show all without abbreviation.
 ```
-
-</details>

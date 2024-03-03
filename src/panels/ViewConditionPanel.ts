@@ -1,45 +1,38 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn, commands } from "vscode";
+import { WebviewPanel, window, Uri, ViewColumn, commands, ProgressLocation } from "vscode";
 import {
   DBDriverResolver,
   DbTable,
   RDSBaseDriver,
   ResultSetData,
+  toDeleteStatement,
+  toInsertStatement,
+  toUpdateStatement,
   toViewDataNormalizedQuery,
   toViewDataQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { StateStorage } from "../utilities/StateStorage";
 import { ActionCommand } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
-import { createWebviewContent } from "../utilities/webviewUtil";
-import { MdhPanel } from "./MdhPanel";
+import { log, logError } from "../utilities/logger";
 import { ViewConditionParams } from "../shared/ViewConditionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { ViewConditionPanelEventData } from "../shared/MessageEventData";
-import { REFRESH_SQL_HISTORIES } from "../constant";
+import { OPEN_MDH_VIEWER, REFRESH_SQL_HISTORIES } from "../constant";
+import { MdhViewParams } from "../types/views";
+import { BasePanel } from "./BasePanel";
+import { SaveValuesInRdhParams } from "../shared/SaveValuesInRdhParams";
 
 const PREFIX = "[ViewConditionPanel]";
 
-const componentName: ComponentName = "ViewConditionPanel";
-
-export class ViewConditionPanel {
+export class ViewConditionPanel extends BasePanel {
   public static currentPanel: ViewConditionPanel | undefined;
   private static stateStorage?: StateStorage;
-  private readonly _panel: WebviewPanel;
-  private _disposables: Disposable[] = [];
   private tableRes: DbTable | undefined;
   private numOfRows: number = 0;
   private isPositionedParameterAvailable: boolean | undefined;
+  private rdhForUpdate?: ResultSetData;
 
-  private constructor(panel: WebviewPanel, private extensionUri: Uri) {
-    this._panel = panel;
-
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(
-      this._panel.webview,
-      this.extensionUri,
-      componentName
-    );
-    this._setWebviewMessageListener(this._panel.webview);
+  private constructor(panel: WebviewPanel, extensionUri: Uri) {
+    super(panel, extensionUri);
   }
 
   public static revive(panel: WebviewPanel, extensionUri: Uri) {
@@ -52,7 +45,7 @@ export class ViewConditionPanel {
 
   public static render(extensionUri: Uri, tableRes: DbTable, numOfRows: number) {
     if (ViewConditionPanel.currentPanel) {
-      ViewConditionPanel.currentPanel._panel.reveal(ViewColumn.One);
+      ViewConditionPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
@@ -75,6 +68,10 @@ export class ViewConditionPanel {
     ViewConditionPanel.currentPanel.renderSub();
   }
 
+  getComponentName(): ComponentName {
+    return "ViewConditionPanel";
+  }
+
   async renderSub() {
     if (!this.tableRes) {
       return;
@@ -93,19 +90,11 @@ export class ViewConditionPanel {
       },
     };
 
-    this._panel.webview.postMessage(msg);
+    this.panel.webview.postMessage(msg);
   }
 
-  public dispose() {
+  public preDispose(): void {
     ViewConditionPanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
-    }
   }
 
   private async getPreviewSql(
@@ -139,104 +128,262 @@ export class ViewConditionPanel {
     }
   }
 
-  private _setWebviewMessageListener(webview: Webview) {
-    webview.onDidReceiveMessage(
-      async (message: ActionCommand) => {
-        const { command, params } = message;
-        switch (command) {
-          case "cancel":
-            this.dispose();
+  protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
+    const { command, params } = message;
+    switch (command) {
+      case "saveValues":
+        this.saveValues(params);
+        break;
+      case "cancel":
+        this.dispose();
+        return;
+      case "ok":
+        {
+          const { conditions, specfyCondition, limit, editable, preview } =
+            params as ViewConditionParams;
+
+          if (preview) {
+            this.numOfRows = limit;
+            const previewSql = await this.getPreviewSql(conditions, specfyCondition);
+            // send to webview
+            const msg: ViewConditionPanelEventData = {
+              command: "set-preview-sql",
+              componentName: "ViewConditionPanel",
+              value: {
+                setPreviewSql: {
+                  previewSql,
+                },
+              },
+            };
+            this.panel.webview.postMessage(msg);
+
             return;
-          case "ok":
-            {
-              const { conditions, specfyCondition, limit, editable, preview } =
-                params as ViewConditionParams;
+          }
 
-              if (preview) {
-                this.numOfRows = limit;
-                const previewSql = await this.getPreviewSql(conditions, specfyCondition);
-                // send to webview
-                const msg: ViewConditionPanelEventData = {
-                  command: "set-preview-sql",
-                  componentName: "ViewConditionPanel",
-                  value: {
-                    setPreviewSql: {
-                      previewSql,
-                    },
+          const { tableRes } = this;
+          if (!tableRes || !ViewConditionPanel.stateStorage) {
+            return;
+          }
+          const { conName, schemaName } = tableRes.meta;
+          const setting = await ViewConditionPanel.stateStorage.getConnectionSettingByName(conName);
+          if (!setting) {
+            return;
+          }
+
+          const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+            RDSBaseDriver,
+            ResultSetData
+          >(setting, async (driver) => {
+            const { query, binds } = toViewDataNormalizedQuery({
+              tableRes,
+              schemaName,
+              toPositionedParameter: driver.isPositionedParameterAvailable(),
+              conditions: specfyCondition ? conditions : undefined,
+              limit: this.numOfRows,
+            });
+
+            log(`${PREFIX} query:[${query}]`);
+            log(`${PREFIX} binds:[${binds}]`);
+            return await driver.requestSql({
+              sql: query,
+              conditions: {
+                binds,
+              },
+              meta: {
+                tableName: tableRes.name,
+                compareKeys: tableRes.getCompareKeys(),
+                comment: tableRes.comment,
+                editable,
+              },
+            });
+          });
+
+          if (ok && result) {
+            const { query, binds } = toViewDataQuery({
+              tableRes,
+              schemaName,
+              conditions: specfyCondition ? conditions : undefined,
+              limit: this.numOfRows,
+            });
+            await ViewConditionPanel.stateStorage.addSQLHistory({
+              connectionName: conName,
+              sqlDoc: query,
+              variables: binds,
+              meta: result.meta,
+              summary: result.summary,
+            });
+            commands.executeCommand(REFRESH_SQL_HISTORIES);
+            if (editable) {
+              this.rdhForUpdate = result;
+              const msg: ViewConditionPanelEventData = {
+                command: "set-rdh-for-update",
+                componentName: "ViewConditionPanel",
+                value: {
+                  rdhForUpdate: result,
+                },
+              };
+              this.panel.webview.postMessage(msg);
+            } else {
+              const commandParam: MdhViewParams = { title: tableRes.name, list: [result] };
+              commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+              this.dispose();
+            }
+          } else {
+            window.showErrorMessage(message);
+            this.dispose();
+          }
+        }
+        return;
+    }
+  }
+
+  private async saveValues(params: SaveValuesInRdhParams) {
+    const rdh = this.rdhForUpdate;
+    if (rdh === undefined) {
+      return;
+    }
+    const { connectionName, tableName } = rdh.meta;
+    if (connectionName === undefined || tableName === undefined) {
+      return;
+    }
+
+    const setting = await ViewConditionPanel.stateStorage?.getConnectionSettingByName(
+      connectionName
+    );
+    if (!setting) {
+      return;
+    }
+
+    const { insertList, updateList, deleteList } = params;
+    const totalCount = insertList.length + updateList.length + deleteList.length;
+    const increment = Math.floor(100 / totalCount);
+    const { ok, message } = await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        return await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+          setting,
+          async (driver) => {
+            const toPositionedParameter = driver.isPositionedParameterAvailable();
+            let errorMessage = "";
+            for (let i = 0; i < insertList.length; i++) {
+              const prefix = `INSERT[${i + 1}/${insertList.length}] `;
+              const { values } = insertList[i];
+              try {
+                const { query, binds } = toInsertStatement({
+                  tableName,
+                  columns: rdh.keys,
+                  values,
+                  bindOption: {
+                    specifyValuesWithBindParameters: true,
+                    toPositionedParameter,
                   },
-                };
-                this._panel.webview.postMessage(msg);
-
-                return;
-              }
-
-              const { tableRes } = this;
-              if (!tableRes || !ViewConditionPanel.stateStorage) {
-                return;
-              }
-              const { conName, schemaName } = tableRes.meta;
-              const setting = await ViewConditionPanel.stateStorage.getConnectionSettingByName(
-                conName
-              );
-              if (!setting) {
-                return;
-              }
-
-              const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
-                RDSBaseDriver,
-                ResultSetData
-              >(setting, async (driver) => {
-                const { query, binds } = toViewDataNormalizedQuery({
-                  tableRes,
-                  schemaName,
-                  toPositionedParameter: driver.isPositionedParameterAvailable(),
-                  conditions: specfyCondition ? conditions : undefined,
-                  limit: this.numOfRows,
                 });
+                log(`${prefix} sql:[${query}]`);
+                log(`${prefix} binds:${JSON.stringify(binds)}`);
 
-                log(`${PREFIX} query:[${query}]`);
-                log(`${PREFIX} binds:[${binds}]`);
-                return await driver.requestSql({
+                const r = await driver.requestSql({
                   sql: query,
                   conditions: {
                     binds,
                   },
-                  meta: {
-                    tableName: tableRes.name,
-                    compareKeys: tableRes.getCompareKeys(),
-                    comment: tableRes.comment,
-                    editable,
+                });
+                log(`${prefix} OK`);
+              } catch (e: any) {
+                errorMessage = e.message;
+                logError(`${prefix} NG:${e.message}`);
+              }
+              progress.report({
+                message: `Inserted [${i + 1}/${insertList.length}]`,
+                increment,
+              });
+            }
+
+            for (let i = 0; i < updateList.length; i++) {
+              const prefix = `UPDATE[${i + 1}/${updateList.length}] `;
+              const { values, conditions } = updateList[i];
+              try {
+                const { query, binds } = toUpdateStatement({
+                  tableName,
+                  columns: rdh.keys,
+                  values,
+                  conditions,
+                  bindOption: {
+                    specifyValuesWithBindParameters: true,
+                    toPositionedParameter,
                   },
                 });
-              });
 
-              if (ok && result) {
-                MdhPanel.render(this.extensionUri, tableRes.name, [result]);
+                log(`${prefix} sql:[${query}]`);
+                log(`${prefix} binds:${JSON.stringify(binds)}`);
 
-                const { query, binds } = toViewDataQuery({
-                  tableRes,
-                  schemaName,
-                  conditions: specfyCondition ? conditions : undefined,
-                  limit: this.numOfRows,
+                const r = await driver.requestSql({
+                  sql: query,
+                  conditions: {
+                    binds,
+                  },
                 });
-                await ViewConditionPanel.stateStorage.addSQLHistory({
-                  connectionName: conName,
-                  sqlDoc: query,
-                  variables: binds,
-                  meta: result.meta,
-                  summary: result.summary,
-                });
-                commands.executeCommand(REFRESH_SQL_HISTORIES);
-              } else {
-                window.showErrorMessage(message);
+                log(`${prefix} OK`);
+              } catch (e: any) {
+                errorMessage = e.message;
+                logError(`${prefix} NG:${e.message}`);
               }
+              progress.report({
+                message: `Updated [${i + 1}/${insertList.length}]`,
+                increment,
+              });
             }
-            this.dispose();
-            return;
-        }
-      },
-      undefined,
-      this._disposables
+
+            for (let i = 0; i < deleteList.length; i++) {
+              const prefix = `DELETE[${i + 1}/${deleteList.length}] `;
+              const { conditions } = deleteList[i];
+              try {
+                const { query, binds } = toDeleteStatement({
+                  tableName,
+                  columns: rdh.keys,
+                  conditions,
+                  bindOption: {
+                    specifyValuesWithBindParameters: true,
+                    toPositionedParameter,
+                  },
+                });
+                log(`${prefix} sql:[${query}]`);
+                log(`${prefix} binds:${JSON.stringify(binds)}`);
+
+                const r = await driver.requestSql({
+                  sql: query,
+                  conditions: {
+                    binds,
+                  },
+                });
+                log(`${prefix} OK`);
+              } catch (e: any) {
+                errorMessage = e.message;
+                logError(`${prefix} NG:${e.message}`);
+              }
+              progress.report({
+                message: `Deleted [${i + 1}/${insertList.length}]`,
+                increment,
+              });
+            }
+
+            progress.report({
+              increment: 100,
+            });
+            if (errorMessage) {
+              throw new Error(errorMessage);
+            }
+          }
+        );
+      }
     );
+    if (ok) {
+      window.showInformationMessage("OK");
+      this.dispose();
+    } else if (message) {
+      window.showErrorMessage(message);
+    }
   }
 }

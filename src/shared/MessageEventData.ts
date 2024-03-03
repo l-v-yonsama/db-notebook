@@ -1,7 +1,6 @@
 import type {
   ConnectionSetting,
   ContentTypeInfo,
-  CsvParseOptions,
   DBType,
   DbResource,
   DbSchema,
@@ -26,11 +25,11 @@ import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 import type { Har } from "har-format";
 
 export type MessageEventData =
-  | MdhPanelEventData
+  | MdhViewEventData
   | HttpEventPanelEventData
   | CsvParseSettingPanelEventData
   | HarFilePanelEventData
-  | DiffPanelEventData
+  | DiffMdhViewEventData
   | ScanPanelEventData
   | ViewConditionPanelEventData
   | VariablesPanelEventData
@@ -70,15 +69,20 @@ export type HarFileTabItem = {
   rdh: ResultSetData;
 };
 
-export type MdhPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item",
-  "MdhPanel",
+export type MdhViewEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "init",
+  "MdhView",
   {
     searchResult?: {
       tabId: string;
       value: ResultSetData[];
     };
     addTabItem?: RdhTabItem;
+    init?: {
+      tabItems: RdhTabItem[];
+      currentTabId?: string;
+      currentInnerIndex?: number;
+    };
   }
 >;
 
@@ -145,15 +149,20 @@ export type DiffTabItem = {
   list: DiffTabInnerItem[];
 };
 
-export type DiffPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item",
-  "DiffPanel",
+export type DiffMdhViewEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "init",
+  "DiffMdhView",
   {
     searchResult?: {
       tabId: string;
       value: DiffTabItem;
     };
     addTabItem?: DiffTabItem;
+    init?: {
+      tabItems: DiffTabItem[];
+      currentTabId?: string;
+      currentInnerIndex?: number;
+    };
   }
 >;
 
@@ -213,7 +222,7 @@ export type ScanPanelEventData = BaseMessageEventData<
 >;
 
 export type ViewConditionPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-preview-sql",
+  BaseMessageEventDataCommand | "set-preview-sql" | "set-rdh-for-update",
   "ViewConditionPanel",
   {
     initialize?: {
@@ -225,6 +234,7 @@ export type ViewConditionPanelEventData = BaseMessageEventData<
     setPreviewSql?: {
       previewSql: string;
     };
+    rdhForUpdate?: ResultSetData;
   }
 >;
 

@@ -1,6 +1,6 @@
 export type ComponentName =
-  | "MdhPanel"
-  | "DiffPanel"
+  | "MdhView"
+  | "DiffMdhView"
   | "ScanPanel"
   | "VariablesPanel"
   | "CsvParseSettingPanel"

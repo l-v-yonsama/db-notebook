@@ -1,5 +1,5 @@
-import { NotebookCell, NotebookCellKind, NotebookDocument, Uri, workspace } from "vscode";
-import { CellMeta } from "../types/Notebook";
+import { NotebookCell, NotebookCellKind, NotebookEditor, window } from "vscode";
+import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { RecordRule } from "../shared/RecordRule";
 import { readFileOnStorage } from "./fsUtil";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
@@ -18,7 +18,7 @@ export const isJsCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "javascript";
 };
 
-export const isSelectOrShowSqlCell = (cell: NotebookCell): boolean => {
+export const hasAnyRdhOutputCell = (cell: NotebookCell): boolean => {
   if (!isSqlCell(cell) || cell.outputs.length === 0) {
     return false;
   }
@@ -26,7 +26,10 @@ export const isSelectOrShowSqlCell = (cell: NotebookCell): boolean => {
   if (!meta) {
     return false;
   }
-  return meta.type === "select" || meta.type === "show";
+  if (meta.rdh === undefined && meta.explainRdh === undefined && meta.analyzedRdh === undefined) {
+    return false;
+  }
+  return true;
 };
 
 export const isJsonCell = (cell: NotebookCell): boolean => {
@@ -45,10 +48,10 @@ export const isPreExecution = (cell: NotebookCell): boolean => {
 };
 
 export const readRuleFile = async (
-  cell: NotebookCell,
+  metadata: CellMeta,
   rdh: ResultSetData
 ): Promise<RecordRule | undefined> => {
-  const { ruleFile }: CellMeta = cell.metadata;
+  const { ruleFile } = metadata;
   if (ruleFile) {
     const text = await readFileOnStorage(ruleFile);
     if (text) {
@@ -63,9 +66,9 @@ export const readRuleFile = async (
 };
 
 export const readCodeResolverFile = async (
-  cell: NotebookCell
+  metadata: CellMeta
 ): Promise<CodeResolverParams | undefined> => {
-  const { codeResolverFile }: CellMeta = cell.metadata;
+  const { codeResolverFile } = metadata;
   if (codeResolverFile) {
     const text = await readFileOnStorage(codeResolverFile);
     if (text) {
@@ -73,4 +76,12 @@ export const readCodeResolverFile = async (
     }
   }
   return undefined;
+};
+
+export const getToolbarButtonClickedNotebookEditor = (
+  e: NotebookToolbarClickEvent
+): NotebookEditor | undefined => {
+  return window.visibleNotebookEditors.find(
+    (it) => it.notebook.uri.toString() === e.notebookEditor.notebookUri.toString()
+  );
 };

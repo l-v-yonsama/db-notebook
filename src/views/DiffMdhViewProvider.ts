@@ -1,14 +1,11 @@
 import {
-  Disposable,
-  Webview,
-  WebviewPanel,
   window,
   Uri,
-  ViewColumn,
   ProgressLocation,
   commands,
   NotebookCellData,
   NotebookCellKind,
+  ExtensionContext,
 } from "vscode";
 import {
   DBDriverResolver,
@@ -34,79 +31,117 @@ import {
   CreateUndoChangeSqlActionCommand,
   OutputParams,
 } from "../shared/ActionParams";
-import { createWebviewContent } from "../utilities/webviewUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { log } from "../utilities/logger";
-import { DiffPanelEventData, DiffTabItem } from "../shared/MessageEventData";
-import { getIconPath } from "../utilities/fsUtil";
-import { CREATE_NEW_NOTEBOOK } from "../constant";
+import { DiffMdhViewEventData, DiffTabItem } from "../shared/MessageEventData";
+import { BOTTOM_DIFF_MDH_VIEWID, CREATE_NEW_NOTEBOOK } from "../constant";
+import { DiffMdhViewTabParam } from "../types/views";
+import { BaseViewProvider } from "./BaseViewProvider";
+import { ComponentName } from "../shared/ComponentName";
+import { waitUntil } from "../utilities/waitUntil";
 
-const PREFIX = "[DiffPanel]";
+const PREFIX = "[DiffMdhView]";
 
 dayjs.extend(utc);
 
-const componentName = "DiffPanel";
-
-export type DiffTabParam = {
-  title: string;
-  comparable: boolean;
-  undoable: boolean;
-  list1: ResultSetData[];
-  list2: ResultSetData[];
-};
-
-export class DiffPanel {
-  public static currentPanel: DiffPanel | undefined;
-  private static stateStorage?: StateStorage;
-  private readonly _panel: WebviewPanel;
-  private _disposables: Disposable[] = [];
+export class DiffMdhViewProvider extends BaseViewProvider {
+  private currentTabId?: string;
+  private currentInnerIndex?: number;
   private items: DiffTabItem[] = [];
 
-  private constructor(panel: WebviewPanel, extensionUri: Uri) {
-    this._panel = panel;
-
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(
-      this._panel.webview,
-      extensionUri,
-      componentName
-    );
-    this._setWebviewMessageListener(this._panel.webview);
+  constructor(
+    viewId: string,
+    context: ExtensionContext,
+    private readonly stateStorage: StateStorage
+  ) {
+    super(viewId, context);
   }
 
-  static setStateStorage(storage: StateStorage) {
-    DiffPanel.stateStorage = storage;
+  getComponentName(): ComponentName {
+    return "DiffMdhView";
   }
 
-  public static render(extensionUri: Uri, params: DiffTabParam) {
-    if (DiffPanel.currentPanel) {
-      // If the webview panel already exists reveal it
-      DiffPanel.currentPanel._panel.reveal(ViewColumn.One);
-    } else {
-      // If a webview panel does not already exist create and show a new one
-      const panel = window.createWebviewPanel(
-        // Panel view type
-        "DiffResultSetsType",
-        // Panel title
-        "Diff",
-        // The editor column the panel should be displayed in
-        ViewColumn.One,
-        // Extra panel configurations
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [
-            Uri.joinPath(extensionUri, "out"),
-            Uri.joinPath(extensionUri, "webview-ui/build"),
-          ],
-        }
-      );
-      panel.iconPath = getIconPath("git-compare.svg");
-      DiffPanel.currentPanel = new DiffPanel(panel, extensionUri);
+  async render(params: DiffMdhViewTabParam) {
+    if (this.webviewView === undefined) {
+      await commands.executeCommand("setContext", BOTTOM_DIFF_MDH_VIEWID + ".visible", true);
     }
-    //               vscode.window.activeColorTheme.kind===ColorThemeKind.Dark
-    DiffPanel.currentPanel.renderSub(params);
+
+    await commands.executeCommand(BOTTOM_DIFF_MDH_VIEWID + ".focus", { preserveFocus: true });
+
+    await waitUntil(() => this.webviewView !== undefined, 100);
+
+    this.renderSub(params);
+  }
+
+  protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
+    const { command, params } = message;
+
+    switch (command) {
+      case "closeTab":
+        {
+          const { tabId } = params;
+          const idx = this.items.findIndex((it) => it.tabId === tabId);
+          if (idx >= 0) {
+            this.items.splice(idx, 1);
+          }
+          if (this.items.length === 0) {
+            this.webviewView = undefined;
+            this.currentTabId = undefined;
+            this.currentInnerIndex = undefined;
+            await commands.executeCommand("setContext", BOTTOM_DIFF_MDH_VIEWID + ".visible", false);
+          }
+          // currentXXXの再設定はフロントから受けるselectTab,selectInnerTabのリクエストのタイミングで実施
+        }
+        break;
+      case "selectTab":
+        {
+          const { tabId } = params;
+          this.currentTabId = tabId;
+          this.currentInnerIndex = undefined;
+          hideStatusMessage();
+        }
+        break;
+      case "selectInnerTab":
+        {
+          const { tabId, innerIndex } = params;
+          const tabItem = this.getTabItemById(tabId);
+          if (!tabItem) {
+            return;
+          }
+          this.currentTabId = tabId;
+          this.currentInnerIndex = innerIndex;
+          showStatusMessage(tabItem.list[innerIndex].diffResult.message);
+        }
+        break;
+
+      case "compare":
+        this.compare(params);
+        return;
+      case "output":
+        this.output(params);
+        return;
+      case "createUndoChangeSql":
+        this.createUndoChangeSql(params);
+        return;
+    }
+  }
+
+  protected onDidChangeVisibility(visible: boolean): void {
+    if (visible === true && this.currentTabId) {
+      this.postMessage<DiffMdhViewEventData>({
+        command: "init",
+        componentName: "DiffMdhView",
+
+        value: {
+          init: {
+            tabItems: this.items,
+            currentTabId: this.currentTabId,
+            currentInnerIndex: this.currentInnerIndex,
+          },
+        },
+      });
+    }
   }
 
   private async createTabItem(
@@ -222,7 +257,7 @@ export class DiffPanel {
     return this.items.find((it) => it.tabId === tabId);
   }
 
-  async renderSub(params: DiffTabParam): Promise<DiffTabItem | undefined> {
+  private async renderSub(params: DiffMdhViewTabParam): Promise<DiffTabItem | undefined> {
     const { title, list1, comparable, undoable, list2 } = params;
     let item = this.getTabByTitle(title);
     if (item) {
@@ -231,9 +266,9 @@ export class DiffPanel {
       item.list = tmpItem.list;
       item.subTitle = tmpItem.subTitle;
 
-      const msg: DiffPanelEventData = {
+      const msg: DiffMdhViewEventData = {
         command: "set-search-result",
-        componentName: "DiffPanel",
+        componentName: "DiffMdhView",
         value: {
           searchResult: {
             tabId: item.tabId,
@@ -241,85 +276,24 @@ export class DiffPanel {
           },
         },
       };
-      this._panel.webview.postMessage(msg);
+      this.postMessage<DiffMdhViewEventData>(msg);
+      this.currentTabId = item.tabId;
       return item;
     }
 
     item = await this.createTabItem(title, comparable, undoable, list1, list2);
     this.items.push(item);
+    this.currentTabId = item.tabId;
 
-    const msg2: DiffPanelEventData = {
+    const msg2: DiffMdhViewEventData = {
       command: "add-tab-item",
-      componentName: "DiffPanel",
+      componentName: "DiffMdhView",
       value: {
         addTabItem: item,
       },
     };
-    this._panel.webview.postMessage(msg2);
+    this.postMessage<DiffMdhViewEventData>(msg2);
     return item;
-  }
-
-  public dispose() {
-    log(`${PREFIX} dispose`);
-    DiffPanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
-    }
-  }
-
-  private _setWebviewMessageListener(webview: Webview) {
-    webview.onDidReceiveMessage(
-      async (message: ActionCommand) => {
-        const { command, params } = message;
-
-        switch (command) {
-          case "closeTab":
-            {
-              const { tabId } = params;
-              const idx = this.items.findIndex((it) => it.tabId === tabId);
-              if (idx >= 0) {
-                this.items.splice(idx, 1);
-              }
-              if (this.items.length === 0) {
-                this.dispose();
-              }
-            }
-            break;
-          case "selectTab":
-            {
-              hideStatusMessage();
-            }
-            break;
-          case "selectInnerTab":
-            {
-              const { tabId, innerIndex } = params;
-              const tabItem = this.getTabItemById(tabId);
-              if (!tabItem) {
-                return;
-              }
-              showStatusMessage(tabItem.list[innerIndex].diffResult.message);
-            }
-            break;
-
-          case "compare":
-            this.compare(params);
-            return;
-          case "output":
-            this.output(params);
-            return;
-          case "createUndoChangeSql":
-            this.createUndoChangeSql(params);
-            return;
-        }
-      },
-      undefined,
-      this._disposables
-    );
   }
 
   private async createUndoChangeSql(params: CreateUndoChangeSqlActionCommand["params"]) {
@@ -360,7 +334,7 @@ export class DiffPanel {
 
     for (let i = 0; i < conNames.length; i++) {
       const conName = conNames[i];
-      const setting = await DiffPanel.stateStorage?.getConnectionSettingByName(conName);
+      const setting = await this.stateStorage?.getConnectionSettingByName(conName);
       if (!setting) {
         continue;
       }
@@ -460,7 +434,7 @@ export class DiffPanel {
       },
       async (progress, token) => {
         for (const conName of conNames) {
-          const setting = await DiffPanel.stateStorage?.getConnectionSettingByName(conName);
+          const setting = await this.stateStorage?.getConnectionSettingByName(conName);
           if (!setting) {
             continue;
           }
@@ -506,7 +480,7 @@ export class DiffPanel {
       }
     );
 
-    const diffParams: DiffTabParam = {
+    const diffParams: DiffMdhViewTabParam = {
       title: tabItem.title,
       comparable: tabItem.comparable,
       undoable: tabItem.undoable,

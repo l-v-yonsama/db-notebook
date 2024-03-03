@@ -2,11 +2,14 @@ import type { RdhMeta, RdhSummary } from "@l-v-yonsama/multi-platform-database-d
 
 export type SQLHistory = {
   id: string;
-  connectionName: string;
   sqlDoc: string;
   variables?: {
     [key: string]: any;
   };
   meta?: RdhMeta;
   summary?: RdhSummary;
+  // CellMeta
+  connectionName: string;
+  ruleFile?: string;
+  codeResolverFile?: string;
 };

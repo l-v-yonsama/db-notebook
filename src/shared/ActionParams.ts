@@ -25,8 +25,6 @@ export type SaveCsvOptionParams = CsvParseOptions & {
   preview: boolean;
 };
 
-export type SaveValuesParams = TabIdParam & SaveValuesInRdhParams;
-
 export type OutputParams = TabIdParam & {
   fileType: "excel" | "csv" | "markdown" | "text";
   outputWithType: "none" | "withComment" | "withType" | "both";
@@ -167,7 +165,7 @@ export type CreateRequestScriptActionCommand = BaseActionCommand<"createRequestS
 
 export type SaveValuesActionCommand = {
   command: "saveValues";
-  params: SaveValuesParams;
+  params: SaveValuesInRdhParams;
 };
 
 export type DeleteKeyActionCommand = {

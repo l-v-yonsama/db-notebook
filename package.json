@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -115,6 +115,18 @@
           "title": "DB Notebook",
           "icon": "media/dark/database.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "database-notebook-view-rdh",
+          "title": "ResultSets",
+          "icon": "media/dark/database.svg"
+        },
+        {
+          "id": "database-notebook-view-diff-rdh",
+          "title": "Diff in ResultSets",
+          "icon": "media/dark/database.svg"
+        }
       ]
     },
     "views": {
@@ -146,6 +158,24 @@
           "visibility": "collapsed",
           "icon": "media/logo.png",
           "contextualTitle": "Help"
+        }
+      ],
+      "database-notebook-view-rdh": [
+        {
+          "type": "webview",
+          "id": "database-notebook.view.bottom.mdh",
+          "name": "ResultSets",
+          "contextualTitle": "ResultSets",
+          "when": "database-notebook.view.bottom.mdh.visible"
+        }
+      ],
+      "database-notebook-view-diff-rdh": [
+        {
+          "type": "webview",
+          "id": "database-notebook.view.bottom.diff-mdh",
+          "name": "Diff in ResultSets",
+          "contextualTitle": "Diff in ResultSets",
+          "when": "database-notebook.view.bottom.diff-mdh.visible"
         }
       ]
     },
@@ -320,17 +350,17 @@
       ],
       "notebook/toolbar": [
         {
-          "command": "database-notebook.show-all-variables",
+          "command": "database-notebook.toolbar.show-all-variables",
           "group": "navigation/execute@1",
           "when": "notebookType == 'database-notebook-type' && visibleVariables"
         },
         {
-          "command": "database-notebook.show-all-rdh",
+          "command": "database-notebook.toolbar.show-all-rdh",
           "group": "navigation/execute@1",
           "when": "notebookType == 'database-notebook-type' && visibleRdh"
         },
         {
-          "command": "database-notebook.specify-connection-all",
+          "command": "database-notebook.toolbar.specify-connection-all",
           "group": "navigation/execute@1",
           "when": "notebookType == 'database-notebook-type' && hasSql"
         }
@@ -571,22 +601,17 @@
         "icon": "$(gear)"
       },
       {
-        "command": "database-notebook.show-rdh-diff",
-        "title": "Open Resultset Diff",
-        "icon": "$(git-compare)"
-      },
-      {
-        "command": "database-notebook.show-all-variables",
+        "command": "database-notebook.toolbar.show-all-variables",
         "title": "Open Variables",
         "icon": "$(symbol-variable)"
       },
       {
-        "command": "database-notebook.show-all-rdh",
+        "command": "database-notebook.toolbar.show-all-rdh",
         "title": "Open ResultSets",
         "icon": "$(table)"
       },
       {
-        "command": "database-notebook.specify-connection-all",
+        "command": "database-notebook.toolbar.specify-connection-all",
         "title": "Specify connection in all SQL Cells",
         "shortTitle": "Specify connection in all",
         "icon": "$(debug-disconnect)"
@@ -657,6 +682,16 @@
         "title": "Delete selected sql",
         "shortTitle": "Delete",
         "icon": "$(trash)"
+      },
+      {
+        "command": "database-notebook.open-mdh-viewer",
+        "title": "Open Resultset Data Holder",
+        "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.open-diff-mdh-viewer",
+        "title": "Open Resultset Diff",
+        "icon": "$(git-compare)"
       }
     ],
     "configuration": {
