@@ -1,4 +1,11 @@
-import { ExtensionContext, NotebookCellData, NotebookCellKind, commands, window } from "vscode";
+import {
+  ExtensionContext,
+  NotebookCellData,
+  NotebookCellKind,
+  ProgressLocation,
+  commands,
+  window,
+} from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
 
 import {
@@ -132,17 +139,43 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     log(`${PREFIX} query:` + query);
     log(`${PREFIX} binds:` + JSON.stringify(binds));
 
-    const { ok, message, result } = await resolver.workflow<RDSBaseDriver, ResultSetData>(
-      connectionSetting,
-      async (driver) => {
-        return await driver.requestSql({
-          sql: query,
-          conditions: {
-            binds,
-          },
+    const { ok, message, result } = await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        let driverForKill: RDSBaseDriver | undefined = undefined;
+
+        token.onCancellationRequested(() => {
+          driverForKill?.kill();
         });
+
+        progress.report({
+          message: `Execute query: ${query}`,
+          increment: 50,
+        });
+
+        const r = await resolver.workflow<RDSBaseDriver, ResultSetData>(
+          connectionSetting,
+          async (driver) => {
+            driverForKill = driver;
+            return await driver.requestSql({
+              sql: query,
+              conditions: {
+                binds,
+              },
+            });
+          }
+        );
+        progress.report({
+          message: `Completed.`,
+          increment: 50,
+        });
+        return r;
       }
     );
+
     if (ok && result) {
       const cell = createNotebookSqlCellByHistory(history);
 
