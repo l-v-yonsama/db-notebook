@@ -4,6 +4,7 @@ export type ComponentName =
   | "ScanPanel"
   | "VariablesPanel"
   | "CsvParseSettingPanel"
+  | "CreateInsertScriptSettingsPanel"
   | "HarFilePanel"
   | "HttpEventPanel"
   | "ViewConditionPanel"

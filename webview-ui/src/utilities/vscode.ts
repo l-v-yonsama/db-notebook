@@ -6,6 +6,7 @@ export * from "../../../src/shared/ModeType";
 export * from "../../../src/shared/RecordRule";
 export * from "../../../src/shared/CodeResolverParams";
 export * from "../../../src/shared/ViewConditionParams";
+export * from "../../../src/shared/CreateScriptConditionParams";
 export * from "../../../src/shared/SaveValuesInRdhParams";
 export * from "../../../src/shared/ComponentName";
 export * from "../../../src/shared/RunResultMetadata";

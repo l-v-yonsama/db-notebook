@@ -612,7 +612,7 @@ defineExpose({
                     <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
                       item.$ruleViolationMarks[key.name]
                     }}</span>
-                    <span>{{ item[key.name] }}</span>
+                    <span class="val">{{ item[key.name] }}</span>
                   </p>
                   <span
                     v-if="item.$resolvedLabels[key.name]"
@@ -774,6 +774,10 @@ td {
       text-overflow: ellipsis;
       white-space: nowrap;
       width: 100%;
+
+      & > span.val {
+        margin-right: 2px;
+      }
     }
 
     span.violation-mark {

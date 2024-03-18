@@ -5,12 +5,9 @@ import { ComponentName } from "../shared/ComponentName";
 import { ActionCommand } from "../shared/ActionParams";
 
 export abstract class BasePanel {
-  protected readonly panel: WebviewPanel;
   private _disposables: Disposable[] = [];
 
-  protected constructor(panel: WebviewPanel, protected extensionUri: Uri) {
-    this.panel = panel;
-
+  protected constructor(protected readonly panel: WebviewPanel, protected extensionUri: Uri) {
     this.panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this.panel.webview.html = createWebviewContent(
       this.panel.webview,

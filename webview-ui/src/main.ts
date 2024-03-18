@@ -7,6 +7,7 @@ import "splitpanes/dist/splitpanes.css";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowUp,
+  faBook,
   faCheck,
   faClipboard,
   faCirclePlay,
@@ -28,6 +29,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
 library.add(faArrowUp);
+library.add(faBook);
 library.add(faCheck);
 library.add(faClipboard);
 library.add(faCirclePlay);

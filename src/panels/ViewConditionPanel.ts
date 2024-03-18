@@ -27,7 +27,8 @@ export class ViewConditionPanel extends BasePanel {
   public static currentPanel: ViewConditionPanel | undefined;
   private static stateStorage?: StateStorage;
   private tableRes: DbTable | undefined;
-  private numOfRows: number = 0;
+  private numOfRows = 0;
+  private limit = 100;
   private isPositionedParameterAvailable: boolean | undefined;
   private rdhForUpdate?: ResultSetData;
 
@@ -64,7 +65,7 @@ export class ViewConditionPanel extends BasePanel {
       ViewConditionPanel.currentPanel = new ViewConditionPanel(panel, extensionUri);
     }
     ViewConditionPanel.currentPanel.tableRes = tableRes;
-    ViewConditionPanel.currentPanel.numOfRows = Math.min(1000, numOfRows);
+    ViewConditionPanel.currentPanel.numOfRows = Math.min(100000, numOfRows);
     ViewConditionPanel.currentPanel.renderSub();
   }
 
@@ -83,7 +84,7 @@ export class ViewConditionPanel extends BasePanel {
       value: {
         initialize: {
           tableRes: this.tableRes,
-          limit: this.numOfRows,
+          limit: this.limit,
           numOfRows: this.numOfRows,
           previewSql,
         },
@@ -120,7 +121,7 @@ export class ViewConditionPanel extends BasePanel {
         schemaName,
         toPositionedParameter: this.isPositionedParameterAvailable,
         conditions: specfyCondition ? conditions : undefined,
-        limit: this.numOfRows,
+        limit: this.limit,
       });
       return query + "";
     } catch (_) {
@@ -143,7 +144,7 @@ export class ViewConditionPanel extends BasePanel {
             params as ViewConditionParams;
 
           if (preview) {
-            this.numOfRows = limit;
+            this.limit = limit;
             const previewSql = await this.getPreviewSql(conditions, specfyCondition);
             // send to webview
             const msg: ViewConditionPanelEventData = {
@@ -179,7 +180,7 @@ export class ViewConditionPanel extends BasePanel {
               schemaName,
               toPositionedParameter: driver.isPositionedParameterAvailable(),
               conditions: specfyCondition ? conditions : undefined,
-              limit: this.numOfRows,
+              limit: this.limit,
             });
 
             log(`${PREFIX} query:[${query}]`);
@@ -203,7 +204,7 @@ export class ViewConditionPanel extends BasePanel {
               tableRes,
               schemaName,
               conditions: specfyCondition ? conditions : undefined,
-              limit: this.numOfRows,
+              limit: this.limit,
             });
             await ViewConditionPanel.stateStorage.addSQLHistory({
               connectionName: conName,

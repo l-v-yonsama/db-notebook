@@ -13,6 +13,7 @@ import {
   IamGroup,
   IamOrganization,
   IamRealm,
+  RdsDatabase,
   ResourceType,
   sleep,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -45,6 +46,11 @@ export class StateStorage {
       return this.resMap.get(connectionName)?.res;
     }
     return undefined;
+  }
+
+  getFirstRdsDatabaseByName(connectionName: string): RdsDatabase | undefined {
+    const dbs = this.getResourceByName(connectionName);
+    return dbs?.find((it) => it instanceof RdsDatabase) as RdsDatabase;
   }
 
   async loadResource(

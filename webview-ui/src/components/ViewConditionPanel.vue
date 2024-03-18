@@ -56,9 +56,9 @@ const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void
     return;
   }
 
-  limit.value = (v.limit ?? 0) + "";
+  limit.value = (v.limit ?? 100) + "";
   numOfRows.value = v.numOfRows;
-  limitMax = Math.min(100000, v.numOfRows);
+  limitMax = Math.max(100000, v.numOfRows);
   previewSql.value = v.previewSql;
   if (v.tableRes.comment) {
     tableNameWithComment.value = `${v.tableRes.name} (${v.tableRes.comment})`;
@@ -130,7 +130,7 @@ const ok = (editable: boolean, preview: boolean) => {
   const params: ViewConditionParams = {
     conditions: JSON.parse(JSON.stringify(editorItem.value.conditions)),
     specfyCondition: specifyCondition.value,
-    limit: limit.value === "" ? 0 : Number(limit.value),
+    limit: limit.value === "" ? 100 : Number(limit.value),
     editable,
     preview,
   };

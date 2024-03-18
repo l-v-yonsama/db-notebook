@@ -268,9 +268,13 @@ export class HttpEventPanel extends BasePanel {
               });
             }
           } else {
+            let lang = contentTypeInfo.shortLang ?? "text";
+            if (content.size > 100_000) {
+              lang = "text"; // Avoid too much time spent on decoration
+            }
             codeBlocks.res.contents = await createCodeHtmlString({
               code: content.text,
-              lang: contentTypeInfo.shortLang ?? "text",
+              lang,
             });
           }
         } else {
@@ -281,7 +285,7 @@ export class HttpEventPanel extends BasePanel {
         }
       }
 
-      this.loading(100);
+      await this.loading(100);
     }
 
     const msg: HttpEventPanelEventData = {
@@ -296,6 +300,6 @@ export class HttpEventPanel extends BasePanel {
       },
     };
 
-    setTimeout(() => this.panel.webview.postMessage(msg), 150);
+    setTimeout(() => this.panel.webview.postMessage(msg));
   }
 }

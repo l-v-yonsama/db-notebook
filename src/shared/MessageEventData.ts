@@ -27,6 +27,7 @@ import type { Har } from "har-format";
 export type MessageEventData =
   | MdhViewEventData
   | HttpEventPanelEventData
+  | CreateInsertScriptSettingsPanelEventData
   | CsvParseSettingPanelEventData
   | HarFilePanelEventData
   | DiffMdhViewEventData
@@ -101,6 +102,25 @@ export type HttpEventPanelEventCodeBlocks = {
     cookies?: ResultSetData;
   };
 };
+
+export type CreateInsertScriptSettingsPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-preview-sql",
+  "CreateInsertScriptSettingsPanel",
+  {
+    initialize?: {
+      tableRes: DbTable;
+      previewSql: string;
+      assignSchemaName?: boolean;
+      onlyNotNullColumns?: boolean;
+      withComments?: boolean;
+      compactSql?: boolean;
+      langType: "sql" | "javascript";
+    };
+    setPreviewSql?: {
+      previewSql: string;
+    };
+  }
+>;
 
 export type HttpEventPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand,

@@ -30,6 +30,8 @@ export const CREATE_ER_DIAGRAM = `${EXTENSION_NAME}.create-er-diagram`;
 export const CREATE_ER_DIAGRAM_WITH_SETTINGS = `${EXTENSION_NAME}.create-er-diagram-with-settings`;
 export const WRITE_ER_DIAGRAM_TO_CLIPBOARD = `${EXTENSION_NAME}.write-er-diagram-to-clipboard`;
 
+export const CREATE_INSERT_SCRIPT_WITH_SETTINGS = `${EXTENSION_NAME}.create-insert-script-with-settings`;
+
 //---------------------------------------------------
 // SQL HISTORIES TREE
 //---------------------------------------------------

@@ -35,11 +35,13 @@ import {
   SHOW_RESOURCE_PROPERTIES,
   SHOW_SCAN_PANEL,
   WRITE_ER_DIAGRAM_TO_CLIPBOARD,
+  CREATE_INSERT_SCRIPT_WITH_SETTINGS,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { ViewConditionPanel } from "../panels/ViewConditionPanel";
+import { CreateInsertScriptSettingsPanel } from "../panels/CreateInsertScriptSettingsPanel";
 
 type ResourceTreeParams = {
   context: ExtensionContext;
@@ -176,11 +178,8 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   commands.registerCommand(CREATE_ER_DIAGRAM_WITH_SETTINGS, async (tableRes: DbTable) => {
     try {
       const { conName, schemaName } = tableRes.meta;
-      const dbs = stateStorage.getResourceByName(conName);
-      let schema: DbSchema | undefined = undefined;
-      if (dbs && dbs[0] instanceof RdsDatabase) {
-        schema = (dbs[0] as RdsDatabase).getSchema({ name: schemaName });
-      }
+      const rdb = stateStorage.getFirstRdsDatabaseByName(conName);
+      const schema = rdb?.getSchema({ name: schemaName });
       let title = tableRes.comment ?? "";
       if (!title) {
         title = tableRes.name;
@@ -197,14 +196,30 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   commands.registerCommand(WRITE_ER_DIAGRAM_TO_CLIPBOARD, async (tableRes: DbTable) => {
     try {
       const { conName, schemaName } = tableRes.meta;
-      const dbs = stateStorage.getResourceByName(conName);
-      let schema: DbSchema | undefined = undefined;
-      if (dbs && dbs[0] instanceof RdsDatabase) {
-        schema = (dbs[0] as RdsDatabase).getSchema({ name: schemaName });
-      }
+      const rdb = stateStorage.getFirstRdsDatabaseByName(conName);
+      const schema = rdb?.getSchema({ name: schemaName });
       const params = createSimpleERDiagramParams(schema, tableRes);
       const content = createErDiagram(params);
       env.clipboard.writeText(content);
+    } catch (e: any) {
+      window.showErrorMessage(e.message);
+    }
+  });
+
+  // scripts
+  commands.registerCommand(CREATE_INSERT_SCRIPT_WITH_SETTINGS, async (tableRes: DbTable) => {
+    try {
+      const { conName, schemaName } = tableRes.meta;
+      const rdb = stateStorage.getFirstRdsDatabaseByName(conName);
+      const schema = rdb?.getSchema({ name: schemaName });
+      if (!schema) {
+        return;
+      }
+      let title = tableRes.comment ?? "";
+      if (!title) {
+        title = tableRes.name;
+      }
+      CreateInsertScriptSettingsPanel.render(context.extensionUri, schema.name, tableRes);
     } catch (e: any) {
       window.showErrorMessage(e.message);
     }

@@ -5,6 +5,7 @@ import { ref, onMounted } from "vue";
 
 import MdhView from "./components/MdhView.vue";
 import HttpEventPanel from "./components/HttpEventPanel.vue";
+import CreateInsertScriptSettingsPanel from "./components/CreateInsertScriptSettingsPanel.vue";
 import CsvParseSettingPanel from "./components/CsvParseSettingPanel.vue";
 import HarFilePanel from "./components/HarFilePanel.vue";
 import DBFormView from "./components/DBFormView.vue";
@@ -24,6 +25,8 @@ import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
 const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
 const MdhViewRef = ref<InstanceType<typeof MdhView>>();
 const csvParseSettingPanelRef = ref<InstanceType<typeof CsvParseSettingPanel>>();
+const createInsertScriptSettingsPanelRef =
+  ref<InstanceType<typeof CreateInsertScriptSettingsPanel>>();
 const httpEventPanelRef = ref<InstanceType<typeof HttpEventPanel>>();
 const harFilePanelRef = ref<InstanceType<typeof HarFilePanel>>();
 const diffMdhViewRef = ref<InstanceType<typeof DiffMdhView>>();
@@ -51,6 +54,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "MdhView":
       MdhViewRef.value?.recieveMessage(data);
+      break;
+    case "CreateInsertScriptSettingsPanel":
+      createInsertScriptSettingsPanelRef.value?.recieveMessage(data);
       break;
     case "CsvParseSettingPanel":
       csvParseSettingPanelRef.value?.recieveMessage(data);
@@ -107,6 +113,11 @@ onMounted(() => {
     <MdhView v-if="currentComponentName === 'MdhView'" ref="MdhViewRef" />
 
     <HttpEventPanel v-if="currentComponentName === 'HttpEventPanel'" ref="httpEventPanelRef" />
+
+    <CreateInsertScriptSettingsPanel
+      v-if="currentComponentName === 'CreateInsertScriptSettingsPanel'"
+      ref="createInsertScriptSettingsPanelRef"
+    />
 
     <CsvParseSettingPanel
       v-if="currentComponentName === 'CsvParseSettingPanel'"

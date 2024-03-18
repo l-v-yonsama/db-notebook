@@ -15,7 +15,6 @@ import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
-import { createWebviewContent } from "../utilities/webviewUtil";
 import { ERDiagramSettingParams } from "../shared/ERDiagram";
 import { createERDiagramParams, createErDiagram } from "../utilities/erDiagramGenerator";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
@@ -24,30 +23,19 @@ import {
   ERDiagramSettingsInputParams,
   ERDiagramSettingsPanelEventData,
 } from "../shared/MessageEventData";
+import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[ERDiagramSettingsPanel]";
 
 dayjs.extend(utc);
 
-const componentName: ComponentName = "ERDiagramSettingsPanel";
-
-export class ERDiagramSettingsPanel {
+export class ERDiagramSettingsPanel extends BasePanel {
   public static currentPanel: ERDiagramSettingsPanel | undefined;
   private static stateStorage?: StateStorage;
-  private readonly _panel: WebviewPanel;
-  private _disposables: Disposable[] = [];
   private variables: ERDiagramSettingsInputParams | undefined;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
-    this._panel = panel;
-
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(
-      this._panel.webview,
-      extensionUri,
-      componentName
-    );
-    this._setWebviewMessageListener(this._panel.webview);
+    super(panel, extensionUri);
   }
 
   public static revive(panel: WebviewPanel, extensionUri: Uri) {
@@ -58,10 +46,14 @@ export class ERDiagramSettingsPanel {
     ERDiagramSettingsPanel.stateStorage = storage;
   }
 
+  getComponentName(): ComponentName {
+    return "ERDiagramSettingsPanel";
+  }
+
   public static render(extensionUri: Uri, params: ERDiagramSettingsInputParams) {
     log(`${PREFIX} render`);
     if (ERDiagramSettingsPanel.currentPanel) {
-      ERDiagramSettingsPanel.currentPanel._panel.reveal(ViewColumn.Two);
+      ERDiagramSettingsPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.Two);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
@@ -97,46 +89,28 @@ export class ERDiagramSettingsPanel {
       },
     };
 
-    this._panel.webview.postMessage(msg);
+    this.getWebviewPanel().webview.postMessage(msg);
   }
 
-  /**
-   * Cleans up and disposes of webview resources when the webview panel is closed.
-   */
-  public dispose() {
-    log(`${PREFIX} dispose`);
+  protected preDispose(): void {
     ERDiagramSettingsPanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
-    }
   }
 
-  private _setWebviewMessageListener(webview: Webview) {
-    webview.onDidReceiveMessage(
-      async (message: ActionCommand) => {
-        const { command, params } = message;
-        // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
-        switch (command) {
-          case "cancel":
-            this.dispose();
-            return;
-          case "writeToClipboard":
-            this.writeToClipboard(params);
-            return;
-          case "createERDiagram":
-            this.createERDiagram(params);
-            this.dispose();
-            return;
-        }
-      },
-      undefined,
-      this._disposables
-    );
+  protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
+    const { command, params } = message;
+    // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
+    switch (command) {
+      case "cancel":
+        this.dispose();
+        return;
+      case "writeToClipboard":
+        this.writeToClipboard(params);
+        return;
+      case "createERDiagram":
+        this.createERDiagram(params);
+        this.dispose();
+        return;
+    }
   }
 
   private async writeToClipboard(params: WriteToClipboardParams<ERDiagramSettingParams>) {

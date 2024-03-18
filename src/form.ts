@@ -117,7 +117,6 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
   setForm(mode: ModeType, res?: DbResource) {
     // log(`${PREFIX} setForm mode:[${mode}]`);
     if (!this.webviewView) {
-      vscode.window.showInformationMessage("Expand 'Resource properties' view", "OK");
       this.cacheForm = {
         mode,
         res,

@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -247,6 +247,11 @@
           "group": "inline"
         },
         {
+          "command": "database-notebook.create-insert-script-with-settings",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "script@6"
+        },
+        {
           "command": "database-notebook.retrieve-table-records",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "db-resourc@2"
@@ -259,7 +264,7 @@
         {
           "command": "database-notebook.create-blank-record-rule",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
-          "group": "record-rule@6"
+          "group": "z-record-rule@8"
         },
         {
           "command": "database-notebook.show-scan-panel",
@@ -463,6 +468,15 @@
           "light": "media/light/git-pull-request.svg"
         },
         "category": "er-diagram"
+      },
+      {
+        "command": "database-notebook.create-insert-script-with-settings",
+        "title": "Create Insert script with settings",
+        "icon": {
+          "dark": "media/dark/git-pull-request.svg",
+          "light": "media/light/git-pull-request.svg"
+        },
+        "category": "create-script"
       },
       {
         "command": "database-notebook.create-connection-setting",
@@ -749,7 +763,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.243",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-0.1.244.tgz",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",
