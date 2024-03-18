@@ -7,6 +7,7 @@ import {
   NotebookCellKind,
   commands,
   env,
+  workspace,
 } from "vscode";
 import { ActionCommand, WriteHttpEventToClipboardParams } from "../shared/ActionParams";
 import { log } from "../utilities/logger";
@@ -56,7 +57,33 @@ export class HttpEventPanel extends BasePanel {
       case "createRequestScript":
         this.createRequestScript();
         break;
+      case "openInEditor":
+        this.openInEditor();
+        break;
     }
+  }
+
+  private async openInEditor() {
+    if (!this.item) {
+      return;
+    }
+
+    const { request, response } = this.item.entry;
+    const contentTypeInfo = parseContentType({
+      contentType: response?.content?.mimeType,
+      fileName: getPathFromUrl(request?.url),
+    });
+
+    if (!contentTypeInfo.isTextValue) {
+      return;
+    }
+
+    const textDoc = await workspace.openTextDocument({
+      language: contentTypeInfo.shortLang,
+      content: response.content.text,
+    });
+
+    window.showTextDocument(textDoc);
   }
 
   private async createRequestScript() {

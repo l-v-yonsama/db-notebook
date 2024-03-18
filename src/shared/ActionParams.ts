@@ -46,6 +46,7 @@ export type ActionCommand =
   | WriteHttpEventToClipboardActionCommand
   | DescribeActionCommand
   | OpenScanPanelActionCommand
+  | OpenInEditorActionCommand
   | CloseScanPanelActionCommand
   | SearchScanPanelActionCommand
   | RefreshPanelActionCommand
@@ -221,6 +222,11 @@ export type OpenScanPanelParams = {
 export type OpenScanPanelActionCommand = {
   command: "openScanPanel";
   params: OpenScanPanelParams;
+};
+
+export type OpenInEditorActionCommand = {
+  command: "openInEditor";
+  params: {};
 };
 
 export type CloseScanPanelActionCommand = {

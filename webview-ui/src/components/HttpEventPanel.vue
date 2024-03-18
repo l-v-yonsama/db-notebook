@@ -28,6 +28,7 @@ const isLoading = ref(true);
 const loadingRate = ref(0);
 const noRequest = ref(true);
 const saveButtonEnabled = ref(false);
+const openInEditorEnabled = ref(false);
 
 const displayReqItems = [
   { label: "Request", value: "req" },
@@ -133,6 +134,12 @@ const initialize = (params: HttpEventPanelEventData["value"]["initialize"]) => {
       previewContentTypeInfo.renderType !== "Unknown" &&
       (resContent?.text ?? "").length > 0;
 
+    openInEditorEnabled.value =
+      previewContentTypeInfo !== undefined &&
+      previewContentTypeInfo.isTextValue &&
+      previewContentTypeInfo.renderType !== "Unknown" &&
+      (resContent?.text ?? "").length > 0;
+
     let noRequestVal = true;
     if (params.value.entry.request) {
       const method = params.value.entry.request.method.toLocaleLowerCase() ?? "";
@@ -212,6 +219,13 @@ const selectedMoreOptions = (params: WriteHttpEventToClipboardParams): void => {
     params: {
       ...params,
     },
+  });
+};
+
+const openInEditor = (): void => {
+  vscode.postCommand({
+    command: "openInEditor",
+    params: {},
   });
 };
 
@@ -300,6 +314,9 @@ defineExpose({
       />
       <button :disabled="!saveButtonEnabled" @click="downloadBase64File()" title="Save as a file">
         <fa icon="save" />
+      </button>
+      <button :disabled="!openInEditorEnabled" @click="openInEditor()" title="Open in a editor">
+        <fa icon="pencil" />
       </button>
     </div>
 
