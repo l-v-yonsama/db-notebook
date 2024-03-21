@@ -181,7 +181,7 @@ const save = () => {
                 legend="Compare keys"
                 :items="compareKeyCheckboxItems"
                 v-model="compareKeyCheckboxSelected"
-              ></VsCodeCheckboxGroup>
+              />
             </td>
             <td>
               <VsCodeButton @click="cancelEdit(item)" appearance="secondary" title="Cancel"

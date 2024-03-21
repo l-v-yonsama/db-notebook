@@ -315,7 +315,12 @@ defineExpose({
       <button :disabled="!saveButtonEnabled" @click="downloadBase64File()" title="Save as a file">
         <fa icon="save" />
       </button>
-      <button :disabled="!openInEditorEnabled" @click="openInEditor()" title="Open in a editor">
+      <button
+        v-if="displayReqSwitch === 'res'"
+        :disabled="!openInEditorEnabled"
+        @click="openInEditor()"
+        title="Open in a editor"
+      >
         <fa icon="pencil" />
       </button>
     </div>

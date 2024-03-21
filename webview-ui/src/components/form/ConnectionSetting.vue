@@ -336,7 +336,7 @@ defineExpose({
       id="awsCredentialType"
       v-model="awsCredentialType"
       :items="supplyCredentialItems"
-    ></VsCodeRadioGroupVue>
+    />
 
     <label v-show="elmSettings.getProfile().visible" for="profile">Profile name</label>
     <p v-if="isShowMode && elmSettings.getProfile().visible" id="profile">{{ awsProfile }}</p>
@@ -423,14 +423,14 @@ defineExpose({
       legend="Services"
       :items="awsServiceItems"
       v-model="awsServiceSelected"
-    ></VsCodeCheckboxGroup>
+    />
 
     <VsCodeCheckboxGroup
       v-show="elmSettings.getIamRetrieveResources().visible"
       legend="Retrieve resources on connection"
       :items="resourceTypeItemsForIam"
       v-model="resourceTypeSelectedForIam"
-    ></VsCodeCheckboxGroup>
+    />
 
     <div v-if="!isShowMode" class="commands">
       <VsCodeButton @click="test" :disabled="!acceptValues || isInProgress"
