@@ -26,6 +26,8 @@ export abstract class BaseElementSetting {
   abstract getAwsCredentialType(): ElementSetting;
 
   abstract accept(setting: ConnectionSetting): boolean;
+
+  abstract getSsl(): ElementSetting;
 }
 export type ElementSetting<T extends string | number = string> = {
   visible: boolean;

@@ -68,6 +68,9 @@ export class KeycloakElementSetting extends BaseElementSetting {
   getAwsCredentialType(): ElementSetting {
     return { visible: false };
   }
+  getSsl(): ElementSetting {
+    return { visible: false };
+  }
 
   accept(setting: ConnectionSetting): boolean {
     const { name, database, user, password, url, iamSolution } = setting;

@@ -66,6 +66,9 @@ export class AwsElementSetting extends BaseElementSetting {
   getAwsCredentialType(): ElementSetting {
     return { visible: true };
   }
+  getSsl(): ElementSetting {
+    return { visible: false };
+  }
 
   accept(setting: ConnectionSetting): boolean {
     const { name, awsSetting, user, password } = setting;

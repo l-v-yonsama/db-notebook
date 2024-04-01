@@ -9,6 +9,7 @@ import * as DBTypeConst from "@/types/lib/DBType";
 import * as AwsRegionConst from "@/types/lib/AwsRegion";
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
 import { AwsServiceType, AwsServiceTypeValues } from "@/types/lib/AwsServiceType";
+import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
 
 import type {
   ResourceType,
@@ -21,6 +22,8 @@ import { vscode } from "@/utilities/vscode";
 import type { ModeType } from "@/utilities/vscode";
 import type { DropdownItem } from "@/types/Components";
 import { ElementSettingFactory } from "./factories/ElementSettingFactory";
+
+provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const supplyCredentialItems: DropdownItem[] = [
   {
@@ -99,6 +102,9 @@ const props = withDefaults(defineProps<Props>(), {
       clientId: "",
       grantType: "password",
     },
+    ssl: {
+      use: false,
+    },
   }),
   prohibitedNames: () => [],
 });
@@ -145,6 +151,8 @@ if (props.item.iamSolution?.retrieveGroupOrOrgResOnConnection) {
 const clientId = ref(props.item.iamSolution?.clientId ?? "");
 const clientSecret = ref(props.item.iamSolution?.clientSecret ?? "");
 
+const useSsl = ref(props.item.ssl?.use ?? false);
+
 const elmSettings = computed(() => {
   const it = ElementSettingFactory.create({
     dbType: dbType.value,
@@ -159,6 +167,13 @@ const urlNote = computed((): string => {
   }
   return "";
 });
+
+const handleUseSsl = (e: any) => {
+  if (!e.target) {
+    return;
+  }
+  useSsl.value = e.target["checked"] === true;
+};
 
 function createItem(): ConnectionSetting {
   let awsSetting: AwsSetting | undefined = undefined;
@@ -200,8 +215,16 @@ function createItem(): ConnectionSetting {
     awsSetting,
     iamSolution,
   };
+
+  if (useSsl.value) {
+    a["ssl"] = {
+      use: true,
+    };
+  }
+
   return a;
 }
+
 function save() {
   vscode.postCommand({
     command: "saveConnectionSetting",
@@ -232,6 +255,7 @@ function setDefault() {
   clientSecret.value = elmSettings.value.getIamClientSecret().defaultValue ?? "";
   database.value = elmSettings.value.getDatabase().defaultValue ?? "";
   port.value = elmSettings.value.getPort().defaultValue ?? 0;
+  useSsl.value = false;
 }
 
 const stopProgress = () => {
@@ -431,6 +455,17 @@ defineExpose({
       :items="resourceTypeItemsForIam"
       v-model="resourceTypeSelectedForIam"
     />
+
+    <label v-show="elmSettings.getSsl().visible" for="useSsl">SSL(Optional)</label>
+    <p v-if="isShowMode && elmSettings.getSsl().visible" id="useSsl">{{ useSsl }}</p>
+    <vscode-checkbox
+      id="useSsl"
+      v-if="!isShowMode && elmSettings.getSsl().visible"
+      :checked="useSsl"
+      @change="($e:InputEvent) => handleUseSsl($e)"
+      style="margin-right: auto"
+      >Use SSL(sslmode=no-verify)</vscode-checkbox
+    >
 
     <div v-if="!isShowMode" class="commands">
       <VsCodeButton @click="test" :disabled="!acceptValues || isInProgress"

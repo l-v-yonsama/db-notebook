@@ -79,6 +79,9 @@ export class MysqlElementSetting extends RdsElementSetting {
       defaultValue: 3306,
     };
   }
+  getSsl(): ElementSetting {
+    return { visible: false };
+  }
 }
 
 export class PostgresElementSetting extends RdsElementSetting {
@@ -95,6 +98,13 @@ export class PostgresElementSetting extends RdsElementSetting {
     return {
       visible: true,
       defaultValue: 5432,
+    };
+  }
+  getSsl(): ElementSetting {
+    return {
+      visible: true,
+      placeholder: "SSL",
+      label: "SSL",
     };
   }
 }

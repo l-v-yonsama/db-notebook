@@ -69,6 +69,9 @@ export class Auth0ElementSetting extends BaseElementSetting {
   getAwsCredentialType(): ElementSetting {
     return { visible: false };
   }
+  getSsl(): ElementSetting {
+    return { visible: false };
+  }
 
   accept(setting: ConnectionSetting): boolean {
     const { name, host, iamSolution } = setting;

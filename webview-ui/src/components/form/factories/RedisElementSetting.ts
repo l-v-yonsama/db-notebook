@@ -57,6 +57,9 @@ export class RedisElementSetting extends BaseElementSetting {
   getAwsCredentialType(): ElementSetting {
     return { visible: false };
   }
+  getSsl(): ElementSetting {
+    return { visible: false };
+  }
 
   accept(setting: ConnectionSetting): boolean {
     const { name, database } = setting;
