@@ -10,6 +10,8 @@ import CsvParseSettingPanel from "./components/CsvParseSettingPanel.vue";
 import HarFilePanel from "./components/HarFilePanel.vue";
 import DBFormView from "./components/DBFormView.vue";
 import DiffMdhView from "./components/DiffMdhView.vue";
+import CountRecordView from "./components/CountRecordView.vue";
+
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ViewConditionPanel from "./components/ViewConditionPanel.vue";
@@ -24,6 +26,8 @@ import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
 
 const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
 const MdhViewRef = ref<InstanceType<typeof MdhView>>();
+const countRecordViewRef = ref<InstanceType<typeof CountRecordView>>();
+
 const csvParseSettingPanelRef = ref<InstanceType<typeof CsvParseSettingPanel>>();
 const createInsertScriptSettingsPanelRef =
   ref<InstanceType<typeof CreateInsertScriptSettingsPanel>>();
@@ -54,6 +58,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "MdhView":
       MdhViewRef.value?.recieveMessage(data);
+      break;
+    case "CountRecordView":
+      countRecordViewRef.value?.recieveMessage(data);
       break;
     case "CreateInsertScriptSettingsPanel":
       createInsertScriptSettingsPanelRef.value?.recieveMessage(data);
@@ -91,6 +98,7 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     case "ERDiagramSettingsPanel":
       eRDiagramSettingsPanelRef.value?.recieveMessage(data);
       break;
+
     case "RecordRuleEditor":
       recordRuleEditorRef.value?.recieveMessage(data);
       break;
@@ -151,6 +159,8 @@ onMounted(() => {
       v-if="currentComponentName === 'ERDiagramSettingsPanel'"
       ref="eRDiagramSettingsPanelRef"
     />
+
+    <CountRecordView v-if="currentComponentName === 'CountRecordView'" ref="countRecordViewRef" />
 
     <NotebookCellMetadataPanel
       v-if="currentComponentName === 'NotebookCellMetadataPanel'"

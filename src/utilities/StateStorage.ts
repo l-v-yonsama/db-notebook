@@ -112,6 +112,9 @@ export class StateStorage {
         };
         // for rds
         dbRes.findChildren<DbSchema>({ resourceType: ResourceType.Schema }).forEach((schemaRes) => {
+          schemaRes.meta = {
+            conName: conRes.name,
+          };
           schemaRes.children.forEach((tableRes) => {
             tableRes.meta = {
               conName: conRes.name,

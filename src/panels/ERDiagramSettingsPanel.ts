@@ -1,6 +1,4 @@
 import {
-  Disposable,
-  Webview,
   WebviewPanel,
   window,
   Uri,

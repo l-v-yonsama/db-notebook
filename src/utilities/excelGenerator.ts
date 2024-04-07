@@ -3,6 +3,7 @@ import * as os from "os";
 import { EnumValues } from "enum-values";
 import {
   AnnotationType,
+  ChangeInNumbersAnnotation,
   CodeResolvedAnnotation,
   DiffResult,
   FileAnnotation,
@@ -243,9 +244,9 @@ function createQueryResultSheet(
   setTableHeaderCell(cell);
 
   rdh.keys.forEach((column: RdhKey, idx: number) => {
-    const cell_phy = sheet.getCell(baseRowNo + plusNo, idx + 3);
-    cell_phy.value = column.name;
-    setTableHeaderCell(cell_phy);
+    const cellPhy = sheet.getCell(baseRowNo + plusNo, idx + 3);
+    cellPhy.value = column.name;
+    setTableHeaderCell(cellPhy);
 
     if (outputWithType === "both" || outputWithType === "withComment") {
       const cellLog = sheet.getCell(baseRowNo + plusNo + 1, idx + 3);
@@ -324,6 +325,17 @@ function createQueryResultSheet(
               "Cod"
             )?.values?.label;
           }
+          // ChangeInNumbersAnnotation
+          const cinAnnotation = RowHelper.getFirstAnnotationOf<ChangeInNumbersAnnotation>(
+            rdhRow,
+            column.name,
+            "Cin"
+          );
+          if (cinAnnotation && cinAnnotation.values?.value) {
+            resolvedLabel =
+              (cinAnnotation.values?.value >= 0 ? " +" : " ") + cinAnnotation.values?.value;
+          }
+
           setAnyValueByIndex(cell, v, { isHyperText, format, ruleMarker, resolvedLabel });
         }
       });
@@ -692,9 +704,9 @@ async function createBookFromDiffList(
         setTableHeaderCell(cell);
 
         rdh.keys.forEach((column: RdhKey, idx: number) => {
-          const cell_phy = sheet.getCell(startIndex, idx + 2);
-          cell_phy.value = column.name;
-          setTableHeaderCell(cell_phy);
+          const cellPhy = sheet.getCell(startIndex, idx + 2);
+          cellPhy.value = column.name;
+          setTableHeaderCell(cellPhy);
 
           if (
             options?.rdh?.outputWithType === "both" ||
@@ -1138,7 +1150,7 @@ function setAnyValueByIndex(
       | "justify"
       | "centerContinuous"
       | "distributed";
-    font_size?: number;
+    fontSize?: number;
     format?: CellFormat;
   }
 ) {
@@ -1160,9 +1172,9 @@ function setAnyValueByIndex(
         cell.alignment.horizontal = options.horizontal;
       }
     }
-    if (options.font_size) {
+    if (options.fontSize) {
       cell.font = {
-        size: options.font_size,
+        size: options.fontSize,
       };
     }
     let useFormat = !!options.format;
@@ -1257,7 +1269,7 @@ function setAnyValue(
       | "justify"
       | "centerContinuous"
       | "distributed";
-    font_size?: number;
+    fontSize?: number;
     format?: CellFormat;
   }
 ) {

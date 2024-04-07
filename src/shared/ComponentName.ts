@@ -1,4 +1,5 @@
 export type ComponentName =
+  | "CountRecordView"
   | "MdhView"
   | "DiffMdhView"
   | "ScanPanel"

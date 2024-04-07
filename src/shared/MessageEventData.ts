@@ -26,6 +26,7 @@ import type { Har } from "har-format";
 
 export type MessageEventData =
   | MdhViewEventData
+  | CountRecordViewEventData
   | HttpEventPanelEventData
   | CreateInsertScriptSettingsPanelEventData
   | CsvParseSettingPanelEventData
@@ -325,6 +326,19 @@ export type ERDiagramSettingsPanelEventData = BaseMessageEventData<
   {
     initialize?: {
       params: ERDiagramSettingsInputParams;
+    };
+  }
+>;
+
+export type CountRecordViewEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "refresh",
+  "CountRecordView",
+  {
+    refresh: {
+      schemaRes: DbSchema;
+      selectedTableNames: string[];
+      mode: "setting" | "running" | "show";
+      rdh?: ResultSetData;
     };
   }
 >;

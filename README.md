@@ -18,6 +18,7 @@ It also provides a CSV and Har file preview feature.
 - SQL history management
 - Variable sharing between notebook cells
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
+- Count the number of all tables belonging to the schema
 - Provide IntelliSense using DB resource names and comments
 - Convenient visualization of result sets
   - Difference display using comparison key (Primary or Unique key)
@@ -58,6 +59,10 @@ It also provides a CSV and Har file preview feature.
 - Format SQL statement
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/12_format.gif)
+
+- Count the number of all tables belonging to the schema
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/15_count_for_all_tables.gif)
 
 <details>
 

@@ -36,6 +36,8 @@ import {
   SHOW_SCAN_PANEL,
   WRITE_ER_DIAGRAM_TO_CLIPBOARD,
   CREATE_INSERT_SCRIPT_WITH_SETTINGS,
+  COUNT_FOR_ALL_TABLES,
+  OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
@@ -113,6 +115,12 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   });
 
   context.subscriptions.push(
+    commands.registerCommand(COUNT_FOR_ALL_TABLES, async (schemaRes: DbSchema) => {
+      commands.executeCommand(OPEN_COUNT_FOR_ALL_TABLES_VIEWER, schemaRes);
+    })
+  );
+
+  context.subscriptions.push(
     commands.registerCommand(RETRIEVE_TABLE_RECORDS, async (tableRes: DbTable) => {
       const { conName, schemaName } = tableRes.meta;
       const setting = await stateStorage.getConnectionSettingByName(conName);
@@ -126,7 +134,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
         }
       );
 
-      if (ok) {
+      if (ok && result !== undefined) {
         ViewConditionPanel.render(context.extensionUri, tableRes, result);
       } else {
         window.showErrorMessage(message);

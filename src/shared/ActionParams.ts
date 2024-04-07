@@ -60,6 +60,7 @@ export type ActionCommand =
   | DeleteKeyActionCommand
   | UpdateTextDocumentActionCommand
   | UpdateCodeResolverTextDocumentActionCommand
+  | CountAllTablesActionCommand
   | OkActionCommand;
 
 export type NameWithComment = {
@@ -105,6 +106,13 @@ export type UpdateTextDocumentActionCommand = BaseActionCommand<
       detail?: any;
     };
     scrollPos: number;
+  }
+>;
+
+export type CountAllTablesActionCommand = BaseActionCommand<
+  "countAllTables",
+  {
+    selectedTableNames: string[];
   }
 >;
 

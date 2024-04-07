@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -126,6 +126,11 @@
           "id": "database-notebook-view-diff-rdh",
           "title": "Diff in ResultSets",
           "icon": "media/dark/database.svg"
+        },
+        {
+          "id": "database-notebook-view-count-for-all-tables",
+          "title": "Count for all tables",
+          "icon": "media/dark/symbol-numeric.svg"
         }
       ]
     },
@@ -177,6 +182,15 @@
           "contextualTitle": "Diff in ResultSets",
           "when": "database-notebook.view.bottom.diff-mdh.visible"
         }
+      ],
+      "database-notebook-view-count-for-all-tables": [
+        {
+          "type": "webview",
+          "id": "database-notebook.view.bottom.count-for-all-tables",
+          "name": "Count for all tables",
+          "contextualTitle": "Count for all tables",
+          "when": "database-notebook.view.bottom.count-for-all-tables.visible"
+        }
       ]
     },
     "menus": {
@@ -220,6 +234,16 @@
           "command": "database-notebook.delete-connection-setting",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.count-for-all-tables",
+          "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.count-for-all-tables",
+          "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
+          "group": "db-resourc@2"
         },
         {
           "command": "database-notebook.create-er-diagram",
@@ -568,6 +592,12 @@
         }
       },
       {
+        "command": "database-notebook.count-for-all-tables",
+        "title": "Count Table Records",
+        "shortTitle": "Count",
+        "icon": "$(list-ordered)"
+      },
+      {
         "command": "database-notebook.retrieve-table-records",
         "title": "Retrieve Table Records",
         "shortTitle": "Retrieve",
@@ -763,7 +793,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.246",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.1.248",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

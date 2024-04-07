@@ -36,6 +36,7 @@ import type {
   CompareKey,
   FileAnnotation,
   GeneralColumnType,
+  ChangeInNumbersAnnotation,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
@@ -62,6 +63,9 @@ type RowValues = {
   };
   $resolvedLabels: {
     [key: string]: CodeResolvedAnnotation["values"];
+  };
+  $changeInNumbers: {
+    [key: string]: ChangeInNumbersAnnotation["values"];
   };
   $beforeKeyValues?: {
     [key: string]: any;
@@ -183,6 +187,7 @@ const list = ref(
       const item: RowValues = {
         $meta: row.meta,
         $resolvedLabels: {},
+        $changeInNumbers: {},
         $ruleViolationMarks: {},
         $fileValues: {},
       };
@@ -220,6 +225,14 @@ const list = ref(
             }
           }
         }
+        // change in numbers
+        const cinAnnonation = meta[k.name]?.find(
+          (it) => it.type === "Cin"
+        ) as ChangeInNumbersAnnotation;
+        if (cinAnnonation) {
+          item.$changeInNumbers[k.name] = cinAnnonation.values;
+        }
+
         // file
         const fileAnnonation = meta[k.name]?.find((it) => it.type === "Fil") as FileAnnotation;
         if (fileAnnonation) {
@@ -235,6 +248,7 @@ const addRow = (): void => {
     editType: "ins",
     $meta: {},
     $resolvedLabels: {},
+    $changeInNumbers: {},
     $ruleViolationMarks: {},
     $fileValues: {},
   };
@@ -333,10 +347,14 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
     "width": `${keyInfo.width}px`,
     "max-width": `${keyInfo.width}px`,
   };
-  if (keyInfo.align) {
+  const meta: RdhRow["meta"] = p["$meta"];
+  if (
+    keyInfo.align &&
+    !hasAnnotationsOf(meta, "Cod", keyInfo.name) &&
+    !hasAnnotationsOf(meta, "Cin", keyInfo.name)
+  ) {
     styles["text-align"] = keyInfo.align;
   }
-  const meta: RdhRow["meta"] = p["$meta"];
   if (hasAnnotationsOf(meta, "Upd", keyInfo.name)) {
     styles["background-color"] = "rgba(112, 83, 255, 0.32) !important";
   }
@@ -622,6 +640,16 @@ defineExpose({
                       'marker-error': item.$resolvedLabels[key.name]?.isUndefined,
                     }"
                     >{{ item.$resolvedLabels[key.name]?.label }}</span
+                  >
+                  <span
+                    v-if="item.$changeInNumbers[key.name]"
+                    class="marker-box code-label"
+                    :class="{
+                      'marker-info': item.$changeInNumbers[key.name]?.value >= 0,
+                      'marker-error': item.$changeInNumbers[key.name]?.value < 0,
+                    }"
+                    >{{ item.$changeInNumbers[key.name]?.value >= 0 ? " +" : " " }}
+                    {{ item.$changeInNumbers[key.name]?.value }}</span
                   >
                   <div
                     class="cell-actions"

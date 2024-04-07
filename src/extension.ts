@@ -3,7 +3,7 @@ import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
 import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { StateStorage } from "./utilities/StateStorage";
-import { DBDriverResolver } from "@l-v-yonsama/multi-platform-database-drivers";
+import { DBDriverResolver, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
 
 import { ScanPanel } from "./panels/ScanPanel";
 import { activateNotebook } from "./notebook/activator";
@@ -17,6 +17,8 @@ import {
   SHOW_CSV,
   SHOW_HAR,
   OPEN_DIFF_MDH_VIEWER,
+  BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
+  OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
 } from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
 import { initializePath } from "./utilities/fsUtil";
@@ -30,6 +32,7 @@ import { HarFilePanel } from "./panels/HarFilePanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
 import { DiffMdhViewTabParam, MdhViewParams } from "./types/views";
 import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
+import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
 
 const PREFIX = "[extension]";
 
@@ -124,6 +127,20 @@ export async function activate(context: ExtensionContext) {
     );
     commands.registerCommand(OPEN_DIFF_MDH_VIEWER, (params: DiffMdhViewTabParam) => {
       diffMdhViewProvider.render(params);
+    });
+
+    // Count records View
+    const countRecordViewProvider = new CountRecordViewProvider(
+      BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
+      context,
+      stateStorage
+    );
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(countRecordViewProvider.viewId, countRecordViewProvider)
+    );
+
+    registerDisposableCommand(OPEN_COUNT_FOR_ALL_TABLES_VIEWER, async (schemaRes: DbSchema) => {
+      countRecordViewProvider.render(schemaRes);
     });
   }
 
