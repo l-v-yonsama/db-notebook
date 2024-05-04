@@ -30,8 +30,12 @@ export const jsonKernelRun = async (
     });
 
     stdout = `OK: updated ${updated} variable${updated === 1 ? "" : "s"}`;
-  } catch (e: any) {
-    stderr = e.message;
+  } catch (e) {
+    if (e instanceof Error) {
+      stderr = e.message;
+    } else {
+      stderr = "Error:" + e;
+    }
   }
 
   return {

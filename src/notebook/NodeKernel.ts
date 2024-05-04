@@ -1,9 +1,10 @@
 import * as cp from "child_process";
+import * as os from "os";
 import * as path from "path";
 import { NotebookExecutionVariables, RunResult } from "../types/Notebook";
 import { ConnectionSetting, abbr } from "@l-v-yonsama/multi-platform-database-drivers";
 import { log } from "../utilities/logger";
-import { NotebookCell, Uri } from "vscode";
+import { NotebookCell, Uri, window, workspace } from "vscode";
 import {
   createDirectoryOnStorage,
   deleteResource,
@@ -16,6 +17,8 @@ import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { URL } from "url";
 import dayjs = require("dayjs");
 import { Entry } from "har-format";
+import { getNodeConfig } from "../utilities/configUtil";
+import { EMOJI } from "../types/Emoji";
 
 const PREFIX = "  [notebook/NodeKernel]";
 
@@ -218,33 +221,74 @@ export class NodeKernel {
     const script = await this.createScript(cell);
     await writeToResource(this.scriptFile, script);
 
-    this.child = cp.spawn("node", [this.scriptFile.fsPath]);
-
     let stdout = "";
     let stderr = "";
     let metadata: RunResultMetadata = {};
 
-    const promise = new Promise((resolve, reject) => {
-      if (this.child) {
-        if (this.child.stdout) {
-          this.child.stdout.on("data", (data: Buffer) => {
-            stdout += data.toString();
-          });
-        }
-        if (this.child.stderr) {
-          this.child.stderr.on("data", (data) => {
-            stderr += data.toString();
-          });
-        }
-        this.child.on("error", reject);
-        this.child.on("close", (code) => {
-          resolve(code);
-        });
-      } else {
-        reject();
+    try {
+      const rootUri = workspace.workspaceFolders?.[0].uri;
+      const { commandPath } = getNodeConfig();
+      const options: cp.CommonSpawnOptions = {};
+      if (rootUri) {
+        options.cwd = rootUri.fsPath;
       }
-    });
-    await promise;
+
+      if (commandPath) {
+        this.child = cp.spawn(commandPath, [this.scriptFile.fsPath], options);
+      } else {
+        this.child = cp.spawn("node", [this.scriptFile.fsPath], options);
+      }
+
+      const promise = new Promise((resolve, reject) => {
+        if (this.child) {
+          if (this.child.stdout) {
+            this.child.stdout.on("data", (data: Buffer) => {
+              stdout += data.toString();
+            });
+          }
+          if (this.child.stderr) {
+            this.child.stderr.on("data", (data) => {
+              stderr += data.toString();
+            });
+          }
+          this.child.on("error", reject);
+          this.child.on("close", (code) => {
+            resolve(code);
+          });
+        } else {
+          reject();
+        }
+      });
+      await promise;
+    } catch (err) {
+      const errorMessages = ["Error while trying to spawn a child process."];
+
+      // You can configure Visual Studio Code
+      // open the Settings editor, navigate to Code > Settings > Settings. Alternately, open the Settings editor from the Command Palette (⇧⌘P)
+
+      if (err instanceof Error) {
+        errorMessages.push(err.message);
+        errorMessages.push(
+          `${EMOJI.warning} Set or verify the path to the Node.js executable used to run JavaScript.`
+        );
+        errorMessages.push(`${EMOJI.information} Set up your environment variables.`);
+        errorMessages.push(`${EMOJI.information} Go to File or Code > Preferences > Settings.`);
+        errorMessages.push(
+          `${EMOJI.information} Enter the key word "database-notebook node path" in the Search bar.`
+        );
+        errorMessages.push(
+          `${EMOJI.information} Copy the path to the Node.js file installed on your PC, and paste it.`
+        );
+        return {
+          stdout,
+          stderr: errorMessages.join(os.EOL),
+          skipped: false,
+          metadata,
+        };
+      }
+      throw err;
+    }
+
     this.child = undefined;
 
     const reg = new RegExp(".*" + path.basename(this.scriptFile.fsPath) + ":[0-9]+\r?\n *");
@@ -258,8 +302,12 @@ export class NodeKernel {
       if (await existsUri(this.variablesFile)) {
         this.variables = JSON.parse(await readResource(this.variablesFile));
       }
-    } catch (e: any) {
-      log(`${PREFIX} ⭐️ERROR: retrieve variables [${e.message}]`);
+    } catch (e) {
+      if (e instanceof Error) {
+        log(`${PREFIX} retrieve variables Error:${e.message}`);
+      } else {
+        log(`${PREFIX} retrieve variables Error:${e}`);
+      }
     }
 
     if (this.variables["_ResultSetData"]) {
@@ -313,8 +361,12 @@ export class NodeKernel {
       try {
         const message = process.kill(this.child.pid);
         log(`${PREFIX} result:${message}`);
-      } catch (e: any) {
-        log(`${PREFIX} Error:${e.message}`);
+      } catch (e) {
+        if (e instanceof Error) {
+          log(`${PREFIX} [interrupt] Error:${e.message}`);
+        } else {
+          log(`${PREFIX} [interrupt] Error:${e}`);
+        }
       }
       this.child = undefined;
     } else {

@@ -20,6 +20,7 @@ import { OPEN_MDH_VIEWER, REFRESH_SQL_HISTORIES } from "../constant";
 import { MdhViewParams } from "../types/views";
 import { BasePanel } from "./BasePanel";
 import { SaveValuesInRdhParams } from "../shared/SaveValuesInRdhParams";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 const PREFIX = "[ViewConditionPanel]";
 
@@ -230,7 +231,7 @@ export class ViewConditionPanel extends BasePanel {
               this.dispose();
             }
           } else {
-            window.showErrorMessage(message);
+            showWindowErrorMessage(message);
             this.dispose();
           }
         }
@@ -292,9 +293,14 @@ export class ViewConditionPanel extends BasePanel {
                   },
                 });
                 log(`${prefix} OK`);
-              } catch (e: any) {
-                errorMessage = e.message;
-                logError(`${prefix} NG:${e.message}`);
+              } catch (e) {
+                if (e instanceof Error) {
+                  errorMessage = e.message;
+                  logError(`${prefix} NG:${e.message}`);
+                } else {
+                  errorMessage = "Error:" + e;
+                  logError(`${prefix} NG:${e}`);
+                }
               }
               progress.report({
                 message: `Inserted [${i + 1}/${insertList.length}]`,
@@ -327,9 +333,14 @@ export class ViewConditionPanel extends BasePanel {
                   },
                 });
                 log(`${prefix} OK`);
-              } catch (e: any) {
-                errorMessage = e.message;
-                logError(`${prefix} NG:${e.message}`);
+              } catch (e) {
+                if (e instanceof Error) {
+                  errorMessage = e.message;
+                  logError(`${prefix} NG:${e.message}`);
+                } else {
+                  errorMessage = "Error:" + e;
+                  logError(`${prefix} NG:${e}`);
+                }
               }
               progress.report({
                 message: `Updated [${i + 1}/${insertList.length}]`,
@@ -360,9 +371,14 @@ export class ViewConditionPanel extends BasePanel {
                   },
                 });
                 log(`${prefix} OK`);
-              } catch (e: any) {
-                errorMessage = e.message;
-                logError(`${prefix} NG:${e.message}`);
+              } catch (e) {
+                if (e instanceof Error) {
+                  errorMessage = e.message;
+                  logError(`${prefix} NG:${e.message}`);
+                } else {
+                  errorMessage = "Error:" + e;
+                  logError(`${prefix} NG:${e}`);
+                }
               }
               progress.report({
                 message: `Deleted [${i + 1}/${insertList.length}]`,
@@ -384,7 +400,7 @@ export class ViewConditionPanel extends BasePanel {
       window.showInformationMessage("OK");
       this.dispose();
     } else if (message) {
-      window.showErrorMessage(message);
+      showWindowErrorMessage(message);
     }
   }
 }

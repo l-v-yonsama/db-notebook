@@ -13,6 +13,7 @@ import { log } from "./utilities/logger";
 import { createWebviewContent } from "./utilities/webviewUtil";
 import { ComponentName } from "./shared/ComponentName";
 import { DBFormEventData } from "./shared/MessageEventData";
+import { showWindowErrorMessage } from "./utilities/alertUtil";
 
 const PREFIX = "[form]";
 
@@ -76,7 +77,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
             const driver = DBDriverResolver.getInstance().createDriver(params);
             const message = await driver.test(true);
             if (message) {
-              vscode.window.showErrorMessage(message);
+              showWindowErrorMessage(message);
             } else {
               vscode.window.showInformationMessage("OK");
             }

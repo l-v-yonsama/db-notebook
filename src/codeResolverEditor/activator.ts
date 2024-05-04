@@ -5,6 +5,7 @@ import { CODE_RESOLVER_TYPE, CREATE_CODE_RESOLVER } from "../constant";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
 import { CodeResolverEditorProvider } from "./editorProvider";
 import { writeToResource } from "../utilities/fsUtil";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 export function activateCodeResolverEditor(context: ExtensionContext, stateStorage: StateStorage) {
   context.subscriptions.push(CodeResolverEditorProvider.register(context, stateStorage));
@@ -39,8 +40,8 @@ export function activateCodeResolverEditor(context: ExtensionContext, stateStora
         // window.showInformationMessage(`Successfully saved, please open it.\n${uri.fsPath}`);
 
         commands.executeCommand("vscode.openWith", uri, CODE_RESOLVER_TYPE);
-      } catch (e: any) {
-        window.showErrorMessage(e.message);
+      } catch (e) {
+        showWindowErrorMessage(e);
       }
     })
   );

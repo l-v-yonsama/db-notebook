@@ -16,6 +16,7 @@ import {
 import { basename } from "path";
 import { MdhViewParams } from "../types/views";
 import { OPEN_MDH_VIEWER } from "../constant";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 const PREFIX = "[CsvParseSettingPanel]";
 
@@ -181,7 +182,7 @@ export class CsvParseSettingPanel {
       return rdb;
     } catch (e) {
       if (e instanceof Error) {
-        window.showErrorMessage(e.message);
+        showWindowErrorMessage(e.message);
       } else {
         log(`${PREFIX} parse Error:${e}`);
         throw new Error("Parse error");

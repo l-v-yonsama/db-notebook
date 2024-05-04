@@ -26,6 +26,7 @@ import { ScanPanelEventData, ScanTabItem, ScanConditionItem } from "../shared/Me
 import { ComponentName } from "../shared/ComponentName";
 import { DiffMdhViewTabParam } from "../types/views";
 import { OPEN_DIFF_MDH_VIEWER } from "../constant";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 const PREFIX = "[ScanPanel]";
 
@@ -360,7 +361,7 @@ export class ScanPanel {
         this.search(tabItem.lastSearchParam);
       }
     } else {
-      vscode.window.showErrorMessage(message);
+      showWindowErrorMessage(message);
     }
   }
 
@@ -382,7 +383,7 @@ export class ScanPanel {
     }
     const message = await createBookFromRdh(rdh, uri.fsPath);
     if (message) {
-      vscode.window.showErrorMessage(message);
+      showWindowErrorMessage(message);
     } else {
       vscode.window.showInformationMessage(uri.fsPath);
     }
@@ -473,7 +474,7 @@ export class ScanPanel {
       }
       panelItem.prevResourceTypeValue = targetResourceType;
     } else {
-      vscode.window.showErrorMessage(message);
+      showWindowErrorMessage(message);
       const msg2: ScanPanelEventData = {
         command: "stop-progress",
         componentName: "ScanPanel",

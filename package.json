@@ -761,6 +761,12 @@
           "minimum": 1,
           "default": 2,
           "description": "Amount of indentation to use"
+        },
+        "node.Node path": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "description": "Run Javascript on a custom Node installation. This can be a path to a Node executable."
         }
       }
     }
@@ -812,5 +818,9 @@
     "store": "^2.0.12",
     "throttle-debounce": "^5.0.0",
     "ts-node": "^10.9.1"
+  },
+  "volta": {
+    "node": "18.13.0",
+    "npm": "9.3.1"
   }
 }

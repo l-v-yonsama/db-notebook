@@ -371,8 +371,12 @@ async function createBookFromRdh(rdh: ResultSetData, targetExcelPath: string): P
       workbook.xlsx.writeFile(targetExcelPath).then(function () {
         resolve(errorMessage);
       });
-    } catch (e: any) {
-      reject(e.message);
+    } catch (e) {
+      if (e instanceof Error) {
+        reject(e.message);
+      } else {
+        reject("Error:" + e);
+      }
     }
   });
 }
@@ -455,8 +459,12 @@ async function createBookFromList(
       workbook.xlsx.writeFile(targetExcelPath).then(function () {
         resolve(errorMessage);
       });
-    } catch (e: any) {
-      reject(e.message);
+    } catch (e) {
+      if (e instanceof Error) {
+        reject(e.message);
+      } else {
+        reject("Error:" + e);
+      }
     }
   });
 }
@@ -882,8 +890,12 @@ async function createBookFromDiffList(
     }
 
     await workbook.xlsx.writeFile(targetExcelPath);
-  } catch (e: any) {
-    errorMessage = e.message;
+  } catch (e) {
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else {
+      errorMessage = "Error:" + e;
+    }
   }
   return errorMessage;
 }

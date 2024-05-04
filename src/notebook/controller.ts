@@ -55,14 +55,6 @@ import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 const PREFIX = "[notebook/Controller]";
 
-const hasMessageField = (error: any): error is { message: string } => {
-  if ("message" in error && typeof error.message === "string") {
-    return true;
-  } else {
-    return false;
-  }
-};
-
 type NoteSession = {
   executionOrder: number;
   kernel: NodeKernel | undefined;
@@ -98,11 +90,11 @@ export class MainController {
     });
 
     window.onDidChangeActiveNotebookEditor((notebookEditor) => {
-      log(
-        PREFIX +
-          " onDidChangeActiveNotebookEditor notebookEditor.notebookType:" +
-          notebookEditor?.notebook?.notebookType
-      );
+      // log(
+      //   PREFIX +
+      //     " onDidChangeActiveNotebookEditor notebookEditor.notebookType:" +
+      //     notebookEditor?.notebook?.notebookType
+      // );
       if (notebookEditor?.notebook) {
         this.setActiveContext(notebookEditor.notebook);
       }
@@ -110,9 +102,9 @@ export class MainController {
 
     context.subscriptions.push(
       workspace.onDidChangeNotebookDocument((e) => {
-        log(
-          PREFIX + " onDidChangeNotebookDocument e.notebook.notebookType:" + e.notebook.notebookType
-        );
+        // log(
+        //   PREFIX + " onDidChangeNotebookDocument e.notebook.notebookType:" + e.notebook.notebookType
+        // );
         if (e.notebook.notebookType !== NOTEBOOK_TYPE) {
           return;
         }
@@ -121,7 +113,7 @@ export class MainController {
     );
     context.subscriptions.push(
       workspace.onDidOpenNotebookDocument((notebook) => {
-        log(PREFIX + " onDidOpenNotebookDocument e.notebook.notebookType:" + notebook.notebookType);
+        // log(PREFIX + " onDidOpenNotebookDocument e.notebook.notebookType:" + notebook.notebookType);
         if (notebook.notebookType !== NOTEBOOK_TYPE) {
           return;
         }
@@ -217,8 +209,12 @@ export class MainController {
         } else {
           // log(`${PREFIX} No sqlKernel`);
         }
-      } catch (e: any) {
-        log(`${PREFIX} interruptHandler Error:${e.message}`);
+      } catch (e) {
+        if (e instanceof Error) {
+          log(`${PREFIX} interruptHandler Error:${e.message}`);
+        } else {
+          log(`${PREFIX} interruptHandler Error:${e}`);
+        }
       }
     }
     this.sqlMode = undefined;
@@ -403,15 +399,20 @@ export class MainController {
           }
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       success = false;
-      if (hasMessageField(err)) {
+      if (err instanceof Error) {
         stderr = err.message;
         outputs.push(
           new NotebookCellOutput([NotebookCellOutputItem.stdout(err.message)], metadata)
         );
       } else {
-        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.error(err)], metadata));
+        outputs.push(
+          new NotebookCellOutput(
+            [NotebookCellOutputItem.error(new Error("Error:" + err))],
+            metadata
+          )
+        );
       }
     }
     execution.replaceOutput(outputs);

@@ -28,6 +28,7 @@ import path = require("path");
 import { MdhViewParams, DiffMdhViewTabParam } from "../types/views";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 const PREFIX = "[MdhView]";
 dayjs.extend(utc);
@@ -146,7 +147,7 @@ export class MdhViewProvider extends BaseViewProvider {
         this.output(params);
         return;
       case "showError":
-        await window.showErrorMessage(params.message);
+        await showWindowErrorMessage(params.message);
         return;
       case "writeToClipboard":
         this.writeToClipboard(params);
@@ -266,7 +267,7 @@ export class MdhViewProvider extends BaseViewProvider {
       },
     });
     if (message) {
-      window.showErrorMessage(message);
+      showWindowErrorMessage(message);
     } else {
       window.showInformationMessage(uri.fsPath);
     }
@@ -341,7 +342,7 @@ export class MdhViewProvider extends BaseViewProvider {
           );
 
           if (!ok) {
-            window.showErrorMessage(message);
+            showWindowErrorMessage(message);
           }
         }
 
@@ -407,7 +408,7 @@ export class MdhViewProvider extends BaseViewProvider {
       );
 
       if (!ok) {
-        window.showErrorMessage(message);
+        showWindowErrorMessage(message);
       }
     }
 

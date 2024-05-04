@@ -27,7 +27,7 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
     try {
       return Promise.resolve(this.historyResList);
     } catch (e) {
-      console.error(e);
+      console.error(PREFIX, e);
       return Promise.resolve([]);
     }
   }

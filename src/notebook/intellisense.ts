@@ -180,8 +180,12 @@ function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookC
       });
 
     activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
-  } catch (e: any) {
-    log(`${PREFIX} Error:${e.message}`);
+  } catch (e) {
+    if (e instanceof Error) {
+      log(`${PREFIX} intellisense Error:${e.message}`);
+    } else {
+      log(`${PREFIX} intellisense Error:${e}`);
+    }
   }
 }
 

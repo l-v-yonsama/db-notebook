@@ -33,6 +33,7 @@ import { MdhViewParams } from "../types/views";
 import { CellMeta } from "../types/Notebook";
 import { existsFileOnStorage } from "../utilities/fsUtil";
 import { readCodeResolverFile, readRuleFile } from "../utilities/notebookUtil";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 type HistoryTreeParams = {
   context: ExtensionContext;
@@ -121,7 +122,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   registerDisposableCommand(EXECUTE_SQL_HISTORY, async (history: SQLHistory) => {
     const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
     if (!connectionSetting) {
-      window.showErrorMessage("Missing connection " + history.connectionName);
+      showWindowErrorMessage("Missing connection " + history.connectionName);
       await stateStorage.deleteSQLHistoryByID(history.id);
       historyTreeProvider.refresh(true);
       return;
@@ -214,7 +215,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       };
       commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
     } else {
-      window.showErrorMessage(`Execute query Error: ${message}`);
+      showWindowErrorMessage(`Execute query Error: ${message}`);
     }
   });
 };

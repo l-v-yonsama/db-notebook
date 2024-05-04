@@ -6,6 +6,7 @@ import { RecordRuleEditorProvider } from "./editorProvider";
 import { DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
 import { RecordRule } from "../shared/RecordRule";
 import { writeToResource } from "../utilities/fsUtil";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 export function activateRuleEditor(context: ExtensionContext, stateStorage: StateStorage) {
   context.subscriptions.push(RecordRuleEditorProvider.register(context, stateStorage));
@@ -46,8 +47,8 @@ export function activateRuleEditor(context: ExtensionContext, stateStorage: Stat
         await writeToResource(uri, JSON.stringify(recordRule, null, 1));
 
         commands.executeCommand("vscode.openWith", uri, RECORD_RULE_TYPE);
-      } catch (e: any) {
-        window.showErrorMessage(e.message);
+      } catch (e) {
+        showWindowErrorMessage(e);
       }
     })
   );

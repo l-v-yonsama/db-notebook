@@ -23,6 +23,7 @@ import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";
 import path = require("path");
 import { createBookFromList } from "../utilities/excelGenerator";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 const PREFIX = "[CountRecordView]";
 dayjs.extend(utc);
@@ -135,7 +136,7 @@ export class CountRecordViewProvider extends BaseViewProvider {
       },
     });
     if (message) {
-      window.showErrorMessage(message);
+      showWindowErrorMessage(message);
     } else {
       window.showInformationMessage(uri.fsPath);
     }
@@ -153,7 +154,7 @@ export class CountRecordViewProvider extends BaseViewProvider {
       this.schemaRes?.meta.conName
     );
     if (!connectionSetting) {
-      window.showErrorMessage("Missing connection " + this.schemaRes?.meta.conName);
+      showWindowErrorMessage("Missing connection " + this.schemaRes?.meta.conName);
       return;
     }
 
@@ -275,7 +276,7 @@ export class CountRecordViewProvider extends BaseViewProvider {
     } else {
       this.rdh = rdb.build();
       this.renderSub();
-      window.showErrorMessage(`Count Error: ${message}`);
+      showWindowErrorMessage(`Count Error: ${message}`);
     }
   }
 

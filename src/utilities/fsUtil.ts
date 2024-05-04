@@ -32,7 +32,7 @@ export const existsUri = async (uri: Uri): Promise<boolean> => {
     await workspace.fs.stat(uri);
     // log(`${PREFIX} existsUri OK`);
     return true;
-  } catch (err: any) {
+  } catch (_) {
     // log(`${PREFIX} ⭐️existsUri NG:[${err.message}]`);
     return false;
   }

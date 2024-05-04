@@ -44,6 +44,7 @@ import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { ViewConditionPanel } from "../panels/ViewConditionPanel";
 import { CreateInsertScriptSettingsPanel } from "../panels/CreateInsertScriptSettingsPanel";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 type ResourceTreeParams = {
   context: ExtensionContext;
@@ -106,10 +107,10 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       if (ok && result) {
         result?.forEach((dbRes) => conRes.addChild(dbRes));
       } else {
-        window.showErrorMessage(message);
+        showWindowErrorMessage(message);
       }
-    } catch (e: any) {
-      window.showErrorMessage(e.message);
+    } catch (e) {
+      showWindowErrorMessage(e);
     }
     dbResourceTree.changeConnectionTreeData(conRes);
   });
@@ -137,7 +138,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       if (ok && result !== undefined) {
         ViewConditionPanel.render(context.extensionUri, tableRes, result);
       } else {
-        window.showErrorMessage(message);
+        showWindowErrorMessage(message);
       }
     })
   );
@@ -179,8 +180,8 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       const content = createErDiagram(params);
       const cell = new NotebookCellData(NotebookCellKind.Markup, content, "markdown");
       commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
-    } catch (e: any) {
-      window.showErrorMessage(e.message);
+    } catch (e) {
+      showWindowErrorMessage(e);
     }
   });
   commands.registerCommand(CREATE_ER_DIAGRAM_WITH_SETTINGS, async (tableRes: DbTable) => {
@@ -197,8 +198,8 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
         tables: schema?.children ?? [],
         selectedTable: tableRes,
       });
-    } catch (e: any) {
-      window.showErrorMessage(e.message);
+    } catch (e) {
+      showWindowErrorMessage(e);
     }
   });
   commands.registerCommand(WRITE_ER_DIAGRAM_TO_CLIPBOARD, async (tableRes: DbTable) => {
@@ -209,8 +210,8 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       const params = createSimpleERDiagramParams(schema, tableRes);
       const content = createErDiagram(params);
       env.clipboard.writeText(content);
-    } catch (e: any) {
-      window.showErrorMessage(e.message);
+    } catch (e) {
+      showWindowErrorMessage(e);
     }
   });
 
@@ -228,8 +229,8 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
         title = tableRes.name;
       }
       CreateInsertScriptSettingsPanel.render(context.extensionUri, schema.name, tableRes);
-    } catch (e: any) {
-      window.showErrorMessage(e.message);
+    } catch (e) {
+      showWindowErrorMessage(e);
     }
   });
 };

@@ -40,6 +40,7 @@ import { DiffMdhViewTabParam } from "../types/views";
 import { BaseViewProvider } from "./BaseViewProvider";
 import { ComponentName } from "../shared/ComponentName";
 import { waitUntil } from "../utilities/waitUntil";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 
 const PREFIX = "[DiffMdhView]";
 
@@ -407,7 +408,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       },
     });
     if (message) {
-      window.showErrorMessage(message);
+      showWindowErrorMessage(message);
     } else {
       window.showInformationMessage(uri.fsPath);
     }
@@ -473,7 +474,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
           );
 
           if (!ok) {
-            window.showErrorMessage(message);
+            showWindowErrorMessage(message);
           }
         }
         progress.report({ increment: 100 });

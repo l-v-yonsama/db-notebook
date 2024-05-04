@@ -169,7 +169,7 @@ export async function deactivate() {
   try {
     await DBDriverResolver.getInstance().closeAll();
   } catch (e) {
-    console.error(e);
+    console.error(PREFIX, e);
   }
   return undefined;
 }
