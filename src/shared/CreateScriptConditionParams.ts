@@ -6,4 +6,5 @@ export type CreateScriptConditionParams = {
   preview: boolean;
   openInNotebook: boolean;
   lang: "sql" | "javascript";
+  numOfRecords: number;
 };

@@ -7,7 +7,7 @@ import type {
 } from "@/utilities/vscode";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
-
+import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
 import type { DropdownItem } from "@/types/Components";
 
@@ -32,6 +32,15 @@ onMounted(() => {
   nextTick(resetSectionHeight);
 });
 
+const numOfRecordsItems = ref([] as DropdownItem[]);
+
+for (let i of [1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000]) {
+  numOfRecordsItems.value.push({
+    label: `${i}`,
+    value: i,
+  });
+}
+
 const previewSql = ref("");
 
 const assignSchemaName = ref(true);
@@ -40,6 +49,7 @@ const withComments = ref(false);
 const compactSql = ref(false);
 const tableNameWithComment = ref("");
 const langType = ref("sql" as "sql" | "javascript");
+const numOfRecords = ref(1);
 
 const langItems: DropdownItem[] = [
   {
@@ -62,6 +72,7 @@ const initialize = (v: CreateInsertScriptSettingsPanelEventData["value"]["initia
   withComments.value = v.withComments === true;
   compactSql.value = v.compactSql === true;
   langType.value = v.langType;
+  numOfRecords.value = v.numOfRecords;
 
   previewSql.value = v.previewSql;
   if (v.tableRes.comment) {
@@ -76,6 +87,9 @@ const cancel = () => {
     command: "cancel",
     params: {},
   });
+};
+const handleNumOfRecordsOnChange = () => {
+  ok(false, true);
 };
 const handleLnagTypeOnChange = (newVal: "javascript" | "sql") => {
   langType.value = newVal;
@@ -109,6 +123,7 @@ const ok = (openInNotebook: boolean, preview: boolean) => {
     withComments: withComments.value,
     compactSql: compactSql.value,
     lang: langType.value,
+    numOfRecords: numOfRecords.value,
     preview,
     openInNotebook,
   };
@@ -149,14 +164,23 @@ defineExpose({
   <section class="script-creation-root">
     <div class="toolbar">
       <div class="tool-left">
-        <label for="tableName">Table:</label>
-        <span id="tableName">{{ tableNameWithComment }}</span>
+        <label v-if="langType === 'sql'" for="tableName">Table:</label>
+        <span v-if="langType === 'sql'" id="tableName">{{ tableNameWithComment }}</span>
         <label for="langType">Lang:</label>
         <VsCodeRadioGroupVue
           id="langType"
           v-model="langType"
           :items="langItems"
           @change="($e:any) => handleLnagTypeOnChange($e.target?.value)"
+        />
+        <label v-if="langType === 'javascript'" for="numOfRecords"> Num of records </label>
+        <VsCodeDropdown
+          v-if="langType === 'javascript'"
+          id="numOfRecords"
+          v-model="numOfRecords"
+          :items="numOfRecordsItems"
+          style="z-index: 15"
+          @change="handleNumOfRecordsOnChange()"
         />
       </div>
       <div class="tool-right">

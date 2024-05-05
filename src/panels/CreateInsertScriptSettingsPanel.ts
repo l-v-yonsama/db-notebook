@@ -37,6 +37,7 @@ export class CreateInsertScriptSettingsPanel extends BasePanel {
   private withComments = true;
   private compactSql = false;
   private langType: "sql" | "javascript" = "sql";
+  private numOfRecords = 1;
 
   protected constructor(panel: WebviewPanel, extensionUri: Uri) {
     super(panel, extensionUri);
@@ -67,6 +68,7 @@ export class CreateInsertScriptSettingsPanel extends BasePanel {
         this.withComments = (params as CreateScriptConditionParams).withComments;
         this.compactSql = (params as CreateScriptConditionParams).compactSql;
         this.langType = (params as CreateScriptConditionParams).lang;
+        this.numOfRecords = (params as CreateScriptConditionParams).numOfRecords;
 
         const previewSql = this.createPreviewText();
         if (openInNotebook) {
@@ -149,6 +151,7 @@ export class CreateInsertScriptSettingsPanel extends BasePanel {
           withComments: this.withComments,
           compactSql: this.compactSql,
           langType: this.langType,
+          numOfRecords: this.numOfRecords,
           previewSql,
         },
       },
@@ -205,41 +208,62 @@ export class CreateInsertScriptSettingsPanel extends BasePanel {
     // js
     const tableNameWithSchema =
       this.assignSchemaName && this.schemaName ? `${this.schemaName}.${name}` : name;
+    const indent = this.numOfRecords === 1 ? "  " : "    ";
     const contents: string[] = [];
+    contents.push(`let totalAffectedRows = 0;`);
     contents.push(`const setting = getConnectionSettingByName('${conName}');`);
     contents.push(
-      `const { ok, message, result } = await DBDriverResolver.getInstance().flowTransaction(setting, async (driver) => {`
+      `const { ok, message } = await DBDriverResolver.getInstance().flowTransaction(setting, async (driver) => {`
     );
-    contents.push(`  const bindParams = {};`);
+
+    if (this.numOfRecords > 1) {
+      contents.push(`  for (let i = 0; i < ${this.numOfRecords}; i++) {`);
+    }
+    contents.push(`${indent}const bindParams = {};`);
     Object.keys(values).forEach((name) => {
       const column = children.find((column) => column.name === name);
+
+      let bindValue = JSON.stringify(values[name]);
+      if (column?.primaryKey && this.numOfRecords > 1) {
+        if (isTextLike(column.colType)) {
+          bindValue = "`${i}`";
+        } else if (isNumericLike(column.colType)) {
+          bindValue = "i";
+        } else {
+          bindValue = "null";
+        }
+      }
+
       if (this.withComments && column?.comment) {
-        contents.push(
-          `  bindParams['${name}'] = ${JSON.stringify(values[name])}; // ${column.comment}`
-        );
+        contents.push(`${indent}bindParams['${name}'] = ${bindValue}; // ${column.comment}`);
       } else {
-        contents.push(`  bindParams['${name}'] = ${JSON.stringify(values[name])};`);
+        contents.push(`${indent}bindParams['${name}'] = ${bindValue};`);
       }
     });
     contents.push(``);
-    contents.push(`  const { query, binds } = normalizeQuery({`);
+    contents.push(`${indent}const { query, binds } = normalizeQuery({`);
     contents.push(
-      `    query: 'INSERT INTO ${tableNameWithSchema} (${columns
+      `${indent}  query: 'INSERT INTO ${tableNameWithSchema} (${columns
         .map((it) => it.name)
         .join(",")}) VALUES (${columns.map((it) => ":" + it.name).join(",")})',`
     );
-    contents.push(`    bindParams,`);
-    contents.push(`    toPositionedParameter: driver.isPositionedParameterAvailable(),`);
-    contents.push(`  });`);
+    contents.push(`${indent}  bindParams,`);
+    contents.push(`${indent}  toPositionedParameter: driver.isPositionedParameterAvailable(),`);
+    contents.push(`${indent}});`);
     contents.push(``);
-    contents.push(`  return await driver.requestSql({ sql: query, conditions: { binds } });`);
+    contents.push(
+      `${indent}const r = await driver.requestSql({ sql: query, conditions: { binds } });`
+    );
+    contents.push(`${indent}const affectedRows = r?.summary?.affectedRows ?? 0;`);
+    contents.push(`${indent}totalAffectedRows += affectedRows;`);
+    if (this.numOfRecords > 1) {
+      contents.push(`  }`);
+    }
     contents.push(`}, { transactionControlType: 'rollbackOnError' });`);
     contents.push(``);
     contents.push(`console.log('ok', ok);`);
     contents.push(`console.log('message', message);`);
-    contents.push(`if (ok && result) {`);
-    contents.push(`  writeResultSetData('title', result);`);
-    contents.push(`}`);
+    contents.push(`console.log('totalAffectedRows', totalAffectedRows);`);
     contents.push(``);
 
     return contents.join("\n");

@@ -116,6 +116,7 @@ export type CreateInsertScriptSettingsPanelEventData = BaseMessageEventData<
       withComments?: boolean;
       compactSql?: boolean;
       langType: "sql" | "javascript";
+      numOfRecords: number;
     };
     setPreviewSql?: {
       previewSql: string;
