@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.2.9",
+  "version": "0.2.11",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -767,6 +767,27 @@
           "type": "string",
           "default": "",
           "description": "Run Javascript on a custom Node installation. This can be a path to a Node executable."
+        },
+        "node.encoding": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "UTF8",
+            "Shift_JIS",
+            "Windows-31j",
+            "Windows932",
+            "EUC-JP",
+            "GB2312",
+            "GBK",
+            "GB18030",
+            "Windows936",
+            "EUC-CN",
+            "KS_C_5601",
+            "Windows949",
+            "EUC-KR"
+          ],
+          "description": "STDOUT/STDERR encoding of the Javascript execution process"
         }
       }
     }
@@ -785,6 +806,7 @@
     "@types/bytes": "^3.1.3",
     "@types/glob": "^7.1.3",
     "@types/humanize-duration": "^3.27.2",
+    "@types/iconv-lite": "^0.0.1",
     "@types/jmespath": "^0.15.1",
     "@types/node": "14.14.0",
     "@types/qs": "^6.9.9",
@@ -809,6 +831,7 @@
     "execa": "^5.1.1",
     "fast-json-stable-stringify": "^2.1.0",
     "humanize-duration": "^3.30.0",
+    "iconv-lite": "^0.6.3",
     "jmespath": "^0.16.0",
     "qs": "^6.11.2",
     "shelljs": "^0.8.5",

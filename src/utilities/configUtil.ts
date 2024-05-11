@@ -16,5 +16,6 @@ export const getNodeConfig = (): NodeConfigType => {
 
   return {
     commandPath: settings.get("Node path", ""),
+    dataEncoding: settings.get("encoding", ""),
   };
 };

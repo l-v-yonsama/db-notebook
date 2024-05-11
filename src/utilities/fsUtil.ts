@@ -1,16 +1,30 @@
 import { ExtensionContext, Uri, workspace } from "vscode";
 import * as path from "path";
-import { log } from "./logger";
+import { log, logError } from "./logger";
 import { mediaDir } from "../constant";
+import * as fs from "fs";
 
 let storagePath: Uri;
 let nodeModulesPath: Uri;
 
 const PREFIX = "  [fsUtil]";
 
-export const initializePath = (context: ExtensionContext): void => {
+export const initializeStoragePath = (context: ExtensionContext): void => {
   storagePath = context.globalStorageUri;
   nodeModulesPath = Uri.file(context.asAbsolutePath("node_modules"));
+};
+
+export const initializeTmpPath = async (): Promise<void> => {
+  try {
+    await fs.promises.mkdir(path.join(storagePath.fsPath, "tmp"), { recursive: true });
+    await existsUri(Uri.joinPath(storagePath, "tmp"));
+  } catch (err) {
+    if (err instanceof Error) {
+      logError(err.message);
+    } else {
+      logError("Error:" + err);
+    }
+  }
 };
 
 export const getNodeModulePath = (name: string): string => {
@@ -32,8 +46,12 @@ export const existsUri = async (uri: Uri): Promise<boolean> => {
     await workspace.fs.stat(uri);
     // log(`${PREFIX} existsUri OK`);
     return true;
-  } catch (_) {
-    // log(`${PREFIX} ⭐️existsUri NG:[${err.message}]`);
+  } catch (err) {
+    if (err instanceof Error) {
+      log(`${PREFIX} ⭐️existsUri NG:[${err.message}] ${uri?.fsPath}`);
+    } else {
+      log(`${PREFIX} ⭐️existsUri NG:[${err}] ${uri?.fsPath}`);
+    }
     return false;
   }
 };

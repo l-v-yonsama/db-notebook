@@ -21,7 +21,7 @@ import {
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
 } from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
-import { initializePath } from "./utilities/fsUtil";
+import { initializeStoragePath, initializeTmpPath } from "./utilities/fsUtil";
 import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
@@ -48,13 +48,15 @@ export async function activate(context: ExtensionContext) {
     context.subscriptions.push(disposable);
   };
 
-  initializePath(context);
+  initializeStoragePath(context);
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
   const historyTreeProvider = new HistoryTreeProvider(context, stateStorage);
 
   activateLogger(context, EXTENSION_NAME);
   log(`${PREFIX} start activation.`);
+  await initializeTmpPath();
+
   ScanPanel.setStateStorage(stateStorage);
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);

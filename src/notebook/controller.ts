@@ -38,7 +38,7 @@ import {
   window,
   workspace,
 } from "vscode";
-import { log } from "../utilities/logger";
+import { log, logError } from "../utilities/logger";
 import { SqlKernel } from "./sqlKernel";
 import {
   hasAnyRdhOutputCell,
@@ -283,7 +283,9 @@ export class MainController {
     const cellMeta: CellMeta = cell.metadata;
 
     try {
+      log(`${PREFIX} _executeAll before run`);
       const r = await this.run(notebook, cell);
+      log(`${PREFIX} _executeAll after run`);
       stdout = r.stdout;
       stderr = r.stderr;
       skipped = r.skipped;
@@ -400,6 +402,9 @@ export class MainController {
         }
       }
     } catch (err) {
+      console.error(err);
+      logError(`${PREFIX} catch:` + err);
+
       success = false;
       if (err instanceof Error) {
         stderr = err.message;
