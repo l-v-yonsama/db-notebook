@@ -9,15 +9,19 @@ let nodeModulesPath: Uri;
 
 const PREFIX = "  [fsUtil]";
 
+// For storage
 export const initializeStoragePath = (context: ExtensionContext): void => {
   storagePath = context.globalStorageUri;
   nodeModulesPath = Uri.file(context.asAbsolutePath("node_modules"));
 };
 
-export const initializeTmpPath = async (): Promise<void> => {
+export const initializeStorageTmpPath = async (): Promise<void> => {
+  await mkdirsOnStorage(path.join(storagePath.fsPath, "tmp"));
+};
+
+const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
   try {
-    await fs.promises.mkdir(path.join(storagePath.fsPath, "tmp"), { recursive: true });
-    await existsUri(Uri.joinPath(storagePath, "tmp"));
+    await fs.promises.mkdir(fsPath, { recursive: true });
   } catch (err) {
     if (err instanceof Error) {
       logError(err.message);
@@ -44,7 +48,7 @@ export const winToLinuxPath = (s: string) => s.replace(/\\/g, "/");
 export const existsUri = async (uri: Uri): Promise<boolean> => {
   try {
     await workspace.fs.stat(uri);
-    // log(`${PREFIX} existsUri OK`);
+    log(`${PREFIX} existsUri OK`);
     return true;
   } catch (err) {
     if (err instanceof Error) {
@@ -60,6 +64,8 @@ export const writeToResource = async (targetResource: Uri, text: string): Promis
   // log(`${PREFIX} writeToResource [${targetResource}]`);
   const fileContents = Buffer.from(text, "utf8");
   await workspace.fs.writeFile(targetResource, fileContents);
+  // todo:remove
+  await existsUri(targetResource);
 };
 
 export const readResource = async (targetResource: Uri): Promise<string> => {
@@ -78,13 +84,16 @@ export const deleteResource = async (
 
 export const createDirectoryOnStorage = async (...pathSegments: string[]): Promise<Uri> => {
   const uri = Uri.joinPath(storagePath, ...pathSegments);
-  // log(`${PREFIX} createDirectory [${uri}]`);
-  await workspace.fs.createDirectory(uri);
+
+  await mkdirsOnStorage(uri.fsPath);
+  // todo:remove
+  await existsUri(uri);
+
   return uri;
 };
 
-export const existsFileOnStorage = async (fsPath: string): Promise<boolean> => {
-  // log(`${PREFIX} existsFileOnStorage [${fsPath}]`);
+export const existsFileOnWorkspace = async (fsPath: string): Promise<boolean> => {
+  // log(`${PREFIX} existsFileOnWorkspace [${fsPath}]`);
   if (fsPath) {
     let wsfolder = workspace.workspaceFolders?.[0].uri;
     if (!wsfolder) {
@@ -97,8 +106,8 @@ export const existsFileOnStorage = async (fsPath: string): Promise<boolean> => {
   return false;
 };
 
-export const readFileOnStorage = async (fsPath: string): Promise<string | undefined> => {
-  // log(`${PREFIX} readFileOnStorage [${fsPath}]`);
+export const readFileOnWorkspace = async (fsPath: string): Promise<string | undefined> => {
+  // log(`${PREFIX} readFileOnWorkspace [${fsPath}]`);
   if (fsPath) {
     let wsfolder = workspace.workspaceFolders?.[0].uri;
     if (!wsfolder) {

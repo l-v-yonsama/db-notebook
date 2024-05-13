@@ -1,7 +1,7 @@
 import { NotebookCell, NotebookCellKind, NotebookEditor, window } from "vscode";
 import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { RecordRule } from "../shared/RecordRule";
-import { readFileOnStorage } from "./fsUtil";
+import { readFileOnWorkspace } from "./fsUtil";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
 
 import {
@@ -53,7 +53,7 @@ export const readRuleFile = async (
 ): Promise<RecordRule | undefined> => {
   const { ruleFile } = metadata;
   if (ruleFile) {
-    const text = await readFileOnStorage(ruleFile);
+    const text = await readFileOnWorkspace(ruleFile);
     if (text) {
       const rule = JSON.parse(text) as RecordRule;
       rule.tableRule.details.forEach((detail) => {
@@ -70,7 +70,7 @@ export const readCodeResolverFile = async (
 ): Promise<CodeResolverParams | undefined> => {
   const { codeResolverFile } = metadata;
   if (codeResolverFile) {
-    const text = await readFileOnStorage(codeResolverFile);
+    const text = await readFileOnWorkspace(codeResolverFile);
     if (text) {
       return JSON.parse(text) as CodeResolverParams;
     }

@@ -31,7 +31,7 @@ import {
 import { log } from "../utilities/logger";
 import { MdhViewParams } from "../types/views";
 import { CellMeta } from "../types/Notebook";
-import { existsFileOnStorage } from "../utilities/fsUtil";
+import { existsFileOnWorkspace } from "../utilities/fsUtil";
 import { readCodeResolverFile, readRuleFile } from "../utilities/notebookUtil";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 
@@ -180,7 +180,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     if (ok && result) {
       const cell = createNotebookSqlCellByHistory(history);
 
-      if (cell.metadata && history.ruleFile && (await existsFileOnStorage(history.ruleFile))) {
+      if (cell.metadata && history.ruleFile && (await existsFileOnWorkspace(history.ruleFile))) {
         const rrule = await readRuleFile(cell.metadata, result);
         if (rrule) {
           result.meta.tableRule = rrule.tableRule;
@@ -200,7 +200,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       if (
         cell.metadata &&
         history.codeResolverFile &&
-        (await existsFileOnStorage(history.codeResolverFile))
+        (await existsFileOnWorkspace(history.codeResolverFile))
       ) {
         const codeResolver = await readCodeResolverFile(cell.metadata);
         if (codeResolver) {

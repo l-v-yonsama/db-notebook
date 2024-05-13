@@ -49,7 +49,7 @@ import {
   readRuleFile,
 } from "../utilities/notebookUtil";
 import { jsonKernelRun } from "./JsonKernel";
-import { existsFileOnStorage } from "../utilities/fsUtil";
+import { existsFileOnWorkspace } from "../utilities/fsUtil";
 import { createResponseBodyMarkdown } from "../utilities/httpUtil";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
@@ -462,7 +462,7 @@ export class MainController {
       const metadata: CellMeta = cell.metadata;
       if (r.metadata?.rdh?.meta?.type === "select") {
         const { rdh } = r.metadata;
-        if (metadata.ruleFile && (await existsFileOnStorage(metadata.ruleFile))) {
+        if (metadata.ruleFile && (await existsFileOnWorkspace(metadata.ruleFile))) {
           const rrule = await readRuleFile(metadata, rdh);
           if (rrule) {
             rdh.meta.tableRule = rrule.tableRule;
@@ -479,7 +479,7 @@ export class MainController {
             }
           }
         }
-        if (metadata.codeResolverFile && (await existsFileOnStorage(metadata.codeResolverFile))) {
+        if (metadata.codeResolverFile && (await existsFileOnWorkspace(metadata.codeResolverFile))) {
           const codeResolver = await readCodeResolverFile(metadata);
           if (codeResolver) {
             rdh.meta.codeItems = codeResolver.items;
@@ -538,7 +538,7 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
       if (displayFileName.endsWith(".cresolver")) {
         displayFileName = displayFileName.substring(0, displayFileName.length - 10);
       }
-      if (await existsFileOnStorage(codeResolverFile)) {
+      if (await existsFileOnWorkspace(codeResolverFile)) {
         tooltip += " $(replace) Use " + abbr(displayFileName, 18);
       } else {
         tooltip += " $(warning) Missing Code resolver " + abbr(displayFileName, 18);
@@ -550,7 +550,7 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
       if (displayFileName.endsWith(".rrule")) {
         displayFileName = displayFileName.substring(0, displayFileName.length - 6);
       }
-      if (await existsFileOnStorage(ruleFile)) {
+      if (await existsFileOnWorkspace(ruleFile)) {
         tooltip += " $(checklist) Use " + abbr(displayFileName, 18);
       } else {
         tooltip += " $(warning) Missing Rule " + abbr(displayFileName, 18);
