@@ -13,6 +13,7 @@ import {
   readResource,
   winToLinuxPath,
   writeToResource,
+  writeToResourceOnStorage,
 } from "../utilities/fsUtil";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { URL } from "url";
@@ -222,7 +223,8 @@ export class NodeKernel {
     this.scriptFile = Uri.joinPath(this.tmpDirectory, scriptName);
 
     const script = await this.createScript(cell);
-    await writeToResource(this.scriptFile, script);
+    await writeToResourceOnStorage(this.scriptFile.fsPath, script);
+    await existsUri(this.scriptFile);
 
     let stdout = "";
     let stderr = "";
@@ -398,7 +400,8 @@ export class NodeKernel {
   async dispose() {
     // log(`${PREFIX} dispose`);
     this.child = undefined;
-    await deleteResource(this.tmpDirectory, { recursive: true });
+    // TODO: 元に戻す
+    // await deleteResource(this.tmpDirectory, { recursive: true });
   }
 
   queryStringToJSON(queryString: string): { [key: string]: any } | undefined {

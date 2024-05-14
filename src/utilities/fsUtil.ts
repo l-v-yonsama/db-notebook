@@ -21,12 +21,14 @@ export const initializeStorageTmpPath = async (): Promise<void> => {
 
 const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
   try {
-    await fs.promises.mkdir(fsPath, { recursive: true });
+    log(`${PREFIX} mkdirsOnStorage fsPath:${fsPath}`);
+    const result = await fs.promises.mkdir(fsPath, { recursive: true });
+    log(`${PREFIX} mkdirsOnStorage ok result:${result}`);
   } catch (err) {
     if (err instanceof Error) {
-      logError(err.message);
+      logError(PREFIX + err.message);
     } else {
-      logError("Error:" + err);
+      logError(PREFIX + "Error:" + err);
     }
   }
 };
@@ -58,6 +60,11 @@ export const existsUri = async (uri: Uri): Promise<boolean> => {
     }
     return false;
   }
+};
+
+export const writeToResourceOnStorage = async (fsPath: string, text: string): Promise<void> => {
+  log(`${PREFIX} writeToResourceOnStorage [${fsPath}]`);
+  await fs.promises.writeFile(fsPath, text, { encoding: "utf8" });
 };
 
 export const writeToResource = async (targetResource: Uri, text: string): Promise<void> => {
