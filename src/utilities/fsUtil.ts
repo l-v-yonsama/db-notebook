@@ -21,9 +21,7 @@ export const initializeStorageTmpPath = async (): Promise<void> => {
 
 const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
   try {
-    log(`${PREFIX} mkdirsOnStorage fsPath:${fsPath}`);
-    const result = await fs.promises.mkdir(fsPath, { recursive: true });
-    log(`${PREFIX} mkdirsOnStorage ok result:${result}`);
+    await fs.promises.mkdir(fsPath, { recursive: true });
   } catch (err) {
     if (err instanceof Error) {
       logError(PREFIX + err.message);
@@ -50,7 +48,6 @@ export const winToLinuxPath = (s: string) => s.replace(/\\/g, "/");
 export const existsUri = async (uri: Uri): Promise<boolean> => {
   try {
     await workspace.fs.stat(uri);
-    log(`${PREFIX} existsUri OK`);
     return true;
   } catch (err) {
     if (err instanceof Error) {
@@ -63,16 +60,17 @@ export const existsUri = async (uri: Uri): Promise<boolean> => {
 };
 
 export const writeToResourceOnStorage = async (fsPath: string, text: string): Promise<void> => {
-  log(`${PREFIX} writeToResourceOnStorage [${fsPath}]`);
   await fs.promises.writeFile(fsPath, text, { encoding: "utf8" });
+};
+
+export const deleteDirsOnStorage = async (fsPath: string): Promise<void> => {
+  await fs.promises.rm(fsPath, { recursive: true, force: true });
 };
 
 export const writeToResource = async (targetResource: Uri, text: string): Promise<void> => {
   // log(`${PREFIX} writeToResource [${targetResource}]`);
   const fileContents = Buffer.from(text, "utf8");
   await workspace.fs.writeFile(targetResource, fileContents);
-  // todo:remove
-  await existsUri(targetResource);
 };
 
 export const readResource = async (targetResource: Uri): Promise<string> => {
@@ -91,11 +89,7 @@ export const deleteResource = async (
 
 export const createDirectoryOnStorage = async (...pathSegments: string[]): Promise<Uri> => {
   const uri = Uri.joinPath(storagePath, ...pathSegments);
-
   await mkdirsOnStorage(uri.fsPath);
-  // todo:remove
-  await existsUri(uri);
-
   return uri;
 };
 

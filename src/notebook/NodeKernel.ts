@@ -8,6 +8,7 @@ import { log, logError } from "../utilities/logger";
 import { NotebookCell, Uri, window, workspace } from "vscode";
 import {
   createDirectoryOnStorage,
+  deleteDirsOnStorage,
   deleteResource,
   existsUri,
   readResource,
@@ -40,7 +41,6 @@ export class NodeKernel {
 
   static async create(connectionSettings: ConnectionSetting[]): Promise<NodeKernel> {
     const tmpDir = await createDirectoryOnStorage("tmp", `${new Date().getTime()}`);
-    console.log("tmpDir", tmpDir.fsPath);
     return new NodeKernel(connectionSettings, tmpDir);
   }
 
@@ -217,7 +217,6 @@ export class NodeKernel {
   }
 
   public async run(cell: NotebookCell): Promise<RunResult> {
-    log(`${PREFIX} run START`);
     const ext = cell.document.languageId === "javascript" ? "js" : "ts";
     const scriptName = `script.${ext}`;
     this.scriptFile = Uri.joinPath(this.tmpDirectory, scriptName);
@@ -238,13 +237,11 @@ export class NodeKernel {
         options.cwd = rootUri.fsPath;
       }
 
-      log(`${PREFIX} run before spawn`);
       if (commandPath) {
         this.child = cp.spawn(commandPath, [this.scriptFile.fsPath], options);
       } else {
         this.child = cp.spawn("node", [this.scriptFile.fsPath], options);
       }
-      log(`${PREFIX} run after spawn`);
 
       const promise = new Promise((resolve, reject) => {
         if (this.child) {
@@ -276,15 +273,12 @@ export class NodeKernel {
       });
       await promise;
     } catch (err) {
-      console.error(err);
-      logError(`${PREFIX} run spawn::` + err);
       const errorMessages = ["Error while trying to spawn a child process."];
 
       // You can configure Visual Studio Code
       // open the Settings editor, navigate to Code > Settings > Settings. Alternately, open the Settings editor from the Command Palette (⇧⌘P)
 
       if (err instanceof Error) {
-        log(`${PREFIX} run err is Error instance.`);
         errorMessages.push(err.message);
         errorMessages.push(
           `${EMOJI.warning} Set or verify the path to the Node.js executable used to run JavaScript.`
@@ -304,7 +298,7 @@ export class NodeKernel {
           metadata,
         };
       } else {
-        log(`${PREFIX} run err is not Error instance.`);
+        log(`${PREFIX} run err is not Error instance.${err}`);
       }
       throw err;
     }
@@ -317,8 +311,6 @@ export class NodeKernel {
     stderr = stderr.replace(/Node.js v[0-9.:-]+/, "");
     stderr = stderr.replace(/\r\n/g, "\n");
     stderr = stderr.replace(/\n+/g, "\n");
-
-    log(`${PREFIX} run parse variables`);
 
     try {
       if (await existsUri(this.variablesFile)) {
@@ -368,7 +360,6 @@ export class NodeKernel {
         metadata.updateJSONCellValues = v;
       }
     }
-    log(`${PREFIX} run END`);
 
     return {
       stdout,
@@ -400,8 +391,7 @@ export class NodeKernel {
   async dispose() {
     // log(`${PREFIX} dispose`);
     this.child = undefined;
-    // TODO: 元に戻す
-    // await deleteResource(this.tmpDirectory, { recursive: true });
+    await deleteDirsOnStorage(this.tmpDirectory.fsPath);
   }
 
   queryStringToJSON(queryString: string): { [key: string]: any } | undefined {
