@@ -31,6 +31,38 @@ const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
   }
 };
 
+export const createDirectoryOnStorage = async (...pathSegments: string[]): Promise<Uri> => {
+  const uri = Uri.joinPath(storagePath, ...pathSegments);
+  await mkdirsOnStorage(uri.fsPath);
+  return uri;
+};
+
+export const existsOnStorage = async (fsPath: string): Promise<boolean> => {
+  try {
+    await fs.promises.stat(fsPath);
+    return true;
+  } catch (err) {
+    if (err instanceof Error) {
+      log(`${PREFIX} ⭐️existsOnStorage NG:[${err.message}] ${fsPath}`);
+    } else {
+      log(`${PREFIX} ⭐️existsOnStorage NG:[${err}] ${fsPath}`);
+    }
+    return false;
+  }
+};
+
+export const writeToResourceOnStorage = async (fsPath: string, text: string): Promise<void> => {
+  await fs.promises.writeFile(fsPath, text, { encoding: "utf8" });
+};
+
+export const readResourceOnStorage = async (fsPath: string): Promise<string> => {
+  return await fs.promises.readFile(fsPath, { encoding: "utf8" });
+};
+
+export const deleteDirsOnStorage = async (fsPath: string): Promise<void> => {
+  await fs.promises.rm(fsPath, { recursive: true, force: true });
+};
+
 export const getNodeModulePath = (name: string): string => {
   const moduleUri = Uri.joinPath(nodeModulesPath, name);
   return winToLinuxPath(moduleUri.fsPath);
@@ -59,14 +91,6 @@ export const existsUri = async (uri: Uri): Promise<boolean> => {
   }
 };
 
-export const writeToResourceOnStorage = async (fsPath: string, text: string): Promise<void> => {
-  await fs.promises.writeFile(fsPath, text, { encoding: "utf8" });
-};
-
-export const deleteDirsOnStorage = async (fsPath: string): Promise<void> => {
-  await fs.promises.rm(fsPath, { recursive: true, force: true });
-};
-
 export const writeToResource = async (targetResource: Uri, text: string): Promise<void> => {
   // log(`${PREFIX} writeToResource [${targetResource}]`);
   const fileContents = Buffer.from(text, "utf8");
@@ -85,12 +109,6 @@ export const deleteResource = async (
 ): Promise<void> => {
   // log(`${PREFIX} deleteResource [${targetResource}]`);
   await workspace.fs.delete(targetResource, options);
-};
-
-export const createDirectoryOnStorage = async (...pathSegments: string[]): Promise<Uri> => {
-  const uri = Uri.joinPath(storagePath, ...pathSegments);
-  await mkdirsOnStorage(uri.fsPath);
-  return uri;
 };
 
 export const existsFileOnWorkspace = async (fsPath: string): Promise<boolean> => {

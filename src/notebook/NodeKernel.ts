@@ -9,11 +9,9 @@ import { NotebookCell, Uri, window, workspace } from "vscode";
 import {
   createDirectoryOnStorage,
   deleteDirsOnStorage,
-  deleteResource,
-  existsUri,
-  readResource,
+  existsOnStorage,
+  readResourceOnStorage,
   winToLinuxPath,
-  writeToResource,
   writeToResourceOnStorage,
 } from "../utilities/fsUtil";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -223,7 +221,6 @@ export class NodeKernel {
 
     const script = await this.createScript(cell);
     await writeToResourceOnStorage(this.scriptFile.fsPath, script);
-    await existsUri(this.scriptFile);
 
     let stdout = "";
     let stderr = "";
@@ -313,8 +310,8 @@ export class NodeKernel {
     stderr = stderr.replace(/\n+/g, "\n");
 
     try {
-      if (await existsUri(this.variablesFile)) {
-        this.variables = JSON.parse(await readResource(this.variablesFile));
+      if (await existsOnStorage(this.variablesFile.fsPath)) {
+        this.variables = JSON.parse(await readResourceOnStorage(this.variablesFile.fsPath));
       }
     } catch (e) {
       if (e instanceof Error) {
