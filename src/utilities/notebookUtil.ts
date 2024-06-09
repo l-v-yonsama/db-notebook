@@ -85,3 +85,27 @@ export const getToolbarButtonClickedNotebookEditor = (
     (it) => it.notebook.uri.toString() === e.notebookEditor.notebookUri.toString()
   );
 };
+
+export const getSelectedCells = (options?: {
+  onlySql?: boolean;
+  onlyJs?: boolean;
+  onlyCode?: boolean;
+}): NotebookCell[] => {
+  const editor = window.activeNotebookEditor;
+  if (editor === undefined || editor.selection.isEmpty) {
+    return [];
+  }
+  const cells = editor.notebook.getCells(editor.selection);
+  if (options) {
+    if (options.onlySql) {
+      return cells.filter((it) => isSqlCell(it));
+    }
+    if (options.onlySql) {
+      return cells.filter((it) => isJsCell(it));
+    }
+    if (options.onlyCode) {
+      return cells.filter((it) => it.kind === NotebookCellKind.Code);
+    }
+  }
+  return cells;
+};

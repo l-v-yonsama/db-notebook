@@ -43,6 +43,7 @@ import {
   isJsonCell,
   hasAnyRdhOutputCell,
   isSqlCell,
+  getSelectedCells,
 } from "../utilities/notebookUtil";
 import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { log } from "../utilities/logger";
@@ -59,6 +60,7 @@ const PREFIX = "[notebook/activator]";
 export function activateNotebook(context: ExtensionContext, stateStorage: StateStorage) {
   log(`${PREFIX} start activateNotebook.`);
   let controller: MainController;
+
   activateStatusBar(context);
   activateIntellisense(context, stateStorage);
 
@@ -173,7 +175,14 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
   // Notebook cell statusbar commands
   {
-    registerDisposableCommand(CELL_SPECIFY_CONNECTION_TO_USE, async (cell: NotebookCell) => {
+    registerDisposableCommand(CELL_SPECIFY_CONNECTION_TO_USE, async (cell?: NotebookCell) => {
+      let targetCells: NotebookCell[] = [];
+      if (cell === null || cell === undefined) {
+        targetCells = getSelectedCells({ onlySql: true });
+      } else {
+        targetCells = [cell];
+      }
+
       const conSettings = await stateStorage.getConnectionSettingList();
       const items = conSettings.map((it) => ({
         label: it.name,
@@ -181,18 +190,20 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       }));
       const result = await window.showQuickPick(items);
       if (result) {
-        if (cell.metadata?.connectionName === result.label) {
-          return;
-        }
-        const metadata: CellMeta = {
-          ...cell.metadata,
-        };
-        metadata.connectionName = result.label;
-        const edit = new WorkspaceEdit();
-        const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-        edit.set(cell.notebook.uri, [nbEdit]);
+        targetCells.forEach((cell) => {
+          if (cell.metadata?.connectionName === result.label) {
+            return;
+          }
+          const metadata: CellMeta = {
+            ...cell.metadata,
+          };
+          metadata.connectionName = result.label;
+          const edit = new WorkspaceEdit();
+          const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+          edit.set(cell.notebook.uri, [nbEdit]);
 
-        await workspace.applyEdit(edit);
+          workspace.applyEdit(edit);
+        });
       }
     });
 
@@ -240,20 +251,29 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       const title = rrm.axiosEvent.title;
       HttpEventPanel.render(context.extensionUri, title, rrm.axiosEvent);
     });
-    registerDisposableCommand(CELL_MARK_CELL_AS_SKIP, async (cell: NotebookCell) => {
-      const metadata: CellMeta = {
-        ...cell.metadata,
-      };
-      if (metadata.markAsSkip === true) {
-        metadata.markAsSkip = false;
+    registerDisposableCommand(CELL_MARK_CELL_AS_SKIP, async (cell?: NotebookCell) => {
+      let targetCells: NotebookCell[] = [];
+      if (cell === null || cell === undefined) {
+        targetCells = getSelectedCells({ onlyCode: true });
       } else {
-        metadata.markAsSkip = true;
+        targetCells = [cell];
       }
-      const edit = new WorkspaceEdit();
-      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-      edit.set(cell.notebook.uri, [nbEdit]);
 
-      await workspace.applyEdit(edit);
+      targetCells.forEach((cell) => {
+        const metadata: CellMeta = {
+          ...cell.metadata,
+        };
+        if (metadata.markAsSkip === true) {
+          metadata.markAsSkip = false;
+        } else {
+          metadata.markAsSkip = true;
+        }
+        const edit = new WorkspaceEdit();
+        const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+        edit.set(cell.notebook.uri, [nbEdit]);
+
+        workspace.applyEdit(edit);
+      });
     });
     registerDisposableCommand(CELL_MARK_CELL_AS_PRE_EXECUTION, async (cell: NotebookCell) => {
       const metadata: CellMeta = {

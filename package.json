@@ -631,7 +631,7 @@
       },
       {
         "command": "database-notebook.cell.mark-cell-as-skip",
-        "title": "Mark cell as skip",
+        "title": "Mark cell as skip or not",
         "icon": "$(debug-step-over)"
       },
       {
@@ -736,6 +736,18 @@
         "command": "database-notebook.open-diff-mdh-viewer",
         "title": "Open Resultset Diff",
         "icon": "$(git-compare)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "database-notebook.cell.specify-connection-to-use",
+        "key": "ctrl+alt+c",
+        "when": "notebookType == 'database-notebook-type' && notebookCellListFocused && cellLangId == 'sql'"
+      },
+      {
+        "command": "database-notebook.cell.mark-cell-as-skip",
+        "key": "ctrl+alt+s",
+        "when": "notebookType == 'database-notebook-type' && notebookCellListFocused && notebookCellType == 'code'"
       }
     ],
     "configuration": {

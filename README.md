@@ -134,6 +134,16 @@ It also provides a CSV and Har file preview feature.
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
 
+## Keyboard shortcuts
+
+You can open this editor by going to the menu under Code > Settings > Keyboard Shortcuts or by using the Preferences: Open Keyboard Shortcuts command (⌘K ⌘S).
+
+| Command                   | Keybindings | When                                                                                              | Source            |
+| :------------------------ | :---------: | :------------------------------------------------------------------------------------------------ | :---------------- |
+| Mark cell as skip or not  | ctrl+alt+s  | notebookType == 'database-notebook-type' && notebookCellListFocused && notebookCellType == 'code' | Database notebook |
+| Specify connection to use | ctrl+alt+c  | notebookType == 'database-notebook-type' && notebookCellListFocused && cellLangId == 'sql'        | Database notebook |
+| Notebook: cell execution  | ctrl+enter  | -                                                                                                 | System (default)  |
+
 ## Requirements
 
 - node.js >= 18
