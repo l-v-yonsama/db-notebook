@@ -30,7 +30,6 @@ export class ViewConditionPanel extends BasePanel {
   private tableRes: DbTable | undefined;
   private numOfRows = 0;
   private limit = 100;
-  private isPositionedParameterAvailable: boolean | undefined;
   private rdhForUpdate?: ResultSetData;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
@@ -108,22 +107,26 @@ export class ViewConditionPanel extends BasePanel {
       return "";
     }
     const { conName, schemaName } = tableRes.meta;
-    if (this.isPositionedParameterAvailable === undefined) {
-      const setting = await ViewConditionPanel.stateStorage.getConnectionSettingByName(conName);
-      if (!setting) {
-        return "";
-      }
-      const driver = DBDriverResolver.getInstance().createDriver<RDSBaseDriver>(setting);
-      this.isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
+    const setting = await ViewConditionPanel.stateStorage.getConnectionSettingByName(conName);
+    if (!setting) {
+      return "";
     }
+    const driver = DBDriverResolver.getInstance().createDriver<RDSBaseDriver>(setting);
+    const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
+    const toPositionalCharacter = driver.getPositionalCharacter();
+    const isLimitAsTop = driver.isLimitAsTop();
+
     try {
       const { query } = toViewDataNormalizedQuery({
         tableRes,
         schemaName,
-        toPositionedParameter: this.isPositionedParameterAvailable,
+        toPositionedParameter: isPositionedParameterAvailable,
+        toPositionalCharacter: toPositionalCharacter,
+        limitAsTop: isLimitAsTop,
         conditions: specfyCondition ? conditions : undefined,
         limit: this.limit,
       });
+
       return query + "";
     } catch (_) {
       return "";
@@ -180,8 +183,10 @@ export class ViewConditionPanel extends BasePanel {
               tableRes,
               schemaName,
               toPositionedParameter: driver.isPositionedParameterAvailable(),
+              toPositionalCharacter: driver.getPositionalCharacter(),
               conditions: specfyCondition ? conditions : undefined,
               limit: this.limit,
+              limitAsTop: driver.isLimitAsTop(),
             });
 
             log(`${PREFIX} query:[${query}]`);
@@ -201,11 +206,14 @@ export class ViewConditionPanel extends BasePanel {
           });
 
           if (ok && result) {
+            const driver = DBDriverResolver.getInstance().createDriver<RDSBaseDriver>(setting);
+
             const { query, binds } = toViewDataQuery({
               tableRes,
               schemaName,
               conditions: specfyCondition ? conditions : undefined,
               limit: this.limit,
+              limitAsTop: driver.isLimitAsTop(),
             });
             await ViewConditionPanel.stateStorage.addSQLHistory({
               connectionName: conName,
@@ -269,6 +277,7 @@ export class ViewConditionPanel extends BasePanel {
           setting,
           async (driver) => {
             const toPositionedParameter = driver.isPositionedParameterAvailable();
+            const toPositionalCharacter = driver.getPositionalCharacter();
             let errorMessage = "";
             for (let i = 0; i < insertList.length; i++) {
               const prefix = `INSERT[${i + 1}/${insertList.length}] `;
@@ -281,6 +290,7 @@ export class ViewConditionPanel extends BasePanel {
                   bindOption: {
                     specifyValuesWithBindParameters: true,
                     toPositionedParameter,
+                    toPositionalCharacter,
                   },
                 });
                 log(`${prefix} sql:[${query}]`);
@@ -320,6 +330,7 @@ export class ViewConditionPanel extends BasePanel {
                   bindOption: {
                     specifyValuesWithBindParameters: true,
                     toPositionedParameter,
+                    toPositionalCharacter,
                   },
                 });
 
@@ -359,6 +370,7 @@ export class ViewConditionPanel extends BasePanel {
                   bindOption: {
                     specifyValuesWithBindParameters: true,
                     toPositionedParameter,
+                    toPositionalCharacter,
                   },
                 });
                 log(`${prefix} sql:[${query}]`);

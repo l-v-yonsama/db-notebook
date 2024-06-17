@@ -1,5 +1,9 @@
 import type { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
-import { MysqlElementSetting, PostgresElementSetting } from "./RdsElementSetting";
+import {
+  MysqlElementSetting,
+  PostgresElementSetting,
+  SQLServerElementSetting,
+} from "./RdsElementSetting";
 import { AwsElementSetting } from "./AwsElementSetting";
 import { RedisElementSetting } from "./RedisElementSetting";
 import { KeycloakElementSetting } from "./KeycloakElementSetting";
@@ -27,6 +31,8 @@ export class ElementSettingFactory {
         return new MysqlElementSetting();
       case "Postgres":
         return new PostgresElementSetting();
+      case "SQLServer":
+        return new SQLServerElementSetting();
     }
   }
 }

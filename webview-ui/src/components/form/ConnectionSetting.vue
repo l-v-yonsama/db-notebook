@@ -16,6 +16,7 @@ import type {
   AwsSetting,
   ConnectionSetting,
   IamSolutionSetting,
+  SQLServerSetting,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
 import { vscode } from "@/utilities/vscode";
@@ -102,6 +103,10 @@ const props = withDefaults(defineProps<Props>(), {
       clientId: "",
       grantType: "password",
     },
+    sqlServer: {
+      encrypt: false,
+      onlyDefaultSchema: true,
+    },
     ssl: {
       use: false,
     },
@@ -153,6 +158,9 @@ const clientSecret = ref(props.item.iamSolution?.clientSecret ?? "");
 
 const useSsl = ref(props.item.ssl?.use ?? false);
 
+const isSqlServerEncrypt = ref(props.item.sqlServer?.encrypt === true);
+const isSqlServerOnlyDefaultSchema = ref(props.item.sqlServer?.onlyDefaultSchema === true);
+
 const elmSettings = computed(() => {
   const it = ElementSettingFactory.create({
     dbType: dbType.value,
@@ -175,9 +183,24 @@ const handleUseSsl = (e: any) => {
   useSsl.value = e.target["checked"] === true;
 };
 
+const handleIsSqlServerEncrypt = (e: any) => {
+  if (!e.target) {
+    return;
+  }
+  isSqlServerEncrypt.value = e.target["checked"] === true;
+};
+
+const handleIsSqlServerOnlyDefaultSchema = (e: any) => {
+  if (!e.target) {
+    return;
+  }
+  isSqlServerOnlyDefaultSchema.value = e.target["checked"] === true;
+};
+
 function createItem(): ConnectionSetting {
   let awsSetting: AwsSetting | undefined = undefined;
   let iamSolution: IamSolutionSetting | undefined = undefined;
+  let sqlServer: SQLServerSetting | undefined = undefined;
 
   if (DBTypeConst.isAws(dbType.value)) {
     const awsServiceNames = awsServiceSelected.value.join(",").split(",");
@@ -201,11 +224,31 @@ function createItem(): ConnectionSetting {
       retrieveGroupOrOrgResOnConnection,
     };
   }
+  if (dbType.value === "SQLServer") {
+    sqlServer = {
+      encrypt: isSqlServerEncrypt.value,
+      onlyDefaultSchema: isSqlServerOnlyDefaultSchema.value,
+    };
+  }
+
+  const toNum = (s: string | number | undefined): number | undefined => {
+    if (s == null || s === "") {
+      return undefined;
+    }
+    if (typeof s === "number") {
+      return s;
+    }
+    const n = Number(s);
+    if (isNaN(n)) {
+      return undefined;
+    }
+    return n;
+  };
 
   const a: ConnectionSetting = {
     name: name.value,
     host: host.value,
-    port: port.value,
+    port: toNum(port.value),
     database: database.value,
     dbType: dbType.value,
     user: user.value,
@@ -214,6 +257,7 @@ function createItem(): ConnectionSetting {
     url: url.value,
     awsSetting,
     iamSolution,
+    sqlServer,
   };
 
   if (useSsl.value) {
@@ -247,7 +291,7 @@ function setDefault() {
   }
 
   host.value = elmSettings.value.getHost().defaultValue ?? "";
-  user.value = "";
+  user.value = elmSettings.value.getUser().defaultValue ?? "";
   password.value = "";
   timezone.value = "";
   url.value = elmSettings.value.getUrl().defaultValue ?? "";
@@ -467,6 +511,31 @@ defineExpose({
       >Use SSL(sslmode=no-verify)</vscode-checkbox
     >
 
+    <div v-if="dbType === 'SQLServer'" class="sql-server">
+      <label v-if="isShowMode" for="encryption">Encryption</label>
+      <p v-if="isShowMode" id="encryption">{{ isSqlServerEncrypt }}</p>
+      <vscode-checkbox
+        id="encryption"
+        v-if="!isShowMode"
+        :checked="isSqlServerEncrypt"
+        @change="($e:InputEvent) => handleIsSqlServerEncrypt($e)"
+        style="margin-right: auto"
+        >Use encrypt</vscode-checkbox
+      >
+      <label v-if="isShowMode" for="onlyDefaultSchema">Show schemas</label>
+      <p v-if="isShowMode" id="onlyDefaultSchema">
+        {{ isSqlServerOnlyDefaultSchema ? "Only default schema" : "All schemas" }}
+      </p>
+      <vscode-checkbox
+        id="onlyDefaultSchema"
+        v-if="!isShowMode"
+        :checked="isSqlServerOnlyDefaultSchema"
+        @change="($e:InputEvent) => handleIsSqlServerOnlyDefaultSchema($e)"
+        style="margin-right: auto"
+        >Show only default schema</vscode-checkbox
+      >
+    </div>
+
     <div v-if="!isShowMode" class="commands">
       <VsCodeButton @click="test" :disabled="!acceptValues || isInProgress"
         ><fa icon="circle-play" />Test</VsCodeButton
@@ -493,7 +562,8 @@ div.settings > label {
   margin: 0.5rem 0 0 0;
 }
 
-div.settings > p {
+div.settings > p,
+div.settings > div > p {
   margin: 0.3rem 0 0 0.3rem;
   opacity: 0.7;
 }

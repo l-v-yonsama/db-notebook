@@ -108,3 +108,38 @@ export class PostgresElementSetting extends RdsElementSetting {
     };
   }
 }
+
+export class SQLServerElementSetting extends RdsElementSetting {
+  getDatabase(): ElementSetting {
+    return {
+      visible: true,
+      placeholder: "Database name",
+      label: "DB name",
+      defaultValue: "master",
+    };
+  }
+
+  getPort(): ElementSetting<number> {
+    return {
+      visible: true,
+      defaultValue: 1433,
+    };
+  }
+  getUser(): ElementSetting {
+    return {
+      visible: true,
+      label: "User",
+      defaultValue: "sa",
+    };
+  }
+  getSsl(): ElementSetting {
+    return {
+      visible: false,
+      placeholder: "SSL",
+      label: "SSL",
+    };
+  }
+  getTimezone(): ElementSetting {
+    return { visible: false };
+  }
+}

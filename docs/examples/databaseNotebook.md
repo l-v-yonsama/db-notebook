@@ -107,6 +107,7 @@ const { ok, message, result } = await DBDriverResolver.getInstance().flowTransac
           "INSERT INTO order_detail (order_no, detail_no, item_no, amount) VALUES (:order_no, :detail_no, :item_no, :amount)",
         bindParams: { order_no: orderNo, detail_no: i, item_no: i * 50, amount: 100 },
         toPositionedParameter: driver.isPositionedParameterAvailable(),
+        toPositionalCharacter: driver.getPositionalCharacter(),
       });
       await driver.requestSql({ sql: query, conditions: { binds } });
     }

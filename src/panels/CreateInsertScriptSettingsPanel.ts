@@ -249,6 +249,7 @@ export class CreateInsertScriptSettingsPanel extends BasePanel {
     );
     contents.push(`${indent}  bindParams,`);
     contents.push(`${indent}  toPositionedParameter: driver.isPositionedParameterAvailable(),`);
+    contents.push(`${indent}  toPositionalCharacter: driver.getPositionalCharacter(),`);
     contents.push(`${indent}});`);
     contents.push(``);
     contents.push(

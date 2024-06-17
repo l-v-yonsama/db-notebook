@@ -32,6 +32,7 @@ export const setNodeDriverResolverCompletionItems = (
       "    query: 'INSERT INTO test_table (id, title) VALUES (:id, :title)',\n" +
       "    bindParams: { id: 1, title: 'hello' },\n" +
       "    toPositionedParameter: driver.isPositionedParameterAvailable(),\n" +
+      "    toPositionalCharacter: driver.getPositionalCharacter(),\n" +
       "  });\n" +
       "  return await driver.requestSql({ sql: query, conditions: { binds } });\n",
     detail: "Execute flowTransaction",
