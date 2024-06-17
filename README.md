@@ -9,7 +9,7 @@ It also provides a CSV and Har file preview feature.
 ## Features
 
 - Various databases accesss in Notebooks, Sidebars and panels UI
-  - MySQL, PostgreSQL, Redis, AWS, Keycloak, Auth0
+  - MySQL, PostgreSQL, SQL Server, Redis, AWS, Keycloak, Auth0
 - Execute & stop SQL, JavaScript code in node.js
 - Execute SQL mode
   - Execute query (Default)
