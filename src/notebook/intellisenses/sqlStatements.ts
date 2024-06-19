@@ -1,9 +1,19 @@
 import { CompletionItem, CompletionItemKind, SnippetString } from "vscode";
 import { createDocumentation } from "../intellisense";
+import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 
-export const setSqlStatementCompletionItems = (list: CompletionItem[]): void => {
-  let example = "SELECT ${2} \nFROM ${1} \nLIMIT 100";
-  list.push(createCompletionItem({ label: "select", example }));
+export const setSqlStatementCompletionItems = (
+  list: CompletionItem[],
+  dbType: DBType | undefined
+): void => {
+  let example: string;
+  if (dbType === DBType.SQLServer) {
+    example = "SELECT TOP 100 ${2} \nFROM ${1}";
+    list.push(createCompletionItem({ label: "select", example }));
+  } else {
+    example = "SELECT ${2} \nFROM ${1} \nLIMIT 100";
+    list.push(createCompletionItem({ label: "select", example }));
+  }
 
   example = "INSERT INTO ${1}\n ($2)\n VALUES ()";
   list.push(createCompletionItem({ label: "insert", example }));

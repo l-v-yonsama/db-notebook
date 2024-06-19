@@ -235,8 +235,8 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
       let dbs = this.stateStorage.getResourceByName(connectionName);
       if (dbs === undefined) {
         const { ok, result } = await this.stateStorage.loadResource(connectionName, false, true);
-        if (ok) {
-          dbs = result;
+        if (ok && result?.db) {
+          dbs = result.db;
         }
       }
       if (dbs && dbs[0] instanceof RdsDatabase) {

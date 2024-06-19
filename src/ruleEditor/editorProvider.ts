@@ -64,7 +64,7 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
             true
           );
           if (ok) {
-            dbs = result;
+            dbs = result?.db;
           }
         }
         if (dbs && dbs[0] instanceof RdsDatabase) {
@@ -235,7 +235,7 @@ export class RecordRuleEditorProvider implements CustomTextEditorProvider {
                   true
                 );
                 if (ok) {
-                  dbs = result;
+                  dbs = result?.db;
                 }
               }
               if (dbs && dbs[0] instanceof RdsDatabase) {

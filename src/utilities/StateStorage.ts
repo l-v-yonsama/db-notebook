@@ -3,6 +3,7 @@ import {
   Auth0Database,
   ConnectionSetting,
   DBDriverResolver,
+  DBType,
   DbDatabase,
   DbLogGroup,
   DbS3Bucket,
@@ -57,9 +58,9 @@ export class StateStorage {
     connectionName: string,
     reload: boolean,
     wait = false
-  ): Promise<GeneralResult<DbDatabase[]>> {
+  ): Promise<GeneralResult<{ db: DbDatabase[]; dbType: DBType }>> {
     // log(`${PREFIX} loadResource(${connectionName}, reload:${reload}, wait:${wait})`);
-    const ret: GeneralResult<DbDatabase[]> = {
+    const ret: GeneralResult<{ db: DbDatabase[]; dbType: DBType }> = {
       ok: false,
       message: "",
     };
@@ -68,11 +69,12 @@ export class StateStorage {
       ret.message = `Missing connection setting ${connectionName}`;
       return ret;
     }
+    const { dbType } = conRes;
     let resInfo = this.resMap.get(connectionName);
     if (resInfo?.res && !reload) {
       // Hit cache
       ret.ok = true;
-      ret.result = resInfo.res;
+      ret.result = { db: resInfo.res, dbType };
       return ret;
     }
     if (resInfo?.isInProgress) {
@@ -87,7 +89,7 @@ export class StateStorage {
       // log(`${PREFIX} loadResource return res`);
       if (resInfo?.res) {
         ret.ok = true;
-        ret.result = resInfo.res;
+        ret.result = { db: resInfo.res, dbType };
       } else {
         ret.message = "skipped.";
       }
@@ -186,7 +188,7 @@ export class StateStorage {
         }
       }
       this.resMap.set(connectionName, { isInProgress: false, res: result });
-      ret.result = result;
+      ret.result = { db: result, dbType };
       ret.ok = true;
     } else {
       log(`${PREFIX} loadResource Error:${message}`);

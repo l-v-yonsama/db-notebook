@@ -21,6 +21,7 @@ import {
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
 import {
+  DBType,
   ProposalKind,
   RdsDatabase,
   abbr,
@@ -46,8 +47,11 @@ const throttleFunc = throttle(300, async (connectionName: string): Promise<void>
     return;
   }
   const { ok, result } = await storage.loadResource(connectionName, false, false);
-  if (ok && result && result[0] instanceof RdsDatabase) {
-    rdsDatabase = result[0];
+  if (ok && result) {
+    if (result.db[0] instanceof RdsDatabase) {
+      rdsDatabase = result.db[0];
+    }
+    dbType = result.dbType;
   }
   // log(`  ${PREFIX} end throttleFunc with rdsDatabase`);
 });
@@ -59,6 +63,7 @@ export async function setupDbResource(connectionName: string) {
 
 let storage: StateStorage;
 let rdsDatabase: RdsDatabase | undefined;
+let dbType: DBType | undefined;
 
 export function activateIntellisense(context: ExtensionContext, stateStorage: StateStorage) {
   log(`${PREFIX} start activateIntellisense`);
@@ -374,7 +379,7 @@ function createSQLIntellisense() {
           }
         }
 
-        setSqlStatementCompletionItems(list);
+        setSqlStatementCompletionItems(list, dbType);
 
         return list;
       },

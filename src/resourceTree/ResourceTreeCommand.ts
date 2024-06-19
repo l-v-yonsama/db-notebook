@@ -104,8 +104,8 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       const { ok, message, result } = await stateStorage.loadResource(conRes.name, true, true);
       conRes.isInProgress = false;
       conRes.clearChildren();
-      if (ok && result) {
-        result?.forEach((dbRes) => conRes.addChild(dbRes));
+      if (ok && result?.db) {
+        result.db.forEach((dbRes) => conRes.addChild(dbRes));
       } else {
         showWindowErrorMessage(message);
       }
