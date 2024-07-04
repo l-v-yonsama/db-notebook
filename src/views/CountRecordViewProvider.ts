@@ -132,7 +132,6 @@ export class CountRecordViewProvider extends BaseViewProvider {
     const message = await createBookFromList([this.rdh], uri.fsPath, {
       rdh: {
         outputAllOnOneSheet: true,
-        outputWithType: data.outputWithType,
       },
     });
     if (message) {

@@ -5,6 +5,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { WriteToClipboardParams } from "../shared/ActionParams";
 import * as os from "os";
+import { getToStringParamByConfig } from "./configUtil";
 
 export const rdhListToText = (list: ResultSetData[], params: WriteToClipboardParams): string => {
   if (list.length === 1) {
@@ -23,17 +24,7 @@ export const rdhListToText = (list: ResultSetData[], params: WriteToClipboardPar
 };
 
 const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): string => {
-  const maxPrintLines = params.limit ?? 10;
-  const maxCellValueLength = params.limitCell ?? 100;
-
-  const outputDetail: ToStringParam = {
-    maxPrintLines,
-    maxCellValueLength,
-    withRowNo: params.withRowNo,
-    withCodeLabel: params.withCodeLabel,
-    withRuleViolation: params.withRuleViolation,
-    ...createOutputDetail(params.outputWithType),
-  };
+  const outputDetail = getToStringParamByConfig();
   let ret = "";
   switch (params.fileType) {
     case "csv":
@@ -52,31 +43,4 @@ const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): s
       throw new Error("Not supported file type.");
   }
   return ret + os.EOL;
-};
-
-const createOutputDetail = (
-  outputWithType: WriteToClipboardParams["outputWithType"]
-): { withComment: boolean; withType: boolean } => {
-  switch (outputWithType) {
-    case "none":
-      return {
-        withComment: false,
-        withType: false,
-      };
-    case "withComment":
-      return {
-        withComment: true,
-        withType: false,
-      };
-    case "withType":
-      return {
-        withComment: false,
-        withType: true,
-      };
-    default:
-      return {
-        withComment: true,
-        withType: true,
-      };
-  }
 };

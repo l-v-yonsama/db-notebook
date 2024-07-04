@@ -9,6 +9,7 @@ export const EXTENSION_NAME = "database-notebook";
 export const CONNECTION_SETTING_FORM_VIEWID = `${EXTENSION_NAME}.connectionForm`;
 export const BOTTOM_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.mdh`;
 export const BOTTOM_DIFF_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.diff-mdh`;
+export const BOTTOM_CHARTS_VIEWID = `${EXTENSION_NAME}.view.bottom.charts`;
 export const BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID = `${EXTENSION_NAME}.view.bottom.count-for-all-tables`;
 
 //---------------------------------------------------
@@ -50,6 +51,7 @@ export const SHOW_CSV = `${EXTENSION_NAME}.show-csv-file`;
 export const SHOW_HAR = `${EXTENSION_NAME}.show-har-file`;
 export const OPEN_MDH_VIEWER = `${EXTENSION_NAME}.open-mdh-viewer`;
 export const OPEN_DIFF_MDH_VIEWER = `${EXTENSION_NAME}.open-diff-mdh-viewer`;
+export const OPEN_CHARTS_VIEWER = `${EXTENSION_NAME}.open-diff-charts`;
 export const OPEN_COUNT_FOR_ALL_TABLES_VIEWER = `${EXTENSION_NAME}.open-count-for-all-tables-viewer`;
 
 //---------------------------------------------------
@@ -62,12 +64,12 @@ export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
 export const SHOW_NOTEBOOK_ALL_VARIABLES = `${EXTENSION_NAME}.toolbar.show-all-variables`;
 export const SHOW_NOTEBOOK_ALL_RDH = `${EXTENSION_NAME}.toolbar.show-all-rdh`;
 export const SPECIFY_CONNECTION_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-connection-all`;
+export const EXPORT_IN_HTML = `${EXTENSION_NAME}.toolbar.export-in-html`;
 
 // NOTEBOOK CELL STATUS-BAR COMMANDS
 export const CELL_MARK_CELL_AS_SKIP = `${EXTENSION_NAME}.cell.mark-cell-as-skip`;
 export const CELL_SHOW_METADATA_SETTINGS = `${EXTENSION_NAME}.cell.show-metadata-setting`;
 export const CELL_SPECIFY_CONNECTION_TO_USE = `${EXTENSION_NAME}.cell.specify-connection-to-use`;
-export const CELL_WRITE_TO_CLIPBOARD = `${EXTENSION_NAME}.cell.write-to-clipboard`;
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
 export const CELL_OPEN_HTTP_RESPONSE = `${EXTENSION_NAME}.cell.open-http-response`;
 export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;

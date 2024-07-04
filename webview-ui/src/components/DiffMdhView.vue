@@ -20,7 +20,6 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
-import { OUTPUT_DETAIL_ITEMS } from "@/constants";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -38,7 +37,6 @@ const displayOnlyChanged = ref(false);
 const hasUndoChangeSql = ref(false);
 const comparable = ref(false);
 
-const outputDetailItems = OUTPUT_DETAIL_ITEMS;
 const compareDetailItems = [
   {
     kind: "selection",
@@ -299,18 +297,9 @@ defineExpose({
         title="Compare"
         @onSelect="compare"
       />
-      <button
-        @click="output({ fileType: 'excel', outputWithType: 'withComment' })"
-        :disabled="inProgress"
-        title="Output as Excel"
-      >
+      <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
         <fa icon="file-excel" />
       </button>
-      <SecondarySelectionAction
-        :items="outputDetailItems"
-        title="Output as Excel"
-        @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
-      />
       <button
         :disabled="!hasUndoChangeSql"
         @click="createUndoChangeSql"

@@ -400,16 +400,13 @@ defineExpose({
 <template>
   <section class="ScanPanel">
     <div class="tab-container-actions">
-      <button
-        @click="output({ fileType: 'excel', outputWithType: 'withComment' })"
-        title="Output as Excel"
-      >
+      <button @click="output({ fileType: 'excel' })" title="Output as Excel">
         <fa icon="file-excel" />
       </button>
       <SecondarySelectionAction
         :items="outputDetailItems"
         title="Output as Excel"
-        @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
+        @onSelect="(v:any) => output({ fileType: 'excel'  })"
       />
     </div>
     <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">

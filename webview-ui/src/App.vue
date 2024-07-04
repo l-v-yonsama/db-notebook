@@ -11,11 +11,11 @@ import HarFilePanel from "./components/HarFilePanel.vue";
 import DBFormView from "./components/DBFormView.vue";
 import DiffMdhView from "./components/DiffMdhView.vue";
 import CountRecordView from "./components/CountRecordView.vue";
+import ChartsView from "./components/charts/ChartsView.vue";
 
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ViewConditionPanel from "./components/ViewConditionPanel.vue";
-import WriteToClipboardParamsPanel from "./components/WriteToClipboardParamsPanel.vue";
 import WriteHttpEventToClipboardParamsPanel from "./components/WriteHttpEventToClipboardParamsPanel.vue";
 import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
 
@@ -27,6 +27,7 @@ import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
 const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
 const MdhViewRef = ref<InstanceType<typeof MdhView>>();
 const countRecordViewRef = ref<InstanceType<typeof CountRecordView>>();
+const chartsViewRef = ref<InstanceType<typeof ChartsView>>();
 
 const csvParseSettingPanelRef = ref<InstanceType<typeof CsvParseSettingPanel>>();
 const createInsertScriptSettingsPanelRef =
@@ -37,7 +38,6 @@ const diffMdhViewRef = ref<InstanceType<typeof DiffMdhView>>();
 const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
 const viewConditionPanelRef = ref<InstanceType<typeof ViewConditionPanel>>();
 const variablesPanelRef = ref<InstanceType<typeof VariablesPanel>>();
-const writeToClipboardParamsPanelRef = ref<InstanceType<typeof WriteToClipboardParamsPanel>>();
 const writeHttpEventToClipboardParamsPanelRef =
   ref<InstanceType<typeof WriteHttpEventToClipboardParamsPanel>>();
 const notebookCellMetadataPanelRef = ref<InstanceType<typeof NotebookCellMetadataPanel>>();
@@ -58,6 +58,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "MdhView":
       MdhViewRef.value?.recieveMessage(data);
+      break;
+    case "ChartsView":
+      chartsViewRef.value?.recieveMessage(data);
       break;
     case "CountRecordView":
       countRecordViewRef.value?.recieveMessage(data);
@@ -85,9 +88,6 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "VariablesPanel":
       variablesPanelRef.value?.recieveMessage(data);
-      break;
-    case "WriteToClipboardParamsPanel":
-      writeToClipboardParamsPanelRef.value?.recieveMessage(data);
       break;
     case "WriteHttpEventToClipboardParamsPanel":
       writeHttpEventToClipboardParamsPanelRef.value?.recieveMessage(data);
@@ -145,11 +145,6 @@ onMounted(() => {
 
     <VariablesPanel v-if="currentComponentName === 'VariablesPanel'" ref="variablesPanelRef" />
 
-    <WriteToClipboardParamsPanel
-      v-if="currentComponentName === 'WriteToClipboardParamsPanel'"
-      ref="writeToClipboardParamsPanelRef"
-    />
-
     <WriteHttpEventToClipboardParamsPanel
       v-if="currentComponentName === 'WriteHttpEventToClipboardParamsPanel'"
       ref="writeHttpEventToClipboardParamsPanelRef"
@@ -161,6 +156,8 @@ onMounted(() => {
     />
 
     <CountRecordView v-if="currentComponentName === 'CountRecordView'" ref="countRecordViewRef" />
+
+    <ChartsView v-if="currentComponentName === 'ChartsView'" ref="chartsViewRef" />
 
     <NotebookCellMetadataPanel
       v-if="currentComponentName === 'NotebookCellMetadataPanel'"

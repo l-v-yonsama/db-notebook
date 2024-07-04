@@ -21,6 +21,7 @@ import { MdhViewParams } from "../types/views";
 import { BasePanel } from "./BasePanel";
 import { SaveValuesInRdhParams } from "../shared/SaveValuesInRdhParams";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getDatabaseConfig } from "../utilities/configUtil";
 
 const PREFIX = "[ViewConditionPanel]";
 
@@ -29,7 +30,7 @@ export class ViewConditionPanel extends BasePanel {
   private static stateStorage?: StateStorage;
   private tableRes: DbTable | undefined;
   private numOfRows = 0;
-  private limit = 100;
+  private limit = getDatabaseConfig().limitRows;
   private rdhForUpdate?: ResultSetData;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {

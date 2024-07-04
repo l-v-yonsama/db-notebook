@@ -82,6 +82,14 @@ fieldset.no-elements {
   padding: 3px 4px;
   margin-bottom: 10px;
   display: flex;
+
+  &.top {
+    position: absolute;
+    right: 5px;
+    top: 4px;
+    z-index: 10;
+    background-color: white;
+  }
 }
 div.tool-left,
 div.tool-right {

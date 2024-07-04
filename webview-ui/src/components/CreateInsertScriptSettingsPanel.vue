@@ -21,7 +21,7 @@ window.addEventListener("resize", () => resetSectionHeight());
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector(".script-creation-root");
   if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 35, 100);
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 75, 100);
   }
   if (sectionWrapper?.clientWidth) {
     sectionWidth.value = Math.max(sectionWrapper.clientWidth - 14, 100);

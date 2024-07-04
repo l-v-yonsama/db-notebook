@@ -1,7 +1,6 @@
 import { WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import * as vscode from "vscode";
 import { ActionCommand, WriteHttpEventToClipboardParams } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
 import { WriteHttpEventToClipboardParamsPanelEventData } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
 import { BasePanel } from "./BasePanel";

@@ -22,7 +22,7 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
-import { OUTPUT_DETAIL_ITEMS, WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
+import { WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
 import { isNumericLike } from "@/utilities/GeneralColumnUtil";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
@@ -40,7 +40,6 @@ const noCompareKeys = ref(false);
 const activeTabRdhList = ref([] as ResultSetData[]);
 
 // secondarySelections
-const outputDetailItems = OUTPUT_DETAIL_ITEMS;
 const writeToClipboardDetailItems = WRITE_TO_CLIP_BOARD_DETAIL_ITEMS;
 
 type CompareMoreOption = {
@@ -390,10 +389,6 @@ defineExpose({
         @click="
           writeToClipboard({
             fileType: 'text',
-            outputWithType: 'withComment',
-            withRowNo: false,
-            withRuleViolation: true,
-            withCodeLabel: true,
           })
         "
         :disabled="inProgress"
@@ -406,18 +401,9 @@ defineExpose({
         title="Write to clipboard"
         @onSelect="writeToClipboard"
       />
-      <button
-        @click="output({ fileType: 'excel', outputWithType: 'withComment' })"
-        :disabled="inProgress"
-        title="Output as Excel"
-      >
+      <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
         <fa icon="file-excel" />
       </button>
-      <SecondarySelectionAction
-        :items="outputDetailItems"
-        title="Output as Excel"
-        @onSelect="(v:any) => output({ fileType: 'excel', outputWithType: v })"
-      />
       <button
         v-if="describable"
         @click="actionToolbar('describe', {})"

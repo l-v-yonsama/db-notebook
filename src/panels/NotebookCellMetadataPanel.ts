@@ -18,6 +18,7 @@ import { NotebookCellMetadataPanelEventData } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
 import { CellMeta } from "../types/Notebook";
 import { StateStorage } from "../utilities/StateStorage";
+import { RdhKey, ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
 
 const PREFIX = "[NotebookCellMetadataPanel]";
 
@@ -112,6 +113,16 @@ export class NotebookCellMetadataPanel {
       value: "",
     });
 
+    const { outputs } = this.cell;
+    const columnItems:RdhKey[] = [];
+    const output = outputs.find((it) => it.metadata && it.metadata.rdh);
+    if (output && output.metadata?.rdh.meta.type === "select") {
+      const rdh = output.metadata.rdh as ResultSetData;
+      rdh.keys.forEach((it) => {
+        columnItems.push(it);
+      });
+    }
+
     const msg: NotebookCellMetadataPanelEventData = {
       command: "initialize",
       componentName: "NotebookCellMetadataPanel",
@@ -124,6 +135,7 @@ export class NotebookCellMetadataPanel {
           connectionSettingNames: ["", ...connectionSettingNames],
           codeFileItems,
           ruleFileItems,
+          columnItems,
         },
       },
     };
@@ -176,6 +188,9 @@ export class NotebookCellMetadataPanel {
               }
               if (newMetadata.sharedVariableName === "") {
                 delete newMetadata.sharedVariableName;
+              }
+              if (params.metadata.chart === undefined) {
+                delete newMetadata.chart;
               }
 
               const edit = new WorkspaceEdit();

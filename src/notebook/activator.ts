@@ -9,6 +9,7 @@ import {
   NotebookEdit,
   Range,
   TextEdit,
+  Uri,
   WorkspaceEdit,
   commands,
   window,
@@ -23,12 +24,12 @@ import {
   CELL_OPEN_MDH,
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SHOW_METADATA_SETTINGS,
-  CELL_WRITE_TO_CLIPBOARD,
   CREATE_NEW_NOTEBOOK,
   NOTEBOOK_TYPE,
   SHOW_NOTEBOOK_ALL_RDH,
   SHOW_NOTEBOOK_ALL_VARIABLES,
   SPECIFY_CONNECTION_TO_ALL_CELLS,
+  EXPORT_IN_HTML,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
@@ -45,7 +46,6 @@ import {
   isSqlCell,
   getSelectedCells,
 } from "../utilities/notebookUtil";
-import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { log } from "../utilities/logger";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -54,6 +54,9 @@ import { HttpEventPanel } from "../panels/HttpEventPanel";
 import sqlFormatter from "sql-formatter-plus";
 import { getFormatterConfig } from "../utilities/configUtil";
 import { MdhViewParams } from "../types/views";
+import dayjs = require("dayjs");
+import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { createHtml } from "../utilities/htmlGenerator";
 
 const PREFIX = "[notebook/activator]";
 
@@ -171,6 +174,29 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         }
       }
     );
+
+    registerDisposableCommand(EXPORT_IN_HTML, async (e: NotebookToolbarClickEvent) => {
+      const notebookEditor = getToolbarButtonClickedNotebookEditor(e);
+      const cells = notebookEditor?.notebook.getCells();
+      if (!cells || !notebookEditor) {
+        return;
+      }
+      const title = path.basename(notebookEditor?.notebook.uri.fsPath);
+      const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}.html`;
+      const uri = await window.showSaveDialog({
+        defaultUri: Uri.file(path.join("./", defaultFileName)),
+        filters: { "*": ["html"] },
+      });
+      if (!uri) {
+        return;
+      }
+      const message = await createHtml(notebookEditor.notebook, uri.fsPath);
+      if (message) {
+        showWindowErrorMessage(message);
+      } else {
+        window.showInformationMessage(uri.fsPath);
+      }
+    });
   }
 
   // Notebook cell statusbar commands
@@ -207,23 +233,6 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       }
     });
 
-    registerDisposableCommand(CELL_WRITE_TO_CLIPBOARD, async (cell: NotebookCell) => {
-      const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
-      const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;
-      if (!isSqlCell(cell) || rrm === undefined) {
-        return;
-      }
-      WriteToClipboardParamsPanel.render(context.extensionUri, rrmListToRdhList([rrm]), {
-        tabId: "",
-        fileType: "markdown",
-        outputWithType: "withComment",
-        withRowNo: false,
-        withCodeLabel: true,
-        specifyDetail: true,
-        withRuleViolation: true,
-        limit: 10,
-      });
-    });
     registerDisposableCommand(CELL_OPEN_MDH, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;
       const rrm: RunResultMetadata | undefined = cell.outputs?.[0].metadata;

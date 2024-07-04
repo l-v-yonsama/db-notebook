@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer Redis, AWS, Keycloak and Auth0.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -132,6 +132,11 @@
           "id": "database-notebook-view-count-for-all-tables",
           "title": "Count for all tables",
           "icon": "media/dark/symbol-numeric.svg"
+        },
+        {
+          "id": "database-notebook-view-charts",
+          "title": "Charts",
+          "icon": "media/dark/symbol-numeric.svg"
         }
       ]
     },
@@ -182,6 +187,15 @@
           "name": "Diff in ResultSets",
           "contextualTitle": "Diff in ResultSets",
           "when": "database-notebook.view.bottom.diff-mdh.visible"
+        }
+      ],
+      "database-notebook-view-charts": [
+        {
+          "type": "webview",
+          "id": "database-notebook.view.bottom.charts",
+          "name": "Charts",
+          "contextualTitle": "Charts",
+          "when": "database-notebook.view.bottom.charts.visible"
         }
       ],
       "database-notebook-view-count-for-all-tables": [
@@ -393,6 +407,11 @@
           "command": "database-notebook.toolbar.specify-connection-all",
           "group": "navigation/execute@1",
           "when": "notebookType == 'database-notebook-type' && hasSql"
+        },
+        {
+          "command": "database-notebook.toolbar.export-in-html",
+          "group": "navigation/execute@1",
+          "when": "notebookType == 'database-notebook-type'"
         }
       ],
       "notebook/cell/execute": [
@@ -621,11 +640,6 @@
         "icon": "$(table)"
       },
       {
-        "command": "database-notebook.cell.write-to-clipboard",
-        "title": "Write to clipboard",
-        "icon": "$(clippy)"
-      },
-      {
         "command": "database-notebook.cell.specify-connection-to-use",
         "title": "Specify connection to use",
         "icon": "$(debug-disconnect)"
@@ -658,8 +672,14 @@
       {
         "command": "database-notebook.toolbar.specify-connection-all",
         "title": "Specify connection in all SQL Cells",
-        "shortTitle": "Specify connection in all",
+        "shortTitle": "Specify connection all",
         "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "database-notebook.toolbar.export-in-html",
+        "title": "Output in html",
+        "shortTitle": "Output html",
+        "icon": "$(output)"
       },
       {
         "command": "database-notebook.cell-execute-query",
@@ -801,6 +821,76 @@
             "EUC-KR"
           ],
           "description": "STDOUT/STDERR encoding of the Javascript execution process"
+        },
+        "resultset.Header display comment": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": true,
+          "description": "Display column comments in Resultset header"
+        },
+        "resultset.Header display type": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": true,
+          "description": "Display column type in Resultset header"
+        },
+        "resultset.Display rowno": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": false,
+          "description": "Display row number in Resultset"
+        },
+        "resultset.Max characters in cell": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 100,
+          "description": "Maximum number of characters to be displayed in a cell"
+        },
+        "resultset.Max rows in preview": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 10,
+          "description": "Maximum number of rows displayed in preview"
+        },
+        "database.Default limit rows": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 100,
+          "description": "Specify the number of records to return"
+        },
+        "output.Html: display TOC": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": true,
+          "description": "Display TOC in HTML"
+        },
+        "output.Html: display graphs": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": true,
+          "description": "Display graphs in HTML"
+        },
+        "output.Max rows in output file": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 10000,
+          "description": "Maximum number of rows displayed in output file"
+        },
+        "output.Max characters in cell in output file": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 10000,
+          "description": "Maximum number of characters to be displayed in a cell in output file"
         }
       }
     }
@@ -834,7 +924,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.2.7",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.3.2",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

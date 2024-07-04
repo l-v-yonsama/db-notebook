@@ -22,7 +22,6 @@ import { MdhViewEventData, RdhTabItem } from "../shared/MessageEventData";
 import { createHash } from "crypto";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { createBookFromList } from "../utilities/excelGenerator";
-import { WriteToClipboardParamsPanel } from "../panels/WriteToClipboardParamsPanel";
 import { rdhListToText } from "../utilities/rdhToText";
 import path = require("path");
 import { MdhViewParams, DiffMdhViewTabParam } from "../types/views";
@@ -260,7 +259,6 @@ export class MdhViewProvider extends BaseViewProvider {
     const message = await createBookFromList(tabItem.list, uri.fsPath, {
       rdh: {
         outputAllOnOneSheet: true,
-        outputWithType: data.outputWithType,
       },
       rule: {
         withRecordRule: true,
@@ -279,11 +277,8 @@ export class MdhViewProvider extends BaseViewProvider {
     if (!tabItem) {
       return;
     }
-    if (params.specifyDetail === true) {
-      WriteToClipboardParamsPanel.render(this.context.extensionUri, tabItem.list, params);
-    } else {
-      await env.clipboard.writeText(rdhListToText(tabItem.list, params));
-    }
+
+    await env.clipboard.writeText(rdhListToText(tabItem.list, params));
   }
 
   private async compare(params: CompareParams) {

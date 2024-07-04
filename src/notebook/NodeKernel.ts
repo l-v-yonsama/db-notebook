@@ -20,6 +20,7 @@ import dayjs = require("dayjs");
 import { Entry } from "har-format";
 import { getNodeConfig } from "../utilities/configUtil";
 import { EMOJI } from "../types/Emoji";
+import stringify = require("fast-json-stable-stringify");
 
 const PREFIX = "  [notebook/NodeKernel]";
 
@@ -51,7 +52,7 @@ export class NodeKernel {
   }
 
   private async createScript(cell: NotebookCell): Promise<string> {
-    const variablesJsonString = JSON.stringify(this.variables);
+    const variablesJsonString = stringify(this.variables);
 
     return `
     (async () => {
@@ -63,6 +64,7 @@ export class NodeKernel {
       const axios = require('${winToLinuxPath(
         path.join(nodeModules, "axios/dist/node/axios.cjs")
       )}');
+      axios.defaults.validateStatus = () => true;
       const _harTracker = require('${winToLinuxPath(path.join(nodeModules, "axios-har-tracker"))}');
       const _axiosTracker = new _harTracker.AxiosHarTracker(axios); 
       axios.interceptors.request.use( x => {
@@ -81,7 +83,7 @@ export class NodeKernel {
         path.join(nodeModules, "@l-v-yonsama/multi-platform-database-drivers")
       )}');
       const getConnectionSettingByName = (s) => {
-        const settings = ${JSON.stringify(this.connectionSettings)};
+        const settings = ${stringify(this.connectionSettings)};
         const o = settings.find(it => it.name == s);
         if (o) {
           return o;
@@ -99,6 +101,7 @@ export class NodeKernel {
       const writeResponseData = (res) => {
         try {
           const har = _axiosTracker.getGeneratedHar();
+          _axiosTracker.resetHar();
           const rc = res.config;
           const entry = har.log.entries.find(it => it.request.url===rc.url && it.request.method === rc.method && it.response.status === res.status);
     
@@ -292,6 +295,7 @@ export class NodeKernel {
           stdout,
           stderr: errorMessages.join(os.EOL),
           skipped: false,
+          status: "error",
           metadata,
         };
       } else {
@@ -309,8 +313,10 @@ export class NodeKernel {
     stderr = stderr.replace(/\r\n/g, "\n");
     stderr = stderr.replace(/\n+/g, "\n");
 
+    let existsVariablesFile = false;
     try {
       if (await existsOnStorage(this.variablesFile.fsPath)) {
+        existsVariablesFile = true;
         this.variables = JSON.parse(await readResourceOnStorage(this.variablesFile.fsPath));
       }
     } catch (e) {
@@ -357,11 +363,23 @@ export class NodeKernel {
         metadata.updateJSONCellValues = v;
       }
     }
+    try {
+      if (existsVariablesFile) {
+        await writeToResourceOnStorage(this.variablesFile.fsPath, stringify(this.variables));
+      }
+    } catch (e) {
+      if (e instanceof Error) {
+        log(`${PREFIX} save variables Error:${e.message}`);
+      } else {
+        log(`${PREFIX} save variables Error:${e}`);
+      }
+    }
 
     return {
       stdout,
       stderr,
       skipped: false,
+      status: stderr.length > 0 ? "error" : "executed",
       metadata,
     };
   }

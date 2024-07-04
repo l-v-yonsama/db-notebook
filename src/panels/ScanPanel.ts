@@ -27,6 +27,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { DiffMdhViewTabParam } from "../types/views";
 import { OPEN_DIFF_MDH_VIEWER } from "../constant";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getDatabaseConfig } from "../utilities/configUtil";
 
 const PREFIX = "[ScanPanel]";
 
@@ -100,7 +101,7 @@ export class ScanPanel {
     const now = dayjs();
     const title = rootRes.name;
     const keyword = createCondition("Keyword", "");
-    const limit = createCondition("Limit", 100);
+    const limit = createCondition("Limit", getDatabaseConfig().limitRows);
     const jsonExpansion = createCondition("JsonExpansion", false);
     const startDt = createCondition("StartDt", now.format("YYYY-MM-DD"));
     const endDt = createCondition("EndDt", now.format("YYYY-MM-DD"));

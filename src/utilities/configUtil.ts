@@ -1,5 +1,12 @@
 import { workspace } from "vscode";
-import { NodeConfigType, SQLFormatterConfigType } from "../types/Config";
+import {
+  DatabaseConfigType,
+  NodeConfigType,
+  OutputConfigType,
+  ResultsetConfigType,
+  SQLFormatterConfigType,
+} from "../types/Config";
+import { ToStringParam } from "@l-v-yonsama/multi-platform-database-drivers";
 
 export const getFormatterConfig = (): SQLFormatterConfigType => {
   const settings = workspace.getConfiguration("sql-formatter", null);
@@ -18,4 +25,61 @@ export const getNodeConfig = (): NodeConfigType => {
     commandPath: settings.get("Node path", ""),
     dataEncoding: settings.get("encoding", ""),
   };
+};
+
+export const getResultsetConfig = (): ResultsetConfigType => {
+  const settings = workspace.getConfiguration("resultset", null);
+
+  return {
+    header: {
+      displayComment: settings.get("Header display comment", true),
+      displayType: settings.get("Header display type", false),
+    },
+    displayRowno: settings.get("Display rowno", false),
+    maxCharactersInCell: settings.get("Max characters in cell", 100),
+    maxRowsInPreview: settings.get("Max rows in preview", 10),
+  };
+};
+
+export const getDatabaseConfig = (): DatabaseConfigType => {
+  const settings = workspace.getConfiguration("database", null);
+
+  return {
+    limitRows: settings.get("Default limit rows", 100),
+  };
+};
+
+export const getOutputConfig = (): OutputConfigType => {
+  const settings = workspace.getConfiguration("output", null);
+
+  return {
+    maxRows: settings.get("Max rows in output file", 10000),
+    maxCharactersInCell: settings.get("Max characters in cell in output file", 10000),
+    html: {
+      displayToc: settings.get("Html: display TOC", true),
+      displayGraphs: settings.get("Html: display graphs", true),
+    },
+  };
+};
+
+export const getToStringParamByConfig = (options?: Partial<ToStringParam>): ToStringParam => {
+  const output = getOutputConfig();
+  const rdh = getResultsetConfig();
+  const config = {
+    maxPrintLines: output.maxRows,
+    maxCellValueLength: output.maxCharactersInCell,
+    withType: rdh.header.displayType,
+    withComment: rdh.header.displayComment,
+    withRowNo: rdh.displayRowno,
+    withCodeLabel: true,
+    withRuleViolation: true,
+  };
+
+  if (options) {
+    return {
+      ...config,
+      ...options,
+    };
+  }
+  return config;
 };

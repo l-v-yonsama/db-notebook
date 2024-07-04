@@ -1,7 +1,9 @@
 export type ComponentName =
   | "CountRecordView"
+  | "ChartsView"
   | "MdhView"
   | "DiffMdhView"
+  | "ExportHtmlParamsPanel"
   | "ScanPanel"
   | "VariablesPanel"
   | "CsvParseSettingPanel"
@@ -9,7 +11,6 @@ export type ComponentName =
   | "HarFilePanel"
   | "HttpEventPanel"
   | "ViewConditionPanel"
-  | "WriteToClipboardParamsPanel"
   | "WriteHttpEventToClipboardParamsPanel"
   | "DBFormView"
   | "ERDiagramSettingsPanel"

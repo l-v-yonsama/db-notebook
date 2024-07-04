@@ -6,6 +6,7 @@ import type {
   DbSchema,
   DbTable,
   DiffResult,
+  RdhKey,
   ResourceType,
   ResultSetData,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -20,13 +21,15 @@ import type {
 } from "./ActionParams";
 import type { RecordRule } from "./RecordRule";
 import type { CodeResolverParams } from "./CodeResolverParams";
-import type { CellMeta } from "../types/Notebook";
+import type { CellMeta, CellMetaChart } from "../types/Notebook";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 import type { Har } from "har-format";
+import type { ExtChartData, ExtChartOptions, PairPlotChartParams } from "../shared/ExtChartJs";
 
 export type MessageEventData =
   | MdhViewEventData
   | CountRecordViewEventData
+  | ChartsViewEventData
   | HttpEventPanelEventData
   | CreateInsertScriptSettingsPanelEventData
   | CsvParseSettingPanelEventData
@@ -35,7 +38,6 @@ export type MessageEventData =
   | ScanPanelEventData
   | ViewConditionPanelEventData
   | VariablesPanelEventData
-  | WriteToClipboardParamsPanelEventData
   | WriteHttpEventToClipboardParamsPanelEventData
   | NotebookCellMetadataPanelEventData
   | ERDiagramSettingsPanelEventData
@@ -188,6 +190,15 @@ export type DiffMdhViewEventData = BaseMessageEventData<
   }
 >;
 
+export type ChartTabItem = {
+  tabId: string;
+  title: string;
+  type: CellMetaChart["type"];
+  data?: ExtChartData;
+  options?: ExtChartOptions;
+  pairPlotChartParams?: PairPlotChartParams;
+};
+
 export type ScanConditionItem = {
   label: string;
   value: any;
@@ -280,17 +291,6 @@ export type VariablesPanelEventData = BaseMessageEventData<
   }
 >;
 
-export type WriteToClipboardParamsPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand,
-  "WriteToClipboardParamsPanel",
-  {
-    initialize?: {
-      params: WriteToClipboardParams;
-      previewText: string;
-    };
-  }
->;
-
 export type WriteHttpEventToClipboardParamsPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand,
   "WriteHttpEventToClipboardParamsPanel",
@@ -311,6 +311,7 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
       connectionSettingNames: string[];
       codeFileItems: { label: string; value: string }[];
       ruleFileItems: { label: string; value: string }[];
+      columnItems: RdhKey[];
     };
   }
 >;
@@ -340,6 +341,22 @@ export type CountRecordViewEventData = BaseMessageEventData<
       selectedTableNames: string[];
       mode: "setting" | "running" | "show";
       rdh?: ResultSetData;
+    };
+  }
+>;
+
+export type ChartsViewEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "init",
+  "ChartsView",
+  {
+    searchResult?: {
+      tabId: string;
+      value: ChartTabItem;
+    };
+    addTabItem?: ChartTabItem;
+    init?: {
+      tabItems: ChartTabItem[];
+      currentTabId?: string;
     };
   }
 >;

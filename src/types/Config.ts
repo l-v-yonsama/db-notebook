@@ -22,3 +22,26 @@ export type NodeProcessDataEncodingType =
   | "KS_C_5601"
   | "Windows949"
   | "EUC-KR";
+
+export type ResultsetConfigType = {
+  header: {
+    displayComment: boolean;
+    displayType: boolean;
+  };
+  displayRowno: boolean;
+  maxCharactersInCell: number;
+  maxRowsInPreview: number;
+};
+
+export type DatabaseConfigType = {
+  limitRows: number;
+};
+
+export type OutputConfigType = {
+  maxRows: number;
+  maxCharactersInCell: number;
+  html: {
+    displayToc: boolean;
+    displayGraphs: boolean;
+  };
+};

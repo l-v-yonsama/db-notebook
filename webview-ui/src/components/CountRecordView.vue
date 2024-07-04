@@ -82,8 +82,6 @@ const output = (): void => {
     params: {
       tabId: "",
       fileType: "excel",
-      outputWithType: "both",
-      withRowNo: true,
       displayOnlyChanged: false,
     },
   });

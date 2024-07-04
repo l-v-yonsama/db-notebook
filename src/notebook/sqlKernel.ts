@@ -32,6 +32,7 @@ export class SqlKernel {
         stdout,
         stderr: "",
         skipped: true,
+        status: "skipped",
       };
     }
     if (connectionName) {
@@ -41,6 +42,7 @@ export class SqlKernel {
         stdout,
         stderr: "Specify the connection name to be used.",
         skipped: false,
+        status: "error",
       };
     }
     if (!connectionSetting) {
@@ -48,6 +50,7 @@ export class SqlKernel {
         stdout,
         stderr: "Missing connection " + connectionName,
         skipped: false,
+        status: "error",
       };
     }
 
@@ -136,6 +139,7 @@ export class SqlKernel {
       stdout,
       stderr: stderrs.join(os.EOL),
       skipped: false,
+      status: stderrs.length > 0 ? "error" : "executed",
       metadata,
     };
   }

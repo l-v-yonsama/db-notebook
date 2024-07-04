@@ -26,7 +26,9 @@ It also provides a CSV and Har file preview feature.
   - Verify result sets comply with a rule.
   - Output in Excel file format
   - Generate descriptive statistics
+  - Support graphs
 - Create and execute "Undo changes sql statements"
+- Output notebook in HTML file format
 - File preview
   - CSV file preview
   - Har file preview
@@ -63,6 +65,10 @@ It also provides a CSV and Har file preview feature.
 - Count the number of all tables belonging to the schema
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/15_count_for_all_tables.gif)
+
+- Output notebook in HTML file format
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/16_html_report.gif)
 
 <details>
 
@@ -133,6 +139,7 @@ It also provides a CSV and Har file preview feature.
 ## Examples
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
+- [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 
 ## Keyboard shortcuts
 

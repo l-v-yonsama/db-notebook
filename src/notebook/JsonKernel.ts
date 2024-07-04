@@ -18,6 +18,7 @@ export const jsonKernelRun = async (
       stdout,
       stderr,
       skipped: true,
+      status: "skipped",
     };
   }
 
@@ -42,5 +43,6 @@ export const jsonKernelRun = async (
     stdout,
     stderr,
     skipped: false,
+    status: "executed",
   };
 };

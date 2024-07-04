@@ -11,6 +11,7 @@ export * from "../../../src/shared/SaveValuesInRdhParams";
 export * from "../../../src/shared/ComponentName";
 export * from "../../../src/shared/RunResultMetadata";
 export * from "../../../src/shared/MessageEventData";
+export * from "../../../src/shared/ExtChartJs";
 
 class VSCodeAPIWrapper {
   private readonly vsCodeApi: WebviewApi<unknown> | undefined;

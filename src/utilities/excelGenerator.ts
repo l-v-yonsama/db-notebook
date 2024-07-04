@@ -22,6 +22,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Fill } from "exceljs";
 import dayjs = require("dayjs");
+import { getResultsetConfig } from "./configUtil";
 
 // const FONT_NAME_Arial ='Arial';
 const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";
@@ -54,7 +55,6 @@ type TocRecords = {
 export type BookCreateOption = {
   rdh: {
     outputAllOnOneSheet: boolean;
-    outputWithType?: "none" | "withComment" | "withType" | "both";
   };
   diff?: {
     displayOnlyChanged: boolean;
@@ -124,13 +124,7 @@ function createQueryResultListSheet(
         rows: rdh.meta.type === "select" ? rdh.rows.length : "-",
         time,
       });
-      const plusRows = createQueryResultSheet(
-        workbook,
-        sheet,
-        rdh,
-        baseRowNo,
-        options.rdh.outputWithType
-      );
+      const plusRows = createQueryResultSheet(workbook, sheet, rdh, baseRowNo);
       baseRowNo += plusRows + 2;
     });
   } else {
@@ -153,7 +147,7 @@ function createQueryResultListSheet(
         pageSetup: { paperSize: 9, orientation: "portrait" },
       });
       sheet.getColumn("A").width = 2;
-      createQueryResultSheet(workbook, sheet, rdh, baseRowNo, options?.rdh.outputWithType);
+      createQueryResultSheet(workbook, sheet, rdh, baseRowNo);
     });
   }
 
@@ -164,10 +158,10 @@ function createQueryResultSheet(
   book: Excel.Workbook,
   sheet: Excel.Worksheet,
   rdh: ResultSetData,
-  baseRowNo: number,
-  outputWithType?: BookCreateOption["rdh"]["outputWithType"]
+  baseRowNo: number
 ): number {
   let plusNo = 0;
+  const rdhConfig = getResultsetConfig();
 
   const { tableName, comment, ruleViolationSummary } = rdh.meta;
   // table name / comment
@@ -248,24 +242,24 @@ function createQueryResultSheet(
     cellPhy.value = column.name;
     setTableHeaderCell(cellPhy);
 
-    if (outputWithType === "both" || outputWithType === "withComment") {
+    if (rdhConfig.header.displayComment) {
       const cellLog = sheet.getCell(baseRowNo + plusNo + 1, idx + 3);
       cellLog.value = column.comment;
       setTableHeaderCell(cellLog);
     }
-    if (outputWithType === "both" || outputWithType === "withType") {
+    if (rdhConfig.header.displayType) {
       const cellType = sheet.getCell(
-        baseRowNo + plusNo + (outputWithType === "both" ? 2 : 1),
+        baseRowNo + plusNo + (rdhConfig.header.displayComment ? 2 : 1),
         idx + 3
       );
       cellType.value = EnumValues.getNameFromValue(GeneralColumnType, column.type);
       setTableHeaderCell(cellType);
     }
   });
-  if (outputWithType === "both") {
+  if (rdhConfig.header.displayComment && rdhConfig.header.displayType) {
     sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 2}`);
     plusNo += 3;
-  } else if (outputWithType === "withComment" || outputWithType === "withType") {
+  } else if (rdhConfig.header.displayComment || rdhConfig.header.displayType) {
     sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 1}`);
     plusNo += 2;
   } else {
@@ -364,7 +358,7 @@ async function createBookFromRdh(rdh: ResultSetData, targetExcelPath: string): P
   var sheet = workbook.addWorksheet(sheetName, {
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
-  createQueryResultSheet(workbook, sheet, rdh, 1, "withType");
+  createQueryResultSheet(workbook, sheet, rdh, 1);
 
   return new Promise<string>((resolve, reject) => {
     try {
@@ -509,6 +503,7 @@ async function createBookFromDiffList(
   let errorMessage = "";
   var workbook = new Excel.Workbook();
   const displayOnlyChanged = options?.diff?.displayOnlyChanged === true;
+  const rdhConfig = getResultsetConfig();
 
   try {
     // TOC
@@ -716,21 +711,14 @@ async function createBookFromDiffList(
           cellPhy.value = column.name;
           setTableHeaderCell(cellPhy);
 
-          if (
-            options?.rdh?.outputWithType === "both" ||
-            options?.rdh?.outputWithType === "withComment"
-          ) {
+          if (rdhConfig.header.displayComment) {
             const cellLog = sheet.getCell(startIndex + 1, idx + 2);
             cellLog.value = column.comment;
             setTableHeaderCell(cellLog);
           }
 
-          if (
-            options?.rdh?.outputWithType === "both" ||
-            options?.rdh?.outputWithType === "withType"
-          ) {
-            const rowIdx =
-              options?.rdh?.outputWithType === "both" ? startIndex + 2 : startIndex + 1;
+          if (rdhConfig.header.displayType) {
+            const rowIdx = rdhConfig.header.displayComment ? startIndex + 2 : startIndex + 1;
             const cellType = sheet.getCell(rowIdx, idx + 2);
             cellType.value = EnumValues.getNameFromValue(GeneralColumnType, column.type);
             setTableHeaderCell(cellType);
@@ -738,13 +726,10 @@ async function createBookFromDiffList(
         });
 
         cur.rowNo++;
-        if (options?.rdh?.outputWithType === "both") {
+        if (rdhConfig.header.displayComment && rdhConfig.header.displayType) {
           cur.rowNo += 2;
           sheet.mergeCells(`A${startIndex}:A${startIndex + 2}`);
-        } else if (
-          options?.rdh?.outputWithType === "withComment" ||
-          options?.rdh?.outputWithType === "withType"
-        ) {
+        } else if (rdhConfig.header.displayComment || rdhConfig.header.displayType) {
           cur.rowNo++;
           sheet.mergeCells(`A${startIndex}:A${startIndex + 1}`);
         }

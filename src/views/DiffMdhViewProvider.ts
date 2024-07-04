@@ -398,7 +398,6 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     const message = await createBookFromDiffList(tabItem.list, uri.fsPath, {
       rdh: {
         outputAllOnOneSheet: false,
-        outputWithType: data.outputWithType,
       },
       diff: {
         displayOnlyChanged: data.displayOnlyChanged ?? false,

@@ -19,6 +19,8 @@ import {
   OPEN_DIFF_MDH_VIEWER,
   BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
+  BOTTOM_CHARTS_VIEWID,
+  OPEN_CHARTS_VIEWER,
 } from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
 import { initializeStoragePath, initializeStorageTmpPath } from "./utilities/fsUtil";
@@ -30,9 +32,10 @@ import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
 import { MdhViewProvider } from "./views/MdhViewProvider";
 import { HarFilePanel } from "./panels/HarFilePanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
-import { DiffMdhViewTabParam, MdhViewParams } from "./types/views";
+import { ChartsViewParams, DiffMdhViewTabParam, MdhViewParams } from "./types/views";
 import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
 import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
+import { ChartsViewProvider } from "./views/ChartsViewProvider";
 
 const PREFIX = "[extension]";
 
@@ -129,6 +132,15 @@ export async function activate(context: ExtensionContext) {
     );
     commands.registerCommand(OPEN_DIFF_MDH_VIEWER, (params: DiffMdhViewTabParam) => {
       diffMdhViewProvider.render(params);
+    });
+
+    // Charts View
+    const chartsViewProvider = new ChartsViewProvider(BOTTOM_CHARTS_VIEWID, context, stateStorage);
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(chartsViewProvider.viewId, chartsViewProvider)
+    );
+    commands.registerCommand(OPEN_CHARTS_VIEWER, (params: ChartsViewParams) => {
+      chartsViewProvider.render(params);
     });
 
     // Count records View

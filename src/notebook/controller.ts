@@ -3,11 +3,11 @@ import {
   CELL_OPEN_MDH,
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SHOW_METADATA_SETTINGS,
-  CELL_WRITE_TO_CLIPBOARD,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
   REFRESH_SQL_HISTORIES,
+  OPEN_CHARTS_VIEWER,
 } from "../constant";
 import { NodeKernel } from "./NodeKernel";
 import { StateStorage } from "../utilities/StateStorage";
@@ -52,6 +52,8 @@ import { jsonKernelRun } from "./JsonKernel";
 import { existsFileOnWorkspace } from "../utilities/fsUtil";
 import { createResponseBodyMarkdown } from "../utilities/httpUtil";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
+import { ChartsViewParams } from "../types/views";
+import { getResultsetConfig, getToStringParamByConfig } from "../utilities/configUtil";
 
 const PREFIX = "[notebook/Controller]";
 
@@ -146,13 +148,6 @@ export class MainController {
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
         new CellMetadataProvider(stateStorage)
-      )
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new WriteToClipboardProvider()
       )
     );
 
@@ -279,6 +274,7 @@ export class MainController {
     let stdout = "";
     let stderr = "";
     let skipped = false;
+    let status = "skipped";
     let metadata: RunResultMetadata | undefined = undefined;
     const cellMeta: CellMeta = cell.metadata;
 
@@ -289,13 +285,17 @@ export class MainController {
       stdout = r.stdout;
       stderr = r.stderr;
       skipped = r.skipped;
-      metadata = r.metadata;
+      status = r.status;
+      metadata = {
+        ...r.metadata,
+        status,
+      };
 
       if (stdout.length) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
       }
       if (stderr) {
-        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stdout(stderr)], metadata));
+        outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stderr(stderr)], metadata));
         success = false;
       }
       if (skipped) {
@@ -309,32 +309,41 @@ export class MainController {
 
       if (metadata) {
         const { rdh, explainRdh, analyzedRdh, axiosEvent, updateJSONCellValues } = metadata;
+
         if (rdh) {
-          const withComment = rdh.keys.some((it) => (it.comment ?? "").length);
+          const toMarkdownConfig = getToStringParamByConfig({
+            maxPrintLines: getResultsetConfig().maxRowsInPreview,
+            maxCellValueLength: getResultsetConfig().maxCharactersInCell,
+            withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
+            withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
+          });
           outputs.push(
             new NotebookCellOutput(
               [
                 NotebookCellOutputItem.text(
                   `\`[Query Result]\` ${rdh.summary?.info}\n` +
-                    ResultSetDataBuilder.from(rdh).toMarkdown({
-                      withComment,
-                      withRowNo: true,
-                      withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
-                      withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
-                    }),
+                    ResultSetDataBuilder.from(rdh).toMarkdown(toMarkdownConfig),
                   "text/markdown"
                 ),
               ],
               metadata
             )
           );
+          if (cellMeta && cellMeta.chart) {
+            const commandParam: ChartsViewParams = { ...cellMeta.chart, rdh };
+            commands.executeCommand(OPEN_CHARTS_VIEWER, commandParam);
+          }
         }
 
         if (explainRdh) {
-          const md = ResultSetDataBuilder.from(explainRdh).toMarkdown({
-            withComment: true,
-            withRowNo: false,
-          });
+          const md = ResultSetDataBuilder.from(explainRdh).toMarkdown(
+            getToStringParamByConfig({
+              maxPrintLines: getResultsetConfig().maxRowsInPreview,
+              maxCellValueLength: getResultsetConfig().maxCharactersInCell,
+              withComment: true,
+              withRowNo: false,
+            })
+          );
 
           outputs.push(
             new NotebookCellOutput(
@@ -344,10 +353,14 @@ export class MainController {
           );
         }
         if (analyzedRdh) {
-          const md = ResultSetDataBuilder.from(analyzedRdh).toMarkdown({
-            withComment: false,
-            withRowNo: false,
-          });
+          const md = ResultSetDataBuilder.from(analyzedRdh).toMarkdown(
+            getToStringParamByConfig({
+              maxPrintLines: getResultsetConfig().maxRowsInPreview,
+              maxCellValueLength: getResultsetConfig().maxCharactersInCell,
+              withComment: false,
+              withRowNo: false,
+            })
+          );
 
           outputs.push(
             new NotebookCellOutput(
@@ -429,6 +442,7 @@ export class MainController {
         stdout,
         stderr,
         skipped,
+        status,
         metadata,
       });
     }
@@ -440,6 +454,7 @@ export class MainController {
         stdout: "",
         stderr: "",
         skipped: true,
+        status: "skipped",
       };
     }
     const noteSession = this.getNoteSession(notebook);
@@ -525,9 +540,9 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
     const {
       ruleFile,
       codeResolverFile,
-      markAsSkip,
       savingSharedVariables,
       sharedVariableName,
+      chart,
     }: CellMeta = cell.metadata;
     let tooltip = "";
 
@@ -559,6 +574,28 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
 
     if (savingSharedVariables && sharedVariableName) {
       tooltip += " $(symbol-variable) " + abbr(sharedVariableName, 18);
+    }
+
+    if (chart && chart.type) {
+      switch (chart.type) {
+        case "bar":
+          tooltip += " $(graph) " + chart.type;
+          break;
+        case "doughnut":
+        case "pie":
+          tooltip += " $(pie-chart) " + chart.type;
+          break;
+        case "line":
+          tooltip += " $(graph-line) " + chart.type;
+          break;
+        case "scatter":
+        case "pairPlot":
+          tooltip += " $(graph-scatter) " + chart.type;
+          break;
+        case "radar":
+          tooltip += " $(graph) " + chart.type;
+          break;
+      }
     }
 
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
@@ -618,26 +655,6 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_SPECIFY_CONNECTION_TO_USE;
     item.tooltip = tooltip;
-    return item;
-  }
-}
-
-class WriteToClipboardProvider implements NotebookCellStatusBarItemProvider {
-  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    const rMetadata: RunResultMetadata | undefined = cell.outputs[0]?.metadata;
-    if (!rMetadata) {
-      return;
-    }
-    const { rdh, explainRdh, analyzedRdh } = rMetadata;
-    if (rdh === undefined && explainRdh === undefined && analyzedRdh === undefined) {
-      return;
-    }
-    const item = new NotebookCellStatusBarItem(
-      "$(clippy) Write to clipbaord",
-      NotebookCellStatusBarAlignment.Right
-    );
-    item.command = CELL_WRITE_TO_CLIPBOARD;
-    item.tooltip = "Write to clipbaord";
     return item;
   }
 }

@@ -25,7 +25,7 @@ export const toNodeRunAxiosEvent = (entry: Entry): NodeRunAxiosEvent => {
   };
 };
 
-const getHeaderValue = (headers: Header[], name: string): string | undefined => {
+export const getHeaderValue = (headers: Header[], name: string): string | undefined => {
   const ln = name.toLocaleLowerCase();
   return headers.find((it) => it.name.toLocaleLowerCase() === ln)?.value;
 };
@@ -316,8 +316,8 @@ const cookieToText = (cookies: Cookie[], isMarkdown: boolean) => {
   const rdb = createRdbFromCookies(cookies);
 
   const outputDetail: ToStringParam = {
-    maxPrintLines: 1000,
-    maxCellValueLength: 1000,
+    maxPrintLines: 10000,
+    maxCellValueLength: 10000,
     withType: false,
     withComment: false,
     withRowNo: true,
