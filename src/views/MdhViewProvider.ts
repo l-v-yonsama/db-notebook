@@ -28,6 +28,7 @@ import { MdhViewParams, DiffMdhViewTabParam } from "../types/views";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
 
 const PREFIX = "[MdhView]";
 dayjs.extend(utc);
@@ -248,22 +249,26 @@ export class MdhViewProvider extends BaseViewProvider {
       return;
     }
     const { title } = tabItem;
-    const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}.xlsx`;
+    const fileExtension = data.fileType === "excel" ? "xlsx" : "html";
+    const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}.${fileExtension}`;
     const uri = await window.showSaveDialog({
       defaultUri: Uri.file(path.join("./", defaultFileName)),
-      filters: { "*": ["xlsx"] },
+      filters: { "*": [fileExtension] },
     });
     if (!uri) {
       return;
     }
-    const message = await createBookFromList(tabItem.list, uri.fsPath, {
-      rdh: {
-        outputAllOnOneSheet: true,
-      },
-      rule: {
-        withRecordRule: true,
-      },
-    });
+    const message =
+      data.fileType === "excel"
+        ? await createBookFromList(tabItem.list, uri.fsPath, {
+            rdh: {
+              outputAllOnOneSheet: true,
+            },
+            rule: {
+              withRecordRule: true,
+            },
+          })
+        : await createHtmlFromRdhList(tabItem.list, uri.fsPath);
     if (message) {
       showWindowErrorMessage(message);
     } else {

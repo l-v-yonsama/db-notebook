@@ -401,6 +401,9 @@ defineExpose({
         title="Write to clipboard"
         @onSelect="writeToClipboard"
       />
+      <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as Html">
+        <fa icon="file-lines" />
+      </button>
       <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
         <fa icon="file-excel" />
       </button>

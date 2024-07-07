@@ -8,7 +8,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellMeta, RunResult, NotebookExecutionVariables, SQLMode } from "../types/Notebook";
 import { NotebookCell } from "vscode";
-import { log } from "../utilities/logger";
+import { log, logError } from "../utilities/logger";
 import * as os from "os";
 
 const PREFIX = "  [notebook/SqlKernel]";
@@ -54,86 +54,92 @@ export class SqlKernel {
       };
     }
 
-    const resolver = DBDriverResolver.getInstance();
-    const driver = resolver.createDriver<RDSBaseDriver>(connectionSetting);
-    const toPositionedParameter = driver.isPositionedParameterAvailable();
-    const toPositionalCharacter = driver.getPositionalCharacter();
-    const { query, binds } = normalizeQuery({
-      query: cell.document.getText(),
-      bindParams: variables,
-      toPositionedParameter,
-      toPositionalCharacter,
-    });
-    log(`${PREFIX} query:` + query);
-    log(`${PREFIX} binds:` + JSON.stringify(binds));
-
     let metadata: RunResult["metadata"] = {};
 
-    if (sqlMode === "ExplainAnalyze") {
-      const { message } = await resolver.flowTransaction<RDSBaseDriver>(
-        connectionSetting,
-        async (driver) => {
-          this.driver = driver;
-          metadata!.analyzedRdh = await driver.explainAnalyzeSql({
-            sql: query,
-            conditions: {
-              binds,
-            },
-          });
-        },
-        {
-          transactionControlType: "alwaysRollback",
-        }
-      );
+    try {
+      const resolver = DBDriverResolver.getInstance();
+      const driver = resolver.createRDSDriver(connectionSetting);
+      const toPositionedParameter = driver.isPositionedParameterAvailable();
+      const toPositionalCharacter = driver.getPositionalCharacter();
+      const { query, binds } = normalizeQuery({
+        query: cell.document.getText(),
+        bindParams: variables,
+        toPositionedParameter,
+        toPositionalCharacter,
+      });
+      log(`${PREFIX} query:` + query);
+      log(`${PREFIX} binds:` + JSON.stringify(binds));
 
-      if (message) {
-        stderrs.push(`Explain Analyze Error: ${message}`);
-      }
-    }
+      if (sqlMode === "ExplainAnalyze") {
+        const { message } = await resolver.flowTransaction<RDSBaseDriver>(
+          connectionSetting,
+          async (driver) => {
+            this.driver = driver;
+            metadata!.analyzedRdh = await driver.explainAnalyzeSql({
+              sql: query,
+              conditions: {
+                binds,
+              },
+            });
+          },
+          {
+            transactionControlType: "alwaysRollback",
+          }
+        );
 
-    if (sqlMode === "Explain") {
-      const { message } = await resolver.workflow<RDSBaseDriver>(
-        connectionSetting,
-        async (driver) => {
-          this.driver = driver;
-          metadata!.explainRdh = await driver.explainSql({
-            sql: query,
-            conditions: {
-              binds,
-            },
-          });
+        if (message) {
+          stderrs.push(`Explain Analyze Error: ${message}`);
         }
-      );
-      if (message) {
-        stderrs.push(`Explain Error: ${message}`);
       }
-    }
 
-    if (sqlMode === "Query") {
-      const { ok, message, result } = await resolver.workflow<RDSBaseDriver, ResultSetData>(
-        connectionSetting,
-        async (driver) => {
-          this.driver = driver;
-          return await driver.requestSql({
-            sql: query,
-            conditions: {
-              binds,
-            },
-          });
+      if (sqlMode === "Explain") {
+        const { message } = await resolver.workflow<RDSBaseDriver>(
+          connectionSetting,
+          async (driver) => {
+            this.driver = driver;
+            metadata!.explainRdh = await driver.explainSql({
+              sql: query,
+              conditions: {
+                binds,
+              },
+            });
+          }
+        );
+        if (message) {
+          stderrs.push(`Explain Error: ${message}`);
         }
-      );
-      if (ok && result) {
-        if (!result.meta.tableName) {
-          result.meta.tableName = `CELL${cell.index + 1}`;
-        }
-        metadata!.rdh = result;
-        metadata!.tableName = result.meta.tableName;
-        metadata!.type = result.meta.type;
-      } else {
-        stderrs.push(`Execute query Error: ${message}`);
       }
+
+      if (sqlMode === "Query") {
+        const { ok, message, result } = await resolver.workflow<RDSBaseDriver, ResultSetData>(
+          connectionSetting,
+          async (driver) => {
+            this.driver = driver;
+            return await driver.requestSql({
+              sql: query,
+              conditions: {
+                binds,
+              },
+            });
+          }
+        );
+        if (ok && result) {
+          if (!result.meta.tableName) {
+            result.meta.tableName = `CELL${cell.index + 1}`;
+          }
+          metadata!.rdh = result;
+          metadata!.tableName = result.meta.tableName;
+          metadata!.type = result.meta.type;
+        } else {
+          stderrs.push(`Execute query Error: ${message}`);
+        }
+      }
+      this.driver = undefined;
+    } catch (e) {
+      let message = e instanceof Error ? e.message : e + "";
+      logError(`${PREFIX} ${message}`);
+      stderrs.push(message);
     }
-    this.driver = undefined;
 
     return {
       stdout,

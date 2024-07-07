@@ -14,6 +14,7 @@ import {
   faCodeCompare,
   faEye,
   faFileExcel,
+  faFileLines,
   faFloppyDisk,
   faLeaf,
   faMagnifyingGlassChart,
@@ -36,6 +37,7 @@ library.add(faCirclePlay);
 library.add(faCodeCompare);
 library.add(faEye);
 library.add(faFileExcel);
+library.add(faFileLines);
 library.add(faFloppyDisk);
 library.add(faLeaf);
 library.add(faMagnifyingGlassChart);

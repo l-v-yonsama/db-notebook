@@ -129,7 +129,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
 
     const resolver = DBDriverResolver.getInstance();
-    const driver = resolver.createDriver<RDSBaseDriver>(connectionSetting);
+    const driver = resolver.createRDSDriver(connectionSetting);
     const toPositionedParameter = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
     const { query, binds } = normalizeQuery({

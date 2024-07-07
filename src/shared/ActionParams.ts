@@ -26,7 +26,7 @@ export type SaveCsvOptionParams = CsvParseOptions & {
 };
 
 export type OutputParams = TabIdParam & {
-  fileType: "excel" | "csv" | "markdown" | "text";
+  fileType: "excel" | "csv" | "markdown" | "text" | "html";
   displayOnlyChanged?: boolean;
 };
 

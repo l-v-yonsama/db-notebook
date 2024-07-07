@@ -41,6 +41,7 @@ import { BaseViewProvider } from "./BaseViewProvider";
 import { ComponentName } from "../shared/ComponentName";
 import { waitUntil } from "../utilities/waitUntil";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { createHtmlFromDiffList } from "../utilities/htmlGenerator";
 
 const PREFIX = "[DiffMdhView]";
 
@@ -387,25 +388,29 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       return;
     }
     const { title } = tabItem;
-    const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}_diff.xlsx`;
+    const fileExtension = data.fileType === "excel" ? "xlsx" : "html";
+    const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}_diff.${fileExtension}`;
     const uri = await window.showSaveDialog({
       defaultUri: Uri.file(path.join("./", defaultFileName)),
-      filters: { "*": ["xlsx"] },
+      filters: { "*": [fileExtension] },
     });
     if (!uri) {
       return;
     }
-    const message = await createBookFromDiffList(tabItem.list, uri.fsPath, {
-      rdh: {
-        outputAllOnOneSheet: false,
-      },
-      diff: {
-        displayOnlyChanged: data.displayOnlyChanged ?? false,
-      },
-      rule: {
-        withRecordRule: true,
-      },
-    });
+    const message =
+      data.fileType === "excel"
+        ? await createBookFromDiffList(tabItem.list, uri.fsPath, {
+            rdh: {
+              outputAllOnOneSheet: false,
+            },
+            diff: {
+              displayOnlyChanged: data.displayOnlyChanged ?? false,
+            },
+            rule: {
+              withRecordRule: true,
+            },
+          })
+        : await createHtmlFromDiffList(tabItem.list, uri.fsPath);
     if (message) {
       showWindowErrorMessage(message);
     } else {

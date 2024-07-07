@@ -112,7 +112,7 @@ export class ViewConditionPanel extends BasePanel {
     if (!setting) {
       return "";
     }
-    const driver = DBDriverResolver.getInstance().createDriver<RDSBaseDriver>(setting);
+    const driver = DBDriverResolver.getInstance().createRDSDriver(setting);
     const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
     const isLimitAsTop = driver.isLimitAsTop();
@@ -207,7 +207,7 @@ export class ViewConditionPanel extends BasePanel {
           });
 
           if (ok && result) {
-            const driver = DBDriverResolver.getInstance().createDriver<RDSBaseDriver>(setting);
+            const driver = DBDriverResolver.getInstance().createRDSDriver(setting);
 
             const { query, binds } = toViewDataQuery({
               tableRes,

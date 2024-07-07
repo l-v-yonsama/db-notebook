@@ -56,7 +56,7 @@ import { getFormatterConfig } from "../utilities/configUtil";
 import { MdhViewParams } from "../types/views";
 import dayjs = require("dayjs");
 import { showWindowErrorMessage } from "../utilities/alertUtil";
-import { createHtml } from "../utilities/htmlGenerator";
+import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
 
 const PREFIX = "[notebook/activator]";
 
@@ -190,7 +190,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       if (!uri) {
         return;
       }
-      const message = await createHtml(notebookEditor.notebook, uri.fsPath);
+      const message = await createHtmlFromNotebook(notebookEditor.notebook, uri.fsPath);
       if (message) {
         showWindowErrorMessage(message);
       } else {

@@ -861,13 +861,13 @@ async function createBookFromDiffList(
     // RECORD RULES
     if (options?.rule?.withRecordRule === true) {
       tocRowNo += 2;
-      cell = tocSheet.getCell(`C${tocRowNo}`);
-      cell.value = "■ Record Rules";
-      tocRowNo++;
       const ruleResultList = list
         .map((it) => RdhHelper.getRecordRuleResults(it.rdh2))
         .filter((it) => it !== undefined) as RecordRuleValidationResult[];
       if (ruleResultList.length) {
+        cell = tocSheet.getCell(`C${tocRowNo}`);
+        cell.value = "■ Record Rules";
+        tocRowNo++;
         // create a sheet.
         const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
         tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
