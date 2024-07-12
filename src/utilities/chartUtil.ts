@@ -17,6 +17,7 @@ import type {
   ExtChartJsInputParams,
   PairPlotChartParam,
   PairPlotChartParams,
+  PairPlotChartCorrelationParam,
 } from "../shared/ExtChartJs";
 
 const DEFAULT_CHART_OPTIONS: ExtChartOptions = {
@@ -251,7 +252,7 @@ const createLineParams = (params: ChartsViewParams): ExtChartJsInputParams => {
     datasets: [],
   };
 
-  const colors = createColors2(4, 0.3);
+  const colors = createColors2(4, 0.5);
   const borderColors = createColors2(4, 0.9);
   const pointStyles = createPointStyles(4);
 
@@ -387,13 +388,16 @@ const createBarParams = (params: ChartsViewParams): ExtChartJsInputParams => {
     datasets: [],
   };
 
-  const colors = createColors2(4);
+  const colors = createColors2(4, 0.5);
+  const borderColors = createColors2(4, 0.9);
 
   data.labels = rows.map((it) => it.values[params.label]);
   data.datasets.push({
     yAxisID: "y",
     label: params.data ?? "y1",
     backgroundColor: colors[0],
+    borderColor: borderColors[0],
+    borderWidth: 2,
     data: rows.map((it) => it.values[params.data]),
     stack: params.stacked ? "s0" : undefined,
   });
@@ -403,6 +407,8 @@ const createBarParams = (params: ChartsViewParams): ExtChartJsInputParams => {
         yAxisID: "y",
         label: params.data2 ?? "y2",
         backgroundColor: colors[1],
+        borderColor: borderColors[1],
+        borderWidth: 2,
         data: rows.map((it) => it.values[params.data2!]),
         stack: params.stacked ? "s0" : undefined,
       });
@@ -412,6 +418,8 @@ const createBarParams = (params: ChartsViewParams): ExtChartJsInputParams => {
         yAxisID: "y",
         label: params.data2 ?? "y3",
         backgroundColor: colors[2],
+        borderColor: borderColors[2],
+        borderWidth: 2,
         data: rows.map((it) => it.values[params.data3!]),
         stack: params.stacked ? "s0" : undefined,
       });
@@ -421,6 +429,8 @@ const createBarParams = (params: ChartsViewParams): ExtChartJsInputParams => {
         yAxisID: "y",
         label: params.data4 ?? "y4",
         backgroundColor: colors[3],
+        borderColor: borderColors[3],
+        borderWidth: 2,
         data: rows.map((it) => it.values[params.data4!]),
         stack: params.stacked ? "s0" : undefined,
       });
@@ -453,7 +463,9 @@ const createDoughnutOrPieParams = (params: ChartsViewParams): ExtChartJsInputPar
     labels: rows.map((it) => it.values[params.label]),
     datasets: [
       {
-        backgroundColor: createColors(rows.length),
+        backgroundColor: createColors(rows.length, 0.5),
+        borderColor: createColors(rows.length, 0.9),
+        borderWidth: 2,
         data: rows.map((it) => it.values[params.data]),
       },
     ],
@@ -518,24 +530,30 @@ const createHistogramParams = (params: ChartsViewParams): ExtChartJsInputParams 
   if (params.rdh.keys.some((it) => it.name === params.label)) {
     const group = groupByRows(params.rdh, params.label);
     const groupKeys = Object.keys(group);
-    const colors = createColors(groupKeys.length);
+    const colors = createColors(groupKeys.length, 0.5);
+    const borderColors = createColors(groupKeys.length, 0.9);
     data.datasets.push(
       ...groupKeys.map((label, idx) => {
         return {
           yAxisID: "y",
           label,
           backgroundColor: colors[idx],
+          borderColor: borderColors[idx],
+          borderWidth: 2,
           data: group[label].map((it) => it.values["value"]),
           stack: params.stacked ? "s0" : undefined,
         };
       })
     );
   } else {
-    const colors = createColors(1);
+    const colors = createColors(1, 0.5);
+    const borderColors = createColors(1, 0.9);
     data.datasets.push({
       yAxisID: "y",
       label: "value",
       backgroundColor: colors[0],
+      borderColor: borderColors[0],
+      borderWidth: 2,
       data: rows.map((it) => it.values["value"]),
     });
   }
@@ -673,7 +691,7 @@ const createScatterParams = (params: ChartsViewParams): ExtChartJsInputParams =>
   if (params.label) {
     const group = groupByRows(params.rdh, params.label);
     const groupKeys = Object.keys(group);
-    const colors = createColors(groupKeys.length, 0.3);
+    const colors = createColors(groupKeys.length, 0.5);
     const colors2 = createColors(groupKeys.length, 0.9);
     const pointStyles = createPointStyles(groupKeys.length);
     data.datasets.push(
@@ -699,7 +717,7 @@ const createScatterParams = (params: ChartsViewParams): ExtChartJsInputParams =>
       xAxisID: "x",
       yAxisID: "y",
       label: params.label || params.dataX,
-      backgroundColor: createColors(1, 0.3)[0],
+      backgroundColor: createColors(1, 0.5)[0],
       pointRadius: params.pointRadius ?? 6,
       pointBorderColor: createColors(1, 0.9)[0],
       pointBorderWidth: 2,
@@ -761,7 +779,7 @@ export const createPairPlotChartParams = (params: ChartsViewParams): PairPlotCha
             rowName: ck.name,
             colName: rk.name,
             type: "correlation",
-            correlation: rdb.sampleCorrelation(rk.name, ck.name),
+            correlation: createCorrelation(rdb.sampleCorrelation(rk.name, ck.name)),
           });
         } else {
           // Left part of histogram
@@ -785,6 +803,27 @@ export const createPairPlotChartParams = (params: ChartsViewParams): PairPlotCha
   });
 
   return ret;
+};
+
+const createCorrelation = (value: number): PairPlotChartCorrelationParam => {
+  const absV = Math.abs(value ? value : 0);
+  let category: PairPlotChartCorrelationParam["category"];
+  if (absV <= 0.2) {
+    category = "very_weak";
+  } else if (absV <= 0.4) {
+    category = "weak";
+  } else if (absV <= 0.6) {
+    category = "moderate";
+  } else if (absV <= 0.6) {
+    category = "strong";
+  } else {
+    category = "very_strong";
+  }
+
+  return {
+    value,
+    category,
+  };
 };
 
 const createHistogramExtChartJsInputParamsForPairPlot = (

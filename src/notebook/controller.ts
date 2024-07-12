@@ -49,11 +49,15 @@ import {
   readRuleFile,
 } from "../utilities/notebookUtil";
 import { jsonKernelRun } from "./JsonKernel";
-import { existsFileOnWorkspace } from "../utilities/fsUtil";
+import { existsFileOnWorkspace, initializeStorageTmpPath } from "../utilities/fsUtil";
 import { createResponseBodyMarkdown } from "../utilities/httpUtil";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 import { ChartsViewParams } from "../types/views";
-import { getResultsetConfig, getToStringParamByConfig } from "../utilities/configUtil";
+import {
+  getNodeConfig,
+  getResultsetConfig,
+  getToStringParamByConfig,
+} from "../utilities/configUtil";
 
 const PREFIX = "[notebook/Controller]";
 
@@ -224,7 +228,9 @@ export class MainController {
     notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
-    // log(`${PREFIX} _executeAll START`);
+    log(`${PREFIX} _executeAll START`);
+    const config = getNodeConfig();
+    await initializeStorageTmpPath(config.tmpDirPath);
     const connectionSettings = await this.stateStorage.getConnectionSettingList();
     const kernel = await NodeKernel.create(connectionSettings);
     let noteSession: NoteSession = {

@@ -5,9 +5,9 @@ import * as iconv from "iconv-lite";
 import { NotebookExecutionVariables, RunResult } from "../types/Notebook";
 import { ConnectionSetting, abbr } from "@l-v-yonsama/multi-platform-database-drivers";
 import { log, logError } from "../utilities/logger";
-import { NotebookCell, Uri, window, workspace } from "vscode";
+import { NotebookCell, workspace } from "vscode";
 import {
-  createDirectoryOnStorage,
+  createDirectoryOnTmpStorage,
   deleteDirsOnStorage,
   existsOnStorage,
   readResourceOnStorage,
@@ -28,18 +28,21 @@ const baseDir = path.join(__filename, "..", "..", "..");
 const nodeModules = path.join(baseDir, "node_modules");
 
 export class NodeKernel {
-  private variablesFile: Uri;
-  private scriptFile?: Uri;
+  private variablesFile: string;
+  private scriptFile?: string;
   private child: cp.ChildProcess | undefined;
   private variables: NotebookExecutionVariables;
 
-  private constructor(private connectionSettings: ConnectionSetting[], private tmpDirectory: Uri) {
-    this.variablesFile = Uri.joinPath(this.tmpDirectory, "storedVariables.json");
+  private constructor(
+    private connectionSettings: ConnectionSetting[],
+    private tmpDirectory: string
+  ) {
+    this.variablesFile = path.join(this.tmpDirectory, "storedVariables.json");
     this.variables = {};
   }
 
   static async create(connectionSettings: ConnectionSetting[]): Promise<NodeKernel> {
-    const tmpDir = await createDirectoryOnStorage("tmp", `${new Date().getTime()}`);
+    const tmpDir = await createDirectoryOnTmpStorage(`${new Date().getTime()}`);
     return new NodeKernel(connectionSettings, tmpDir);
   }
 
@@ -180,7 +183,7 @@ export class NodeKernel {
           saveMap[key] = value;
         });
         myfs.writeFileSync('${winToLinuxPath(
-          this.variablesFile.fsPath
+          this.variablesFile
         )}', fstringify(saveMap), {encoding:'utf8'});
       };
       const _skipSql = (b) => { variables.set('_skipSql', b); };
@@ -220,10 +223,10 @@ export class NodeKernel {
   public async run(cell: NotebookCell): Promise<RunResult> {
     const ext = cell.document.languageId === "javascript" ? "js" : "ts";
     const scriptName = `script.${ext}`;
-    this.scriptFile = Uri.joinPath(this.tmpDirectory, scriptName);
+    this.scriptFile = path.join(this.tmpDirectory, scriptName);
 
     const script = await this.createScript(cell);
-    await writeToResourceOnStorage(this.scriptFile.fsPath, script);
+    await writeToResourceOnStorage(this.scriptFile, script);
 
     let stdout = "";
     let stderr = "";
@@ -238,9 +241,9 @@ export class NodeKernel {
       }
 
       if (commandPath) {
-        this.child = cp.spawn(commandPath, [this.scriptFile.fsPath], options);
+        this.child = cp.spawn(commandPath, [this.scriptFile], options);
       } else {
-        this.child = cp.spawn("node", [this.scriptFile.fsPath], options);
+        this.child = cp.spawn("node", [this.scriptFile], options);
       }
 
       const promise = new Promise((resolve, reject) => {
@@ -306,7 +309,7 @@ export class NodeKernel {
 
     this.child = undefined;
 
-    const reg = new RegExp(".*" + path.basename(this.scriptFile.fsPath) + ":[0-9]+\r?\n *");
+    const reg = new RegExp(".*" + path.basename(this.scriptFile) + ":[0-9]+\r?\n *");
     stderr = stderr.replace(reg, "");
     stderr = stderr.replace(/ +at +[a-zA-Z0-9()/. :_\[\]-]+/g, "");
     stderr = stderr.replace(/Node.js v[0-9.:-]+/, "");
@@ -315,9 +318,9 @@ export class NodeKernel {
 
     let existsVariablesFile = false;
     try {
-      if (await existsOnStorage(this.variablesFile.fsPath)) {
+      if (await existsOnStorage(this.variablesFile)) {
         existsVariablesFile = true;
-        this.variables = JSON.parse(await readResourceOnStorage(this.variablesFile.fsPath));
+        this.variables = JSON.parse(await readResourceOnStorage(this.variablesFile));
       }
     } catch (e) {
       if (e instanceof Error) {
@@ -365,7 +368,7 @@ export class NodeKernel {
     }
     try {
       if (existsVariablesFile) {
-        await writeToResourceOnStorage(this.variablesFile.fsPath, stringify(this.variables));
+        await writeToResourceOnStorage(this.variablesFile, stringify(this.variables));
       }
     } catch (e) {
       if (e instanceof Error) {
@@ -406,7 +409,7 @@ export class NodeKernel {
   async dispose() {
     // log(`${PREFIX} dispose`);
     this.child = undefined;
-    await deleteDirsOnStorage(this.tmpDirectory.fsPath);
+    await deleteDirsOnStorage(this.tmpDirectory);
   }
 
   queryStringToJSON(queryString: string): { [key: string]: any } | undefined {

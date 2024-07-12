@@ -5,7 +5,7 @@ import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
 import { createHash } from "crypto";
 import { ActionCommand } from "../shared/ActionParams";
-import { BOTTOM_CHARTS_VIEWID, CREATE_NEW_NOTEBOOK } from "../constant";
+import { BOTTOM_CHARTS_VIEWID } from "../constant";
 import { BaseViewProvider } from "./BaseViewProvider";
 import { ComponentName } from "../shared/ComponentName";
 import { waitUntil } from "../utilities/waitUntil";
@@ -160,9 +160,5 @@ export class ChartsViewProvider extends BaseViewProvider {
 
   private getTabByTitle(title: string): ChartTabItem | undefined {
     return this.items.find((it) => it.title === title);
-  }
-
-  private getTabItemById(tabId: string): ChartTabItem | undefined {
-    return this.items.find((it) => it.tabId === tabId);
   }
 }

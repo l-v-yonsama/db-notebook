@@ -51,12 +51,17 @@ export type ExtChartJsInputParams = {
   data: ExtChartData;
 };
 
+export type PairPlotChartCorrelationParam = {
+  value: number;
+  category: "very_weak" | "weak" | "moderate" | "strong" | "very_strong";
+};
+
 export type PairPlotChartParam = {
   rowName: string;
   colName: string;
   type: "scatter" | "histogram" | "correlation";
   chartParams?: ExtChartJsInputParams;
-  correlation?: number;
+  correlation?: PairPlotChartCorrelationParam;
 };
 
 export type PairPlotChartParams = {

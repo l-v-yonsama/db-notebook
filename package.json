@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer Redis, AWS, Keycloak and Auth0.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -16,6 +16,8 @@
     "node": ">= 18"
   },
   "categories": [
+    "Programming Languages",
+    "Data Science",
     "Notebooks",
     "Visualization"
   ],
@@ -821,6 +823,12 @@
             "EUC-KR"
           ],
           "description": "STDOUT/STDERR encoding of the Javascript execution process"
+        },
+        "node.Tmp dir path": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "description": "temporary directory."
         },
         "resultset.Header display comment": {
           "scope": "resource",

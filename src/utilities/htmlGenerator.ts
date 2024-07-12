@@ -80,6 +80,7 @@ const HTML_CONTENT_PREFIX = `
       .pair-plot-chart table {
         table-layout: fixed;
         width: 100%;
+        margin:1px;
       }
 
       .pair-plot-chart th {
@@ -89,12 +90,12 @@ const HTML_CONTENT_PREFIX = `
         color: gray;
       }
       .pair-plot-chart th.rl {
-        width: 1.2em;
+        width: 1.7em;
         text-align: center;
       }
       .pair-plot-chart th div.rl {
         line-height: 0.9em;
-        width: 1.2em;
+        width: 1.7em;
         text-align: center;
         white-space: pre-line;
         overflow: hidden;
@@ -117,11 +118,11 @@ const HTML_CONTENT_PREFIX = `
         font-size: large;
       }
       .pair-plot-chart td .strong {
-        color: #000;
+        color: #511;
         font-size: x-large;
       }
       .pair-plot-chart td .very_strong {
-        color: #400;
+        color: #822;
         font-size: xx-large;
       }
       .pair-plot-chart .correlation {
@@ -568,12 +569,10 @@ const createHtml = async (
                           });
                         } else {
                           htmlContents.push(
-                            `          <div   class="correlation ${getSampleCorrelationClass(
-                              matrix.correlation!
-                            )}" >`
+                            `          <div   class="correlation ${matrix.correlation?.category}" >`
                           );
                           htmlContents.push(
-                            `            R = ${(matrix.correlation ?? 0).toFixed(2)}`
+                            `            R = ${(matrix.correlation?.value ?? 0).toFixed(2)}`
                           );
                           htmlContents.push(`          </div>`);
                         }
@@ -811,21 +810,6 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
   });
 
   return s;
-};
-
-const getSampleCorrelationClass = (correlation: number): string[] => {
-  const absV = Math.abs(correlation ? correlation : 0);
-  if (absV <= 0.2) {
-    return ["very_weak"];
-  } else if (absV <= 0.4) {
-    return ["weak"];
-  } else if (absV <= 0.6) {
-    return ["moderate"];
-  } else if (absV <= 0.6) {
-    return ["strong"];
-  } else {
-    return ["very_strong"];
-  }
 };
 
 const createDiffTitle = (item: DiffTabInnerItem) => {

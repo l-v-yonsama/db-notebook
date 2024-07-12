@@ -4,19 +4,24 @@ import { log, logError } from "./logger";
 import { mediaDir } from "../constant";
 import * as fs from "fs";
 
-let storagePath: Uri;
+let globalStorageUri: Uri;
 let nodeModulesPath: Uri;
+let storageTmpPath: string;
 
 const PREFIX = "  [fsUtil]";
 
 // For storage
 export const initializeStoragePath = (context: ExtensionContext): void => {
-  storagePath = context.globalStorageUri;
+  globalStorageUri = context.globalStorageUri;
   nodeModulesPath = Uri.file(context.asAbsolutePath("node_modules"));
 };
 
-export const initializeStorageTmpPath = async (): Promise<void> => {
-  await mkdirsOnStorage(path.join(storagePath.fsPath, "tmp"));
+export const initializeStorageTmpPath = async (tmpDirPath?: string): Promise<void> => {
+  storageTmpPath = tmpDirPath ? tmpDirPath : path.join(globalStorageUri.fsPath, "tmp");
+  if (!(await existsOnStorage(storageTmpPath))) {
+    log(`${PREFIX} ⭐️initializeStorageTmpPath:[${storageTmpPath}]`);
+    await mkdirsOnStorage(storageTmpPath);
+  }
 };
 
 const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
@@ -31,10 +36,11 @@ const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
   }
 };
 
-export const createDirectoryOnStorage = async (...pathSegments: string[]): Promise<Uri> => {
-  const uri = Uri.joinPath(storagePath, ...pathSegments);
-  await mkdirsOnStorage(uri.fsPath);
-  return uri;
+export const createDirectoryOnTmpStorage = async (dirName: string): Promise<string> => {
+  const dir = path.join(storageTmpPath, dirName);
+  await mkdirsOnStorage(dir);
+  log(`${PREFIX} createDirectoryOnTmpStorage:[${dir}]`);
+  return dir;
 };
 
 export const existsOnStorage = async (fsPath: string): Promise<boolean> => {

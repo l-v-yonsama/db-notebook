@@ -1,4 +1,4 @@
-import { ExtensionContext, Uri, commands, window } from "vscode";
+import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
 import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
 import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
@@ -23,7 +23,7 @@ import {
   OPEN_CHARTS_VIEWER,
 } from "./constant";
 import { activateRuleEditor } from "./ruleEditor/activator";
-import { initializeStoragePath, initializeStorageTmpPath } from "./utilities/fsUtil";
+import { initializeStoragePath } from "./utilities/fsUtil";
 import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
@@ -58,7 +58,6 @@ export async function activate(context: ExtensionContext) {
 
   activateLogger(context, EXTENSION_NAME);
   log(`${PREFIX} start activation.`);
-  await initializeStorageTmpPath();
 
   ScanPanel.setStateStorage(stateStorage);
   ViewConditionPanel.setStateStorage(stateStorage);

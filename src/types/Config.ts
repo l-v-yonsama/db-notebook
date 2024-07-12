@@ -6,6 +6,7 @@ export type SQLFormatterConfigType = {
 export type NodeConfigType = {
   commandPath?: string;
   dataEncoding: NodeProcessDataEncodingType;
+  tmpDirPath?: string;
 };
 export type NodeProcessDataEncodingType =
   | ""

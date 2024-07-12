@@ -54,25 +54,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const isCapturing = ref(false);
 
-const getSampleCorrelation = (correlation: number): number => {
-  return correlation ? correlation : 0;
-};
-
-const getSampleCorrelationClass = (correlation: number): string[] => {
-  const abs_v = Math.abs(correlation ? correlation : 0);
-  if (abs_v <= 0.2) {
-    return ["very_weak"];
-  } else if (abs_v <= 0.4) {
-    return ["weak"];
-  } else if (abs_v <= 0.6) {
-    return ["moderate"];
-  } else if (abs_v <= 0.6) {
-    return ["strong"];
-  } else {
-    return ["very_strong"];
-  }
-};
-
 const getBase64Image = async (id: string): Promise<string> => {
   var node = document.getElementById(id);
   if (!node) {
@@ -135,9 +116,9 @@ defineExpose({ getBase64Image });
             <div
               v-else-if="matrix.type === 'correlation'"
               class="correlation"
-              :class="getSampleCorrelationClass(matrix.correlation!)"
+              :class="[matrix.correlation?.category]"
             >
-              R = {{ getSampleCorrelation(matrix.correlation!).toFixed(2) }}
+              R = {{ (matrix.correlation?.value ?? 0).toFixed(2) }}
             </div>
           </td>
         </tr>
@@ -211,11 +192,11 @@ defineExpose({ getBase64Image });
         font-size: large;
       }
       .strong {
-        color: #000;
+        color: #511;
         font-size: x-large;
       }
       .very_strong {
-        color: #400;
+        color: #822;
         font-size: xx-large;
       }
     }
