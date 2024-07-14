@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import type { ResultSetData, FileAnnotation } from "@l-v-yonsama/multi-platform-database-drivers";
-import FileAnnotationView from "./base/FileAnnotationView.vue";
+import type { CellFocusParams, ShowCellDetailParams } from "@/types/RdhEvents";
+import { isJsonLike, type FileAnnotation, type ResultSetData } from "@l-v-yonsama/rdh";
+import { computed, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import RDH from "./RDH.vue";
-import type { CellFocusParams, ShowCellDetailParams } from "@/types/RdhEvents";
-import { isJsonLike } from "@/utilities/GeneralColumnUtil";
 
 type Props = {
   width: number;

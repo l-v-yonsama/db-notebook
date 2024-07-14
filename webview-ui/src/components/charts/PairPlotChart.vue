@@ -1,23 +1,23 @@
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
-import { toPng } from "html-to-image";
-import ChartDataLabels from "chartjs-plugin-datalabels";
-import "chartjs-adapter-date-fns";
 import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
   ArcElement,
   BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LinearScale,
   LineElement,
   PointElement,
-  CategoryScale,
-  LinearScale,
   RadialLinearScale,
   TimeScale,
+  Title,
+  Tooltip,
 } from "chart.js";
+import "chartjs-adapter-date-fns";
+import ChartDataLabels from "chartjs-plugin-datalabels";
+import { toPng } from "html-to-image";
+import { nextTick, ref } from "vue";
 
 import { Bar, Scatter } from "vue-chartjs";
 
@@ -42,11 +42,13 @@ interface Props {
   showTitle: boolean;
   pairPlotChartParams: any;
   height: number;
+  showDataLabels: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   title: "",
   showTitle: false,
+  showDataLabels: false,
   hue: "",
   height: 150,
   pairPlotChartParams: () => ({} as unknown as any),
@@ -143,6 +145,7 @@ defineExpose({ getBase64Image });
   }
   .legends {
     text-align: center;
+    margin-bottom: 1px;
     div.legend {
       display: inline-block;
       min-width: 3em;
@@ -152,13 +155,13 @@ defineExpose({ getBase64Image });
       border-style: solid;
       line-height: 1.2;
     }
-    margin-bottom: 1px;
   }
   table {
     table-layout: fixed;
     width: 100%;
 
     th {
+      color: #333;
       font-weight: normal;
       background-color: #e0e0e0;
       text-align: center;

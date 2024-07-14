@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed } from "vue";
-import { vscode } from "@/utilities/vscode";
+import type { DropdownItem } from "@/types/Components";
 import type { NotebookCellMetadataPanelEventData } from "@/utilities/vscode";
+import { vscode } from "@/utilities/vscode";
+import { isDateTimeOrDateOrTime, isNumericLike } from "@l-v-yonsama/rdh";
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
+import { computed, nextTick, onMounted, ref } from "vue";
+import type { CellMetaChart } from "../../../src/types/Notebook";
+import TextOrDropdown from "./base/TextOrDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
-import TextOrDropdown from "./base/TextOrDropdown.vue";
-import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
-import type { DropdownItem } from "@/types/Components";
-import type { CellMetaChart } from "../../../src/types/Notebook";
-import { isDateTimeOrDateOrTime, isNumericLike } from "@/utilities/GeneralColumnUtil";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 

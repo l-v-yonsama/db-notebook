@@ -1,14 +1,14 @@
 <script setup lang="ts">
+import type { HttpResponseTabItem } from "@/utilities/vscode";
+import type { ContentTypeInfo } from "@l-v-yonsama/rdh";
+import {
+  provideVSCodeDesignSystem,
+  vsCodePanels,
+  vsCodePanelTab,
+  vsCodePanelView,
+} from "@vscode/webview-ui-toolkit";
 import { ref } from "vue";
 import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
-import {
-  vsCodePanels,
-  vsCodePanelView,
-  vsCodePanelTab,
-  provideVSCodeDesignSystem,
-} from "@vscode/webview-ui-toolkit";
-import type { HttpResponseTabItem } from "@/utilities/vscode";
-import type { ContentTypeInfo } from "@l-v-yonsama/multi-platform-database-drivers";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -131,7 +131,7 @@ if (props.previewContentTypeInfo) {
           :style="{ 'max-height': `${height}px`, 'max-width': `${width}px` }"
           :src="imgSrc"
         />
-        <p v-else-if="visibleFontPreview" class="fontPreview" rows="6">{{ fontPreviewText }}</p>
+        <p v-else-if="visibleFontPreview" class="fontPreview">{{ fontPreviewText }}</p>
       </div>
     </vscode-panel-view>
   </section>

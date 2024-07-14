@@ -1,28 +1,28 @@
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
 import "./assets/scss/main.scss";
 import type { ComponentName, MessageEventData } from "./utilities/vscode";
-import { ref, onMounted } from "vue";
 
-import MdhView from "./components/MdhView.vue";
-import HttpEventPanel from "./components/HttpEventPanel.vue";
+import CountRecordView from "./components/CountRecordView.vue";
 import CreateInsertScriptSettingsPanel from "./components/CreateInsertScriptSettingsPanel.vue";
 import CsvParseSettingPanel from "./components/CsvParseSettingPanel.vue";
-import HarFilePanel from "./components/HarFilePanel.vue";
 import DBFormView from "./components/DBFormView.vue";
 import DiffMdhView from "./components/DiffMdhView.vue";
-import CountRecordView from "./components/CountRecordView.vue";
+import HarFilePanel from "./components/HarFilePanel.vue";
+import HttpEventPanel from "./components/HttpEventPanel.vue";
+import MdhView from "./components/MdhView.vue";
 import ChartsView from "./components/charts/ChartsView.vue";
 
+import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ViewConditionPanel from "./components/ViewConditionPanel.vue";
 import WriteHttpEventToClipboardParamsPanel from "./components/WriteHttpEventToClipboardParamsPanel.vue";
-import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
 
-import ERDiagramSettings from "./components/ERDiagramSettings.vue";
-import RecordRuleEditor from "./components/RecordRuleEditor.vue";
 import CodeResolverEditor from "./components/CodeResolverEditor.vue";
 import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
+import ERDiagramSettings from "./components/ERDiagramSettings.vue";
+import RecordRuleEditor from "./components/RecordRuleEditor.vue";
 
 const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
 const MdhViewRef = ref<InstanceType<typeof MdhView>>();

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, defineExpose, nextTick, reactive } from "vue";
+import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+import { defineExpose, nextTick, reactive, ref } from "vue";
+import type { DBFormEventData, ModeType } from "../utilities/vscode";
 import ConnectionSettingVue from "./form/ConnectionSetting.vue";
 import ResourceProperties from "./form/ResourceProperties.vue";
-import type { ModeType, DBFormEventData } from "../utilities/vscode";
-import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 
 const visible = reactive<{
   connectionSetting: boolean;

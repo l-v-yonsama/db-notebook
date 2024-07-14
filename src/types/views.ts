@@ -1,4 +1,4 @@
-import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ResultSetData } from "@l-v-yonsama/rdh";
 import type { CellMetaChart } from "./Notebook";
 
 export type MdhViewParams = {

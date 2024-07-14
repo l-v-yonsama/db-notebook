@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
-import VsCodeTextArea from "./base/VsCodeTextArea.vue";
 import type { NodeRunAxiosEvent } from "@/utilities/vscode";
+import type { ContentTypeInfo } from "@l-v-yonsama/rdh";
 import {
-  vsCodePanels,
-  vsCodePanelView,
-  vsCodePanelTab,
   provideVSCodeDesignSystem,
+  vsCodePanels,
+  vsCodePanelTab,
+  vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
-import type { ContentTypeInfo } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ref } from "vue";
+import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 

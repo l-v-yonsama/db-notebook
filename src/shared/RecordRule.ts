@@ -1,4 +1,4 @@
-import type { TableRule, TableRuleDetail } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { TableRule, TableRuleDetail } from "@l-v-yonsama/rdh";
 
 export type RecordRule = {
   tableRule: TableRule;

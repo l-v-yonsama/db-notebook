@@ -1,11 +1,10 @@
-import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
-import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import * as vscode from "vscode";
+import { Disposable, Uri, ViewColumn, Webview, WebviewPanel, window } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
-import { createWebviewContent } from "../utilities/webviewUtil";
 import { ComponentName } from "../shared/ComponentName";
 import { VariablesPanelEventData } from "../shared/MessageEventData";
+import { createWebviewContent } from "../utilities/webviewUtil";
 
 const PREFIX = "[VariablesPanel]";
 

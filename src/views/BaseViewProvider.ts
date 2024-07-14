@@ -1,14 +1,14 @@
 import {
-  ExtensionContext,
-  WebviewViewProvider,
-  WebviewView,
-  WebviewViewResolveContext,
   CancellationToken,
+  ExtensionContext,
+  WebviewView,
+  WebviewViewProvider,
+  WebviewViewResolveContext,
 } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
+import { ComponentName } from "../shared/ComponentName";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
-import { ComponentName } from "../shared/ComponentName";
 
 export abstract class BaseViewProvider implements WebviewViewProvider {
   protected webviewView?: WebviewView;

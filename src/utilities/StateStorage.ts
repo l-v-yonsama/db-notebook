@@ -1,4 +1,3 @@
-import ShortUniqueId from "short-unique-id";
 import {
   Auth0Database,
   ConnectionSetting,
@@ -16,8 +15,9 @@ import {
   IamRealm,
   RdsDatabase,
   ResourceType,
-  sleep,
 } from "@l-v-yonsama/multi-platform-database-drivers";
+import { sleep } from "@l-v-yonsama/rdh";
+import ShortUniqueId from "short-unique-id";
 import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
 import { SQLHistory } from "../types/SQLHistory";

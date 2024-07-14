@@ -1,3 +1,4 @@
+import { ToStringParam } from "@l-v-yonsama/rdh";
 import { workspace } from "vscode";
 import {
   DatabaseConfigType,
@@ -6,7 +7,6 @@ import {
   ResultsetConfigType,
   SQLFormatterConfigType,
 } from "../types/Config";
-import { ToStringParam } from "@l-v-yonsama/multi-platform-database-drivers";
 
 export const getFormatterConfig = (): SQLFormatterConfigType => {
   const settings = workspace.getConfiguration("sql-formatter", null);

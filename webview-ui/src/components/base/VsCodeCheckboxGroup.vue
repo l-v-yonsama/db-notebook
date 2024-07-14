@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const clickBox = (value: string, $e: InputEvent) => {

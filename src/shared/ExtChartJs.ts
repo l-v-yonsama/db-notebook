@@ -1,5 +1,3 @@
-import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
-
 export type ExtChartOptions = {
   responsive: boolean;
   maintainAspectRatio: boolean;

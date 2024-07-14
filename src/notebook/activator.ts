@@ -1,6 +1,5 @@
-import { DBNotebookSerializer } from "./serializer";
-import { MainController } from "./controller";
-import { StateStorage } from "../utilities/StateStorage";
+import * as path from "path";
+import sqlFormatter from "sql-formatter-plus";
 import {
   ExtensionContext,
   NotebookCell,
@@ -15,48 +14,49 @@ import {
   window,
   workspace,
 } from "vscode";
-import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
-import { activateIntellisense } from "./intellisense";
-import * as path from "path";
-import { VariablesPanel } from "../panels/VariablesPanel";
-import { activateStatusBar } from "../statusBar";
 import {
+  CELL_EXECUTE_EXPLAIN,
+  CELL_EXECUTE_EXPLAIN_ANALYZE,
+  CELL_EXECUTE_QUERY,
+  CELL_MARK_CELL_AS_PRE_EXECUTION,
+  CELL_MARK_CELL_AS_SKIP,
+  CELL_OPEN_HTTP_RESPONSE,
   CELL_OPEN_MDH,
-  CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SHOW_METADATA_SETTINGS,
+  CELL_SPECIFY_CONNECTION_TO_USE,
+  CELL_TOOLBAR_FORMAT,
   CREATE_NEW_NOTEBOOK,
+  EXPORT_IN_HTML,
   NOTEBOOK_TYPE,
+  OPEN_MDH_VIEWER,
   SHOW_NOTEBOOK_ALL_RDH,
   SHOW_NOTEBOOK_ALL_VARIABLES,
   SPECIFY_CONNECTION_TO_ALL_CELLS,
-  EXPORT_IN_HTML,
-  CELL_MARK_CELL_AS_SKIP,
-  CELL_OPEN_HTTP_RESPONSE,
-  CELL_MARK_CELL_AS_PRE_EXECUTION,
-  CELL_TOOLBAR_FORMAT,
-  CELL_EXECUTE_QUERY,
-  CELL_EXECUTE_EXPLAIN,
-  CELL_EXECUTE_EXPLAIN_ANALYZE,
-  OPEN_MDH_VIEWER,
 } from "../constant";
-import {
-  getToolbarButtonClickedNotebookEditor,
-  isJsonCell,
-  hasAnyRdhOutputCell,
-  isSqlCell,
-  getSelectedCells,
-} from "../utilities/notebookUtil";
-import { log } from "../utilities/logger";
-import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
-import { RunResultMetadata } from "../shared/RunResultMetadata";
-import { rrmListToRdhList } from "../utilities/rrmUtil";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
-import sqlFormatter from "sql-formatter-plus";
-import { getFormatterConfig } from "../utilities/configUtil";
+import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
+import { VariablesPanel } from "../panels/VariablesPanel";
+import { RunResultMetadata } from "../shared/RunResultMetadata";
+import { activateStatusBar } from "../statusBar";
+import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
-import dayjs = require("dayjs");
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getFormatterConfig } from "../utilities/configUtil";
 import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
+import { log } from "../utilities/logger";
+import {
+  getSelectedCells,
+  getToolbarButtonClickedNotebookEditor,
+  hasAnyRdhOutputCell,
+  isJsonCell,
+  isSqlCell,
+} from "../utilities/notebookUtil";
+import { rrmListToRdhList } from "../utilities/rrmUtil";
+import { StateStorage } from "../utilities/StateStorage";
+import { MainController } from "./controller";
+import { activateIntellisense } from "./intellisense";
+import { DBNotebookSerializer } from "./serializer";
+import dayjs = require("dayjs");
 
 const PREFIX = "[notebook/activator]";
 

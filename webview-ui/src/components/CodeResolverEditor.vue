@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { onMounted, ref, nextTick, computed } from "vue";
 import {
   vscode,
-  type UpdateCodeResolverTextDocumentActionCommand,
-  type CodeResolverParams,
   type CodeResolverEditorEventData,
+  type CodeResolverParams,
+  type UpdateCodeResolverTextDocumentActionCommand,
 } from "@/utilities/vscode";
-import VsCodeTextField from "./base/VsCodeTextField.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import VsCodeButton from "./base/VsCodeButton.vue";
-import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
+import { computed, nextTick, onMounted, ref } from "vue";
 import Paragraph from "./base/Paragraph.vue";
+import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 import type { DropdownItem } from "@/types/Components";
-import type { CodeItem, CodeItemDetail } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { CodeItem, CodeItemDetail } from "@l-v-yonsama/rdh";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 

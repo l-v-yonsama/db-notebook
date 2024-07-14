@@ -131,27 +131,27 @@
 </template>
 
 <script setup lang="ts">
+import type { DropdownItem } from "@/types/Components";
+import { RULE_BASE_OPERATORS, VIEW_CONDITIONAL_OPERATORS } from "@/utilities/RRuleUtil";
 import { computed, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
-import type { DropdownItem } from "@/types/Components";
-import { RULE_BASE_OPERATORS, VIEW_CONDITIONAL_OPERATORS } from "@/utilities/RRuleUtil";
 
-import type {
-  ConditionProperties,
-  AllConditions,
-  AnyConditions,
-  TopLevelCondition,
-} from "@/utilities/vscode";
 import {
   isAllConditions,
   isAnyConditions,
   isConditionProperties,
   isTopLevelCondition,
 } from "@/utilities/RRuleUtil";
-import { GeneralColumnTypeConst, isNumericLike } from "@/utilities/GeneralColumnUtil";
+import type {
+  AllConditions,
+  AnyConditions,
+  ConditionProperties,
+  TopLevelCondition,
+} from "@/utilities/vscode";
+import { GeneralColumnType, isNumericLike } from "@l-v-yonsama/rdh";
 
 type Props = {
   modelValue: any; // TableRuleDetail["conditions"];
@@ -320,11 +320,10 @@ const selectableValType = (ope: string): boolean => {
 
 const toExample = (p: ConditionProperties): string => {
   const { operator, fact } = p;
-  let colType = GeneralColumnTypeConst.INTEGER;
+  let colType = GeneralColumnType.INTEGER;
   if (fact) {
     colType =
-      props.columnItems.find((it) => it.value === fact)?.meta?.colType ??
-      GeneralColumnTypeConst.INTEGER;
+      props.columnItems.find((it) => it.value === fact)?.meta?.colType ?? GeneralColumnType.INTEGER;
   }
   switch (operator) {
     case "like":

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
-import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
-import RDHViewer from "./RDHViewer.vue";
 import type { VariablesPanelEventData } from "@/utilities/vscode";
+import type { ResultSetData } from "@l-v-yonsama/rdh";
+import { nextTick, onMounted, ref } from "vue";
+import RDHViewer from "./RDHViewer.vue";
 
 const rdh = ref(undefined as ResultSetData | undefined);
 

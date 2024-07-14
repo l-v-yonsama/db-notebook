@@ -1,8 +1,8 @@
-import { ExtensionContext, Uri, workspace } from "vscode";
-import * as path from "path";
-import { log, logError } from "./logger";
-import { mediaDir } from "../constant";
 import * as fs from "fs";
+import * as path from "path";
+import { ExtensionContext, Uri, workspace } from "vscode";
+import { mediaDir } from "../constant";
+import { log, logError } from "./logger";
 
 let globalStorageUri: Uri;
 let nodeModulesPath: Uri;

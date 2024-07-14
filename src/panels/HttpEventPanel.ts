@@ -1,34 +1,34 @@
-import {
-  WebviewPanel,
-  window,
-  Uri,
-  ViewColumn,
-  NotebookCellData,
-  NotebookCellKind,
-  commands,
-  env,
-  workspace,
-} from "vscode";
-import { ActionCommand, WriteHttpEventToClipboardParams } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
-import { ComponentName } from "../shared/ComponentName";
-import { HttpEventPanelEventData, HttpEventPanelEventCodeBlocks } from "../shared/MessageEventData";
-import { getIconPath } from "../utilities/fsUtil";
-import { NodeRunAxiosEvent } from "../shared/RunResultMetadata";
-import { createCodeHtmlString } from "../utilities/highlighter";
-import { ContentTypeInfo, parseContentType } from "@l-v-yonsama/multi-platform-database-drivers";
-import { BasePanel } from "./BasePanel";
-import {
-  httpEventToText,
-  headersToJson,
-  queryStringsToJson,
-  createRdbFromCookies,
-  getPathFromUrl,
-} from "../utilities/httpUtil";
-import { WriteHttpEventToClipboardParamsPanel } from "./WriteHttpEventToClipboardParamsPanel";
-import { CREATE_NEW_NOTEBOOK } from "../constant";
+import { parseContentType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { AxiosRequestConfig } from "axios";
 import * as qs from "qs";
+import {
+  NotebookCellData,
+  NotebookCellKind,
+  Uri,
+  ViewColumn,
+  WebviewPanel,
+  commands,
+  env,
+  window,
+  workspace,
+} from "vscode";
+import { CREATE_NEW_NOTEBOOK } from "../constant";
+import { ActionCommand, WriteHttpEventToClipboardParams } from "../shared/ActionParams";
+import { ComponentName } from "../shared/ComponentName";
+import { HttpEventPanelEventCodeBlocks, HttpEventPanelEventData } from "../shared/MessageEventData";
+import { NodeRunAxiosEvent } from "../shared/RunResultMetadata";
+import { getIconPath } from "../utilities/fsUtil";
+import { createCodeHtmlString } from "../utilities/highlighter";
+import {
+  createRdbFromCookies,
+  getPathFromUrl,
+  headersToJson,
+  httpEventToText,
+  queryStringsToJson,
+} from "../utilities/httpUtil";
+import { log } from "../utilities/logger";
+import { BasePanel } from "./BasePanel";
+import { WriteHttpEventToClipboardParamsPanel } from "./WriteHttpEventToClipboardParamsPanel";
 
 const PREFIX = "[HttpEventPanel]";
 

@@ -1,19 +1,18 @@
-import * as vscode from "vscode";
-import { StateStorage } from "./utilities/StateStorage";
 import {
   DBDriverResolver,
   DbConnection,
   DbResource,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ModeType } from "./shared/ModeType";
+import * as vscode from "vscode";
 import { CONNECTION_SETTING_FORM_VIEWID, REFRESH_RESOURCES } from "./constant";
 import { ActionCommand } from "./shared/ActionParams";
-import { log } from "./utilities/logger";
-import { createWebviewContent } from "./utilities/webviewUtil";
 import { ComponentName } from "./shared/ComponentName";
 import { DBFormEventData } from "./shared/MessageEventData";
+import { ModeType } from "./shared/ModeType";
 import { showWindowErrorMessage } from "./utilities/alertUtil";
+import { StateStorage } from "./utilities/StateStorage";
+import { createWebviewContent } from "./utilities/webviewUtil";
 
 const PREFIX = "[form]";
 

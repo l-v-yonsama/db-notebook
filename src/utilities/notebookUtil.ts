@@ -1,13 +1,11 @@
 import { NotebookCell, NotebookCellKind, NotebookEditor, window } from "vscode";
-import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
-import { RecordRule } from "../shared/RecordRule";
-import { readFileOnWorkspace } from "./fsUtil";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
+import { RecordRule } from "../shared/RecordRule";
+import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
+import { readFileOnWorkspace } from "./fsUtil";
 
-import {
-  ResultSetData,
-  stringConditionToJsonCondition,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import { stringConditionToJsonCondition } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData } from "@l-v-yonsama/rdh";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export const isSqlCell = (cell: NotebookCell): boolean => {

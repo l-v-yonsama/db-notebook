@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import type { FileAnnotation } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { FileAnnotation } from "@l-v-yonsama/rdh";
 import { ref } from "vue";
 
 const props = defineProps<{

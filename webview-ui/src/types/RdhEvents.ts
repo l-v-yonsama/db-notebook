@@ -1,7 +1,4 @@
-import type {
-  FileAnnotation,
-  GeneralColumnType,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import type { GeneralColumnType } from "@l-v-yonsama/rdh";
 
 export type CellFocusParams<T = any> = {
   rowPos: number;

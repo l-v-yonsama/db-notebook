@@ -1,12 +1,12 @@
-import { StateStorage } from "../utilities/StateStorage";
-import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
-import * as path from "path";
-import { CREATE_NEW_RECORD_RULE, RECORD_RULE_TYPE } from "../constant";
-import { RecordRuleEditorProvider } from "./editorProvider";
 import { DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
+import * as path from "path";
+import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
+import { CREATE_NEW_RECORD_RULE, RECORD_RULE_TYPE } from "../constant";
 import { RecordRule } from "../shared/RecordRule";
-import { writeToResource } from "../utilities/fsUtil";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { writeToResource } from "../utilities/fsUtil";
+import { StateStorage } from "../utilities/StateStorage";
+import { RecordRuleEditorProvider } from "./editorProvider";
 
 export function activateRuleEditor(context: ExtensionContext, stateStorage: StateStorage) {
   context.subscriptions.push(RecordRuleEditorProvider.register(context, stateStorage));

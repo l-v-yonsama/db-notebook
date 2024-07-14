@@ -1,16 +1,12 @@
 <template>
   <div class="dropdown-action-container">
     <div class="monaco-dropdown">
-      <div class="dropdown-label" :disabled="disabled">
+      <div class="dropdown-label">
         <a
           class="action-label codicon"
-          :class="{ 'codicon-chevron-down': isChevron, 'codicon-ellipsis': isMore }"
+          :class="{ 'codicon-chevron-down': isChevron, 'codicon-ellipsis': isMore, disabled }"
           role="button"
-          aria-haspopup="true"
-          aria-expanded="false"
           :title="title"
-          :aria-label="title"
-          :disabled="disabled"
           @click="toggle"
         ></a>
       </div>
@@ -28,8 +24,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
 import type { SecondaryItem, SecondaryItemSelection } from "@/types/Components";
+import { ref } from "vue";
 
 const props = defineProps<{
   title: string;

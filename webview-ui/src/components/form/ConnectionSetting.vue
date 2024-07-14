@@ -1,27 +1,26 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import VsCodeButton from "../base/VsCodeButton.vue";
-import VsCodeTextField from "../base/VsCodeTextField.vue";
-import VsCodeDropdown from "../base/VsCodeDropdown.vue";
-import VsCodeCheckboxGroup from "../base/VsCodeCheckboxGroup.vue";
-import VsCodeRadioGroupVue from "../base/VsCodeRadioGroup.vue";
-import * as DBTypeConst from "@/types/lib/DBType";
 import * as AwsRegionConst from "@/types/lib/AwsRegion";
-import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
 import { AwsServiceType, AwsServiceTypeValues } from "@/types/lib/AwsServiceType";
-import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
+import * as DBTypeConst from "@/types/lib/DBType";
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
+import { computed, ref } from "vue";
+import VsCodeButton from "../base/VsCodeButton.vue";
+import VsCodeCheckboxGroup from "../base/VsCodeCheckboxGroup.vue";
+import VsCodeDropdown from "../base/VsCodeDropdown.vue";
+import VsCodeRadioGroupVue from "../base/VsCodeRadioGroup.vue";
+import VsCodeTextField from "../base/VsCodeTextField.vue";
 
 import type {
-  ResourceType,
   AwsSetting,
   ConnectionSetting,
   IamSolutionSetting,
   SQLServerSetting,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
-import { vscode } from "@/utilities/vscode";
-import type { ModeType } from "@/utilities/vscode";
 import type { DropdownItem } from "@/types/Components";
+import type { ModeType } from "@/utilities/vscode";
+import { vscode } from "@/utilities/vscode";
 import { ElementSettingFactory } from "./factories/ElementSettingFactory";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());

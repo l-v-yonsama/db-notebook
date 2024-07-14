@@ -1,29 +1,28 @@
 <script setup lang="ts">
-import { ref, defineExpose, onMounted, nextTick } from "vue";
-import CompareKeySettings from "./CompareKeySettings.vue";
-import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
-import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import {
-  vsCodePanels,
-  vsCodePanelView,
-  vsCodePanelTab,
-  provideVSCodeDesignSystem,
-} from "@vscode/webview-ui-toolkit";
-import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
-import RDHViewer from "./RDHViewer.vue";
+import { WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
+import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import type {
   CloseTabActionCommand,
   CompareParams,
-  OutputParams,
-  WriteToClipboardParams,
   MdhViewEventData,
+  OutputParams,
   RdhTabItem,
+  WriteToClipboardParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import type { DropdownItem, SecondaryItem } from "@/types/Components";
-import { WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
-import { isNumericLike } from "@/utilities/GeneralColumnUtil";
+import { isNumericLike, type ResultSetData } from "@l-v-yonsama/rdh";
+import {
+  provideVSCodeDesignSystem,
+  vsCodePanels,
+  vsCodePanelTab,
+  vsCodePanelView,
+} from "@vscode/webview-ui-toolkit";
+import { defineExpose, nextTick, onMounted, ref } from "vue";
+import CompareKeySettings from "./CompareKeySettings.vue";
+import RDHViewer from "./RDHViewer.vue";
+import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
+import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -121,7 +120,7 @@ const showTab = async (tabId: string, innerIndex?: number) => {
 
   await nextTick();
 
-  tabItem.list.forEach((rdh: ResultSetData, idx) => {
+  tabItem.list.forEach((rdh: ResultSetData, idx: number) => {
     const { tableName, type } = rdh.meta;
     const sqlType = (type ?? "").substring(0, 3).trim().toUpperCase();
     const label = `${idx + 1}:${sqlType}: ${tableName}`;

@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import { ref, defineExpose, onMounted, nextTick } from "vue";
-import HttpResponseViewer from "./HttpResponseViewer.vue";
-import HttpRequestViewer from "./HttpRequestViewer.vue";
-import RDHViewer from "./RDHViewer.vue";
+import type { SecondaryItem } from "@/types/Components";
 import {
-  vsCodePanels,
-  vsCodePanelView,
-  vsCodePanelTab,
-  provideVSCodeDesignSystem,
-} from "@vscode/webview-ui-toolkit";
-import {
+  type HttpEventPanelEventCodeBlocks,
   type HttpEventPanelEventData,
   type NodeRunAxiosEvent,
-  type HttpEventPanelEventCodeBlocks,
   type WriteHttpEventToClipboardParams,
   vscode,
 } from "@/utilities/vscode";
-import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
+import {
+  provideVSCodeDesignSystem,
+  vsCodePanels,
+  vsCodePanelTab,
+  vsCodePanelView,
+} from "@vscode/webview-ui-toolkit";
+import { defineExpose, nextTick, onMounted, ref } from "vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
-import type { SecondaryItem } from "@/types/Components";
+import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
+import HttpRequestViewer from "./HttpRequestViewer.vue";
+import HttpResponseViewer from "./HttpResponseViewer.vue";
+import RDHViewer from "./RDHViewer.vue";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 

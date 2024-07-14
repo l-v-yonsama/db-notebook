@@ -48,7 +48,7 @@ button[disabled] {
   cursor: not-allowed !important;
 }
 
-a[disabled="true"] {
+a.disabled {
   cursor: not-allowed !important;
   pointer-events: none;
 }

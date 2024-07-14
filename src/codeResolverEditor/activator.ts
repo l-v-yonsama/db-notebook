@@ -1,11 +1,11 @@
-import { StateStorage } from "../utilities/StateStorage";
-import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
 import * as path from "path";
+import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
 import { CODE_RESOLVER_TYPE, CREATE_CODE_RESOLVER } from "../constant";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
-import { CodeResolverEditorProvider } from "./editorProvider";
-import { writeToResource } from "../utilities/fsUtil";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { writeToResource } from "../utilities/fsUtil";
+import { StateStorage } from "../utilities/StateStorage";
+import { CodeResolverEditorProvider } from "./editorProvider";
 
 export function activateCodeResolverEditor(context: ExtensionContext, stateStorage: StateStorage) {
   context.subscriptions.push(CodeResolverEditorProvider.register(context, stateStorage));

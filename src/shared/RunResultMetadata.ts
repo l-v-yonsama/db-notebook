@@ -1,4 +1,4 @@
-import type { ResultSetData, ContentTypeInfo } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ResultSetData } from "@l-v-yonsama/rdh";
 import type { Entry } from "har-format";
 
 export type NodeRunAxiosEvent = {

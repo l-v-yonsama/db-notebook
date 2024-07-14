@@ -1,15 +1,15 @@
-import { StateStorage } from "../utilities/StateStorage";
 import {
   ConnectionSetting,
   DBDriverResolver,
   RDSBaseDriver,
-  ResultSetData,
   normalizeQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { CellMeta, RunResult, NotebookExecutionVariables, SQLMode } from "../types/Notebook";
-import { NotebookCell } from "vscode";
-import { log, logError } from "../utilities/logger";
+import { ResultSetData } from "@l-v-yonsama/rdh";
 import * as os from "os";
+import { NotebookCell } from "vscode";
+import { CellMeta, NotebookExecutionVariables, RunResult, SQLMode } from "../types/Notebook";
+import { log, logError } from "../utilities/logger";
+import { StateStorage } from "../utilities/StateStorage";
 
 const PREFIX = "  [notebook/SqlKernel]";
 

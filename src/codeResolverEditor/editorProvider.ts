@@ -11,19 +11,18 @@ import {
   workspace,
 } from "vscode";
 
+import { RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CODE_RESOLVER_TYPE } from "../constant";
-import { createWebviewContent } from "../utilities/webviewUtil";
 import {
   ActionCommand,
   NameWithComment,
   UpdateCodeResolverTextDocumentActionCommand,
 } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
-import { StateStorage } from "../utilities/StateStorage";
-import { RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
 import { ComponentName } from "../shared/ComponentName";
 import { CodeResolverEditorEventData } from "../shared/MessageEventData";
+import { StateStorage } from "../utilities/StateStorage";
+import { createWebviewContent } from "../utilities/webviewUtil";
 
 const PREFIX = "[CodeResolverEditorProvider]";
 const componentName: ComponentName = "CodeResolverEditor";

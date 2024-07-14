@@ -1,11 +1,11 @@
-import { WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import * as vscode from "vscode";
+import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand, WriteHttpEventToClipboardParams } from "../shared/ActionParams";
-import { WriteHttpEventToClipboardParamsPanelEventData } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
-import { BasePanel } from "./BasePanel";
+import { WriteHttpEventToClipboardParamsPanelEventData } from "../shared/MessageEventData";
 import { NodeRunAxiosEvent } from "../shared/RunResultMetadata";
 import { httpEventToText } from "../utilities/httpUtil";
+import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[WriteJttpEventToClipboardParamsPanel]";
 

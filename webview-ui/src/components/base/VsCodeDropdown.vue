@@ -4,7 +4,7 @@
   </vscode-radio-group> -->
   <vscode-dropdown
     :value="modelValue"
-    :class="{ transparent: isTransparent, verr: isError }"
+    :class="{ transparent, verr: isError }"
     @change="handleOnChange"
   >
     <!-- <vscode-option value="" aria-disabled="true" style="display: none">-- Select --</vscode-option> -->
@@ -17,17 +17,18 @@
 <script setup lang="ts">
 import type { DropdownItem } from "@/types/Components";
 import {
+  provideVSCodeDesignSystem,
   vsCodeDropdown,
   vsCodeOption,
-  provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
 import { ref, watch } from "vue";
 provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeOption());
 
 type Props = {
+  id?: string;
   items: DropdownItem[];
   modelValue: string | number;
-  isTransparent?: boolean;
+  transparent?: boolean;
   required?: boolean;
 };
 

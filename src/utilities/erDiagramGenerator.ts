@@ -1,9 +1,5 @@
-import {
-  DbColumn,
-  DbSchema,
-  DbTable,
-  displayGeneralColumnType,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import { DbColumn, DbSchema, DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
+import { displayGeneralColumnType } from "@l-v-yonsama/rdh";
 import {
   ERDiagramParams,
   ERDiagramSettingParams,

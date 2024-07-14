@@ -1,7 +1,7 @@
 <template>
   <vscode-text-field
     class="child"
-    :class="{ transparent: isTransparent, verr: isError }"
+    :class="{ transparent, verr: isError }"
     :value="modelValue"
     @input="handleOnInput"
     @focus="handleOnFocus"
@@ -14,25 +14,28 @@
     :max="max"
     :size="size"
     :readonly="readonly"
+    :title="title"
   >
     <span v-if="isError" slot="end" class="codicon codicon-error"></span>
   </vscode-text-field>
 </template>
 
 <script setup lang="ts">
-import { vsCodeTextField, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodeTextField } from "@vscode/webview-ui-toolkit";
 import { nextTick, ref, watch } from "vue";
 
 provideVSCodeDesignSystem().register(vsCodeTextField());
 
 const props = defineProps<{
+  id?: string;
+  title?: string;
   modelValue?: string | number;
   type?: string;
   placeholder?: string;
   disabled?: boolean;
   maxlength?: number;
   readonly?: boolean;
-  isTransparent?: boolean;
+  transparent?: boolean;
   min?: number;
   max?: number;
   size?: number;

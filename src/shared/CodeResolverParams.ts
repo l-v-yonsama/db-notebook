@@ -1,4 +1,4 @@
-import type { CodeItem } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { CodeItem } from "@l-v-yonsama/rdh";
 
 export type CodeResolverParams = {
   items: CodeItem[];

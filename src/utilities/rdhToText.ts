@@ -1,10 +1,6 @@
-import {
-  ResultSetDataBuilder,
-  ResultSetData,
-  ToStringParam,
-} from "@l-v-yonsama/multi-platform-database-drivers";
-import { WriteToClipboardParams } from "../shared/ActionParams";
+import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import * as os from "os";
+import { WriteToClipboardParams } from "../shared/ActionParams";
 import { getToStringParamByConfig } from "./configUtil";
 
 export const rdhListToText = (list: ResultSetData[], params: WriteToClipboardParams): string => {

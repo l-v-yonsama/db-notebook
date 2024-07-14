@@ -1,18 +1,18 @@
 import { commands, ExtensionContext } from "vscode";
 
-import { StateStorage } from "../utilities/StateStorage";
+import { createHash } from "crypto";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
-import { createHash } from "crypto";
-import { ActionCommand } from "../shared/ActionParams";
 import { BOTTOM_CHARTS_VIEWID } from "../constant";
-import { BaseViewProvider } from "./BaseViewProvider";
+import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
-import { waitUntil } from "../utilities/waitUntil";
-import { ChartsViewParams } from "../types/views";
-import { ChartsViewEventData, ChartTabItem } from "../shared/MessageEventData";
-import { createChartJsParams, createPairPlotChartParams } from "../utilities/chartUtil";
 import { ExtChartData, ExtChartOptions, PairPlotChartParams } from "../shared/ExtChartJs";
+import { ChartsViewEventData, ChartTabItem } from "../shared/MessageEventData";
+import { ChartsViewParams } from "../types/views";
+import { createChartJsParams, createPairPlotChartParams } from "../utilities/chartUtil";
+import { StateStorage } from "../utilities/StateStorage";
+import { waitUntil } from "../utilities/waitUntil";
+import { BaseViewProvider } from "./BaseViewProvider";
 
 const PREFIX = "[ChartsView]";
 

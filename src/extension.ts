@@ -1,41 +1,41 @@
-import { ExtensionContext, Uri, commands, window, workspace } from "vscode";
-import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
-import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
-import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
-import { StateStorage } from "./utilities/StateStorage";
 import { DBDriverResolver, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
+import { commands, ExtensionContext, Uri, window } from "vscode";
+import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
+import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
+import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
+import { StateStorage } from "./utilities/StateStorage";
 
-import { ScanPanel } from "./panels/ScanPanel";
-import { activateNotebook } from "./notebook/activator";
-import { activateLogger, log, setupDisposeLogger } from "./utilities/logger";
-import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
+import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
 import {
+  BOTTOM_CHARTS_VIEWID,
+  BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
   BOTTOM_DIFF_MDH_VIEWID,
   BOTTOM_MDH_VIEWID,
   EXTENSION_NAME,
+  OPEN_CHARTS_VIEWER,
+  OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
+  OPEN_DIFF_MDH_VIEWER,
   OPEN_MDH_VIEWER,
   SHOW_CSV,
   SHOW_HAR,
-  OPEN_DIFF_MDH_VIEWER,
-  BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
-  OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
-  BOTTOM_CHARTS_VIEWID,
-  OPEN_CHARTS_VIEWER,
 } from "./constant";
-import { activateRuleEditor } from "./ruleEditor/activator";
-import { initializeStoragePath } from "./utilities/fsUtil";
-import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
-import { ViewConditionPanel } from "./panels/ViewConditionPanel";
-import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 import { HelpProvider } from "./help/HelpProvider";
 import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
-import { MdhViewProvider } from "./views/MdhViewProvider";
-import { HarFilePanel } from "./panels/HarFilePanel";
+import { activateNotebook } from "./notebook/activator";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
+import { HarFilePanel } from "./panels/HarFilePanel";
+import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
+import { ScanPanel } from "./panels/ScanPanel";
+import { ViewConditionPanel } from "./panels/ViewConditionPanel";
+import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
+import { activateRuleEditor } from "./ruleEditor/activator";
 import { ChartsViewParams, DiffMdhViewTabParam, MdhViewParams } from "./types/views";
-import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
-import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
+import { initializeStoragePath } from "./utilities/fsUtil";
+import { activateLogger, log, setupDisposeLogger } from "./utilities/logger";
 import { ChartsViewProvider } from "./views/ChartsViewProvider";
+import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
+import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
+import { MdhViewProvider } from "./views/MdhViewProvider";
 
 const PREFIX = "[extension]";
 

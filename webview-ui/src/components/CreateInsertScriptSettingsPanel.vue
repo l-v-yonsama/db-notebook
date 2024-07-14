@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { nextTick, ref, onMounted, computed } from "vue";
-import { vscode } from "@/utilities/vscode";
+import type { DropdownItem } from "@/types/Components";
 import type {
   CreateInsertScriptSettingsPanelEventData,
   CreateScriptConditionParams,
 } from "@/utilities/vscode";
+import { vscode } from "@/utilities/vscode";
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
+import { nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
-import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
-import type { DropdownItem } from "@/types/Components";
+import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 

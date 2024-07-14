@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { vsCodePanelTab, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodePanelTab } from "@vscode/webview-ui-toolkit";
 import { ref } from "vue";
 import VsCodeButton from "./VsCodeButton.vue";
 

@@ -1,6 +1,6 @@
 import { TextDecoder, TextEncoder } from "util";
-import { RawNotebookData } from "../types/Notebook";
 import { CancellationToken, NotebookCellData, NotebookData, NotebookSerializer } from "vscode";
+import { RawNotebookData } from "../types/Notebook";
 
 export class DBNotebookSerializer implements NotebookSerializer {
   // public readonly label: string = "DB Contents Serializer";

@@ -14,14 +14,15 @@
 
 <script setup lang="ts">
 import {
+  provideVSCodeDesignSystem,
   vsCodeRadio,
   vsCodeRadioGroup,
-  provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
 provideVSCodeDesignSystem().register(vsCodeRadioGroup(), vsCodeRadio());
 
 const props = withDefaults(
   defineProps<{
+    id?: string;
     items: {
       label: string;
       value: string | number;

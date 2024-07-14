@@ -12,6 +12,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.4.0",
     "@fortawesome/free-solid-svg-icons": "^6.4.0",
     "@fortawesome/vue-fontawesome": "^3.0.0-5",
+    "@l-v-yonsama/rdh": "^0.1.0",
     "@virtual-list/vue": "^1.2.0",
     "@vscode/codicons": "^0.0.32",
     "@vscode/webview-ui-toolkit": "^1.2.1",
@@ -25,7 +26,6 @@
     "vue-click-outside-element": "^3.1.2"
   },
   "devDependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.3.5",
     "@types/chart.js": "^2.9.41",
     "@types/node": "^16.11.27",
     "@types/splitpanes": "^2.2.1",
@@ -35,6 +35,7 @@
     "css-declaration-sorter": "^7.0.3",
     "postcss": "^8.4.27",
     "sass": "^1.64.2",
+    "terser": "^5.31.2",
     "typescript": "~4.6.3",
     "vite": "^2.9.13",
     "vue-tsc": "^0.34.7"

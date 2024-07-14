@@ -1,38 +1,38 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
-import VsCodeButton from "../base/VsCodeButton.vue";
-import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
-import {
-  vsCodePanels,
-  vsCodePanelView,
-  vsCodePanelTab,
-  provideVSCodeDesignSystem,
-} from "@vscode/webview-ui-toolkit";
 import {
   vscode,
   type ChartsViewEventData,
   type ChartTabItem,
   type CloseTabActionCommand,
 } from "@/utilities/vscode";
-import PairPlotChart from "./PairPlotChart.vue";
-import { getBase64Image } from "./utils";
-import ChartDataLabels from "chartjs-plugin-datalabels";
-import "chartjs-adapter-date-fns";
 import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
+  provideVSCodeDesignSystem,
+  vsCodePanels,
+  vsCodePanelTab,
+  vsCodePanelView,
+} from "@vscode/webview-ui-toolkit";
+import {
   ArcElement,
   BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LinearScale,
   LineElement,
   PointElement,
-  CategoryScale,
-  LinearScale,
   RadialLinearScale,
   TimeScale,
+  Title,
+  Tooltip,
 } from "chart.js";
+import "chartjs-adapter-date-fns";
+import ChartDataLabels from "chartjs-plugin-datalabels";
+import { nextTick, onMounted, ref } from "vue";
+import VsCodeButton from "../base/VsCodeButton.vue";
+import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
+import PairPlotChart from "./PairPlotChart.vue";
+import { getBase64Image } from "./utils";
 
 import { Bar, Doughnut, Line, Pie, Radar, Scatter } from "vue-chartjs";
 

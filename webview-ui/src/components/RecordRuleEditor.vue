@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
-import VsCodeButton from "./base/VsCodeButton.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import VsCodeTextField from "./base/VsCodeTextField.vue";
-import Paragraph from "./base/Paragraph.vue";
-import type {
-  DbColumn,
-  DbSchema,
-  TableRuleDetail,
-} from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   vscode,
   type RecordRule,
-  type UpdateTextDocumentActionCommand,
   type RecordRuleEditorEventData,
+  type UpdateTextDocumentActionCommand,
 } from "@/utilities/vscode";
+import type { DbColumn, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
+import { computed, nextTick, onMounted, ref } from "vue";
+import Paragraph from "./base/Paragraph.vue";
+import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 import type { DropdownItem } from "@/types/Components";
-import TopLevelConditionVue from "./TopLevelCondition.vue";
 import { conditionsToString } from "@/utilities/RRuleUtil";
+import type { TableRuleDetail } from "@l-v-yonsama/rdh";
+import TopLevelConditionVue from "./TopLevelCondition.vue";
 
 let recordRule: RecordRule;
 
@@ -79,7 +76,7 @@ const initialize = async (v: RecordRuleEditorEventData["value"]["initialize"]) =
 
   details.value.splice(0, details.value.length);
 
-  v.recordRule.tableRule.details.forEach((it, originalIndex) =>
+  v.recordRule.tableRule.details.forEach((it, originalIndex: number) =>
     details.value.push({
       ...it,
       originalIndex,

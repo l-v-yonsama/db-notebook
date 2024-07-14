@@ -1,4 +1,13 @@
 import {
+  DBType,
+  ProposalKind,
+  RdsDatabase,
+  getProposals,
+  getResourcePositions,
+} from "@l-v-yonsama/multi-platform-database-drivers";
+import { abbr, toLines } from "@l-v-yonsama/rdh";
+import { throttle } from "throttle-debounce";
+import {
   CancellationToken,
   CompletionContext,
   CompletionItem,
@@ -18,25 +27,15 @@ import {
   window,
   workspace,
 } from "vscode";
+import { NOTEBOOK_TYPE } from "../constant";
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
-import {
-  DBType,
-  ProposalKind,
-  RdsDatabase,
-  abbr,
-  getProposals,
-  getResourcePositions,
-  toLines,
-} from "@l-v-yonsama/multi-platform-database-drivers";
-import { throttle } from "throttle-debounce";
-import { NOTEBOOK_TYPE } from "../constant";
 import { isJsCell, isJsonCell, isSqlCell } from "../utilities/notebookUtil";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
-import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
 import { setNodeExecaCompletionItems } from "./intellisenses/nodeExeca";
 import { setNodeVariablesCompletionItems } from "./intellisenses/nodeVariables";
+import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
 
 const PREFIX = "[notebook/intellisense]";
 

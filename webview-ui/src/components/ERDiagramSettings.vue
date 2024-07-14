@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
-import VsCodeButton from "./base/VsCodeButton.vue";
-import VsCodeTextField from "./base/VsCodeTextField.vue";
-import type {
-  DbTable,
-  ForeignKeyConstraintDetail,
-} from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   vscode,
   type ActionCommand,
   type ERDiagramSettingsPanelEventData,
 } from "@/utilities/vscode";
+import type {
+  DbTable,
+  ForeignKeyConstraintDetail,
+} from "@l-v-yonsama/multi-platform-database-drivers";
+import { computed, nextTick, onMounted, ref } from "vue";
+import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 const sectionHeight = ref(300);
 

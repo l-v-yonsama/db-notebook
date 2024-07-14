@@ -21,9 +21,9 @@
 
 <script setup lang="ts">
 import type { DropdownItem } from "@/types/Components";
+import { ref } from "vue";
 import VsCodeDropdown from "./VsCodeDropdown.vue";
 import VsCodeTextField from "./VsCodeTextField.vue";
-import { nextTick, ref, watch } from "vue";
 
 const props = defineProps<{
   modelValue: string | number;

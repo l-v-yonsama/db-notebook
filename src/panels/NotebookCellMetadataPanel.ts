@@ -1,24 +1,22 @@
+import { RdhKey, ResultSetData } from "@l-v-yonsama/rdh";
+import * as path from "path";
 import {
   Disposable,
+  NotebookCell,
+  NotebookEdit,
+  Uri,
+  ViewColumn,
   Webview,
   WebviewPanel,
   window,
-  Uri,
-  ViewColumn,
   workspace,
   WorkspaceEdit,
-  NotebookEdit,
-  NotebookCell,
 } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
-import * as path from "path";
-import { createWebviewContent } from "../utilities/webviewUtil";
-import { NotebookCellMetadataPanelEventData } from "../shared/MessageEventData";
 import { ComponentName } from "../shared/ComponentName";
-import { CellMeta } from "../types/Notebook";
+import { NotebookCellMetadataPanelEventData } from "../shared/MessageEventData";
 import { StateStorage } from "../utilities/StateStorage";
-import { RdhKey, ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
+import { createWebviewContent } from "../utilities/webviewUtil";
 
 const PREFIX = "[NotebookCellMetadataPanel]";
 
@@ -114,7 +112,7 @@ export class NotebookCellMetadataPanel {
     });
 
     const { outputs } = this.cell;
-    const columnItems:RdhKey[] = [];
+    const columnItems: RdhKey[] = [];
     const output = outputs.find((it) => it.metadata && it.metadata.rdh);
     if (output && output.metadata?.rdh.meta.type === "select") {
       const rdh = output.metadata.rdh as ResultSetData;

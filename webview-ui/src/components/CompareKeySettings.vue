@@ -1,13 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import type { CompareKey, RdhMeta, ResultSetData } from "@l-v-yonsama/rdh";
+import { computed, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckboxGroup from "./base/VsCodeCheckboxGroup.vue";
-
-import type {
-  CompareKey,
-  RdhMeta,
-  ResultSetData,
-} from "@l-v-yonsama/multi-platform-database-drivers";
 
 type Props = {
   rdhList: ResultSetData[];

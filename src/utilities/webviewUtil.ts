@@ -1,6 +1,6 @@
 import { Uri, Webview } from "vscode";
-import { getUri } from "./getUri";
 import { getNonce } from "./getNonce";
+import { getUri } from "./getUri";
 
 export const createWebviewContent = (
   webview: Webview,

@@ -1,15 +1,5 @@
 <script setup lang="ts">
-import { ref, defineExpose, onMounted, nextTick } from "vue";
-import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
-import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import {
-  vsCodePanels,
-  vsCodePanelView,
-  vsCodePanelTab,
-  provideVSCodeDesignSystem,
-} from "@vscode/webview-ui-toolkit";
-import RDHViewer from "./RDHViewer.vue";
+import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import type {
   CloseTabActionCommand,
   CompareParams,
@@ -19,7 +9,17 @@ import type {
   OutputParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import type { DropdownItem, SecondaryItem } from "@/types/Components";
+import {
+  provideVSCodeDesignSystem,
+  vsCodePanels,
+  vsCodePanelTab,
+  vsCodePanelView,
+} from "@vscode/webview-ui-toolkit";
+import { defineExpose, nextTick, onMounted, ref } from "vue";
+import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
+import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
+import RDHViewer from "./RDHViewer.vue";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 

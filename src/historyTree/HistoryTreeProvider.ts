@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
 
-import { log } from "../utilities/logger";
+import { abbr } from "@l-v-yonsama/rdh";
 import { SQLHistory } from "../types/SQLHistory";
-import { abbr } from "@l-v-yonsama/multi-platform-database-drivers";
+import { log } from "../utilities/logger";
 
 const PREFIX = "[HistoryTreeProvider]";
 

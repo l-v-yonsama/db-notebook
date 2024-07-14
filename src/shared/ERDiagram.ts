@@ -1,5 +1,4 @@
 import type { DbTable } from "@l-v-yonsama/multi-platform-database-drivers";
-import type { ModeType } from "./ModeType";
 
 export type TableColumn = {
   tableName: string;

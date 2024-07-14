@@ -1,4 +1,4 @@
-import type { TableRuleDetail } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { TableRuleDetail } from "@l-v-yonsama/rdh";
 
 export type ViewConditionParams = {
   conditions: TableRuleDetail["conditions"];

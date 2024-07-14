@@ -11,15 +11,14 @@ import {
   workspace,
 } from "vscode";
 
-import { RECORD_RULE_TYPE } from "../constant";
-import { createWebviewContent } from "../utilities/webviewUtil";
-import { RecordRule } from "../shared/RecordRule";
-import { ActionCommand, UpdateTextDocumentActionCommand } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
-import { StateStorage } from "../utilities/StateStorage";
 import { DbSchema, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
+import { RECORD_RULE_TYPE } from "../constant";
+import { ActionCommand, UpdateTextDocumentActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { RecordRuleEditorEventData } from "../shared/MessageEventData";
+import { RecordRule } from "../shared/RecordRule";
+import { StateStorage } from "../utilities/StateStorage";
+import { createWebviewContent } from "../utilities/webviewUtil";
 
 const PREFIX = "[RecordRuleEditorProvider]";
 const componentName: ComponentName = "RecordRuleEditor";

@@ -1,4 +1,4 @@
-import { sleep } from "@l-v-yonsama/multi-platform-database-drivers";
+import { sleep } from "@l-v-yonsama/rdh";
 
 export const waitUntil = async (predicate: () => boolean, interval = 500, timeout = 30 * 1000) => {
   const start = Date.now();

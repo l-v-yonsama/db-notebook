@@ -1,13 +1,4 @@
 import {
-  ExtensionContext,
-  NotebookCellData,
-  NotebookCellKind,
-  commands,
-  env,
-  window,
-} from "vscode";
-import { StateStorage } from "../utilities/StateStorage";
-import {
   DBDriverResolver,
   DbConnection,
   DbResource,
@@ -17,17 +8,26 @@ import {
   RdsDatabase,
   RedisDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ResourceTreeProvider } from "./ResourceTreeProvider";
-import { ScanPanel } from "../panels/ScanPanel";
 import {
-  DUPLICATE_CONNECTION_SETTING,
+  ExtensionContext,
+  NotebookCellData,
+  NotebookCellKind,
+  commands,
+  env,
+  window,
+} from "vscode";
+import {
+  COUNT_FOR_ALL_TABLES,
   CREATE_CONNECTION_SETTING,
   CREATE_ER_DIAGRAM,
   CREATE_ER_DIAGRAM_WITH_SETTINGS,
+  CREATE_INSERT_SCRIPT_WITH_SETTINGS,
   CREATE_NEW_NOTEBOOK,
   DELETE_CONNECTION_SETTING,
+  DUPLICATE_CONNECTION_SETTING,
   EDIT_CONNECTION_SETTING,
   FLUSH_DB,
+  OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   REFRESH_RESOURCES,
   RETRIEVE_RESOURCES,
   RETRIEVE_TABLE_RECORDS,
@@ -35,16 +35,16 @@ import {
   SHOW_RESOURCE_PROPERTIES,
   SHOW_SCAN_PANEL,
   WRITE_ER_DIAGRAM_TO_CLIPBOARD,
-  CREATE_INSERT_SCRIPT_WITH_SETTINGS,
-  COUNT_FOR_ALL_TABLES,
-  OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
-import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
-import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
-import { ViewConditionPanel } from "../panels/ViewConditionPanel";
 import { CreateInsertScriptSettingsPanel } from "../panels/CreateInsertScriptSettingsPanel";
+import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
+import { ScanPanel } from "../panels/ScanPanel";
+import { ViewConditionPanel } from "../panels/ViewConditionPanel";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
+import { StateStorage } from "../utilities/StateStorage";
+import { ResourceTreeProvider } from "./ResourceTreeProvider";
 
 type ResourceTreeParams = {
   context: ExtensionContext;

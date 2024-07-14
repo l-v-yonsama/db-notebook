@@ -5,21 +5,26 @@
     :rows="rows"
     :cols="cols"
     :placeholder="placeholder"
+    :maxlength="maxlength"
+    :title="title"
   >
     <slot></slot>
   </vscode-text-area>
 </template>
 
 <script setup lang="ts">
-import { vsCodeTextArea, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodeTextArea } from "@vscode/webview-ui-toolkit";
 provideVSCodeDesignSystem().register(vsCodeTextArea());
 
 const props = defineProps<{
+  id?: string;
   modelValue?: string;
   value?: string;
   cols?: number;
   rows?: number;
   placeholder?: string;
+  title?: string;
+  maxlength?: number;
 }>();
 const emit = defineEmits<{
   (event: "input", value: any): void;

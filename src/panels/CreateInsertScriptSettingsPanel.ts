@@ -1,30 +1,23 @@
+import { DbTable, toInsertStatement } from "@l-v-yonsama/multi-platform-database-drivers";
+import { createRdhKey, isNumericLike, isTextLike, RdhKey } from "@l-v-yonsama/rdh";
 import {
-  WebviewPanel,
-  window,
-  Uri,
-  ViewColumn,
+  commands,
   env,
   NotebookCellData,
-  commands,
   NotebookCellKind,
+  Uri,
+  ViewColumn,
+  WebviewPanel,
+  window,
 } from "vscode";
-import { ActionCommand } from "../shared/ActionParams";
-import { log } from "../utilities/logger";
-import { ComponentName } from "../shared/ComponentName";
-import { CreateInsertScriptSettingsPanelEventData } from "../shared/MessageEventData";
-import { getIconPath } from "../utilities/fsUtil";
-import {
-  DbTable,
-  RdhKey,
-  createRdhKey,
-  isNumericLike,
-  isTextLike,
-  toInsertStatement,
-} from "@l-v-yonsama/multi-platform-database-drivers";
-import { BasePanel } from "./BasePanel";
-import { CreateScriptConditionParams } from "../shared/CreateScriptConditionParams";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
+import { ActionCommand } from "../shared/ActionParams";
+import { ComponentName } from "../shared/ComponentName";
+import { CreateScriptConditionParams } from "../shared/CreateScriptConditionParams";
+import { CreateInsertScriptSettingsPanelEventData } from "../shared/MessageEventData";
 import { CellMeta } from "../types/Notebook";
+import { getIconPath } from "../utilities/fsUtil";
+import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[CreateInsertScriptSettingsPanel]";
 

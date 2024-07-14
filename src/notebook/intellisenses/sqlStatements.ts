@@ -1,6 +1,6 @@
+import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CompletionItem, CompletionItemKind, SnippetString } from "vscode";
 import { createDocumentation } from "../intellisense";
-import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 
 export const setSqlStatementCompletionItems = (
   list: CompletionItem[],

@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { nextTick, ref, onMounted, computed } from "vue";
-import { vscode } from "@/utilities/vscode";
+import type { DropdownItem } from "@/types/Components";
 import type {
   UpdateTextDocumentActionCommand,
   ViewConditionPanelEventData,
   ViewConditionParams,
 } from "@/utilities/vscode";
-import VsCodeTextField from "./base/VsCodeTextField.vue";
+import { vscode } from "@/utilities/vscode";
+import { nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeTextField from "./base/VsCodeTextField.vue";
 import RDHViewer from "./RDHViewer.vue";
-import type { DropdownItem } from "@/types/Components";
 import TopLevelConditionVue from "./TopLevelCondition.vue";
 
-import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 

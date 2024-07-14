@@ -1,43 +1,38 @@
 <script setup lang="ts">
-import { ref, nextTick, computed } from "vue";
 import type { CellFocusParams, ShowCellDetailParams } from "@/types/RdhEvents";
-import VsCodeButton from "./base/VsCodeButton.vue";
+import type {
+  EditRowDeleteValues,
+  EditRowInsertValues,
+  EditRowUpdateValues,
+  SaveValuesInRdhParams,
+} from "@/utilities/vscode";
 import {
-  isNumericLike,
-  isDate,
-  isDateTimeOrDateOrTime,
-  isDateTime,
-  isDateTimeOrDate,
+  type AnnotationType,
+  type ChangeInNumbersAnnotation,
+  type CodeResolvedAnnotation,
+  type CompareKey,
+  type FileAnnotation,
+  type GeneralColumnType,
+  type RdhKey,
+  type RdhRow,
+  type ResultSetData,
+  type RuleAnnotation,
   isArray,
   isBinaryLike,
   isBooleanLike,
+  isDateTimeOrDate,
+  isDateTimeOrDateOrTime,
   isEnumOrSet,
   isJsonLike,
+  isNumericLike,
   isTextLike,
-  isYear,
   isUUIDType,
-} from "@/utilities/GeneralColumnUtil";
-import type {
-  EditRowInsertValues,
-  EditRowUpdateValues,
-  EditRowDeleteValues,
-  SaveValuesInRdhParams,
-} from "@/utilities/vscode";
+} from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
-import VsCodeTextField from "./base/VsCodeTextField.vue";
+import { computed, nextTick, ref } from "vue";
 import FileAnnotationView from "./base/FileAnnotationView.vue";
-import type {
-  CodeResolvedAnnotation,
-  ResultSetData,
-  RdhRow,
-  RdhKey,
-  AnnotationType,
-  RuleAnnotation,
-  CompareKey,
-  FileAnnotation,
-  GeneralColumnType,
-  ChangeInNumbersAnnotation,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 type Props = {
   rdh: ResultSetData;
@@ -129,7 +124,7 @@ const columns = ref(
     if (isNumericLike(k.type)) {
       typeClass = "codicon-symbol-numeric";
       type = "number";
-      if (isYear(k.type)) {
+      if (k.type === "year") {
         width = 55;
       }
     } else if (isUUIDType(k.type)) {
@@ -138,7 +133,7 @@ const columns = ref(
       typeClass = "codicon-calendar";
       width = 160;
       if (isDateTimeOrDate(k.type)) {
-        if (isDate(k.type)) {
+        if (k.type === "date") {
           width = 96;
         }
       } else {
@@ -284,11 +279,12 @@ function toValue(key: RdhKey, value: any): any {
   if (isBooleanLike(key.type)) {
     return value === true ? "T" : "F";
   }
-  if (isDateTime(key.type)) {
-    return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
-  }
-  if (isDate(key.type)) {
-    return dayjs(value).format("YYYY-MM-DD");
+  if (isDateTimeOrDate(key.type)) {
+    if (key.type === "date") {
+      return dayjs(value).format("YYYY-MM-DD");
+    } else {
+      return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
+    }
   }
 
   return value;

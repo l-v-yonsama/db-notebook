@@ -1,6 +1,4 @@
-import * as Excel from "exceljs";
-import * as os from "os";
-import { EnumValues } from "enum-values";
+import { getRecordRuleResults } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   AnnotationType,
   ChangeInNumbersAnnotation,
@@ -8,7 +6,6 @@ import {
   DiffResult,
   FileAnnotation,
   GeneralColumnType,
-  RdhHelper,
   RdhKey,
   RdhMeta,
   RecordRuleValidationResult,
@@ -19,10 +16,13 @@ import {
   UpdateAnnotation,
   isDateTimeOrDate,
   toDate,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+} from "@l-v-yonsama/rdh";
+import { EnumValues } from "enum-values";
+import * as Excel from "exceljs";
 import { Fill } from "exceljs";
-import dayjs = require("dayjs");
+import * as os from "os";
 import { getResultsetConfig } from "./configUtil";
+import dayjs = require("dayjs");
 
 // const FONT_NAME_Arial ='Arial';
 const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";
@@ -67,7 +67,7 @@ export type BookCreateOption = {
   subTitle?: string;
 };
 
-export { columnToLetter, createBookFromList, createBookFromRdh, createBookFromDiffList };
+export { columnToLetter, createBookFromDiffList, createBookFromList, createBookFromRdh };
 
 function columnToLetter(column: number) {
   var temp,
@@ -434,7 +434,7 @@ async function createBookFromList(
 
     // RECORD RULES
     const ruleResultList = generalList
-      .map((rdh) => RdhHelper.getRecordRuleResults(rdh))
+      .map((rdh) => getRecordRuleResults(rdh))
       .filter((it) => it !== undefined) as RecordRuleValidationResult[];
     if (ruleResultList.length) {
       cell = tocSheet.getCell(`C${tocRowNo}`);
@@ -862,7 +862,7 @@ async function createBookFromDiffList(
     if (options?.rule?.withRecordRule === true) {
       tocRowNo += 2;
       const ruleResultList = list
-        .map((it) => RdhHelper.getRecordRuleResults(it.rdh2))
+        .map((it) => getRecordRuleResults(it.rdh2))
         .filter((it) => it !== undefined) as RecordRuleValidationResult[];
       if (ruleResultList.length) {
         cell = tocSheet.getCell(`C${tocRowNo}`);

@@ -1,6 +1,5 @@
-import { CellMeta, RunResult } from "../types/Notebook";
 import { NotebookCell } from "vscode";
-import { log } from "../utilities/logger";
+import { RunResult } from "../types/Notebook";
 import { NodeKernel } from "./NodeKernel";
 
 const PREFIX = "  [notebook/JsonKernel]";

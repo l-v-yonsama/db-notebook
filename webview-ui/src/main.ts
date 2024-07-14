@@ -1,16 +1,10 @@
-import { createApp } from "vue";
-import App from "./App.vue";
-import VirtualList from "@virtual-list/vue";
-import { Splitpanes, Pane } from "splitpanes";
-import vueClickOutsideElement from "vue-click-outside-element";
-import "splitpanes/dist/splitpanes.css";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowUp,
   faBook,
   faCheck,
-  faClipboard,
   faCirclePlay,
+  faClipboard,
   faCodeCompare,
   faEye,
   faFileExcel,
@@ -24,10 +18,16 @@ import {
   faRotateLeft,
   faSave,
   faSearch,
-  faTrash,
   faTimes,
+  faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import VirtualList from "@virtual-list/vue";
+import { Pane, Splitpanes } from "splitpanes";
+import "splitpanes/dist/splitpanes.css";
+import { createApp } from "vue";
+import vueClickOutsideElement from "vue-click-outside-element";
+import App from "./App.vue";
 
 library.add(faArrowUp);
 library.add(faBook);

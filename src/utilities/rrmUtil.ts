@@ -1,5 +1,4 @@
-import type { ResultSetData } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ResultSetDataBuilder } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export const copyRrm = (rrm: RunResultMetadata): RunResultMetadata => {
