@@ -1,22 +1,27 @@
-import type { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
+import type {
+  DBType,
+  SQLServerAuthenticationType,
+} from "@l-v-yonsama/multi-platform-database-drivers";
+import { Auth0ElementSetting } from "./Auth0ElementSetting";
+import { AwsElementSetting } from "./AwsElementSetting";
+import type { BaseElementSetting } from "./BaseElementSetting";
+import { KeycloakElementSetting } from "./KeycloakElementSetting";
 import {
   MysqlElementSetting,
   PostgresElementSetting,
   SQLServerElementSetting,
 } from "./RdsElementSetting";
-import { AwsElementSetting } from "./AwsElementSetting";
 import { RedisElementSetting } from "./RedisElementSetting";
-import { KeycloakElementSetting } from "./KeycloakElementSetting";
-import type { BaseElementSetting } from "./BaseElementSetting";
-import { Auth0ElementSetting } from "./Auth0ElementSetting";
 
 export class ElementSettingFactory {
   public static create({
     dbType,
     awsCredentialType,
+    sqlServerAuthenticationType,
   }: {
     dbType: DBType;
     awsCredentialType: string;
+    sqlServerAuthenticationType: string;
   }): BaseElementSetting {
     switch (dbType) {
       case "Aws":
@@ -32,7 +37,9 @@ export class ElementSettingFactory {
       case "Postgres":
         return new PostgresElementSetting();
       case "SQLServer":
-        return new SQLServerElementSetting();
+        return new SQLServerElementSetting({
+          sqlServerAuthenticationType: sqlServerAuthenticationType as SQLServerAuthenticationType,
+        });
     }
   }
 }

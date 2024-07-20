@@ -34,11 +34,12 @@ export class KeycloakElementSetting extends BaseElementSetting {
       visible: true,
       placeholder: "admin-cli",
       defaultValue: "admin-cli",
+      label: "Client id",
     };
   }
 
   getIamClientSecret(): ElementSetting {
-    return { visible: false };
+    return { visible: false, label: "Client secret" };
   }
 
   getIamRetrieveResources(): ElementSetting {
@@ -69,6 +70,22 @@ export class KeycloakElementSetting extends BaseElementSetting {
     return { visible: false };
   }
   getSsl(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerTenantId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientSecret(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerConnectString(): ElementSetting {
     return { visible: false };
   }
 

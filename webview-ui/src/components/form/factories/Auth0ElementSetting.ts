@@ -29,6 +29,7 @@ export class Auth0ElementSetting extends BaseElementSetting {
       visible: true,
       placeholder: "client-id",
       defaultValue: "",
+      label: "Client id",
     };
   }
 
@@ -37,6 +38,7 @@ export class Auth0ElementSetting extends BaseElementSetting {
       visible: true,
       placeholder: "client-secret",
       defaultValue: "",
+      label: "Client secret",
     };
   }
 
@@ -70,6 +72,22 @@ export class Auth0ElementSetting extends BaseElementSetting {
     return { visible: false };
   }
   getSsl(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerTenantId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientSecret(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerConnectString(): ElementSetting {
     return { visible: false };
   }
 

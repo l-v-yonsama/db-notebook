@@ -28,6 +28,14 @@ export abstract class BaseElementSetting {
   abstract accept(setting: ConnectionSetting): boolean;
 
   abstract getSsl(): ElementSetting;
+
+  abstract getSqlServerClientId(): ElementSetting;
+
+  abstract getSqlServerTenantId(): ElementSetting;
+
+  abstract getSqlServerClientSecret(): ElementSetting;
+
+  abstract getSqlServerConnectString(): ElementSetting;
 }
 export type ElementSetting<T extends string | number = string> = {
   visible: boolean;

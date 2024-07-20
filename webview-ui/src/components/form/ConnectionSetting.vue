@@ -5,6 +5,7 @@ import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
 import * as DBTypeConst from "@/types/lib/DBType";
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { computed, ref } from "vue";
+import LabeledText from "../base/LabeledText.vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeCheckboxGroup from "../base/VsCodeCheckboxGroup.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
@@ -21,6 +22,7 @@ import type {
 import type { DropdownItem } from "@/types/Components";
 import type { ModeType } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
+import { toNum } from "@l-v-yonsama/rdh";
 import { ElementSettingFactory } from "./factories/ElementSettingFactory";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
@@ -33,6 +35,33 @@ const supplyCredentialItems: DropdownItem[] = [
   {
     label: "Explicit in property",
     value: "Explicit in property",
+  },
+];
+
+const sqlServerAuthenticationTypeItems: DropdownItem[] = [
+  {
+    label: "SQL Server(Default)",
+    value: "default",
+  },
+  {
+    label: "Azure AD Default",
+    value: "azure-active-directory-default",
+  },
+  {
+    label: "Azure AD Password",
+    value: "azure-active-directory-password",
+  },
+  {
+    label: "AAD ServicePrincipal..",
+    value: "azure-active-directory-service-principal-secret",
+  },
+  {
+    label: "Azure AD MsiVm",
+    value: "azure-active-directory-msi-vm",
+  },
+  {
+    label: "Use Connect String",
+    value: "Use Connect String",
   },
 ];
 
@@ -104,7 +133,12 @@ const props = withDefaults(defineProps<Props>(), {
     },
     sqlServer: {
       encrypt: false,
+      authenticationType: "default",
       onlyDefaultSchema: true,
+      clientId: "",
+      tenantId: "",
+      clientSecret: "",
+      token: "",
     },
     ssl: {
       use: false,
@@ -159,11 +193,17 @@ const useSsl = ref(props.item.ssl?.use ?? false);
 
 const isSqlServerEncrypt = ref(props.item.sqlServer?.encrypt === true);
 const isSqlServerOnlyDefaultSchema = ref(props.item.sqlServer?.onlyDefaultSchema === true);
+const sqlServerAuthenticationType = ref(props.item.sqlServer?.authenticationType ?? "default");
+const sqlServerClientId = ref(props.item.sqlServer?.clientId ?? "");
+const sqlServerClientSecret = ref(props.item.sqlServer?.clientSecret ?? "");
+const sqlServerTenantId = ref(props.item.sqlServer?.tenantId ?? "");
+const sqlServerConnectString = ref(props.item.sqlServer?.connectString ?? "");
 
 const elmSettings = computed(() => {
   const it = ElementSettingFactory.create({
     dbType: dbType.value,
     awsCredentialType: awsCredentialType.value,
+    sqlServerAuthenticationType: sqlServerAuthenticationType.value,
   });
   return it;
 });
@@ -226,23 +266,14 @@ function createItem(): ConnectionSetting {
   if (dbType.value === "SQLServer") {
     sqlServer = {
       encrypt: isSqlServerEncrypt.value,
+      authenticationType: sqlServerAuthenticationType.value,
       onlyDefaultSchema: isSqlServerOnlyDefaultSchema.value,
+      clientId: sqlServerClientId.value,
+      clientSecret: sqlServerClientSecret.value,
+      tenantId: sqlServerTenantId.value,
+      connectString: sqlServerConnectString.value,
     };
   }
-
-  const toNum = (s: string | number | undefined): number | undefined => {
-    if (s == null || s === "") {
-      return undefined;
-    }
-    if (typeof s === "number") {
-      return s;
-    }
-    const n = Number(s);
-    if (isNaN(n)) {
-      return undefined;
-    }
-    return n;
-  };
 
   const a: ConnectionSetting = {
     name: name.value,
@@ -328,18 +359,14 @@ defineExpose({
     ></VsCodeTextField>
     <p v-if="isDuplicateName" class="marker-error">Duplicate name</p>
 
-    <label v-show="elmSettings.getHost().visible" for="host">{{
-      elmSettings.getHost().label ?? "Host"
-    }}</label>
-    <p v-if="isShowMode" v-show="elmSettings.getHost().visible" id="host">{{ host }}</p>
-    <VsCodeTextField
-      v-else
+    <LabeledText
       v-show="elmSettings.getHost().visible"
       id="host"
       v-model="host"
-      :placeholder="elmSettings.getHost().placeholder"
-      :maxlength="256"
-    ></VsCodeTextField>
+      :isShowMode="isShowMode"
+      :label="elmSettings.getHost().label ?? ''"
+      :placeholder="elmSettings.getHost().placeholder ?? ''"
+    />
 
     <label v-show="elmSettings.getPort().visible" for="port">Port</label>
     <p v-if="isShowMode" v-show="elmSettings.getPort().visible" id="port">{{ port }}</p>
@@ -351,46 +378,33 @@ defineExpose({
       type="number"
     ></VsCodeTextField>
 
-    <label v-show="elmSettings.getDatabase().visible" for="database">{{
-      elmSettings.getDatabase().label
-    }}</label>
-    <p v-if="isShowMode" v-show="elmSettings.getDatabase().visible" id="database">{{ database }}</p>
-    <VsCodeTextField
-      v-else
+    <LabeledText
       v-show="elmSettings.getDatabase().visible"
       id="database"
       v-model="database"
-      :placeholder="elmSettings.getDatabase().placeholder"
-      :maxlength="128"
-    ></VsCodeTextField>
+      :isShowMode="isShowMode"
+      :label="elmSettings.getDatabase().label ?? ''"
+      :placeholder="elmSettings.getDatabase().placeholder ?? ''"
+    />
 
-    <label v-show="elmSettings.getIamClientId().visible" for="clientId">Client-id</label>
-    <p v-if="isShowMode" v-show="elmSettings.getIamClientId().visible" id="clientId">
-      {{ clientId }}
-    </p>
-    <VsCodeTextField
-      v-else
+    <LabeledText
       v-show="elmSettings.getIamClientId().visible"
       id="clientId"
       v-model="clientId"
-      :placeholder="elmSettings.getIamClientId().placeholder"
-      :maxlength="128"
-    ></VsCodeTextField>
+      :isShowMode="isShowMode"
+      :label="elmSettings.getIamClientId().label ?? ''"
+      :placeholder="elmSettings.getIamClientId().placeholder ?? ''"
+    />
 
-    <label v-show="elmSettings.getIamClientSecret().visible" for="clientSecret"
-      >Client-secret</label
-    >
-    <p v-if="isShowMode" v-show="elmSettings.getIamClientSecret().visible" id="clientSecret">
-      {{ maskedClientSecret }}
-    </p>
-    <VsCodeTextField
-      v-else
+    <LabeledText
       v-show="elmSettings.getIamClientSecret().visible"
       id="clientSecret"
       v-model="clientSecret"
-      :placeholder="elmSettings.getIamClientSecret().placeholder"
-      :maxlength="128"
-    ></VsCodeTextField>
+      :showModeValue="maskedClientSecret"
+      :isShowMode="isShowMode"
+      :label="elmSettings.getIamClientSecret().label ?? ''"
+      :placeholder="elmSettings.getIamClientSecret().placeholder ?? ''"
+    />
 
     <label v-show="elmSettings.getAwsCredentialType().visible" for="awsCredentialType"
       >Aws credential type</label
@@ -405,36 +419,34 @@ defineExpose({
       :items="supplyCredentialItems"
     />
 
-    <label v-show="elmSettings.getProfile().visible" for="profile">Profile name</label>
-    <p v-if="isShowMode && elmSettings.getProfile().visible" id="profile">{{ awsProfile }}</p>
-    <VsCodeTextField
-      v-show="!isShowMode && elmSettings.getProfile().visible"
+    <LabeledText
+      v-show="elmSettings.getProfile().visible"
       id="profile"
       v-model="awsProfile"
-      :maxlength="128"
-    ></VsCodeTextField>
+      :isShowMode="isShowMode"
+      :label="elmSettings.getProfile().label ?? ''"
+      :placeholder="elmSettings.getProfile().placeholder ?? ''"
+    />
 
-    <label v-show="elmSettings.getUser().visible" for="user">{{
-      elmSettings.getUser().label
-    }}</label>
-    <p v-if="isShowMode && elmSettings.getUser().visible" id="user">{{ maskedUser }}</p>
-    <VsCodeTextField
-      v-if="!isShowMode && elmSettings.getUser().visible"
+    <LabeledText
+      v-show="elmSettings.getUser().visible"
       id="user"
       v-model="user"
-      :maxlength="128"
-    ></VsCodeTextField>
+      :showModeValue="maskedUser"
+      :isShowMode="isShowMode"
+      :label="elmSettings.getUser().label ?? ''"
+      :placeholder="elmSettings.getUser().placeholder ?? ''"
+    />
 
-    <label v-show="elmSettings.getPassword().visible" for="password">{{
-      elmSettings.getPassword().label
-    }}</label>
-    <p v-if="isShowMode && elmSettings.getPassword().visible" id="password">{{ maskedPassword }}</p>
-    <VsCodeTextField
-      v-if="!isShowMode && elmSettings.getPassword().visible"
+    <LabeledText
+      v-show="elmSettings.getPassword().visible"
       id="password"
       v-model="password"
-      :maxlength="128"
-    ></VsCodeTextField>
+      :showModeValue="maskedPassword"
+      :isShowMode="isShowMode"
+      :label="elmSettings.getPassword().label ?? ''"
+      :placeholder="elmSettings.getPassword().placeholder ?? ''"
+    />
 
     <label v-show="elmSettings.getTimezone().visible" for="timezone">Timezone(Optional)</label>
     <p v-if="isShowMode && elmSettings.getTimezone().visible" id="timezone">{{ timezone }}</p>
@@ -533,6 +545,50 @@ defineExpose({
         style="margin-right: auto"
         >Show only default schema</vscode-checkbox
       >
+
+      <label v-if="isShowMode" for="authenticationType">Authentication</label>
+      <p v-if="isShowMode" id="authenticationType">
+        {{ sqlServerAuthenticationType }}
+      </p>
+      <VsCodeDropdown
+        v-else
+        id="authenticationType"
+        v-model="sqlServerAuthenticationType"
+        :items="sqlServerAuthenticationTypeItems"
+      ></VsCodeDropdown>
+
+      <LabeledText
+        v-show="elmSettings.getSqlServerClientId().visible"
+        id="sqlServerClientId"
+        v-model="sqlServerClientId"
+        :isShowMode="isShowMode"
+        :label="elmSettings.getSqlServerClientId().label ?? ''"
+        :placeholder="elmSettings.getSqlServerClientId().placeholder ?? ''"
+      />
+      <LabeledText
+        v-show="elmSettings.getSqlServerClientSecret().visible"
+        id="sqlServerClientSecret"
+        v-model="sqlServerClientSecret"
+        :isShowMode="isShowMode"
+        :label="elmSettings.getSqlServerClientSecret().label ?? ''"
+        :placeholder="elmSettings.getSqlServerClientSecret().placeholder ?? ''"
+      />
+      <LabeledText
+        v-show="elmSettings.getSqlServerTenantId().visible"
+        id="sqlServerTenantId"
+        v-model="sqlServerTenantId"
+        :isShowMode="isShowMode"
+        :label="elmSettings.getSqlServerTenantId().label ?? ''"
+        :placeholder="elmSettings.getSqlServerTenantId().placeholder ?? ''"
+      />
+      <LabeledText
+        v-show="elmSettings.getSqlServerConnectString().visible"
+        id="sqlServerConnectString"
+        v-model="sqlServerConnectString"
+        :isShowMode="isShowMode"
+        :label="elmSettings.getSqlServerConnectString().label ?? ''"
+        :placeholder="elmSettings.getSqlServerConnectString().placeholder ?? ''"
+      />
     </div>
 
     <div v-if="!isShowMode" class="commands">

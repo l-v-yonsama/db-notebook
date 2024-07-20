@@ -60,13 +60,32 @@ export class AwsElementSetting extends BaseElementSetting {
 
   // for aws
   getProfile(): ElementSetting {
-    return { visible: this.params.awsCredentialType === SupplyCredentials.sharedCredentialsFile };
+    return {
+      visible: this.params.awsCredentialType === SupplyCredentials.sharedCredentialsFile,
+      label: "Profile name",
+    };
   }
 
   getAwsCredentialType(): ElementSetting {
     return { visible: true };
   }
   getSsl(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerTenantId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientSecret(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerConnectString(): ElementSetting {
     return { visible: false };
   }
 

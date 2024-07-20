@@ -36,7 +36,7 @@ export class RedisElementSetting extends BaseElementSetting {
   }
 
   getHost(): ElementSetting {
-    return { visible: true };
+    return { visible: true, label: "Host" };
   }
 
   getPort(): ElementSetting<number> {
@@ -58,6 +58,22 @@ export class RedisElementSetting extends BaseElementSetting {
     return { visible: false };
   }
   getSsl(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerTenantId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientSecret(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerConnectString(): ElementSetting {
     return { visible: false };
   }
 

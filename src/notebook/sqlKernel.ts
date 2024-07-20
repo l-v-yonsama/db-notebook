@@ -2,6 +2,7 @@ import {
   ConnectionSetting,
   DBDriverResolver,
   RDSBaseDriver,
+  hasSetVariableClause,
   normalizeQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData } from "@l-v-yonsama/rdh";
@@ -132,6 +133,11 @@ export class SqlKernel {
           metadata!.type = result.meta.type;
         } else {
           stderrs.push(`Execute query Error: ${message}`);
+          if (hasSetVariableClause(query)) {
+            stderrs.push(
+              `If you want to use variables, use bind parameters.\nSee: https://github.com/l-v-yonsama/db-notebook/blob/main/docs/examples/databaseNotebook.md#11-bind-parameters-in-query`
+            );
+          }
         }
       }
       this.driver = undefined;
