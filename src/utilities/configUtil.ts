@@ -39,6 +39,9 @@ export const getResultsetConfig = (): ResultsetConfigType => {
     displayRowno: settings.get("Display rowno", false),
     maxCharactersInCell: settings.get("Max characters in cell", 100),
     maxRowsInPreview: settings.get("Max rows in preview", 10),
+    dateFormat: settings.get("Date format", "YYYY-MM-DD"),
+    eol: settings.get("End of Line", "\n"),
+    binaryToHex: settings.get("Binary to Hex", false),
   };
 };
 
@@ -66,7 +69,7 @@ export const getOutputConfig = (): OutputConfigType => {
 export const getToStringParamByConfig = (options?: Partial<ToStringParam>): ToStringParam => {
   const output = getOutputConfig();
   const rdh = getResultsetConfig();
-  const config = {
+  const config: ToStringParam = {
     maxPrintLines: output.maxRows,
     maxCellValueLength: output.maxCharactersInCell,
     withType: rdh.header.displayType,
@@ -74,6 +77,9 @@ export const getToStringParamByConfig = (options?: Partial<ToStringParam>): ToSt
     withRowNo: rdh.displayRowno,
     withCodeLabel: true,
     withRuleViolation: true,
+    dateFormat: rdh.dateFormat,
+    eol: rdh.eol,
+    binaryToHex: rdh.binaryToHex,
   };
 
   if (options) {

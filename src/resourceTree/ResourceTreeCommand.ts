@@ -131,7 +131,10 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
         setting,
         async (driver) => {
-          return await driver.count({ table: tableRes.name, schema: schemaName });
+          return await driver.count({
+            table: tableRes.name,
+            schema: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
+          });
         }
       );
 

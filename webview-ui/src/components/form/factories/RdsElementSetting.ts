@@ -104,6 +104,49 @@ export class MysqlElementSetting extends RdsElementSetting {
   }
 }
 
+export class SQLiteElementSetting extends RdsElementSetting {
+  getDatabase(): ElementSetting {
+    return {
+      visible: true,
+      label: "DB file",
+      placeholder: "*.sqlite3",
+      defaultValue: "db.sqlite3",
+    };
+  }
+
+  getHost(): ElementSetting {
+    return { visible: false };
+  }
+  getUser(): ElementSetting {
+    return { visible: false };
+  }
+  getPassword(): ElementSetting {
+    return { visible: false };
+  }
+
+  getPort(): ElementSetting<number> {
+    return { visible: false };
+  }
+  getSsl(): ElementSetting {
+    return { visible: false };
+  }
+  getTimezone(): ElementSetting {
+    return { visible: false };
+  }
+  accept(setting: ConnectionSetting): boolean {
+    const { name, database } = setting;
+    if (name === "") {
+      return false;
+    }
+
+    if (database === "") {
+      return false;
+    }
+
+    return true;
+  }
+}
+
 export class PostgresElementSetting extends RdsElementSetting {
   getDatabase(): ElementSetting {
     return {

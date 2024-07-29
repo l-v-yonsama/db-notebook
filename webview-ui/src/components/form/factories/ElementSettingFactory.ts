@@ -10,6 +10,7 @@ import {
   MysqlElementSetting,
   PostgresElementSetting,
   SQLServerElementSetting,
+  SQLiteElementSetting,
 } from "./RdsElementSetting";
 import { RedisElementSetting } from "./RedisElementSetting";
 
@@ -36,6 +37,8 @@ export class ElementSettingFactory {
         return new MysqlElementSetting();
       case "Postgres":
         return new PostgresElementSetting();
+      case "SQLite":
+        return new SQLiteElementSetting();
       case "SQLServer":
         return new SQLServerElementSetting({
           sqlServerAuthenticationType: sqlServerAuthenticationType as SQLServerAuthenticationType,

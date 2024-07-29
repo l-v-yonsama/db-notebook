@@ -32,6 +32,9 @@ export type ResultsetConfigType = {
   displayRowno: boolean;
   maxCharactersInCell: number;
   maxRowsInPreview: number;
+  dateFormat: "YYYY-MM-DD" | "YYYY-MM-DD HH:mm:ss";
+  eol: "\n" | "\r" | "\r\n";
+  binaryToHex: boolean;
 };
 
 export type DatabaseConfigType = {

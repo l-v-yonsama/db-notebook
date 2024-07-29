@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -864,6 +864,33 @@
           "default": 10,
           "description": "Maximum number of rows displayed in preview"
         },
+        "resultset.Date format": {
+          "scope": "resource",
+          "type": "string",
+          "enum": [
+            "YYYY-MM-DD",
+            "YYYY-MM-DD HH:mm:ss"
+          ],
+          "default": "YYYY-MM-DD",
+          "description": "Get the formatted date"
+        },
+        "resultset.End of Line": {
+          "scope": "resource",
+          "type": "string",
+          "enum": [
+            "\n",
+            "\r\n",
+            "\r"
+          ],
+          "default": "\n",
+          "description": "End of Line"
+        },
+        "resultset.Binary to Hex": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": false,
+          "description": "Binary to Hex"
+        },
         "database.Default limit rows": {
           "scope": "resource",
           "type": "number",
@@ -932,8 +959,8 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.4.7",
-    "@l-v-yonsama/rdh": "^0.1.0",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.4.11",
+    "@l-v-yonsama/rdh": "^0.1.5",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

@@ -20,6 +20,7 @@ import { MdhViewEventData, RdhTabItem } from "../shared/MessageEventData";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { DiffMdhViewTabParam, MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getResultsetConfig } from "../utilities/configUtil";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
 import { rdhListToText } from "../utilities/rdhToText";
@@ -229,6 +230,7 @@ export class MdhViewProvider extends BaseViewProvider {
   }
 
   private createTabItem(title: string, list: ResultSetData[]): RdhTabItem {
+    const rdhConfig = getResultsetConfig();
     const tabId = createHash("md5").update(title).digest("hex");
     const refreshable = list.every((it) => it.meta.type === "select" || it.meta.type === "show");
     const item: RdhTabItem = {
@@ -236,6 +238,10 @@ export class MdhViewProvider extends BaseViewProvider {
       title,
       list,
       refreshable,
+      config: {
+        dateFormat: rdhConfig.dateFormat,
+        binaryToHex: rdhConfig.binaryToHex,
+      },
     };
     return item;
   }

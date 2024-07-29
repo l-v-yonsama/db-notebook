@@ -116,11 +116,12 @@ export class ViewConditionPanel extends BasePanel {
     const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
     const isLimitAsTop = driver.isLimitAsTop();
+    const isSchemaSpecificationSvailable = driver.isSchemaSpecificationSvailable();
 
     try {
       const { query } = toViewDataNormalizedQuery({
         tableRes,
-        schemaName,
+        schemaName: isSchemaSpecificationSvailable ? schemaName : undefined,
         toPositionedParameter: isPositionedParameterAvailable,
         toPositionalCharacter: toPositionalCharacter,
         limitAsTop: isLimitAsTop,
@@ -182,7 +183,7 @@ export class ViewConditionPanel extends BasePanel {
           >(setting, async (driver) => {
             const { query, binds } = toViewDataNormalizedQuery({
               tableRes,
-              schemaName,
+              schemaName: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
               toPositionedParameter: driver.isPositionedParameterAvailable(),
               toPositionalCharacter: driver.getPositionalCharacter(),
               conditions: specfyCondition ? conditions : undefined,

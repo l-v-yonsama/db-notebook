@@ -4,6 +4,7 @@ import type {
   EditRowDeleteValues,
   EditRowInsertValues,
   EditRowUpdateValues,
+  RdhViewConfig,
   SaveValuesInRdhParams,
 } from "@/utilities/vscode";
 import {
@@ -36,6 +37,7 @@ import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 type Props = {
   rdh: ResultSetData;
+  config?: RdhViewConfig;
   width: number;
   height: number;
   readonly: boolean;
@@ -281,10 +283,23 @@ function toValue(key: RdhKey, value: any): any {
   }
   if (isDateTimeOrDate(key.type)) {
     if (key.type === "date") {
+      if (props.config?.dateFormat === "YYYY-MM-DD HH:mm:ss") {
+        return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
+      }
       return dayjs(value).format("YYYY-MM-DD");
     } else {
       return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
     }
+  }
+  if (isBinaryLike(key.type) && value) {
+    if (value.type === "Buffer" && value.data && Array.isArray(value.data)) {
+      if (props.config?.binaryToHex) {
+        const arr = value.data as number[];
+        const buffer = arr.map((it) => `${it <= 9 ? "0" : ""}${it.toString(16)}`).join("");
+        return `B'${buffer.substring(0, 64)}`;
+      }
+    }
+    return "(BINARY)";
   }
 
   return value;
@@ -620,7 +635,10 @@ defineExpose({
                 </template>
                 <template v-else>
                   <p
-                    :class="{ 'code-value': item.$resolvedLabels[key.name] }"
+                    :class="{
+                      'code-value': item.$resolvedLabels[key.name],
+                      'is-null': item[key.name] == null,
+                    }"
                     :title="item[key.name]"
                   >
                     <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
@@ -801,6 +819,15 @@ td {
 
       & > span.val {
         margin-right: 2px;
+      }
+
+      &.is-null::after {
+        position: absolute;
+        content: "(NULL)";
+        color: gray;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
       }
     }
 

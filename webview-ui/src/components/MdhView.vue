@@ -447,6 +447,7 @@ defineExpose({
           <div v-if="activeInnerRdh" class="spPaneWrapper">
             <RDHViewer
               :rdh="activeInnerRdh"
+              :config="tabItem.config"
               :width="splitterWidth"
               :height="splitterHeight"
               :readonly="true"

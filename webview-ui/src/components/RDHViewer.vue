@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CellFocusParams, ShowCellDetailParams } from "@/types/RdhEvents";
+import type { RdhViewConfig } from "@/utilities/vscode";
 import { isJsonLike, type FileAnnotation, type ResultSetData } from "@l-v-yonsama/rdh";
 import { computed, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
@@ -9,6 +10,7 @@ type Props = {
   width: number;
   height: number;
   rdh: ResultSetData;
+  config?: RdhViewConfig;
   readonly: boolean;
   showOnlyChanged?: boolean;
   showDetailPane?: boolean;
@@ -79,6 +81,7 @@ defineExpose({
       <pane min-size="5" size="70">
         <RDH
           :rdh="rdh"
+          :config="config"
           :width="width"
           :height="height"
           :readonly="false"

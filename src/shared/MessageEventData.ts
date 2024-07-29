@@ -6,7 +6,13 @@ import type {
   DbTable,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import type { ContentTypeInfo, DiffResult, RdhKey, ResultSetData } from "@l-v-yonsama/rdh";
+import type {
+  ContentTypeInfo,
+  DiffResult,
+  RdhKey,
+  ResultSetData,
+  ToStringParam,
+} from "@l-v-yonsama/rdh";
 import type { Har } from "har-format";
 import type { ExtChartData, ExtChartOptions, PairPlotChartParams } from "../shared/ExtChartJs";
 import type { CellMeta, CellMetaChart } from "../types/Notebook";
@@ -49,11 +55,17 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
   value: V;
 };
 
+export type RdhViewConfig = {
+  dateFormat: ToStringParam["dateFormat"];
+  binaryToHex: ToStringParam["binaryToHex"];
+};
+
 export type RdhTabItem = {
   tabId: string;
   title: string;
   refreshable: boolean;
   list: ResultSetData[];
+  config: RdhViewConfig;
 };
 
 export type HttpResponseTabItem = {

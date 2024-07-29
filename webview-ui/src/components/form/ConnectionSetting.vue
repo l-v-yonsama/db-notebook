@@ -166,7 +166,10 @@ const awsCredentialType = ref(
 );
 const awsServiceSelected = ref(props.item.awsSetting?.services ?? []);
 
-const dbTypeItems = DBTypeConst.DBTypeValues.map((it) => ({ label: it, value: it }));
+const dbTypeItems = DBTypeConst.DBTypeValues.filter((it) => it !== "SQLite").map((it) => ({
+  label: it,
+  value: it,
+}));
 const regionItems = ["", ...AwsRegionConst.AwsRegionValues].map((it) => ({ label: it, value: it }));
 const awsServiceItems = AwsServiceTypeValues.map((it) => ({
   label: it,

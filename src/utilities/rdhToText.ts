@@ -27,7 +27,7 @@ const rdbToText = (rdb: ResultSetDataBuilder, params: WriteToClipboardParams): s
       ret = rdb.toCsv(outputDetail);
       break;
     case "tsv":
-      ret = rdb.toCsv({ delimiter: "\t", ...outputDetail });
+      ret = rdb.toCsv({ ...outputDetail, csv: { delimiter: "\t" } });
       break;
     case "markdown":
       ret = rdb.toMarkdown(outputDetail);
