@@ -166,7 +166,7 @@ const awsCredentialType = ref(
 );
 const awsServiceSelected = ref(props.item.awsSetting?.services ?? []);
 
-const dbTypeItems = DBTypeConst.DBTypeValues.filter((it) => it !== "SQLite").map((it) => ({
+const dbTypeItems = DBTypeConst.DBTypeValues.map((it) => ({
   label: it,
   value: it,
 }));
@@ -318,6 +318,22 @@ function test() {
   });
 }
 
+function selectDatabaseFile() {
+  vscode.postCommand({
+    command: "selectFileActionCommand",
+    params: {
+      canSelectFiles: true,
+      canSelectFolders: false,
+      canSelectMany: false,
+      title: "Select a sqlite database file.",
+      filters: {
+        SQLite: ["sqlite", "sqlite3", "db", "db3", "sdb", "sdb3", "database"],
+        All: ["*"],
+      },
+    },
+  });
+}
+
 function setDefault() {
   if (props.mode !== "update") {
     name.value = dbType.value;
@@ -338,8 +354,13 @@ function setDefault() {
 const stopProgress = () => {
   isInProgress.value = false;
 };
+
+const selectedFile = (filePath: string) => {
+  database.value = filePath;
+};
 defineExpose({
   stopProgress,
+  selectedFile,
 });
 </script>
 
@@ -381,14 +402,28 @@ defineExpose({
       type="number"
     ></VsCodeTextField>
 
-    <LabeledText
-      v-show="elmSettings.getDatabase().visible"
-      id="database"
-      v-model="database"
-      :isShowMode="isShowMode"
-      :label="elmSettings.getDatabase().label ?? ''"
-      :placeholder="elmSettings.getDatabase().placeholder ?? ''"
-    />
+    <label v-show="elmSettings.getDatabase().visible" for="database">{{
+      elmSettings.getDatabase().label ?? "Database"
+    }}</label>
+    <template v-if="dbType === 'SQLite'">
+      <VsCodeButton v-if="!isShowMode" @click="selectDatabaseFile"
+        ><fa icon="database" />Select</VsCodeButton
+      >
+      <p>{{ database }}</p>
+      <br v-if="!isShowMode" />
+    </template>
+    <template v-else>
+      <p v-if="isShowMode" v-show="elmSettings.getDatabase().visible" id="database">
+        {{ database }}
+      </p>
+      <VsCodeTextField
+        v-else
+        v-show="elmSettings.getDatabase().visible"
+        id="database"
+        v-model="database"
+        :placeholder="elmSettings.getDatabase().placeholder ?? ''"
+      ></VsCodeTextField>
+    </template>
 
     <LabeledText
       v-show="elmSettings.getIamClientId().visible"

@@ -7,7 +7,7 @@
     @focus="handleOnFocus"
     @mouseout="handleOnMouseOut"
     :type="type"
-    :placeholder="placeholder"
+    :placeholder="placeholderText"
     :disabled="disabled"
     :maxlength="maxlength"
     :min="min"
@@ -45,6 +45,7 @@ const props = defineProps<{
 
 const isError = ref(false);
 const initialValue = props.modelValue ?? "";
+const placeholderText = ref(props.placeholder ?? "");
 
 watch(
   () => props.modelValue,
@@ -68,6 +69,7 @@ watch(
       }
     }
     isError.value = error;
+    placeholderText.value = props.placeholder ?? error ? "Input required" : "";
   },
   {
     immediate: true,
@@ -94,5 +96,8 @@ function handleOnMouseOut(event: any) {
 <style>
 vscode-text-field[transparent]::part(root) {
   background-color: transparent !important;
+}
+span.codicon-error {
+  color: var(--vscode-editorError-foreground) !important;
 }
 </style>

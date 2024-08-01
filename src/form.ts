@@ -71,6 +71,27 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
       const { command, params } = message;
       // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
       switch (command) {
+        case "selectFileActionCommand":
+          {
+            const r = await vscode.window.showOpenDialog({
+              ...params,
+            });
+
+            let selectedFilePath = "";
+            if (r && r.length) {
+              selectedFilePath = r[0].fsPath;
+            }
+            let msg: DBFormEventData = {
+              command: "selectedFile",
+              componentName: "DBFormView",
+              value: {
+                subComponentName: "ConnectionSetting",
+                selectedFilePath,
+              },
+            };
+            this.webviewView?.webview.postMessage(msg);
+          }
+          break;
         case "testConnectionSetting":
           {
             const driver = DBDriverResolver.getInstance().createDriver(params);

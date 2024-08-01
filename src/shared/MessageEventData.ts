@@ -406,10 +406,11 @@ export type DBFormEventDataValue = {
   resourceProperties?: {
     [key: string]: any;
   };
+  selectedFilePath?: string;
 };
 
 export type DBFormEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand,
+  BaseMessageEventDataCommand | "selectedFile",
   "DBFormView",
   DBFormEventDataValue
 >;

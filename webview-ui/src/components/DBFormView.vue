@@ -51,6 +51,9 @@ const recieveMessage = (data: DBFormEventData) => {
       if (command === "stop-progress") {
         connectionSettingRef.value?.stopProgress();
       }
+      if (command === "selectedFile") {
+        connectionSettingRef.value?.selectedFile(value.selectedFilePath ?? "");
+      }
       break;
     case "ResourceProperties":
       nextTick(() => {

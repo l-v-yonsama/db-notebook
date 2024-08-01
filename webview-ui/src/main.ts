@@ -6,6 +6,7 @@ import {
   faCirclePlay,
   faClipboard,
   faCodeCompare,
+  faDatabase,
   faEye,
   faFileExcel,
   faFileLines,
@@ -35,6 +36,7 @@ library.add(faCheck);
 library.add(faClipboard);
 library.add(faCirclePlay);
 library.add(faCodeCompare);
+library.add(faDatabase);
 library.add(faEye);
 library.add(faFileExcel);
 library.add(faFileLines);

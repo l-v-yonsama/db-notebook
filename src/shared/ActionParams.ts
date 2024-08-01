@@ -51,6 +51,7 @@ export type ActionCommand =
   | CloseTabActionCommand
   | SelectTabActionCommand
   | SelectInnerTabActionCommand
+  | SelectFileActionCommand
   | TestConnectionSettingActionCommand
   | SaveConnectionSettingActionCommand
   | SaveValuesActionCommand
@@ -72,6 +73,42 @@ export type BaseActionCommand<T extends string, U = any> = {
 };
 
 export type ShowErrorActionCommand = BaseActionCommand<"showError", { message: string }>;
+
+export type SelectFileActionCommand = BaseActionCommand<
+  "selectFileActionCommand",
+  {
+    /**
+     * Allow to select files, defaults to `true`.
+     */
+    canSelectFiles?: boolean;
+
+    /**
+     * Allow to select folders, defaults to `false`.
+     */
+    canSelectFolders?: boolean;
+
+    /**
+     * Allow to select many files or folders.
+     */
+    canSelectMany?: boolean;
+
+    /**
+     * A set of file filters that are used by the dialog. Each entry is a human-readable label,
+     * like "TypeScript", and an array of extensions, for example:
+     * ```ts
+     * {
+     * 	'Images': ['png', 'jpg'],
+     * 	'TypeScript': ['ts', 'tsx']
+     * }
+     * ```
+     */
+    filters?: { [name: string]: string[] };
+    /**
+     * Dialog title.
+     */
+    title?: string;
+  }
+>;
 
 export type TestConnectionSettingActionCommand = {
   command: "testConnectionSetting";

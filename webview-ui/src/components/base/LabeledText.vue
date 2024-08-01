@@ -1,7 +1,7 @@
 <template>
   <div class="labeld-text">
     <label :for="id">{{ label }}</label>
-    <p v-if="isShowMode" id="sqlServerClientId">
+    <p v-if="isShowMode" :id="id">
       {{ showModeValue ? showModeValue : modelValue }}
     </p>
     <VsCodeTextField
