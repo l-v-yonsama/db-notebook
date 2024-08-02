@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -381,6 +381,11 @@
           "command": "database-notebook.show-csv-file",
           "when": "resourceExtname == .csv",
           "group": "navigation"
+        },
+        {
+          "command": "database-notebook.create-dbn-from-sql",
+          "when": "resourceExtname == .sql",
+          "group": "navigation"
         }
       ],
       "explorer/context": [
@@ -392,6 +397,11 @@
         {
           "command": "database-notebook.show-csv-file",
           "when": "resourceExtname == .csv",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.create-dbn-from-sql",
+          "when": "resourceExtname == .sql",
           "group": "navigation"
         }
       ],
@@ -714,6 +724,12 @@
         "category": "DB Notebook CSV Viewer"
       },
       {
+        "command": "database-notebook.create-dbn-from-sql",
+        "title": "Create DB Notebook file",
+        "shortTitle": "Create DB Notebook",
+        "category": "DB Notebook"
+      },
+      {
         "command": "database-notebook.show-har-file",
         "title": "Preview har file",
         "category": "DB Notebook HAR Viewer"
@@ -960,7 +976,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.5.6",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.5.7",
     "@l-v-yonsama/rdh": "^0.1.9",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

@@ -58,6 +58,7 @@ export const OPEN_COUNT_FOR_ALL_TABLES_VIEWER = `${EXTENSION_NAME}.open-count-fo
 // NOTE BOOK
 //---------------------------------------------------
 export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;
+export const CREATE_NOTEBOOK_FROM_SQL = `${EXTENSION_NAME}.create-dbn-from-sql`;
 export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
 
 // NOTEBOOK TOOL-BAR COMMANDS

@@ -1,9 +1,11 @@
+import { separateMultipleQueries } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as path from "path";
 import sqlFormatter from "sql-formatter-plus";
 import {
   ExtensionContext,
   NotebookCell,
   NotebookCellData,
+  NotebookCellKind,
   NotebookData,
   NotebookEdit,
   Range,
@@ -26,6 +28,7 @@ import {
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_TOOLBAR_FORMAT,
   CREATE_NEW_NOTEBOOK,
+  CREATE_NOTEBOOK_FROM_SQL,
   EXPORT_IN_HTML,
   NOTEBOOK_TYPE,
   OPEN_MDH_VIEWER,
@@ -42,6 +45,7 @@ import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getFormatterConfig } from "../utilities/configUtil";
+import { readResource } from "../utilities/fsUtil";
 import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
 import { log } from "../utilities/logger";
 import {
@@ -91,6 +95,28 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       const newNotebook = await workspace.openNotebookDocument(
         NOTEBOOK_TYPE,
         new NotebookData(cells ?? [])
+      );
+
+      window.showNotebookDocument(newNotebook);
+    });
+    registerDisposableCommand(CREATE_NOTEBOOK_FROM_SQL, async (uri: Uri) => {
+      const text = await readResource(uri);
+      if (!text) {
+        window.showErrorMessage("No text data");
+        return;
+      }
+      const queries = separateMultipleQueries(text);
+      if (queries.length === 0) {
+        window.showErrorMessage("No query data");
+        return;
+      }
+      const newNotebook = await workspace.openNotebookDocument(
+        NOTEBOOK_TYPE,
+        new NotebookData(
+          queries.map((it) => {
+            return new NotebookCellData(NotebookCellKind.Code, it, "sql");
+          })
+        )
       );
 
       window.showNotebookDocument(newNotebook);
