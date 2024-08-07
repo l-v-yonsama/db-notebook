@@ -23,25 +23,31 @@ export function setupDisposeLogger(context: ExtensionContext) {
   context.subscriptions.push(channel);
 }
 
-export function log(value: string) {
+export function log(...args: unknown[]) {
   if (channel) {
     try {
-      channel.appendLine(value);
+      const message = args
+        .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
+        .join(" ");
+      channel.appendLine(message);
     } catch (e) {
       console.error("Error:logger.ts", e);
     }
   } else {
-    console.log(value);
+    console.log(...args);
   }
 }
-export function logError(value: string) {
+export function logError(...args: unknown[]) {
   if (channel) {
     try {
-      channel.error(value);
+      const message = args
+        .map((arg) => (arg instanceof Error ? arg.message : String(arg)))
+        .join(" ");
+      channel.error(message);
     } catch (e) {
       console.error("Error:logger.ts", e);
     }
   } else {
-    console.log(value);
+    console.log(...args);
   }
 }

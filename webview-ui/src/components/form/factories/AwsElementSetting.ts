@@ -1,8 +1,8 @@
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
 import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
-import { BaseElementSetting, type ElementSetting } from "./BaseElementSetting";
+import { BaseNoSqlElementSetting, type ElementSetting } from "./BaseElementSetting";
 
-export class AwsElementSetting extends BaseElementSetting {
+export class AwsElementSetting extends BaseNoSqlElementSetting {
   constructor(private params: { awsCredentialType: string }) {
     super();
   }
@@ -70,22 +70,6 @@ export class AwsElementSetting extends BaseElementSetting {
     return { visible: true };
   }
   getSsl(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerClientId(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerTenantId(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerClientSecret(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerConnectString(): ElementSetting {
     return { visible: false };
   }
 

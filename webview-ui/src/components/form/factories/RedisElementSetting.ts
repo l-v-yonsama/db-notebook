@@ -1,7 +1,7 @@
 import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
-import { BaseElementSetting, type ElementSetting } from "./BaseElementSetting";
+import { BaseNoSqlElementSetting, type ElementSetting } from "./BaseElementSetting";
 
-export class RedisElementSetting extends BaseElementSetting {
+export class RedisElementSetting extends BaseNoSqlElementSetting {
   getUser(): ElementSetting {
     return { visible: false };
   }
@@ -58,22 +58,6 @@ export class RedisElementSetting extends BaseElementSetting {
     return { visible: false };
   }
   getSsl(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerClientId(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerTenantId(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerClientSecret(): ElementSetting {
-    return { visible: false };
-  }
-
-  getSqlServerConnectString(): ElementSetting {
     return { visible: false };
   }
 

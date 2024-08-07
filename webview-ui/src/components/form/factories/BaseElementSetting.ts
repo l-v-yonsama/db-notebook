@@ -29,6 +29,8 @@ export abstract class BaseElementSetting {
 
   abstract getSsl(): ElementSetting;
 
+  abstract getSqlServerAuthenticationType(): ElementSetting;
+
   abstract getSqlServerClientId(): ElementSetting;
 
   abstract getSqlServerTenantId(): ElementSetting;
@@ -37,6 +39,29 @@ export abstract class BaseElementSetting {
 
   abstract getSqlServerConnectString(): ElementSetting;
 }
+
+export abstract class BaseNoSqlElementSetting extends BaseElementSetting {
+  getSqlServerAuthenticationType(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerTenantId(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerClientSecret(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerConnectString(): ElementSetting {
+    return { visible: false };
+  }
+}
+
 export type ElementSetting<T extends string | number = string> = {
   visible: boolean;
   placeholder?: string;

@@ -70,6 +70,10 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/16_html_report.gif)
 
+- Create DB Notebook from a sql file
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/17_sql_to_dbn.gif)
+
 <details>
 
 <summary>Screenshots ( Convenient visualization of result sets )</summary>

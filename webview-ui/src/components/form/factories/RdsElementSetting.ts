@@ -53,6 +53,10 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getSqlServerAuthenticationType(): ElementSetting {
+    return { visible: false };
+  }
+
   getSqlServerClientId(): ElementSetting {
     return { visible: false };
   }
@@ -191,14 +195,14 @@ export class SQLServerElementSetting extends RdsElementSetting {
     return {
       visible: type !== "Use Connect String",
       label: type === "default" ? "Host" : "Server",
-      defaultValue: type === "default" ? "127.0.0.1" : "",
+      defaultValue: type === "default" ? "127.0.0.1" : "<SERVERNAME>.database.windows.net",
       placeholder: type === "default" ? "" : "<SERVERNAME>.database.windows.net",
     };
   }
   getPort(): ElementSetting<number> {
     const type = this.params.sqlServerAuthenticationType;
     return {
-      visible: type !== "Use Connect String",
+      visible: type == "default",
       label: "Port",
       defaultValue: 1433,
     };
@@ -236,6 +240,14 @@ export class SQLServerElementSetting extends RdsElementSetting {
   }
   getTimezone(): ElementSetting {
     return { visible: false };
+  }
+
+  getSqlServerAuthenticationType(): ElementSetting {
+    return {
+      visible: true,
+      defaultValue: "default",
+      label: "Authentication",
+    };
   }
 
   getSqlServerClientId(): ElementSetting {
@@ -296,7 +308,10 @@ export class SQLServerElementSetting extends RdsElementSetting {
         return false;
       }
     } else {
-      if (database === "" || user === "" || password === "") {
+      if (database === "") {
+        return false;
+      }
+      if (type === "default" && (user === "" || password === "")) {
         return false;
       }
     }

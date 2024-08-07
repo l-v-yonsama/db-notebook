@@ -108,6 +108,11 @@ const maskedString = (s: string): string => {
 const maskedUser = computed((): string => maskedString(user.value ?? ""));
 const maskedPassword = computed((): string => maskedString(password.value ?? ""));
 const maskedClientSecret = computed((): string => maskedString(clientSecret.value ?? ""));
+const maskedSqlServerClientId = computed((): string => maskedString(sqlServerClientId.value ?? ""));
+const maskedSqlServerClientSecret = computed((): string =>
+  maskedString(sqlServerClientSecret.value ?? "")
+);
+const maskedSqlServerTenantId = computed((): string => maskedString(sqlServerTenantId.value ?? ""));
 
 const props = withDefaults(defineProps<Props>(), {
   mode: "create",
@@ -383,6 +388,24 @@ defineExpose({
     ></VsCodeTextField>
     <p v-if="isDuplicateName" class="marker-error">Duplicate name</p>
 
+    <label v-if="elmSettings.getSqlServerAuthenticationType().visible" for="authenticationType"
+      >Authentication</label
+    >
+    <p
+      v-if="isShowMode"
+      v-show="elmSettings.getSqlServerAuthenticationType().visible"
+      id="authenticationType"
+    >
+      {{ sqlServerAuthenticationType }}
+    </p>
+    <VsCodeDropdown
+      v-else
+      v-show="elmSettings.getSqlServerAuthenticationType().visible"
+      id="authenticationType"
+      v-model="sqlServerAuthenticationType"
+      :items="sqlServerAuthenticationTypeItems"
+    ></VsCodeDropdown>
+
     <LabeledText
       v-show="elmSettings.getHost().visible"
       id="host"
@@ -413,6 +436,7 @@ defineExpose({
       <br v-if="!isShowMode" />
     </template>
     <template v-else>
+      <!-- Not SQLite -->
       <p v-if="isShowMode" v-show="elmSettings.getDatabase().visible" id="database">
         {{ database }}
       </p>
@@ -584,22 +608,21 @@ defineExpose({
         >Show only default schema</vscode-checkbox
       >
 
-      <label v-if="isShowMode" for="authenticationType">Authentication</label>
-      <p v-if="isShowMode" id="authenticationType">
-        {{ sqlServerAuthenticationType }}
-      </p>
-      <VsCodeDropdown
-        v-else
-        id="authenticationType"
-        v-model="sqlServerAuthenticationType"
-        :items="sqlServerAuthenticationTypeItems"
-      ></VsCodeDropdown>
-
+      <LabeledText
+        v-show="elmSettings.getSqlServerTenantId().visible"
+        id="sqlServerTenantId"
+        v-model="sqlServerTenantId"
+        :isShowMode="isShowMode"
+        :showModeValue="maskedSqlServerTenantId"
+        :label="elmSettings.getSqlServerTenantId().label ?? ''"
+        :placeholder="elmSettings.getSqlServerTenantId().placeholder ?? ''"
+      />
       <LabeledText
         v-show="elmSettings.getSqlServerClientId().visible"
         id="sqlServerClientId"
         v-model="sqlServerClientId"
         :isShowMode="isShowMode"
+        :showModeValue="maskedSqlServerClientId"
         :label="elmSettings.getSqlServerClientId().label ?? ''"
         :placeholder="elmSettings.getSqlServerClientId().placeholder ?? ''"
       />
@@ -608,17 +631,11 @@ defineExpose({
         id="sqlServerClientSecret"
         v-model="sqlServerClientSecret"
         :isShowMode="isShowMode"
+        :showModeValue="maskedSqlServerClientSecret"
         :label="elmSettings.getSqlServerClientSecret().label ?? ''"
         :placeholder="elmSettings.getSqlServerClientSecret().placeholder ?? ''"
       />
-      <LabeledText
-        v-show="elmSettings.getSqlServerTenantId().visible"
-        id="sqlServerTenantId"
-        v-model="sqlServerTenantId"
-        :isShowMode="isShowMode"
-        :label="elmSettings.getSqlServerTenantId().label ?? ''"
-        :placeholder="elmSettings.getSqlServerTenantId().placeholder ?? ''"
-      />
+
       <LabeledText
         v-show="elmSettings.getSqlServerConnectString().visible"
         id="sqlServerConnectString"

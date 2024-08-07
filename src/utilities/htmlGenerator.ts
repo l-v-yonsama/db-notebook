@@ -1,5 +1,6 @@
 import { prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr, escapeHtml, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
+import { promises as fs } from "fs";
 import {
   NotebookCell,
   NotebookCellKind,
@@ -8,6 +9,7 @@ import {
   NotebookDocument,
   TextDocument,
 } from "vscode";
+import { mediaDir } from "../constant";
 import { ExtChartData, ExtChartOptions, PairPlotChartParams } from "../shared/ExtChartJs";
 import { DiffTabInnerItem } from "../shared/MessageEventData";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -19,160 +21,8 @@ import { writeToResourceOnStorage } from "./fsUtil";
 import { createResponseBodyMarkdown } from "./httpUtil";
 import { logError } from "./logger";
 import dayjs = require("dayjs");
-
+import path = require("path");
 const PREFIX = "[utilities/htmlGenerator]";
-
-const HTML_CONTENT_PREFIX = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title></title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.10.0/css/all.css">
-    <script src="https://code.jquery.com/jquery-1.9.1.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/styles/github.min.css">
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.16/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <style>
-      nav a span.tag {
-        margin-left: 5px;
-        margin-right: 5px;
-        min-width: 90px;
-        text-align: center;
-      }
-
-      div.chart {
-        color: gray;
-        background-color: white;
-      }
-
-      .pair-plot-chart {
-        overflow-y: auto;
-      }
-      .pair-plot-chart p.title {
-        text-align: center;
-        margin: 2px 0;
-      }
-      .pair-plot-chart .legends {
-        text-align: center;
-        margin-bottom: 1px;
-      }
-      .pair-plot-chart .legends div.legend {
-        display: inline-block;
-        min-width: 3em;
-        padding: 0px 5px;
-        margin-right: 2em;
-        border-width: 2px;
-        border-style: solid;
-        line-height: 1.2;
-      }
-
-      .pair-plot-chart table {
-        table-layout: fixed;
-        width: 100%;
-        margin:1px;
-      }
-
-      .pair-plot-chart th {
-        font-weight: normal;
-        background-color: #e0e0e0;
-        text-align: center;
-        color: gray;
-      }
-      .pair-plot-chart th.rl {
-        width: 1.7em;
-        text-align: center;
-      }
-      .pair-plot-chart th div.rl {
-        line-height: 0.9em;
-        width: 1.7em;
-        text-align: center;
-        white-space: pre-line;
-        overflow: hidden;
-        writing-mode: vertical-rl;
-      }
-      .pair-plot-chart td {
-        vertical-align: middle;
-        border: 1px dotted silver;
-        text-align: center;
-      }
-      .pair-plot-chart td .very_weak {
-        color: #999;
-        font-size: small;
-      }
-      .pair-plot-chart td .weak {
-        color: #666;
-      }
-      .pair-plot-chart td .moderate {
-        color: #333;
-        font-size: large;
-      }
-      .pair-plot-chart td .strong {
-        color: #511;
-        font-size: x-large;
-      }
-      .pair-plot-chart td .very_strong {
-        color: #822;
-        font-size: xx-large;
-      }
-      .pair-plot-chart .correlation {
-        text-align: center;
-      }
-
-      .pagetop {
-        height: 50px;
-        width: 50px;
-        position: fixed;
-        right: 30px;
-        bottom: 30px;
-        background: #fff;
-        border: solid 2px #000;
-        border-radius: 50%;
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 2;
-        cursor: pointer;
-      }
-      .pagetop__arrow {
-        display: block;
-        height: 10px;
-        width: 10px;
-        border-top: 3px solid #000;
-        border-right: 3px solid #000;
-        transform: translateY(20%) rotate(-45deg);
-      }
-
-      </style>
-</head>
-<body>
- <section class="section">
-  <div class="container">
-  <h2 class="subtitle is-2">Database Notebook Report.</h2>
-`;
-
-const SCRIPT_COMMON_CONTENT = `
-<script>
-  $(function() {
-    const $pageTop = $('#js-pagetop');
-    $(window).scroll(function () {
-      if ($(window).scrollTop() > 100) {
-        $pageTop.fadeIn(300).css('display', 'flex');
-      } else {
-        $pageTop.fadeOut(300);
-      }
-    });
-    $pageTop.click(function () {
-      $('html, body').animate({ scrollTop: 0 }, 300);
-    });
-  });
-</script>
-`;
 
 type CreateHtmlOptionsParams = {
   isCellOrigin: boolean;
@@ -199,16 +49,19 @@ export const createHtmlFromDiffList = async (
   const outputCondig = getOutputConfig();
   const toHtmlParams = getToStringParamByConfig();
   try {
-    htmlContents.push(HTML_CONTENT_PREFIX);
+    const reportFilePath = path.join(mediaDir, "template", "report.html");
+    let reportText = await fs.readFile(reportFilePath, { encoding: "utf8" });
 
+    htmlContents = [];
     htmlContents.push(`<nav class="panel">`);
-
     // TOC
     if (outputCondig.html.displayToc) {
       htmlContents.push(`  <p class="panel-heading" style="padding:10px">TOC</p>`);
       list.forEach((it, idx) => {
         htmlContents.push(
-          `  <a class="panel-block" href="#cell${idx + 1}" style="padding:10px; font-size:small;">`
+          `  <a class="panel-block cellIdx${idx}" href="#cell${
+            idx + 1
+          }" style="padding:10px; font-size:small;">`
         );
         const title = createDiffTitle(it);
         htmlContents.push(`    No${idx + 1}:${title}`);
@@ -217,12 +70,15 @@ export const createHtmlFromDiffList = async (
       });
       htmlContents.push(`</nav>`);
     }
+    reportText = reportText.replace(/<!-- __TOC__ -->/, htmlContents.join("\n"));
 
     // CONTENTS
+    htmlContents = [];
     list.forEach((it, idx) => {
       const { rdh1, rdh2, diffResult } = it;
-      htmlContents.push("<hr>");
+      htmlContents.push(`<hr class="cellIdx${idx}" />`);
       const id = `id${idx}`;
+      htmlContents.push(`<div class="wrapper cellIdx${idx}" >`);
       const title = createDiffTitle(it);
       htmlContents.push(
         `<h4 class="title is-4" ><a name="cell${idx + 1}">No${idx + 1}:${title}</a></h4>`
@@ -262,78 +118,34 @@ export const createHtmlFromDiffList = async (
       htmlContents.push(`</div>`);
 
       htmlContents.push(`</div>`);
+      htmlContents.push(`</div>`);
     });
-    htmlContents.push(
-      `<button id="js-pagetop" class="pagetop"><span class="pagetop__arrow"></span></button>`
-    );
+
+    reportText = reportText.replace(/<!-- __CONTENTS__ -->/, htmlContents.join("\n"));
+
+    //__FOOTER_CONTENTS__
+    htmlContents = [];
     htmlContents.push(`
-    <footer class="footer has-text-centered" style="padding: 1rem;">
-      <article class="media">
-        <figure class="media-left">
-          <p class="image is-64x64">
-             <img src='https://l-v-yonsama.github.io/db-notebook/media/logo128.png'>
-          </p>
-        </figure>
-        <div class="media-content">
-          <div class="content">
-            <p>
-              This report was generated at ${dayjs().format(
-                "YYYY-MM-DD HH:mm"
-              )} in <a href="https://marketplace.visualstudio.com/items?itemName=HirotakaYoshioka.database-notebook">Database notebook</a>
-              <br />
-              <small>${fsPath}</small>
-            </p>
-          </div>
-        </div>
-      </article>
-    </div>
-    </footer>
-    `);
-    htmlContents.push(`  </div>
-  </section>
-  `);
+      <p>
+        This report was generated at ${dayjs().format(
+          "YYYY-MM-DD HH:mm"
+        )} in <a href="https://marketplace.visualstudio.com/items?itemName=HirotakaYoshioka.database-notebook">Database notebook</a>
+        <br />
+        <small>${fsPath}</small>
+      </p>`);
+    reportText = reportText.replace(/<!-- __FOOTER_CONTENTS__ -->/, htmlContents.join("\n"));
+
+    //__CUSTOM_SCRIPT__
+    htmlContents = [];
     htmlContents.push(`<script>
   var markdownValues = ${JSON.stringify(markdownValues)}
+  var chartValues = ${JSON.stringify({})}
+  var pairPlotChartValues = ${JSON.stringify({})}
+  var numOfContents = ${list.length};
   </script>`);
-    htmlContents.push(SCRIPT_COMMON_CONTENT);
-    htmlContents.push("<script>");
-    htmlContents.push("  $(function() {");
-    htmlContents.push("    var renderer = new marked.Renderer();");
-    htmlContents.push("    renderer.code = (code, language) => {");
-    htmlContents.push(
-      "      return '<pre><code>' + hljs.highlightAuto(code).value + '</code></pre>';   "
-    );
-    htmlContents.push("    };");
-    htmlContents.push("    renderer.heading = (tokens, depth) => {");
-    htmlContents.push(
-      "      return `<h${depth} class='subtitle is-${depth}'>${tokens}</h${depth}>`;"
-    );
-    htmlContents.push("    };");
-    htmlContents.push("    renderer.table = (header, body) => {");
-    htmlContents.push(
-      `      return '<table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">\\n'`
-    );
-    htmlContents.push("        + '<thead>\\n'");
-    htmlContents.push("        + header");
-    htmlContents.push("        + '</thead>\\n'");
-    htmlContents.push("        + body");
-    htmlContents.push("        + '</table>\\n';");
-    htmlContents.push("    };");
-    htmlContents.push("    marked.use({ renderer });");
-    htmlContents.push("");
-    htmlContents.push("    Object.keys(markdownValues).forEach(it=>{");
-    htmlContents.push("      const content = markdownValues[it];");
-    htmlContents.push("      const md = marked.parse(content);");
-    htmlContents.push("      $('#' + it).html(md);");
-    htmlContents.push("    });");
-    htmlContents.push("  });");
-    htmlContents.push("</script>");
-    htmlContents.push(`
-  </body>
-  </html>
-  `);
+    reportText = reportText.replace(/<!-- __CUSTOM_SCRIPT__ -->/, htmlContents.join("\n"));
 
-    await writeToResourceOnStorage(fsPath, htmlContents.join("\n"));
+    await writeToResourceOnStorage(fsPath, reportText);
   } catch (e) {
     console.error(e);
     logError(`${PREFIX} ${e}`);
@@ -412,27 +224,35 @@ const createHtml = async (
   const toHtmlParams = getToStringParamByConfig();
 
   try {
-    htmlContents.push(HTML_CONTENT_PREFIX);
+    const reportFilePath = path.join(mediaDir, "template", "report.html");
+    let reportText = await fs.readFile(reportFilePath, { encoding: "utf8" });
+
+    htmlContents = [];
     htmlContents.push(`<nav class="panel">`);
     // TOC
     if (outputCondig.html.displayToc) {
       htmlContents.push(`  <p class="panel-heading" style="padding:10px">TOC</p>`);
       cells.forEach((cell, idx) => {
         htmlContents.push(
-          `  <a class="panel-block" href="#cell${idx + 1}" style="padding:10px; font-size:small;">`
+          `  <a class="panel-block cellIdx${idx}" href="#cell${
+            idx + 1
+          }" style="padding:10px; font-size:small;">`
         );
         htmlContents.push(`    ${isCellOrigin ? "CELL" : "No"}${idx + 1} ${getTocInfoHtml(cell)}`);
-
         htmlContents.push(`  </a>`);
       });
       htmlContents.push(`</nav>`);
     }
+    reportText = reportText.replace(/<!-- __TOC__ -->/, htmlContents.join("\n"));
 
     // CONTENTS
+    htmlContents = [];
     cells.forEach((cell, idx) => {
       const cellMeta: CellMeta = cell.metadata;
-      htmlContents.push("<hr>");
+      htmlContents.push(`<hr class="cellIdx${idx}" />`);
       const id = `id${idx}`;
+
+      htmlContents.push(`<div class="wrapper cellIdx${idx}" >`);
 
       htmlContents.push(
         `<h4 class="title is-4" ><a name="cell${idx + 1}">${isCellOrigin ? "CELL" : "No"}${
@@ -624,96 +444,34 @@ const createHtml = async (
           });
         }
       }
+      htmlContents.push(`</div>`);
     });
-    htmlContents.push(
-      `<button id="js-pagetop" class="pagetop"><span class="pagetop__arrow"></span></button>`
-    );
+
+    reportText = reportText.replace(/<!-- __CONTENTS__ -->/, htmlContents.join("\n"));
+
+    //__FOOTER_CONTENTS__
+    htmlContents = [];
     htmlContents.push(`
-    <footer class="footer has-text-centered" style="padding: 1rem;">
-      <article class="media">
-        <figure class="media-left">
-          <p class="image is-64x64">
-             <img src='https://l-v-yonsama.github.io/db-notebook/media/logo128.png'>
-          </p>
-        </figure>
-        <div class="media-content">
-          <div class="content">
             <p>
               This report was generated at ${dayjs().format(
                 "YYYY-MM-DD HH:mm"
               )} in <a href="https://marketplace.visualstudio.com/items?itemName=HirotakaYoshioka.database-notebook">Database notebook</a>
               <br />
               <small>${fsPath}</small>
-            </p>
-          </div>
-        </div>
-      </article>
-    </div>
-    </footer>
-    `);
-    htmlContents.push(`  </div>
-  </section>
-  `);
+            </p>`);
+    reportText = reportText.replace(/<!-- __FOOTER_CONTENTS__ -->/, htmlContents.join("\n"));
+
+    //__CUSTOM_SCRIPT__
+    htmlContents = [];
     htmlContents.push(`<script>
-  var markdownValues = ${JSON.stringify(markdownValues)}
-  var chartValues = ${JSON.stringify(chartValues)}
-  var pairPlotChartValues = ${JSON.stringify(pairPlotChartValues)}
+  var markdownValues = ${JSON.stringify(markdownValues)};
+  var chartValues = ${JSON.stringify(chartValues)};
+  var pairPlotChartValues = ${JSON.stringify(pairPlotChartValues)};
+  var numOfContents = ${cells.length};
   </script>`);
-    htmlContents.push(SCRIPT_COMMON_CONTENT);
+    reportText = reportText.replace(/<!-- __CUSTOM_SCRIPT__ -->/, htmlContents.join("\n"));
 
-    htmlContents.push("<script>");
-    htmlContents.push("  $(function() {");
-    htmlContents.push("    var renderer = new marked.Renderer();");
-    htmlContents.push("    renderer.code = (code, language) => {");
-    htmlContents.push(
-      "      return '<pre><code>' + hljs.highlightAuto(code).value + '</code></pre>';   "
-    );
-    htmlContents.push("    };");
-    htmlContents.push("    renderer.heading = (tokens, depth) => {");
-    htmlContents.push(
-      "      return `<h${depth} class='subtitle is-${depth}'>${tokens}</h${depth}>`;"
-    );
-    htmlContents.push("    };");
-    htmlContents.push("    renderer.table = (header, body) => {");
-    htmlContents.push(
-      `      return '<table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">\\n'`
-    );
-    htmlContents.push("        + '<thead>\\n'");
-    htmlContents.push("        + header");
-    htmlContents.push("        + '</thead>\\n'");
-    htmlContents.push("        + body");
-    htmlContents.push("        + '</table>\\n';");
-    htmlContents.push("    };");
-    htmlContents.push("    marked.use({ renderer });");
-    htmlContents.push("");
-    htmlContents.push("    Object.keys(markdownValues).forEach(it=>{");
-    htmlContents.push("      const content = markdownValues[it];");
-    htmlContents.push("      const md = marked.parse(content);");
-    htmlContents.push("      $('#' + it).html(md);");
-    htmlContents.push("    });");
-    htmlContents.push("    // chart");
-    htmlContents.push("    Object.keys(chartValues).forEach(chartId=>{");
-    htmlContents.push("      try {");
-    htmlContents.push("        const content = JSON.parse(chartValues[chartId]);");
-    htmlContents.push("        const ctx = document.getElementById(chartId).getContext('2d');");
-    htmlContents.push("        new Chart(ctx, {");
-    htmlContents.push("           type: content.type,");
-    htmlContents.push("           data: content.data,");
-    htmlContents.push("           options: content.options,");
-    htmlContents.push("           plugins: [ ChartDataLabels ]");
-    htmlContents.push("        });");
-    htmlContents.push("      } catch (e){");
-    htmlContents.push("        console.error('ERROR chartId[' + chartId + ']', e);");
-    htmlContents.push("      }");
-    htmlContents.push("    });");
-    htmlContents.push("  });");
-    htmlContents.push("</script>");
-    htmlContents.push(`
-  </body>
-  </html>
-  `);
-
-    await writeToResourceOnStorage(fsPath, htmlContents.join("\n"));
+    await writeToResourceOnStorage(fsPath, reportText);
   } catch (e) {
     console.error(e);
     logError(`${PREFIX} ${e}`);

@@ -73,6 +73,10 @@ export class KeycloakElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getSqlServerAuthenticationType(): ElementSetting {
+    return { visible: false };
+  }
+
   getSqlServerClientId(): ElementSetting {
     return { visible: false };
   }
