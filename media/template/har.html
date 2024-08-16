@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Database Notebook Report</title>
+    <title>Database Notebook Har viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css" />
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.10.0/css/all.css" />
@@ -29,6 +29,12 @@
         text-align: center;
       }
 
+      nav a span.url {
+        white-space: nowrap;
+        overflow-x: hidden;
+        max-width: 50%;
+      }
+
       div.chart {
         color: gray;
         background-color: white;
@@ -42,79 +48,6 @@
         position: absolute;
         right: 10px;
         top: 1px;
-      }
-
-      .pair-plot-chart {
-        overflow-y: auto;
-      }
-      .pair-plot-chart p.title {
-        text-align: center;
-        margin: 2px 0;
-      }
-      .pair-plot-chart .legends {
-        text-align: center;
-        margin-bottom: 1px;
-      }
-      .pair-plot-chart .legends div.legend {
-        display: inline-block;
-        min-width: 3em;
-        padding: 0px 5px;
-        margin-right: 2em;
-        border-width: 2px;
-        border-style: solid;
-        line-height: 1.2;
-      }
-
-      .pair-plot-chart table {
-        table-layout: fixed;
-        width: 100%;
-        margin: 1px;
-      }
-
-      .pair-plot-chart th {
-        font-weight: normal;
-        background-color: #e0e0e0;
-        text-align: center;
-        color: gray;
-      }
-      .pair-plot-chart th.rl {
-        width: 1.7em;
-        text-align: center;
-      }
-      .pair-plot-chart th div.rl {
-        line-height: 0.9em;
-        width: 1.7em;
-        text-align: center;
-        white-space: pre-line;
-        overflow: hidden;
-        writing-mode: vertical-rl;
-      }
-      .pair-plot-chart td {
-        vertical-align: middle;
-        border: 1px dotted silver;
-        text-align: center;
-      }
-      .pair-plot-chart td .very_weak {
-        color: #999;
-        font-size: small;
-      }
-      .pair-plot-chart td .weak {
-        color: #666;
-      }
-      .pair-plot-chart td .moderate {
-        color: #333;
-        font-size: large;
-      }
-      .pair-plot-chart td .strong {
-        color: #511;
-        font-size: x-large;
-      }
-      .pair-plot-chart td .very_strong {
-        color: #822;
-        font-size: xx-large;
-      }
-      .pair-plot-chart .correlation {
-        text-align: center;
       }
 
       .pagetop {
@@ -244,13 +177,8 @@
           try {
             const { lang, s } = markdownValues[it];
             const content = unescapeHtml(s);
-            if (lang === "Markup") {
-              const md = marked.parse(content);
-              $("#" + it).html(md);
-            } else {
-              const md = marked.parse(` \`\`\`${lang}\n${content}\n\`\`\` `);
-              $("#" + it).html(md);
-            }
+            const md = marked.parse(` \`\`\`${lang}\n${content}\n\`\`\` `);
+            $("#" + it).html(md);
           } catch (e) {
             console.error("at " + idx, e);
           }
@@ -266,31 +194,20 @@
           $("div." + clazz).hide();
           $(`#${clazz}-${tab}`).show();
         });
-        // chart
-        Object.keys(chartValues).forEach((chartId) => {
-          try {
-            const content = JSON.parse(unescapeHtml(chartValues[chartId]));
-            const ctx = document.getElementById(chartId).getContext("2d");
-            new Chart(ctx, {
-              type: content.type,
-              data: content.data,
-              options: content.options,
-              plugins: [ChartDataLabels],
-            });
-          } catch (e) {
-            console.error("ERROR chartId[" + chartId + "]", e);
-          }
-        });
 
         $("span.delete_icon").click(function () {
           $("input.keyword").val("");
           search();
         });
+
         // search
         $("input.keyword").on("keyup", function (e) {
           if (e.key === "Enter" || e.keyCode === 13) {
             search();
           }
+        });
+        $("select.status, select.method, select.content").change(function () {
+          search();
         });
         $("button.search").click(function () {
           search();
@@ -298,8 +215,12 @@
         function search() {
           const keywords = $("input.keyword").val().trim();
           const mode = $("select.mode").val();
+          const status = $("select.status").val();
+          const method = $("select.method").val();
+          const content = $("select.content").val();
           $(`table.table > tbody > tr > td`).removeClass("has-text-link has-background-link-light");
           $(`div.block > span.tag.contains`).remove();
+          $(`div.tabs > ul > li > a span.star.icon`).remove();
 
           const matchKeywords = (elmText) => {
             if (mode === "") {
@@ -312,8 +233,44 @@
             return false;
           };
 
-          if (keywords) {
-            for (let i = 0; i < numOfContents; i++) {
+          for (let i = 0; i < numOfContents; i++) {
+            $(`.cellIdx${i}`).show();
+          }
+
+          const matchedTabIds = new Set();
+          for (let i = 0; i < numOfContents; i++) {
+            if (status) {
+              if (status === "ge400") {
+                if (responseCoreValues[i].status < 400) {
+                  $(`.cellIdx${i}`).hide();
+                  continue;
+                }
+              } else if (status === "lt400") {
+                if (responseCoreValues[i].status >= 400) {
+                  $(`.cellIdx${i}`).hide();
+                  continue;
+                }
+              } else {
+                if (responseCoreValues[i].status != status) {
+                  $(`.cellIdx${i}`).hide();
+                  continue;
+                }
+              }
+            }
+            if (method) {
+              if (responseCoreValues[i].method != method) {
+                $(`.cellIdx${i}`).hide();
+                continue;
+              }
+            }
+            if (content) {
+              if (responseCoreValues[i].contentType != content) {
+                $(`.cellIdx${i}`).hide();
+                continue;
+              }
+            }
+
+            if (keywords) {
               const elmText = $(`div.wrapper.cellIdx${i}`).text();
               if (matchKeywords(elmText)) {
                 $(`.cellIdx${i}`).show();
@@ -322,6 +279,10 @@
                   const text = $el.text();
                   if (matchKeywords(text)) {
                     $el.append('<span class="tag is-link contains">Contains the keywords!</span>');
+                    const tabBlockId = $el.attr("id");
+                    if (tabBlockId.includes("-tab-")) {
+                      matchedTabIds.add(tabBlockId);
+                    }
                   }
                 });
                 $(`.cellIdx${i} table.table > tbody > tr > td`).each((idx, el) => {
@@ -329,19 +290,64 @@
                   const text = $el.text();
                   if (matchKeywords(text)) {
                     $el.addClass("has-text-link has-background-link-light");
+                    const divBlock = $el.closest("div.block");
+                    if (divBlock.length > 0 && divBlock.attr("id")) {
+                      const tabBlockId = divBlock.attr("id");
+                      if (tabBlockId.includes("-tab-")) {
+                        matchedTabIds.add(tabBlockId);
+                      }
+                    }
                   }
                 });
               } else {
                 $(`.cellIdx${i}`).hide();
               }
             }
-          } else {
-            for (let i = 0; i < numOfContents; i++) {
-              $(`.cellIdx${i}`).show();
-            }
           }
+          matchedTabIds.forEach((it) => {
+            $(`#${it}-item`).prepend(
+              `<span class="icon is-small star has-text-link"><i class="fas fa-star"></i></span>`
+            );
+          });
         }
+
+        function init() {
+          const statusTypes = [...new Set(responseCoreValues.map((e) => e.status))];
+          statusTypes.sort();
+          const statusSelect = $("select.status");
+          statusSelect.empty();
+          $('<option value="">-</option>').appendTo(statusSelect);
+          statusTypes.forEach((it) => {
+            $(`<option value="${it}">${it}</option>`).appendTo(statusSelect);
+          });
+          $('<option value="ge400">400 or more</option>').appendTo(statusSelect);
+          $('<option value="lt400">Less than 400</option>').appendTo(statusSelect);
+          statusSelect.val("");
+
+          const methodTypes = [...new Set(responseCoreValues.map((e) => e.method))];
+          methodTypes.sort();
+          const methodSelect = $("select.method");
+          methodSelect.empty();
+          $('<option value="">-</option>').appendTo(methodSelect);
+          methodTypes.forEach((it) => {
+            $(`<option value="${it}">${it}</option>`).appendTo(methodSelect);
+          });
+          methodSelect.val("");
+
+          const contentTypes = [...new Set(responseCoreValues.map((e) => e.contentType))];
+          contentTypes.sort();
+          const contentSelect = $("select.content");
+          contentSelect.empty();
+          $('<option value="">-</option>').appendTo(contentSelect);
+          contentTypes.forEach((it) => {
+            $(`<option value="${it}">${it}</option>`).appendTo(contentSelect);
+          });
+          contentSelect.val("");
+        }
+
+        init();
       });
+
       // -->
     </script>
     <!-- __CUSTOM_SCRIPT__ -->
@@ -349,9 +355,24 @@
   <body>
     <section class="section">
       <div class="container">
-        <h2 class="subtitle is-2">Database Notebook Report.</h2>
+        <h2 class="subtitle is-2">Database Notebook Har viewer.</h2>
 
         <div class="field has-addons">
+          <p class="control">
+            <span class="select">
+              <select class="status"></select>
+            </span>
+          </p>
+          <p class="control">
+            <span class="select">
+              <select class="method"></select>
+            </span>
+          </p>
+          <p class="control">
+            <span class="select">
+              <select class="content"></select>
+            </span>
+          </p>
           <p class="control">
             <span class="select">
               <select class="mode">

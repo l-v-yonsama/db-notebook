@@ -104,10 +104,13 @@ export const createResponseBodyMarkdown = (res: NodeRunAxiosEvent, maxCharLength
           maxCharLength
         )}\n\n${NOTICE}\n\`\`\``;
       } else if (renderType === "Image") {
-        return `${title}\n\n\<img style='max-width:128px;max-height:64px;' src='${createImageUrl(
+        return `${title}\n\n\<a href='${createImageUrl(
           response.content.text,
           contentType
-        )}'>`;
+        )}' download><img style='max-width:128px;max-height:64px;' src='${createImageUrl(
+          response.content.text,
+          contentType
+        )}'></a>`;
       }
     }
   }

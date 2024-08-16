@@ -5,15 +5,19 @@ import { prettyFileSize, prettyTime } from "@l-v-yonsama/multi-platform-database
 import { createRdhKey, GeneralColumnType, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
 import type { Har } from "har-format";
-import { ActionCommand } from "../shared/ActionParams";
+import { ActionCommand, OutputParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { HarFilePanelEventData, HarFileTabItem } from "../shared/MessageEventData";
 import { hideStatusMessage } from "../statusBar";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getIconPath, readResource } from "../utilities/fsUtil";
+import { createHtmlFromHarItem } from "../utilities/htmlGenerator";
 import { toNodeRunAxiosEvent } from "../utilities/httpUtil";
 import { log } from "../utilities/logger";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { HttpEventPanel } from "./HttpEventPanel";
+import dayjs = require("dayjs");
+import path = require("path");
 
 const PREFIX = "[HarFilePanel]";
 
@@ -192,6 +196,9 @@ export class HarFilePanel {
               HttpEventPanel.render(this.extensionUri, axiosEvent.title, axiosEvent);
             }
             break;
+          case "output":
+            this.output(params);
+            return;
         }
       },
       undefined,
@@ -201,5 +208,29 @@ export class HarFilePanel {
 
   private getTabItemById(tabId: string): HarFileTabItem | undefined {
     return this.items.find((it) => it.tabId === tabId);
+  }
+
+  private async output(data: OutputParams) {
+    const { tabId } = data;
+    const tabItem = this.getTabItemById(tabId);
+    if (!tabItem) {
+      return;
+    }
+    const { title, res, rdh } = tabItem;
+    const fileExtension = "html";
+    const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}.${fileExtension}`;
+    const uri = await window.showSaveDialog({
+      defaultUri: Uri.file(path.join("./", defaultFileName)),
+      filters: { "*": [fileExtension] },
+    });
+    if (!uri) {
+      return;
+    }
+    const message = await createHtmlFromHarItem({ title, res, rdh }, uri.fsPath);
+    if (message) {
+      showWindowErrorMessage(message);
+    } else {
+      window.showInformationMessage(uri.fsPath);
+    }
   }
 }

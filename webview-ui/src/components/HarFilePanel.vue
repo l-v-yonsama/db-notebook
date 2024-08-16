@@ -255,6 +255,21 @@ const onClickCell = (params: CellFocusParams): void => {
   }
 };
 
+const outputAsHtml = (): void => {
+  const tabItem = getActiveTabItem();
+  if (!tabItem) {
+    return;
+  }
+
+  vscode.postCommand({
+    command: "output",
+    params: {
+      tabId: tabItem.tabId,
+      fileType: "html",
+    },
+  });
+};
+
 defineExpose({
   recieveMessage,
 });
@@ -262,7 +277,11 @@ defineExpose({
 
 <template>
   <section class="HarFilePanel">
-    <div class="tab-container-actions"></div>
+    <div class="tab-container-actions">
+      <button @click="outputAsHtml" title="Output as HTML">
+        <fa icon="file-lines" />
+      </button>
+    </div>
 
     <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
       <VsCodeTabHeader
