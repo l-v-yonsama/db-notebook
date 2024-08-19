@@ -354,7 +354,6 @@ defineExpose({
             :rdh="codeBlocks.req.cookies"
             :width="splitterWidth"
             :height="Math.max(splitterHeight / 2 - 15, 15)"
-            :readonly="true"
           />
           <div v-else>No data</div>
           <hr style="border-width: 0.5px" />
@@ -364,7 +363,6 @@ defineExpose({
             :rdh="codeBlocks.res.cookies"
             :width="splitterWidth"
             :height="Math.max(splitterHeight / 2 - 15, 15)"
-            :readonly="true"
           />
           <div v-else>No data</div>
         </div>

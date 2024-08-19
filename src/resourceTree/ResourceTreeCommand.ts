@@ -1,6 +1,7 @@
 import {
   DBDriverResolver,
   DbConnection,
+  DbDatabase,
   DbResource,
   DbSchema,
   DbTable,
@@ -8,6 +9,7 @@ import {
   RdsDatabase,
   RedisDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ResultSetData } from "@l-v-yonsama/rdh";
 import {
   ExtensionContext,
   NotebookCellData,
@@ -27,7 +29,9 @@ import {
   DUPLICATE_CONNECTION_SETTING,
   EDIT_CONNECTION_SETTING,
   FLUSH_DB,
+  GET_LOCKS,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
+  OPEN_MDH_VIEWER,
   REFRESH_RESOURCES,
   RETRIEVE_RESOURCES,
   RETRIEVE_TABLE_RECORDS,
@@ -41,6 +45,7 @@ import { CreateInsertScriptSettingsPanel } from "../panels/CreateInsertScriptSet
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
 import { ScanPanel } from "../panels/ScanPanel";
 import { ViewConditionPanel } from "../panels/ViewConditionPanel";
+import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { StateStorage } from "../utilities/StateStorage";
@@ -114,6 +119,28 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     }
     dbResourceTree.changeConnectionTreeData(conRes);
   });
+
+  context.subscriptions.push(
+    commands.registerCommand(GET_LOCKS, async (dbRes: DbDatabase) => {
+      const { conName } = dbRes.meta;
+      const setting = await stateStorage.getConnectionSettingByName(conName);
+      if (!setting) {
+        return;
+      }
+      const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+        RDSBaseDriver,
+        ResultSetData
+      >(setting, async (driver) => {
+        return await driver.getLocks(dbRes.name);
+      });
+      if (ok && result) {
+        const commandParam: MdhViewParams = { title: "Locks", list: [result] };
+        commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+      } else {
+        showWindowErrorMessage(message);
+      }
+    })
+  );
 
   context.subscriptions.push(
     commands.registerCommand(COUNT_FOR_ALL_TABLES, async (schemaRes: DbSchema) => {

@@ -26,7 +26,8 @@ window.addEventListener("resize", () => resetSectionHeight());
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector(".view-conditional-root");
   if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 35, 100);
+    // Don't make it any less because the side-scrolling bar will disappear.
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 50, 100);
   }
   if (sectionWrapper?.clientWidth) {
     sectionWidth.value = Math.max(sectionWrapper.clientWidth - 14, 100);
@@ -274,7 +275,6 @@ defineExpose({
           :rdh="rdhForUpdate"
           :width="sectionWidth"
           :height="sectionHeight"
-          :readonly="true"
           :ref="setRdhViewerRef"
         />
       </div>

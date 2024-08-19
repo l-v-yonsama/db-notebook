@@ -177,7 +177,6 @@ defineExpose({
         :rdh="rdh"
         :width="sectionWidth"
         :height="sectionHeight"
-        :readonly="true"
       />
     </section>
   </section>

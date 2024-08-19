@@ -2,7 +2,9 @@ import {
   DbColumn,
   DbConnection,
   DbResource,
+  DBType,
   IamClient,
+  RdsDatabase,
   RedisDatabase,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -18,7 +20,7 @@ import {
 } from "@l-v-yonsama/rdh";
 import * as path from "path";
 import * as vscode from "vscode";
-import { SHOW_CONNECTION_SETTING, SHOW_RESOURCE_PROPERTIES, mediaDir } from "../constant";
+import { mediaDir, SHOW_CONNECTION_SETTING, SHOW_RESOURCE_PROPERTIES } from "../constant";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 
@@ -128,11 +130,19 @@ export class DBDatabaseItem extends vscode.TreeItem {
     let iconFile = "database.svg";
     let description = resource.comment || "";
     let scannable = false;
+    let showLocks = false;
     let tooltip: string | vscode.MarkdownString | undefined;
 
     switch (resource.resourceType) {
       case ResourceType.RdsDatabase:
-        iconFile = "database.svg";
+        {
+          const res = resource as RdsDatabase;
+          iconFile = "database.svg";
+          const { dbType } = res.meta;
+          if (dbType === DBType.MySQL || dbType === DBType.Postgres) {
+            showLocks = true;
+          }
+        }
         break;
       case ResourceType.AwsDatabase:
         iconFile = "database.svg";
@@ -145,9 +155,12 @@ export class DBDatabaseItem extends vscode.TreeItem {
         scannable = true;
         break;
       case ResourceType.RedisDatabase:
-        iconFile = "database.svg";
-        description = `${(resource as RedisDatabase).numOfKeys} keys`;
-        scannable = true;
+        {
+          const res = resource as RedisDatabase;
+          iconFile = "database.svg";
+          description = `${res.numOfKeys} keys`;
+          scannable = true;
+        }
         break;
       case ResourceType.Schema:
       case ResourceType.Owner:
@@ -242,6 +255,9 @@ export class DBDatabaseItem extends vscode.TreeItem {
     let contextValue = resource.resourceType;
 
     contextValue += ",properties";
+    if (showLocks) {
+      contextValue += ",showLocks";
+    }
     if (scannable) {
       contextValue += ",scannable";
     }

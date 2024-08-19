@@ -1,4 +1,4 @@
-import { separateMultipleQueries } from "@l-v-yonsama/multi-platform-database-drivers";
+import { isRDSType, separateMultipleQueries } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as path from "path";
 import sqlFormatter from "sql-formatter-plus";
 import {
@@ -174,10 +174,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
           return;
         }
         const conSettings = await stateStorage.getConnectionSettingList();
-        const items = conSettings.map((it) => ({
-          label: it.name,
-          description: it.dbType,
-        }));
+        const items = conSettings
+          .filter((it) => isRDSType(it.dbType))
+          .map((it) => ({
+            label: it.name,
+            description: it.dbType,
+          }));
         const result = await window.showQuickPick(items);
         if (result) {
           for (const cell of cells) {
@@ -236,10 +238,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       }
 
       const conSettings = await stateStorage.getConnectionSettingList();
-      const items = conSettings.map((it) => ({
-        label: it.name,
-        description: it.dbType,
-      }));
+      const items = conSettings
+        .filter((it) => isRDSType(it.dbType))
+        .map((it) => ({
+          label: it.name,
+          description: it.dbType,
+        }));
       const result = await window.showQuickPick(items);
       if (result) {
         targetCells.forEach((cell) => {

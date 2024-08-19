@@ -40,7 +40,6 @@ type Props = {
   config?: RdhViewConfig;
   width: number;
   height: number;
-  readonly: boolean;
   withComment: boolean;
   withType?: boolean;
   showOnlyChanged?: boolean;

@@ -111,6 +111,7 @@ export class StateStorage {
       for (const dbRes of result) {
         dbRes.meta = {
           conName: conRes.name,
+          dbType: conRes.dbType,
         };
         // for rds
         dbRes.findChildren<DbSchema>({ resourceType: ResourceType.Schema }).forEach((schemaRes) => {

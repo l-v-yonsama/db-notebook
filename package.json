@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.5.10",
+  "version": "0.5.11",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -252,6 +252,16 @@
           "command": "database-notebook.delete-connection-setting",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "connection-setting@1"
+        },
+        {
+          "command": "database-notebook.get-locks",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showLocks.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.get-locks",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showLocks.*/",
+          "group": "db-resourc@2"
         },
         {
           "command": "database-notebook.count-for-all-tables",
@@ -625,6 +635,11 @@
         }
       },
       {
+        "command": "database-notebook.get-locks",
+        "title": "Show locks",
+        "icon": "$(lock)"
+      },
+      {
         "command": "database-notebook.count-for-all-tables",
         "title": "Count Table Records",
         "shortTitle": "Count",
@@ -976,7 +991,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.5.9",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.5.12",
     "@l-v-yonsama/rdh": "^0.1.10",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

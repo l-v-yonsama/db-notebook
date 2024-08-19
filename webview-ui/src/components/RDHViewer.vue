@@ -11,7 +11,6 @@ type Props = {
   height: number;
   rdh: ResultSetData;
   config?: RdhViewConfig;
-  readonly: boolean;
   showOnlyChanged?: boolean;
   showDetailPane?: boolean;
   withType?: boolean;
@@ -84,7 +83,6 @@ defineExpose({
           :config="config"
           :width="width"
           :height="height"
-          :readonly="false"
           :showOnlyChanged="showOnlyChanged"
           :withComment="rdh.keys.some((it) => it.comment?.length)"
           :withType="withType"

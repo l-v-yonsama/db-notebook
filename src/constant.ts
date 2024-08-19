@@ -4,7 +4,7 @@ export const mediaDir = path.join(__filename, "..", "..", "media");
 export const EXTENSION_NAME = "database-notebook";
 
 //---------------------------------------------------
-// CONNECTION SETTING FORM
+// VIEWIDS
 //---------------------------------------------------
 export const CONNECTION_SETTING_FORM_VIEWID = `${EXTENSION_NAME}.connectionForm`;
 export const BOTTOM_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.mdh`;
@@ -17,6 +17,7 @@ export const BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID = `${EXTENSION_NAME}.view.bottom
 //---------------------------------------------------
 export const REFRESH_RESOURCES = `${EXTENSION_NAME}.refresh-resources`;
 export const RETRIEVE_RESOURCES = `${EXTENSION_NAME}.retrieve-resources`;
+export const GET_LOCKS = `${EXTENSION_NAME}.get-locks`;
 export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;
 export const RETRIEVE_TABLE_RECORDS = `${EXTENSION_NAME}.retrieve-table-records`;
 export const FLUSH_DB = `${EXTENSION_NAME}.flush-db`;

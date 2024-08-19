@@ -344,7 +344,6 @@ defineExpose({
                   :rdh="activeInnerRdh1"
                   :width="splitterWidth"
                   :height="splitterHeight"
-                  :readonly="true"
                   :showOnlyChanged="displayOnlyChanged"
                 >
                 </RDHViewer>
@@ -356,7 +355,6 @@ defineExpose({
                   :rdh="activeInnerRdh2"
                   :width="splitterWidth"
                   :height="splitterHeight"
-                  :readonly="true"
                   :showOnlyChanged="displayOnlyChanged"
                 >
                 </RDHViewer>

@@ -579,7 +579,6 @@ defineExpose({
               :rdh="tabItem.rdh"
               :width="splitterWidth"
               :height="splitterHeight"
-              :readonly="true"
               @onClickCell="onClickCell"
             />
           </div>

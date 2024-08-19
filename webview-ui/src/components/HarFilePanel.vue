@@ -341,7 +341,6 @@ defineExpose({
               :rdh="eventRdh"
               :width="splitterWidth"
               :height="splitterHeight"
-              :readonly="true"
               @onClickCell="onClickCell"
             />
           </div>

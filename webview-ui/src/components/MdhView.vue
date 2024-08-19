@@ -450,7 +450,6 @@ defineExpose({
               :config="tabItem.config"
               :width="splitterWidth"
               :height="splitterHeight"
-              :readonly="true"
               :ref="setRdhViewerRef"
             />
           </div>
