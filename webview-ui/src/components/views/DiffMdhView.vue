@@ -16,10 +16,10 @@ import {
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
 import { defineExpose, nextTick, onMounted, ref } from "vue";
-import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
-import RDHViewer from "./RDHViewer.vue";
+import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
+import VsCodeDropdown from "../base/VsCodeDropdown.vue";
+import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
+import RDHViewer from "../RDHViewer.vue";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -97,9 +97,11 @@ function isActiveTabId(tabId: string): boolean {
   return tabId === id;
 }
 
-const showTab = (tabId: string, innerIndex?: number) => {
+const showTab = async (tabId: string, innerIndex?: number) => {
   hasUndoChangeSql.value = false;
   activeTabId.value = `tab-${tabId}`;
+  await nextTick();
+
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
@@ -159,11 +161,12 @@ const init = (params: DiffMdhViewEventData["value"]["init"]) => {
   }
 };
 
-const addTabItem = (tabItem: DiffTabItem) => {
+const addTabItem = async (tabItem: DiffTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
   }
+  await nextTick();
   showTab(tabItem.tabId);
 };
 

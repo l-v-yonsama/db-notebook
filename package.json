@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.5.11",
+  "version": "0.5.13",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -140,6 +140,11 @@
           "id": "database-notebook-view-charts",
           "title": "Charts",
           "icon": "media/dark/symbol-numeric.svg"
+        },
+        {
+          "id": "database-notebook-view-tools",
+          "title": "Tools",
+          "icon": "media/dark/symbol-numeric.svg"
         }
       ]
     },
@@ -209,6 +214,15 @@
           "contextualTitle": "Count for all tables",
           "when": "database-notebook.view.bottom.count-for-all-tables.visible"
         }
+      ],
+      "database-notebook-view-tools": [
+        {
+          "type": "webview",
+          "id": "database-notebook.view.bottom.tools",
+          "name": "Tools",
+          "contextualTitle": "Tools",
+          "when": "database-notebook.view.bottom.tools.visible"
+        }
       ]
     },
     "menus": {
@@ -255,12 +269,22 @@
         },
         {
           "command": "database-notebook.get-locks",
-          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showLocks.*/",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showSessions.*/",
           "group": "inline"
         },
         {
           "command": "database-notebook.get-locks",
-          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showLocks.*/",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showSessions.*/",
+          "group": "db-resourc@2"
+        },
+        {
+          "command": "database-notebook.get-sessions",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showSessions.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.get-sessions",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showSessions.*/",
           "group": "db-resourc@2"
         },
         {
@@ -640,6 +664,11 @@
         "icon": "$(lock)"
       },
       {
+        "command": "database-notebook.get-sessions",
+        "title": "Show sessions",
+        "icon": "$(info)"
+      },
+      {
         "command": "database-notebook.count-for-all-tables",
         "title": "Count Table Records",
         "shortTitle": "Count",
@@ -991,7 +1020,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.5.12",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.6.1",
     "@l-v-yonsama/rdh": "^0.1.10",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

@@ -130,7 +130,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
     let iconFile = "database.svg";
     let description = resource.comment || "";
     let scannable = false;
-    let showLocks = false;
+    let showSessions = false;
     let tooltip: string | vscode.MarkdownString | undefined;
 
     switch (resource.resourceType) {
@@ -139,8 +139,12 @@ export class DBDatabaseItem extends vscode.TreeItem {
           const res = resource as RdsDatabase;
           iconFile = "database.svg";
           const { dbType } = res.meta;
-          if (dbType === DBType.MySQL || dbType === DBType.Postgres) {
-            showLocks = true;
+          if (
+            dbType === DBType.MySQL ||
+            dbType === DBType.Postgres ||
+            dbType === DBType.SQLServer
+          ) {
+            showSessions = true;
           }
         }
         break;
@@ -255,8 +259,8 @@ export class DBDatabaseItem extends vscode.TreeItem {
     let contextValue = resource.resourceType;
 
     contextValue += ",properties";
-    if (showLocks) {
-      contextValue += ",showLocks";
+    if (showSessions) {
+      contextValue += ",showSessions";
     }
     if (scannable) {
       contextValue += ",scannable";

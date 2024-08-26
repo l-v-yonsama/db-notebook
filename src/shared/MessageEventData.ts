@@ -45,7 +45,8 @@ export type MessageEventData =
   | ERDiagramSettingsPanelEventData
   | RecordRuleEditorEventData
   | CodeResolverEditorEventData
-  | DBFormEventData;
+  | DBFormEventData
+  | ToolsViewEventData;
 
 export type BaseMessageEventDataCommand = "stop-progress" | "loading" | "initialize";
 
@@ -348,6 +349,17 @@ export type CountRecordViewEventData = BaseMessageEventData<
       schemaRes: DbSchema;
       selectedTableNames: string[];
       mode: "setting" | "running" | "show";
+      rdh?: ResultSetData;
+    };
+  }
+>;
+
+export type ToolsViewEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "refresh",
+  "ToolsView",
+  {
+    refresh: {
+      mode: "sessions" | "locks";
       rdh?: ResultSetData;
     };
   }

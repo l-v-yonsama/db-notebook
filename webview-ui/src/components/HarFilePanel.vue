@@ -64,8 +64,10 @@ function isActiveTabId(tabId: string): boolean {
   return tabId === id;
 }
 
-const showTab = (tabId: string) => {
+const showTab = async (tabId: string) => {
   activeTabId.value = `tab-${tabId}`;
+  await nextTick();
+
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
@@ -183,11 +185,12 @@ const resetActiveInnerRdh = () => {
   });
 };
 
-const addTabItem = (tabItem: HarFileTabItem) => {
+const addTabItem = async (tabItem: HarFileTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
   }
+  await nextTick();
   showTab(tabItem.tabId);
 };
 

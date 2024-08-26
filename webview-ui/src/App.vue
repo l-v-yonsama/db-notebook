@@ -3,15 +3,16 @@ import { onMounted, ref } from "vue";
 import "./assets/scss/main.scss";
 import type { ComponentName, MessageEventData } from "./utilities/vscode";
 
-import CountRecordView from "./components/CountRecordView.vue";
 import CreateInsertScriptSettingsPanel from "./components/CreateInsertScriptSettingsPanel.vue";
 import CsvParseSettingPanel from "./components/CsvParseSettingPanel.vue";
 import DBFormView from "./components/DBFormView.vue";
-import DiffMdhView from "./components/DiffMdhView.vue";
 import HarFilePanel from "./components/HarFilePanel.vue";
 import HttpEventPanel from "./components/HttpEventPanel.vue";
-import MdhView from "./components/MdhView.vue";
-import ChartsView from "./components/charts/ChartsView.vue";
+import ChartsView from "./components/views/ChartsView.vue";
+import CountRecordView from "./components/views/CountRecordView.vue";
+import DiffMdhView from "./components/views/DiffMdhView.vue";
+import MdhView from "./components/views/MdhView.vue";
+import ToolsView from "./components/views/ToolsView.vue";
 
 import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
@@ -28,6 +29,7 @@ const dBFormViewRef = ref<InstanceType<typeof DBFormView>>();
 const MdhViewRef = ref<InstanceType<typeof MdhView>>();
 const countRecordViewRef = ref<InstanceType<typeof CountRecordView>>();
 const chartsViewRef = ref<InstanceType<typeof ChartsView>>();
+const toolsViewRef = ref<InstanceType<typeof ToolsView>>();
 
 const csvParseSettingPanelRef = ref<InstanceType<typeof CsvParseSettingPanel>>();
 const createInsertScriptSettingsPanelRef =
@@ -98,12 +100,14 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     case "ERDiagramSettingsPanel":
       eRDiagramSettingsPanelRef.value?.recieveMessage(data);
       break;
-
     case "RecordRuleEditor":
       recordRuleEditorRef.value?.recieveMessage(data);
       break;
     case "CodeResolverEditor":
       codeResolverEditorRef.value?.recieveMessage(data);
+      break;
+    case "ToolsView":
+      toolsViewRef.value?.recieveMessage(data);
       break;
   }
 }
@@ -173,5 +177,8 @@ onMounted(() => {
       v-if="currentComponentName === 'CodeResolverEditor'"
       ref="codeResolverEditorRef"
     />
-  </main>
+
+    <ToolsView v-if="currentComponentName === 'ToolsView'" ref="toolsViewRef" />
+
+</main>
 </template>

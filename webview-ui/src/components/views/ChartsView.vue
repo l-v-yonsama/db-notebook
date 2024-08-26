@@ -31,8 +31,8 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import { nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
-import PairPlotChart from "./PairPlotChart.vue";
-import { getBase64Image } from "./utils";
+import PairPlotChart from "./charts/PairPlotChart.vue";
+import { getBase64Image } from "./charts/utils";
 
 import { Bar, Doughnut, Line, Pie, Radar, Scatter } from "vue-chartjs";
 
@@ -89,6 +89,7 @@ function isActiveTabId(tabId: string): boolean {
 
 const showTab = async (tabId: string, innerIndex?: number) => {
   activeTabId.value = `tab-${tabId}`;
+  await nextTick();
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
 
   if (!tabItem) {
@@ -108,11 +109,12 @@ const init = (params: ChartsViewEventData["value"]["init"]) => {
   }
 };
 
-const addTabItem = (tabItem: ChartTabItem) => {
+const addTabItem = async (tabItem: ChartTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
   }
+  await nextTick();
   showTab(tabItem.tabId);
 };
 

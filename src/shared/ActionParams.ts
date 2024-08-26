@@ -60,7 +60,8 @@ export type ActionCommand =
   | UpdateTextDocumentActionCommand
   | UpdateCodeResolverTextDocumentActionCommand
   | CountAllTablesActionCommand
-  | OkActionCommand;
+  | OkActionCommand
+  | KillActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -73,6 +74,8 @@ export type BaseActionCommand<T extends string, U = any> = {
 };
 
 export type ShowErrorActionCommand = BaseActionCommand<"showError", { message: string }>;
+
+export type KillActionCommand = BaseActionCommand<"kill", { sessionOrPid: number | undefined }>;
 
 export type SelectFileActionCommand = BaseActionCommand<
   "selectFileActionCommand",

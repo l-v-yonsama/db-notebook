@@ -16,4 +16,5 @@ export type ComponentName =
   | "ERDiagramSettingsPanel"
   | "RecordRuleEditor"
   | "NotebookCellMetadataPanel"
-  | "CodeResolverEditor";
+  | "CodeResolverEditor"
+  | "ToolsView";

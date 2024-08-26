@@ -11,6 +11,7 @@ export const BOTTOM_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.mdh`;
 export const BOTTOM_DIFF_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.diff-mdh`;
 export const BOTTOM_CHARTS_VIEWID = `${EXTENSION_NAME}.view.bottom.charts`;
 export const BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID = `${EXTENSION_NAME}.view.bottom.count-for-all-tables`;
+export const BOTTOM_TOOLS_VIEWID = `${EXTENSION_NAME}.view.bottom.tools`;
 
 //---------------------------------------------------
 // RESOURCE TREE
@@ -18,6 +19,7 @@ export const BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID = `${EXTENSION_NAME}.view.bottom
 export const REFRESH_RESOURCES = `${EXTENSION_NAME}.refresh-resources`;
 export const RETRIEVE_RESOURCES = `${EXTENSION_NAME}.retrieve-resources`;
 export const GET_LOCKS = `${EXTENSION_NAME}.get-locks`;
+export const GET_SESSIONS = `${EXTENSION_NAME}.get-sessions`;
 export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;
 export const RETRIEVE_TABLE_RECORDS = `${EXTENSION_NAME}.retrieve-table-records`;
 export const FLUSH_DB = `${EXTENSION_NAME}.flush-db`;
@@ -54,6 +56,7 @@ export const OPEN_MDH_VIEWER = `${EXTENSION_NAME}.open-mdh-viewer`;
 export const OPEN_DIFF_MDH_VIEWER = `${EXTENSION_NAME}.open-diff-mdh-viewer`;
 export const OPEN_CHARTS_VIEWER = `${EXTENSION_NAME}.open-diff-charts`;
 export const OPEN_COUNT_FOR_ALL_TABLES_VIEWER = `${EXTENSION_NAME}.open-count-for-all-tables-viewer`;
+export const OPEN_TOOLS_VIEWER = `${EXTENSION_NAME}.open-tools-viewer`;
 
 //---------------------------------------------------
 // NOTE BOOK

@@ -18,11 +18,11 @@ import {
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
 import { defineExpose, nextTick, onMounted, ref } from "vue";
-import CompareKeySettings from "./CompareKeySettings.vue";
-import RDHViewer from "./RDHViewer.vue";
-import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
-import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
+import CompareKeySettings from "../CompareKeySettings.vue";
+import RDHViewer from "../RDHViewer.vue";
+import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
+import VsCodeDropdown from "../base/VsCodeDropdown.vue";
+import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
 
 provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
@@ -99,8 +99,9 @@ function isActiveTabId(tabId: string): boolean {
 
 const showTab = async (tabId: string, innerIndex?: number) => {
   activeTabId.value = `tab-${tabId}`;
-  const tabItem = tabItems.value.find((it) => it.tabId === tabId);
+  await nextTick();
 
+  const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
   }
@@ -159,19 +160,22 @@ const resetActiveInnerRdh = async () => {
   });
 };
 
-const init = (params: MdhViewEventData["value"]["init"]) => {
+const init = async (params: MdhViewEventData["value"]["init"]) => {
   tabItems.value.splice(0, tabItems.value.length);
+  await nextTick();
+
   params?.tabItems.forEach((it) => tabItems.value.unshift(it));
   if (params?.currentTabId) {
     showTab(params?.currentTabId, params?.currentInnerIndex);
   }
 };
 
-const addTabItem = (tabItem: RdhTabItem) => {
+const addTabItem = async (tabItem: RdhTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
   }
+  await nextTick();
   showTab(tabItem.tabId);
 };
 

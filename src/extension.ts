@@ -11,11 +11,13 @@ import {
   BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
   BOTTOM_DIFF_MDH_VIEWID,
   BOTTOM_MDH_VIEWID,
+  BOTTOM_TOOLS_VIEWID,
   EXTENSION_NAME,
   OPEN_CHARTS_VIEWER,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DIFF_MDH_VIEWER,
   OPEN_MDH_VIEWER,
+  OPEN_TOOLS_VIEWER,
   SHOW_CSV,
   SHOW_HAR,
 } from "./constant";
@@ -36,6 +38,7 @@ import { ChartsViewProvider } from "./views/ChartsViewProvider";
 import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
 import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
 import { MdhViewProvider } from "./views/MdhViewProvider";
+import { ToolsViewParams, ToolsViewProvider } from "./views/ToolsViewProvider";
 
 const PREFIX = "[extension]";
 
@@ -154,6 +157,16 @@ export async function activate(context: ExtensionContext) {
 
     registerDisposableCommand(OPEN_COUNT_FOR_ALL_TABLES_VIEWER, async (schemaRes: DbSchema) => {
       countRecordViewProvider.render(schemaRes);
+    });
+
+    // Tools View
+    const toolsViewProvider = new ToolsViewProvider(BOTTOM_TOOLS_VIEWID, context, stateStorage);
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(toolsViewProvider.viewId, toolsViewProvider)
+    );
+
+    registerDisposableCommand(OPEN_TOOLS_VIEWER, async (params: ToolsViewParams) => {
+      toolsViewProvider.render(params);
     });
   }
 

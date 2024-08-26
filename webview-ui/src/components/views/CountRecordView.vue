@@ -3,9 +3,9 @@ import type { DropdownItem } from "@/types/Components";
 import { vscode, type CountRecordViewEventData } from "@/utilities/vscode";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
 import { nextTick, onMounted, ref } from "vue";
-import VsCodeButton from "./base/VsCodeButton.vue";
-import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
-import RDHViewer from "./RDHViewer.vue";
+import VsCodeButton from "../base/VsCodeButton.vue";
+import VsCodeRadioGroupVue from "../base/VsCodeRadioGroup.vue";
+import RDHViewer from "../RDHViewer.vue";
 
 const sectionWidth = ref(300);
 const sectionHeight = ref(300);

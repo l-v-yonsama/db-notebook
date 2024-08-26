@@ -168,8 +168,10 @@ const toIso8601String = (item: ScanConditionItem, isStart: boolean): string | un
   return d.toISOString();
 };
 
-const showTab = (tabId: string) => {
+const showTab = async (tabId: string) => {
   activeTabId.value = `tab-${tabId}`;
+  await nextTick();
+
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
@@ -183,11 +185,12 @@ const showTab = (tabId: string) => {
   vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
-const addTabItem = (tabItem: ScanTabItem) => {
+const addTabItem = async (tabItem: ScanTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
     tabItems.value.unshift(tabItem);
   }
+  await nextTick();
   showTab(tabItem.tabId);
 };
 
