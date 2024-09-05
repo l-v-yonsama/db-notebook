@@ -70,11 +70,11 @@ export class ChartsViewProvider extends BaseViewProvider {
   protected onDidChangeVisibility(visible: boolean): void {
     if (visible === true && this.items) {
       this.postMessage<ChartsViewEventData>({
-        command: "init",
+        command: "initialize",
         componentName: "ChartsView",
 
         value: {
-          init: {
+          initialize: {
             tabItems: this.items,
             currentTabId: this.currentTabId,
           },

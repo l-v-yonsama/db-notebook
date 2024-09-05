@@ -37,6 +37,7 @@ const activeInnerRdh = ref(null as any);
 const contentMode = ref("tab" as "tab" | "keys");
 const noCompareKeys = ref(false);
 const activeTabRdhList = ref([] as ResultSetData[]);
+const initialized = ref(false);
 
 // secondarySelections
 const writeToClipboardDetailItems = WRITE_TO_CLIP_BOARD_DETAIL_ITEMS;
@@ -160,14 +161,16 @@ const resetActiveInnerRdh = async () => {
   });
 };
 
-const init = async (params: MdhViewEventData["value"]["init"]) => {
+const initialize = async (params: MdhViewEventData["value"]["initialize"]) => {
+  initialized.value = false;
   tabItems.value.splice(0, tabItems.value.length);
   await nextTick();
 
   params?.tabItems.forEach((it) => tabItems.value.unshift(it));
   if (params?.currentTabId) {
-    showTab(params?.currentTabId, params?.currentInnerIndex);
+    await showTab(params?.currentTabId, params?.currentInnerIndex);
   }
+  initialized.value = true;
 };
 
 const addTabItem = async (tabItem: RdhTabItem) => {
@@ -176,10 +179,11 @@ const addTabItem = async (tabItem: RdhTabItem) => {
     tabItems.value.unshift(tabItem);
   }
   await nextTick();
-  showTab(tabItem.tabId);
+  await showTab(tabItem.tabId);
+  initialized.value = true;
 };
 
-const removeTabItem = (tabId: string, changeActiveTab = false) => {
+const removeTabItem = async (tabId: string, changeActiveTab = false) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabId);
   if (idx >= 0) {
     const item = tabItems.value.splice(idx, 1)[0];
@@ -191,26 +195,26 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
     };
     vscode.postCommand(action);
   }
+  await nextTick();
 
   if (changeActiveTab && tabItems.value.length > 0) {
-    showTab(tabItems.value[0].tabId);
+    await showTab(tabItems.value[0].tabId);
   }
 };
 
-const setSearchResult = ({ tabId, value }: { tabId: string; value: ResultSetData[] }) => {
+const setSearchResult = async ({ tabId, value }: { tabId: string; value: ResultSetData[] }) => {
   const tabItem = tabItems.value.find((it) => it.tabId === tabId);
   if (!tabItem) {
     return;
   }
   tabItem.list.splice(0, tabItem.list.length);
+  await nextTick();
+  tabItem.list.push(...value);
+  await nextTick();
 
-  nextTick(() => {
-    tabItem.list.push(...value);
-
-    showTab(tabId);
-    inProgress.value = false;
-    setTimeout(resetSpPaneWrapperHeight, 200);
-  });
+  await showTab(tabId);
+  inProgress.value = false;
+  setTimeout(resetSpPaneWrapperHeight, 200);
 };
 
 function actionToolbar(command: string, inParams?: any) {
@@ -344,8 +348,8 @@ const recieveMessage = (data: MdhViewEventData) => {
       }
       setSearchResult(value.searchResult);
       break;
-    case "init":
-      init(value.init);
+    case "initialize":
+      initialize(value.initialize);
       break;
   }
 };
@@ -357,109 +361,61 @@ defineExpose({
 
 <template>
   <section class="MdhView">
-    <div v-if="contentMode == 'tab'" class="tab-container-actions">
-      <VsCodeDropdown
-        v-if="innerTabItems.length > 1"
-        v-model="innerTabIndex"
-        :items="innerTabItems"
-        style="z-index: 15"
-        @change="resetActiveInnerRdh"
-      />
+    <section v-if="!initialized" class="content">Initializing...{{ initialized }}</section>
+    <template v-else>
 
-      <button
-        v-if="!editable && refreshable"
-        @click="actionToolbar('compare', {})"
-        :disabled="inProgress || noCompareKeys"
-        :title="noCompareKeys ? 'No compare keys(Primary, Unique)' : 'Compare with current content'"
-      >
-        <fa icon="code-compare" />
-      </button>
-      <SecondarySelectionAction
-        v-if="!editable && refreshable"
-        :items="compareDetailItems"
-        title="Compare"
-        @onSelect="selectedCompareMoreOptions"
-      />
-      <button
-        v-if="refreshable"
-        @click="actionToolbar('refresh', {})"
-        :disabled="inProgress"
-        title="Search again"
-      >
-        <fa icon="rotate" />
-      </button>
-      <button
-        @click="
+      <div v-if="contentMode == 'tab'" class="tab-container-actions">
+        <VsCodeDropdown v-if="innerTabItems.length > 1" v-model="innerTabIndex" :items="innerTabItems"
+          style="z-index: 15" @change="resetActiveInnerRdh" />
+
+        <button v-if="!editable && refreshable" @click="actionToolbar('compare', {})"
+          :disabled="inProgress || noCompareKeys"
+          :title="noCompareKeys ? 'No compare keys(Primary, Unique)' : 'Compare with current content'">
+          <fa icon="code-compare" />
+        </button>
+        <SecondarySelectionAction v-if="!editable && refreshable" :items="compareDetailItems" title="Compare"
+          @onSelect="selectedCompareMoreOptions" />
+        <button v-if="refreshable" @click="actionToolbar('refresh', {})" :disabled="inProgress" title="Search again">
+          <fa icon="rotate" />
+        </button>
+        <button @click="
           writeToClipboard({
             fileType: 'text',
           })
-        "
-        :disabled="inProgress"
-        title="Write to clipboard"
-      >
-        <fa icon="clipboard" />
-      </button>
-      <SecondarySelectionAction
-        :items="writeToClipboardDetailItems"
-        title="Write to clipboard"
-        @onSelect="writeToClipboard"
-      />
-      <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as Html">
-        <fa icon="file-lines" />
-      </button>
-      <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
-        <fa icon="file-excel" />
-      </button>
-      <button
-        v-if="describable"
-        @click="actionToolbar('describe', {})"
-        :disabled="inProgress"
-        title="Generate descriptive statistics"
-      >
-        <fa icon="magnifying-glass-chart" />
-      </button>
-    </div>
-    <CompareKeySettings
-      v-if="contentMode == 'keys'"
-      :rdhList="activeTabRdhList"
-      @cancel="contentMode = 'tab'"
-      @save="saveCompareKeys"
-    />
-    <vscode-panels
-      v-if="contentMode == 'tab'"
-      class="tab-wrapper"
-      :activeid="activeTabId"
-      aria-label="With Active Tab"
-    >
-      <VsCodeTabHeader
-        v-for="tabItem in tabItems"
-        :id="tabItem.tabId"
-        :key="tabItem.tabId"
-        :title="`${tabItem.title}`"
-        :is-active="isActiveTabId(tabItem.tabId)"
-        :closable="true"
-        @click="showTab(tabItem.tabId)"
-        @close="removeTabItem(tabItem.tabId, true)"
-      >
-      </VsCodeTabHeader>
-      <vscode-panel-view
-        v-for="tabItem of tabItems"
-        :id="'view-' + tabItem.tabId"
-        :key="tabItem.tabId"
-      >
-        <section :style="{ width: `${splitterWidth}px` }">
-          <div v-if="activeInnerRdh" class="spPaneWrapper">
-            <RDHViewer
-              :rdh="activeInnerRdh"
-              :config="tabItem.config"
-              :width="splitterWidth"
-              :height="splitterHeight"
-              :ref="setRdhViewerRef"
-            />
-          </div>
-        </section>
-      </vscode-panel-view>
-    </vscode-panels>
+          " :disabled="inProgress" title="Write to clipboard">
+          <fa icon="clipboard" />
+        </button>
+        <SecondarySelectionAction :items="writeToClipboardDetailItems" title="Write to clipboard"
+          @onSelect="writeToClipboard" />
+        <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as Html">
+          <fa icon="file-lines" />
+        </button>
+        <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
+          <fa icon="file-excel" />
+        </button>
+        <button v-if="describable" @click="actionToolbar('describe', {})" :disabled="inProgress"
+          title="Generate descriptive statistics">
+          <fa icon="magnifying-glass-chart" />
+        </button>
+      </div>
+      <CompareKeySettings v-if="contentMode == 'keys'" :rdhList="activeTabRdhList" @cancel="contentMode = 'tab'"
+        @save="saveCompareKeys" />
+      <vscode-panels v-if="contentMode == 'tab'" class="tab-wrapper" :activeid="activeTabId"
+        aria-label="With Active Tab">
+        <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
+          :title="`${tabItem.title}`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
+          @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
+        </VsCodeTabHeader>
+        <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
+          <section :style="{ width: `${splitterWidth}px` }">
+            <div v-if="activeInnerRdh" class="spPaneWrapper">
+              <RDHViewer :rdh="activeInnerRdh" :config="tabItem.config" :width="splitterWidth" :height="splitterHeight"
+                :ref="setRdhViewerRef" />
+            </div>
+          </section>
+        </vscode-panel-view>
+      </vscode-panels>
+    </template>
   </section>
 </template>
 

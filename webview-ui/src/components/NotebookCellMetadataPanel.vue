@@ -59,53 +59,52 @@ const resetSpPaneWrapperHeight = () => {
   }
 };
 
-const initialize = (v: NotebookCellMetadataPanelEventData["value"]["initialize"]): void => {
+const initialize = async (v: NotebookCellMetadataPanelEventData["value"]["initialize"]) => {
   if (v === undefined) {
     return;
   }
   initialized.value = false;
   const keys = v.columnItems;
 
-  nextTick(() => {
-    showComment.value = v.metadata.showComment === true;
+  await nextTick();
+  showComment.value = v.metadata.showComment === true;
 
-    codeResolverFile.value = v.metadata.codeResolverFile ?? "";
-    ruleFile.value = v.metadata.ruleFile ?? "";
+  codeResolverFile.value = v.metadata.codeResolverFile ?? "";
+  ruleFile.value = v.metadata.ruleFile ?? "";
 
-    v.codeFileItems.map((it) => {
-      codeFileItems.push({ label: it.label, value: it.value });
-    });
-    v.ruleFileItems.map((it) => {
-      ruleFileItems.push({ label: it.label, value: it.value });
-    });
-
-    chartLabelItems.push({ label: " -- ", value: "" });
-    chartDataItems.push({ label: " -- ", value: "" });
-    keys.map((it) => {
-      const label = `${it.name}${it.comment ? " (" + it.comment + ")" : ""}`;
-      chartLabelItems.push({ label, value: it.name });
-      if (isNumericLike(it.type) || isDateTimeOrDateOrTime(it.type))
-        chartDataItems.push({ label, value: it.name });
-    });
-    chartMultipleDataset.value = v.metadata.chart?.multipleDataset === true;
-    chartShowDataLabels.value = v.metadata.chart?.showDataLabels === true;
-    chartShowTitle.value = v.metadata.chart?.showTitle === true;
-    chartStacked.value = v.metadata.chart?.stacked === true;
-    chartTitle.value = v.metadata.chart?.title ?? "";
-    chartType.value = v.metadata.chart?.type ?? "Unused";
-    chartLabel.value = v.metadata.chart?.label ?? "";
-    chartData.value = v.metadata.chart?.data ?? "";
-    chartData2.value = v.metadata.chart?.data2 ?? "";
-    chartData3.value = v.metadata.chart?.data3 ?? "";
-    chartData4.value = v.metadata.chart?.data4 ?? "";
-    chartDataX.value = v.metadata.chart?.dataX ?? "";
-    chartDataY.value = v.metadata.chart?.dataY ?? "";
-
-    savingSharedVariables.value = v.metadata.savingSharedVariables === true;
-    sharedVariableName.value = v.metadata.sharedVariableName ?? "";
-
-    initialized.value = true;
+  v.codeFileItems.map((it) => {
+    codeFileItems.push({ label: it.label, value: it.value });
   });
+  v.ruleFileItems.map((it) => {
+    ruleFileItems.push({ label: it.label, value: it.value });
+  });
+
+  chartLabelItems.push({ label: " -- ", value: "" });
+  chartDataItems.push({ label: " -- ", value: "" });
+  keys.map((it) => {
+    const label = `${it.name}${it.comment ? " (" + it.comment + ")" : ""}`;
+    chartLabelItems.push({ label, value: it.name });
+    if (isNumericLike(it.type) || isDateTimeOrDateOrTime(it.type))
+      chartDataItems.push({ label, value: it.name });
+  });
+  chartMultipleDataset.value = v.metadata.chart?.multipleDataset === true;
+  chartShowDataLabels.value = v.metadata.chart?.showDataLabels === true;
+  chartShowTitle.value = v.metadata.chart?.showTitle === true;
+  chartStacked.value = v.metadata.chart?.stacked === true;
+  chartTitle.value = v.metadata.chart?.title ?? "";
+  chartType.value = v.metadata.chart?.type ?? "Unused";
+  chartLabel.value = v.metadata.chart?.label ?? "";
+  chartData.value = v.metadata.chart?.data ?? "";
+  chartData2.value = v.metadata.chart?.data2 ?? "";
+  chartData3.value = v.metadata.chart?.data3 ?? "";
+  chartData4.value = v.metadata.chart?.data4 ?? "";
+  chartDataX.value = v.metadata.chart?.dataX ?? "";
+  chartDataY.value = v.metadata.chart?.dataY ?? "";
+
+  savingSharedVariables.value = v.metadata.savingSharedVariables === true;
+  sharedVariableName.value = v.metadata.sharedVariableName ?? "";
+
+  initialized.value = true;
 };
 
 onMounted(() => {
@@ -135,20 +134,20 @@ const save = () => {
           chartType.value === "Unused"
             ? undefined
             : {
-                multipleDataset: chartMultipleDataset.value,
-                showDataLabels: chartShowDataLabels.value,
-                showTitle: chartShowTitle.value,
-                stacked: chartStacked.value,
-                title: chartTitle.value,
-                type: chartType.value as CellMetaChart["type"],
-                label: chartLabel.value,
-                data: chartData.value,
-                data2: chartData2.value,
-                data3: chartData3.value,
-                data4: chartData4.value,
-                dataX: chartDataX.value,
-                dataY: chartDataY.value,
-              },
+              multipleDataset: chartMultipleDataset.value,
+              showDataLabels: chartShowDataLabels.value,
+              showTitle: chartShowTitle.value,
+              stacked: chartStacked.value,
+              title: chartTitle.value,
+              type: chartType.value as CellMetaChart["type"],
+              label: chartLabel.value,
+              data: chartData.value,
+              data2: chartData2.value,
+              data3: chartData3.value,
+              data4: chartData4.value,
+              dataX: chartDataX.value,
+              dataY: chartDataY.value,
+            },
       },
     },
   });
@@ -185,12 +184,12 @@ defineExpose({
     <div class="toolbar">
       <div class="tool-left"></div>
       <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton :disabled="disabledSaveButton" @click="save" title="Save cell metadata"
-          ><fa icon="plus" />Save</VsCodeButton
-        >
+        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
+          <fa icon="times" />Cancel
+        </VsCodeButton>
+        <VsCodeButton :disabled="disabledSaveButton" @click="save" title="Save cell metadata">
+          <fa icon="plus" />Save
+        </VsCodeButton>
       </div>
     </div>
     <section v-if="!initialized" class="content">Initializing...</section>
@@ -198,12 +197,8 @@ defineExpose({
       <fieldset>
         <legend>SQL Editor</legend>
         <div>
-          <vscode-checkbox
-            :checked="showComment"
-            @change="($e:any) => showComment =$e.target.checked"
-            style="margin-right: auto"
-            >Display comments after each resource</vscode-checkbox
-          >
+          <vscode-checkbox :checked="showComment" @change="($e: any) => showComment = $e.target.checked"
+            style="margin-right: auto">Display comments after each resource</vscode-checkbox>
         </div>
       </fieldset>
       <fieldset>
@@ -224,24 +219,14 @@ defineExpose({
         <legend>Saving execution results in shared variables</legend>
         <div>
           <div>
-            <vscode-checkbox
-              :checked="savingSharedVariables"
-              @change="($e:any) => savingSharedVariables =$e.target.checked"
-              style="margin-right: auto"
-              >Save</vscode-checkbox
-            >
+            <vscode-checkbox :checked="savingSharedVariables"
+              @change="($e: any) => savingSharedVariables = $e.target.checked"
+              style="margin-right: auto">Save</vscode-checkbox>
           </div>
           <div v-if="savingSharedVariables">
             <label for="sharedVariableName">shared variable name:</label>
-            <VsCodeTextField
-              id="sharedVariableName"
-              v-model="sharedVariableName"
-              :required="true"
-              :maxlength="50"
-              :transparent="true"
-              :change-on-mouseout="true"
-              title="Shared variable name"
-            >
+            <VsCodeTextField id="sharedVariableName" v-model="sharedVariableName" :required="true" :maxlength="50"
+              :transparent="true" :change-on-mouseout="true" title="Shared variable name">
             </VsCodeTextField>
           </div>
         </div>
@@ -251,193 +236,77 @@ defineExpose({
         <div>
           <div class="dropdown-area">
             <label for="chartType">Type:</label>
-            <VsCodeDropdown
-              id="chartType"
-              v-model="chartType"
-              :items="chartTypeItems"
-              @change="handleChangeType"
-            />
+            <VsCodeDropdown id="chartType" v-model="chartType" :items="chartTypeItems" @change="handleChangeType" />
           </div>
 
           <div v-if="chartType !== 'Unused'">
             <div class="dropdown-area">
               <label for="chartTitle">Title:</label>
-              <VsCodeTextField
-                id="chartTitle"
-                v-model="chartTitle"
-                :transparent="true"
-                :required="true"
-              />
-              <vscode-checkbox
-                id="chartShowTitle"
-                :checked="chartShowTitle"
-                @change="($e:any) => chartShowTitle =$e.target.checked"
-                style="margin-right: auto; margin-left: 10px"
-                >Displays title on chart</vscode-checkbox
-              >
+              <VsCodeTextField id="chartTitle" v-model="chartTitle" :transparent="true" :required="true" />
+              <vscode-checkbox id="chartShowTitle" :checked="chartShowTitle"
+                @change="($e: any) => chartShowTitle = $e.target.checked"
+                style="margin-right: auto; margin-left: 10px">Displays title on chart</vscode-checkbox>
             </div>
             <div v-if="chartType !== 'radar'" class="dropdown-area">
               <label for="chartShowDataLabels">Data values:</label>
-              <vscode-checkbox
-                id="chartShowDataLabels"
-                :checked="chartShowDataLabels"
-                @change="($e:any) => chartShowDataLabels =$e.target.checked"
-                style="margin-right: auto"
-                >Displays values on data</vscode-checkbox
-              >
+              <vscode-checkbox id="chartShowDataLabels" :checked="chartShowDataLabels"
+                @change="($e: any) => chartShowDataLabels = $e.target.checked" style="margin-right: auto">Displays
+                values
+                on data</vscode-checkbox>
             </div>
-            <div
-              v-if="
-                chartType !== 'pairPlot' &&
-                chartType !== 'radar' &&
-                chartType !== 'scatter' &&
-                chartType !== 'doughnut' &&
-                chartType !== 'pie'
-              "
-              class="dropdown-area"
-            >
+            <div v-if="
+              chartType !== 'pairPlot' &&
+              chartType !== 'radar' &&
+              chartType !== 'scatter' &&
+              chartType !== 'doughnut' &&
+              chartType !== 'pie'
+            " class="dropdown-area">
               <label for="chartMultipleDataset">Databset:</label>
-              <vscode-checkbox
-                id="chartMultipleDataset"
-                :checked="chartMultipleDataset"
-                @change="($e:any) => chartMultipleDataset =$e.target.checked"
-                style="margin-right: auto"
-                >Multiple</vscode-checkbox
-              >
+              <vscode-checkbox id="chartMultipleDataset" :checked="chartMultipleDataset"
+                @change="($e: any) => chartMultipleDataset = $e.target.checked"
+                style="margin-right: auto">Multiple</vscode-checkbox>
             </div>
 
             <div v-if="chartType === 'doughnut' || chartType === 'pie'">
-              <TextOrDropdown
-                v-model="chartLabel"
-                label="*Labels"
-                :chartDataItems="chartLabelItems"
-                :required="true"
-              />
-              <TextOrDropdown
-                v-model="chartData"
-                label="*Data"
-                :chartDataItems="chartDataItems"
-                :required="true"
-              />
+              <TextOrDropdown v-model="chartLabel" label="*Labels" :chartDataItems="chartLabelItems" :required="true" />
+              <TextOrDropdown v-model="chartData" label="*Data" :chartDataItems="chartDataItems" :required="true" />
             </div>
             <div v-else-if="chartType === 'scatter'">
-              <TextOrDropdown
-                v-model="chartDataX"
-                label="*Data X"
-                :chartDataItems="chartDataItems"
-                :required="true"
-              />
-              <TextOrDropdown
-                v-model="chartDataY"
-                label="*Data Y"
-                :chartDataItems="chartDataItems"
-                :required="true"
-              />
-              <TextOrDropdown
-                v-model="chartLabel"
-                label="*Group(Hue)"
-                :chartDataItems="chartLabelItems"
-              />
+              <TextOrDropdown v-model="chartDataX" label="*Data X" :chartDataItems="chartDataItems" :required="true" />
+              <TextOrDropdown v-model="chartDataY" label="*Data Y" :chartDataItems="chartDataItems" :required="true" />
+              <TextOrDropdown v-model="chartLabel" label="*Group(Hue)" :chartDataItems="chartLabelItems" />
             </div>
             <div v-else-if="chartType === 'bar'">
-              <TextOrDropdown
-                v-model="chartLabel"
-                label="*Label(X)"
-                :chartDataItems="chartLabelItems"
-                :required="true"
-              />
-              <TextOrDropdown
-                v-model="chartData"
-                label="*Data(Y)"
-                :chartDataItems="chartDataItems"
-                :required="true"
-              />
+              <TextOrDropdown v-model="chartLabel" label="*Label(X)" :chartDataItems="chartLabelItems"
+                :required="true" />
+              <TextOrDropdown v-model="chartData" label="*Data(Y)" :chartDataItems="chartDataItems" :required="true" />
               <div v-if="chartMultipleDataset">
-                <TextOrDropdown
-                  v-model="chartData2"
-                  label="*Data(Y2)"
-                  :chartDataItems="chartDataItems"
-                />
-                <TextOrDropdown
-                  v-model="chartData3"
-                  label="*Data(Y3)"
-                  :chartDataItems="chartDataItems"
-                />
-                <TextOrDropdown
-                  v-model="chartData4"
-                  label="*Data(Y4)"
-                  :chartDataItems="chartDataItems"
-                />
+                <TextOrDropdown v-model="chartData2" label="*Data(Y2)" :chartDataItems="chartDataItems" />
+                <TextOrDropdown v-model="chartData3" label="*Data(Y3)" :chartDataItems="chartDataItems" />
+                <TextOrDropdown v-model="chartData4" label="*Data(Y4)" :chartDataItems="chartDataItems" />
                 <div>
                   <label for="chartStacked">Stacked:</label>
-                  <vscode-checkbox
-                    id="chartStacked"
-                    :checked="chartStacked"
-                    @change="($e:any) => chartStacked =$e.target.checked"
-                    style="margin-right: auto"
-                    >ON</vscode-checkbox
-                  >
+                  <vscode-checkbox id="chartStacked" :checked="chartStacked"
+                    @change="($e: any) => chartStacked = $e.target.checked"
+                    style="margin-right: auto">ON</vscode-checkbox>
                 </div>
               </div>
             </div>
             <div v-else-if="chartType === 'radar'">
-              <TextOrDropdown
-                v-model="chartData"
-                label="*Data"
-                :chartDataItems="chartDataItems"
-                :required="true"
-              />
-              <TextOrDropdown
-                v-model="chartData2"
-                label="*Data2"
-                :chartDataItems="chartDataItems"
-                :required="true"
-              />
-              <TextOrDropdown
-                v-model="chartData3"
-                label="*Data3"
-                :chartDataItems="chartDataItems"
-              />
-              <TextOrDropdown
-                v-model="chartData4"
-                label="*Data4"
-                :chartDataItems="chartDataItems"
-              />
-              <TextOrDropdown
-                v-model="chartLabel"
-                label="*Group(Hue)"
-                :chartDataItems="chartLabelItems"
-              />
+              <TextOrDropdown v-model="chartData" label="*Data" :chartDataItems="chartDataItems" :required="true" />
+              <TextOrDropdown v-model="chartData2" label="*Data2" :chartDataItems="chartDataItems" :required="true" />
+              <TextOrDropdown v-model="chartData3" label="*Data3" :chartDataItems="chartDataItems" />
+              <TextOrDropdown v-model="chartData4" label="*Data4" :chartDataItems="chartDataItems" />
+              <TextOrDropdown v-model="chartLabel" label="*Group(Hue)" :chartDataItems="chartLabelItems" />
             </div>
             <div v-else-if="chartType === 'line'">
-              <TextOrDropdown
-                v-model="chartLabel"
-                label="*Labels(X)"
-                :chartDataItems="chartLabelItems"
-                :required="true"
-              />
-              <TextOrDropdown
-                v-model="chartData"
-                label="*Data(Y)"
-                :chartDataItems="chartDataItems"
-                :required="true"
-              />
+              <TextOrDropdown v-model="chartLabel" label="*Labels(X)" :chartDataItems="chartLabelItems"
+                :required="true" />
+              <TextOrDropdown v-model="chartData" label="*Data(Y)" :chartDataItems="chartDataItems" :required="true" />
               <div v-if="chartMultipleDataset">
-                <TextOrDropdown
-                  v-model="chartData2"
-                  label="*Data(Y2)"
-                  :chartDataItems="chartDataItems"
-                />
-                <TextOrDropdown
-                  v-model="chartData3"
-                  label="*Data(Y3)"
-                  :chartDataItems="chartDataItems"
-                />
-                <TextOrDropdown
-                  v-model="chartData4"
-                  label="*Data(Y4)"
-                  :chartDataItems="chartDataItems"
-                />
+                <TextOrDropdown v-model="chartData2" label="*Data(Y2)" :chartDataItems="chartDataItems" />
+                <TextOrDropdown v-model="chartData3" label="*Data(Y3)" :chartDataItems="chartDataItems" />
+                <TextOrDropdown v-model="chartData4" label="*Data(Y4)" :chartDataItems="chartDataItems" />
               </div>
             </div>
             <div v-if="chartType === 'pairPlot'">
@@ -461,7 +330,7 @@ section.root {
   height: 100vh;
   position: relative;
 
-  & > * {
+  &>* {
     margin: 10px;
   }
 }
@@ -469,13 +338,15 @@ section.root {
 fieldset {
   margin-bottom: 15px;
 }
+
 .scroll-wrapper {
   overflow: auto;
 }
 
 div.dropdown-area {
   margin-bottom: 3px;
-  & > label {
+
+  &>label {
     margin-top: 5px;
     display: inline-block;
     margin-right: 5px;

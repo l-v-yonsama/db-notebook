@@ -36,6 +36,7 @@ const activeInnerRdh2 = ref(null as any);
 const displayOnlyChanged = ref(false);
 const hasUndoChangeSql = ref(false);
 const comparable = ref(false);
+const initialized = ref(false);
 
 const compareDetailItems = [
   {
@@ -153,12 +154,15 @@ const resetActiveInnerRdh = () => {
   });
 };
 
-const init = (params: DiffMdhViewEventData["value"]["init"]) => {
+const initialize = async (params: DiffMdhViewEventData["value"]["initialize"]) => {
+  initialized.value = false;
+  await nextTick();
   tabItems.value.splice(0, tabItems.value.length);
   params?.tabItems.forEach((it) => tabItems.value.unshift(it));
   if (params?.currentTabId) {
-    showTab(params?.currentTabId, params?.currentInnerIndex);
+    await showTab(params?.currentTabId, params?.currentInnerIndex);
   }
+  initialized.value = true;
 };
 
 const addTabItem = async (tabItem: DiffTabItem) => {
@@ -167,10 +171,11 @@ const addTabItem = async (tabItem: DiffTabItem) => {
     tabItems.value.unshift(tabItem);
   }
   await nextTick();
-  showTab(tabItem.tabId);
+  await showTab(tabItem.tabId);
+  initialized.value = true;
 };
 
-const removeTabItem = (tabId: string, changeActiveTab = false) => {
+const removeTabItem = async (tabId: string, changeActiveTab = false) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabId);
   if (idx >= 0) {
     const item = tabItems.value.splice(idx, 1)[0];
@@ -182,21 +187,20 @@ const removeTabItem = (tabId: string, changeActiveTab = false) => {
     };
     vscode.postCommand(action);
   }
-
+  await nextTick();
   if (changeActiveTab && tabItems.value.length > 0) {
-    showTab(tabItems.value[0].tabId);
+    await showTab(tabItems.value[0].tabId);
   }
 };
 
-const setSearchResult = ({ tabId, value }: { tabId: string; value: DiffTabItem }) => {
+const setSearchResult = async ({ tabId, value }: { tabId: string; value: DiffTabItem }) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabId);
   if (idx < 0) {
     return;
   }
   tabItems.value.splice(idx, 1);
-  nextTick(() => {
-    addTabItem(value);
-  });
+  await nextTick();
+  await addTabItem(value);
 };
 
 const compare = (params: Omit<CompareParams, "tabId">): void => {
@@ -265,8 +269,8 @@ const recieveMessage = (data: DiffMdhViewEventData) => {
       }
       setSearchResult(value.searchResult);
       break;
-    case "init":
-      init(value.init);
+    case "initialize":
+      initialize(value.initialize);
       break;
   }
 };
@@ -279,94 +283,56 @@ defineExpose({
 
 <template>
   <section class="MdhView">
-    <div class="tab-container-actions">
-      <VsCodeDropdown
-        v-if="innerTabVisible"
-        v-model="innerTabIndex"
-        :items="innerTabItems"
-        style="z-index: 15"
-        @change="resetActiveInnerRdh"
-      ></VsCodeDropdown>
-      <button
-        @click="compare({ base: 'before' })"
-        :disabled="inProgress || !comparable"
-        title="Compare with before content"
-      >
-        <fa icon="code-compare" />
-      </button>
-      <SecondarySelectionAction
-        :disabled="inProgress || !comparable"
-        :items="compareDetailItems"
-        title="Compare"
-        @onSelect="compare"
-      />
-      <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as Html">
-        <fa icon="file-lines" />
-      </button>
-      <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
-        <fa icon="file-excel" />
-      </button>
-      <button
-        :disabled="!hasUndoChangeSql"
-        @click="createUndoChangeSql"
-        title="Create undo change sql"
-      >
-        <fa icon="rotate-left" />
-      </button>
-      <SecondarySelectionAction
-        :items="moreDetailItems"
-        title="more"
-        @onSelect="selectedMoreOptions"
-      />
-    </div>
-    <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-      <VsCodeTabHeader
-        v-for="tabItem in tabItems"
-        :id="tabItem.tabId"
-        :key="tabItem.tabId"
-        :title="`${tabItem.title}(${tabItem.subTitle})`"
-        :is-active="isActiveTabId(tabItem.tabId)"
-        :closable="true"
-        @click="showTab(tabItem.tabId)"
-        @close="removeTabItem(tabItem.tabId, true)"
-      >
-      </VsCodeTabHeader>
-      <vscode-panel-view
-        v-for="tabItem of tabItems"
-        :id="'view-' + tabItem.tabId"
-        :key="tabItem.tabId"
-      >
-        <section :style="{ width: `${splitterWidth}px` }">
-          <splitpanes
-            class="default-theme"
-            :style="{ 'max-width': `${splitterWidth}px`, 'height': `${splitterHeight}px` }"
-          >
-            <pane min-size="5">
-              <div v-if="activeInnerRdh1" class="spPaneWrapper">
-                <RDHViewer
-                  :rdh="activeInnerRdh1"
-                  :width="splitterWidth"
-                  :height="splitterHeight"
-                  :showOnlyChanged="displayOnlyChanged"
-                >
-                </RDHViewer>
-              </div>
-            </pane>
-            <pane min-size="5">
-              <div v-if="activeInnerRdh2" class="spPaneWrapper">
-                <RDHViewer
-                  :rdh="activeInnerRdh2"
-                  :width="splitterWidth"
-                  :height="splitterHeight"
-                  :showOnlyChanged="displayOnlyChanged"
-                >
-                </RDHViewer>
-              </div>
-            </pane>
-          </splitpanes>
-        </section>
-      </vscode-panel-view>
-    </vscode-panels>
+    <section v-if="!initialized" class="content">Initializing...{{ initialized }}</section>
+    <template v-else>
+      <div class="tab-container-actions">
+        <VsCodeDropdown v-if="innerTabVisible" v-model="innerTabIndex" :items="innerTabItems" style="z-index: 15"
+          @change="resetActiveInnerRdh"></VsCodeDropdown>
+        <button @click="compare({ base: 'before' })" :disabled="inProgress || !comparable"
+          title="Compare with before content">
+          <fa icon="code-compare" />
+        </button>
+        <SecondarySelectionAction :disabled="inProgress || !comparable" :items="compareDetailItems" title="Compare"
+          @onSelect="compare" />
+        <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as Html">
+          <fa icon="file-lines" />
+        </button>
+        <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
+          <fa icon="file-excel" />
+        </button>
+        <button :disabled="!hasUndoChangeSql" @click="createUndoChangeSql" title="Create undo change sql">
+          <fa icon="rotate-left" />
+        </button>
+        <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
+      </div>
+      <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
+        <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
+          :title="`${tabItem.title}(${tabItem.subTitle})`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
+          @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
+        </VsCodeTabHeader>
+        <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
+          <section :style="{ width: `${splitterWidth}px` }">
+            <splitpanes class="default-theme"
+              :style="{ 'max-width': `${splitterWidth}px`, 'height': `${splitterHeight}px` }">
+              <pane min-size="5">
+                <div v-if="activeInnerRdh1" class="spPaneWrapper">
+                  <RDHViewer :rdh="activeInnerRdh1" :width="splitterWidth" :height="splitterHeight"
+                    :showOnlyChanged="displayOnlyChanged">
+                  </RDHViewer>
+                </div>
+              </pane>
+              <pane min-size="5">
+                <div v-if="activeInnerRdh2" class="spPaneWrapper">
+                  <RDHViewer :rdh="activeInnerRdh2" :width="splitterWidth" :height="splitterHeight"
+                    :showOnlyChanged="displayOnlyChanged">
+                  </RDHViewer>
+                </div>
+              </pane>
+            </splitpanes>
+          </section>
+        </vscode-panel-view>
+      </vscode-panels>
+    </template>
   </section>
 </template>
 

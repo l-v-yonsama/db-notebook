@@ -101,7 +101,7 @@ const showTab = async (tabId: string, innerIndex?: number) => {
   vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
-const init = (params: ChartsViewEventData["value"]["init"]) => {
+const initialize = (params: ChartsViewEventData["value"]["initialize"]) => {
   tabItems.value.splice(0, tabItems.value.length);
   params?.tabItems.forEach((it) => tabItems.value.unshift(it));
   if (params?.currentTabId) {
@@ -178,8 +178,8 @@ const recieveMessage = (data: ChartsViewEventData) => {
       }
       setSearchResult(value.searchResult);
       break;
-    case "init":
-      init(value.init);
+    case "initialize":
+      initialize(value.initialize);
       break;
   }
 };
@@ -219,73 +219,36 @@ defineExpose({
     <div class="toolbar top">
       <div class="tool-left"></div>
       <div class="tool-right">
-        <VsCodeButton @click="export2image" title="Save"><fa icon="save" />Download</VsCodeButton>
+        <VsCodeButton @click="export2image" title="Save">
+          <fa icon="save" />Download
+        </VsCodeButton>
       </div>
     </div>
     <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-      <VsCodeTabHeader
-        v-for="tabItem in tabItems"
-        :id="tabItem.tabId"
-        :key="tabItem.tabId"
-        :title="`${tabItem.title}`"
-        :is-active="isActiveTabId(tabItem.tabId)"
-        :closable="true"
-        @click="showTab(tabItem.tabId)"
-        @close="removeTabItem(tabItem.tabId, true)"
-      >
+      <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId" :title="`${tabItem.title}`"
+        :is-active="isActiveTabId(tabItem.tabId)" :closable="true" @click="showTab(tabItem.tabId)"
+        @close="removeTabItem(tabItem.tabId, true)">
       </VsCodeTabHeader>
-      <vscode-panel-view
-        v-for="tabItem of tabItems"
-        :id="'view-' + tabItem.tabId"
-        :key="tabItem.tabId"
-      >
+      <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
         <section :style="{ width: `${sectionWidth}px` }">
           <div :id="'chart-' + tabItem.tabId" v-if="activeChartTabItem" class="spPaneWrapper">
-            <PairPlotChart
-              v-if="activeChartTabItem.type === 'pairPlot'"
+            <PairPlotChart v-if="activeChartTabItem.type === 'pairPlot'"
               :showDataLabels="activeChartTabItem.showDataLabels"
-              :showTitle="activeChartTabItem.pairPlotChartParams.showTitle"
-              :title="activeChartTabItem.title"
-              :pairPlotChartParams="activeChartTabItem.pairPlotChartParams"
-              :height="sectionHeight"
-              :ref="setChartRef"
-            />
-            <Line
-              v-else-if="activeChartTabItem.type === 'line'"
-              :data="activeChartTabItem.data"
-              :options="activeChartTabItem.options"
-              :style="{ height: `${sectionHeight}px`, position: 'relative' }"
-            />
-            <Bar
-              v-else-if="activeChartTabItem.type === 'bar'"
-              :data="activeChartTabItem.data"
-              :options="activeChartTabItem.options"
-              :style="{ height: `${sectionHeight}px`, position: 'relative' }"
-            />
-            <Doughnut
-              v-else-if="activeChartTabItem.type === 'doughnut'"
-              :data="activeChartTabItem.data"
-              :options="activeChartTabItem.options"
-              :style="{ height: `${sectionHeight}px`, position: 'relative' }"
-            />
-            <Pie
-              v-else-if="activeChartTabItem.type === 'pie'"
-              :data="activeChartTabItem.data"
-              :options="activeChartTabItem.options"
-              :style="{ height: `${sectionHeight}px`, position: 'relative' }"
-            />
-            <Radar
-              v-else-if="activeChartTabItem.type === 'radar'"
-              :data="activeChartTabItem.data"
-              :options="activeChartTabItem.options"
-              :style="{ height: `${sectionHeight}px`, position: 'relative' }"
-            />
-            <Scatter
-              v-else-if="activeChartTabItem.type === 'scatter'"
-              :data="activeChartTabItem.data"
-              :options="activeChartTabItem.options"
-              :style="{ height: `${sectionHeight}px`, position: 'relative' }"
-            />
+              :showTitle="activeChartTabItem.pairPlotChartParams.showTitle" :title="activeChartTabItem.title"
+              :pairPlotChartParams="activeChartTabItem.pairPlotChartParams" :height="sectionHeight"
+              :ref="setChartRef" />
+            <Line v-else-if="activeChartTabItem.type === 'line'" :data="activeChartTabItem.data"
+              :options="activeChartTabItem.options" :style="{ height: `${sectionHeight}px`, position: 'relative' }" />
+            <Bar v-else-if="activeChartTabItem.type === 'bar'" :data="activeChartTabItem.data"
+              :options="activeChartTabItem.options" :style="{ height: `${sectionHeight}px`, position: 'relative' }" />
+            <Doughnut v-else-if="activeChartTabItem.type === 'doughnut'" :data="activeChartTabItem.data"
+              :options="activeChartTabItem.options" :style="{ height: `${sectionHeight}px`, position: 'relative' }" />
+            <Pie v-else-if="activeChartTabItem.type === 'pie'" :data="activeChartTabItem.data"
+              :options="activeChartTabItem.options" :style="{ height: `${sectionHeight}px`, position: 'relative' }" />
+            <Radar v-else-if="activeChartTabItem.type === 'radar'" :data="activeChartTabItem.data"
+              :options="activeChartTabItem.options" :style="{ height: `${sectionHeight}px`, position: 'relative' }" />
+            <Scatter v-else-if="activeChartTabItem.type === 'scatter'" :data="activeChartTabItem.data"
+              :options="activeChartTabItem.options" :style="{ height: `${sectionHeight}px`, position: 'relative' }" />
           </div>
         </section>
       </vscode-panel-view>

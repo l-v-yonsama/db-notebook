@@ -172,11 +172,11 @@ export class MdhViewProvider extends BaseViewProvider {
   protected onDidChangeVisibility(visible: boolean): void {
     if (visible === true && this.currentTabId) {
       this.postMessage<MdhViewEventData>({
-        command: "init",
+        command: "initialize",
         componentName: "MdhView",
 
         value: {
-          init: {
+          initialize: {
             tabItems: this.items,
             currentTabId: this.currentTabId,
             currentInnerIndex: this.currentInnerIndex,

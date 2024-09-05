@@ -83,7 +83,7 @@ export type HarFileTabItem = {
 };
 
 export type MdhViewEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "init",
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "initialize",
   "MdhView",
   {
     searchResult?: {
@@ -91,7 +91,7 @@ export type MdhViewEventData = BaseMessageEventData<
       value: ResultSetData[];
     };
     addTabItem?: RdhTabItem;
-    init?: {
+    initialize?: {
       tabItems: RdhTabItem[];
       currentTabId?: string;
       currentInnerIndex?: number;
@@ -183,7 +183,7 @@ export type DiffTabItem = {
 };
 
 export type DiffMdhViewEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "init",
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "initialize",
   "DiffMdhView",
   {
     searchResult?: {
@@ -191,7 +191,7 @@ export type DiffMdhViewEventData = BaseMessageEventData<
       value: DiffTabItem;
     };
     addTabItem?: DiffTabItem;
-    init?: {
+    initialize?: {
       tabItems: DiffTabItem[];
       currentTabId?: string;
       currentInnerIndex?: number;
@@ -366,7 +366,7 @@ export type ToolsViewEventData = BaseMessageEventData<
 >;
 
 export type ChartsViewEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "init",
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "initialize",
   "ChartsView",
   {
     searchResult?: {
@@ -374,7 +374,7 @@ export type ChartsViewEventData = BaseMessageEventData<
       value: ChartTabItem;
     };
     addTabItem?: ChartTabItem;
-    init?: {
+    initialize?: {
       tabItems: ChartTabItem[];
       currentTabId?: string;
     };

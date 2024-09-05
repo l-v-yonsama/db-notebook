@@ -133,11 +133,11 @@ export class DiffMdhViewProvider extends BaseViewProvider {
   protected onDidChangeVisibility(visible: boolean): void {
     if (visible === true && this.currentTabId) {
       this.postMessage<DiffMdhViewEventData>({
-        command: "init",
+        command: "initialize",
         componentName: "DiffMdhView",
 
         value: {
-          init: {
+          initialize: {
             tabItems: this.items,
             currentTabId: this.currentTabId,
             currentInnerIndex: this.currentInnerIndex,
