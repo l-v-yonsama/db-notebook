@@ -14,7 +14,7 @@ import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
 import * as path from "path";
 import * as vscode from "vscode";
-import { Disposable, Uri, ViewColumn, Webview, WebviewPanel, window } from "vscode";
+import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { OPEN_DIFF_MDH_VIEWER } from "../constant";
 import { ActionCommand, OutputParams, SearchScanPanelParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
@@ -25,32 +25,24 @@ import { getDatabaseConfig } from "../utilities/configUtil";
 import { createBookFromRdh } from "../utilities/excelGenerator";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
-import { createWebviewContent } from "../utilities/webviewUtil";
+import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[ScanPanel]";
 
 dayjs.extend(utc);
 
-export const componentName: ComponentName = "ScanPanel";
-
-export class ScanPanel {
+export class ScanPanel extends BasePanel {
   public static currentPanel: ScanPanel | undefined;
   private static stateStorage: StateStorage | undefined;
-  private readonly _panel: WebviewPanel;
-  private _disposables: Disposable[] = [];
   private items: ScanTabItem[] = [];
   private activeTitle = "";
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
-    this._panel = panel;
+    super(panel, extensionUri);
+  }
 
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(
-      this._panel.webview,
-      extensionUri,
-      componentName
-    );
-    this._setWebviewMessageListener(this._panel.webview);
+  public static revive(panel: WebviewPanel, extensionUri: Uri) {
+    ScanPanel.currentPanel = new ScanPanel(panel, extensionUri);
   }
 
   static setStateStorage(storage: StateStorage) {
@@ -62,8 +54,7 @@ export class ScanPanel {
       throw new Error("rootRes must be defined");
     }
     if (ScanPanel.currentPanel) {
-      // If the webview panel already exists reveal it
-      ScanPanel.currentPanel._panel.reveal(ViewColumn.One);
+      ScanPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
@@ -82,6 +73,10 @@ export class ScanPanel {
       ScanPanel.currentPanel = new ScanPanel(panel, extensionUri);
     }
     ScanPanel.currentPanel.renderSub(rootRes);
+  }
+
+  getComponentName(): ComponentName {
+    return "ScanPanel";
   }
 
   private createTabItem(
@@ -264,67 +259,43 @@ export class ScanPanel {
         addTabItem: item,
       },
     };
-    this._panel.webview.postMessage(msg2);
+    this.panel.webview.postMessage(msg2);
     return item;
   }
 
-  /**
-   * Cleans up and disposes of webview resources when the webview panel is closed.
-   */
-  public dispose() {
+  public preDispose(): void {
     ScanPanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
-    }
   }
 
-  /**
-   * Sets up an event listener to listen for messages passed from the webview context and
-   * executes code based on the message that is recieved.
-   *
-   * @param webview A reference to the extension webview
-   * @param context A reference to the extension context
-   */
-  private _setWebviewMessageListener(webview: Webview) {
-    webview.onDidReceiveMessage(
-      async (message: ActionCommand) => {
-        const { command, params } = message;
+  protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
+    const { command, params } = message;
 
-        switch (command) {
-          case "closeScanPanel":
-            {
-              const { tabId } = params;
-              const idx = this.items.findIndex((it) => it.tabId === tabId);
-              if (idx >= 0) {
-                this.items.splice(idx, 1);
-              }
-              if (this.items.length === 0) {
-                this.dispose();
-              }
-            }
-            break;
-          case "search":
-            this.search(params);
-            return;
-          case "output":
-            this.output(params);
-            return;
-          case "openScanPanel":
-            this.openLogStreamScanPanel(params);
-            return;
-          case "DeleteKey":
-            this.deleteKey(params);
-            return;
+    switch (command) {
+      case "closeScanPanel":
+        {
+          const { tabId } = params;
+          const idx = this.items.findIndex((it) => it.tabId === tabId);
+          if (idx >= 0) {
+            this.items.splice(idx, 1);
+          }
+          if (this.items.length === 0) {
+            this.dispose();
+          }
         }
-      },
-      undefined,
-      this._disposables
-    );
+        break;
+      case "search":
+        this.search(params);
+        return;
+      case "output":
+        this.output(params);
+        return;
+      case "openScanPanel":
+        this.openLogStreamScanPanel(params);
+        return;
+      case "DeleteKey":
+        this.deleteKey(params);
+        return;
+    }
   }
 
   private async deleteKey({ tabId, key }: { tabId: string; key: string }) {
@@ -373,13 +344,16 @@ export class ScanPanel {
     const { rdh } = tabItem;
     const tableName = rdh.meta?.tableName;
     const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${tableName ?? "rdh"}.xlsx`;
+    const previousFolder = await ScanPanel.stateStorage?.getPreviousSaveFolder();
+    const baseUri = previousFolder ? Uri.file(previousFolder) : Uri.file("./");
     const uri = await vscode.window.showSaveDialog({
-      defaultUri: Uri.file(path.join("./", defaultFileName)),
+      defaultUri: Uri.joinPath(baseUri, defaultFileName),
       filters: { "*": ["xlsx"] },
     });
     if (!uri) {
       return;
     }
+    await ScanPanel.stateStorage?.setPreviousSaveFolder(path.dirname(uri.fsPath));
     const message = await createBookFromRdh(rdh, uri.fsPath);
     if (message) {
       showWindowErrorMessage(message);
@@ -462,7 +436,7 @@ export class ScanPanel {
           },
         },
       };
-      this._panel.webview.postMessage(msg);
+      this.panel.webview.postMessage(msg);
 
       if (
         execComparativeProcess &&
@@ -479,7 +453,7 @@ export class ScanPanel {
         componentName: "ScanPanel",
         value: {},
       };
-      this._panel.webview.postMessage(msg2);
+      this.panel.webview.postMessage(msg2);
     }
   }
 
@@ -521,7 +495,7 @@ export class ScanPanel {
       },
     };
 
-    this._panel.webview.postMessage(msg);
+    this.panel.webview.postMessage(msg);
 
     setTimeout(async () => {
       res.meta = {

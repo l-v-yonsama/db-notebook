@@ -1,6 +1,7 @@
 import { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr } from "@l-v-yonsama/rdh";
 import * as cp from "child_process";
+import * as dayjs from "dayjs";
 import { Entry } from "har-format";
 import * as iconv from "iconv-lite";
 import * as os from "os";
@@ -20,7 +21,6 @@ import {
   writeToResourceOnStorage,
 } from "../utilities/fsUtil";
 import { log } from "../utilities/logger";
-import dayjs = require("dayjs");
 import stringify = require("fast-json-stable-stringify");
 
 const PREFIX = "  [notebook/NodeKernel]";

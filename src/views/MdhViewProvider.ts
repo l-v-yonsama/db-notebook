@@ -7,6 +7,7 @@ import { resolveCodeLabel, ResultSetData, ResultSetDataBuilder } from "@l-v-yons
 import { createHash } from "crypto";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
+import * as path from "path";
 import { commands, env, ExtensionContext, ProgressLocation, Uri, window } from "vscode";
 import { BOTTOM_MDH_VIEWID, OPEN_DIFF_MDH_VIEWER, OPEN_MDH_VIEWER } from "../constant";
 import {
@@ -27,7 +28,6 @@ import { rdhListToText } from "../utilities/rdhToText";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";
-import path = require("path");
 
 const PREFIX = "[MdhView]";
 dayjs.extend(utc);
@@ -255,13 +255,16 @@ export class MdhViewProvider extends BaseViewProvider {
     const { title } = tabItem;
     const fileExtension = data.fileType === "excel" ? "xlsx" : "html";
     const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}.${fileExtension}`;
+    const previousFolder = await this.stateStorage.getPreviousSaveFolder();
+    const baseUri = previousFolder ? Uri.file(previousFolder) : Uri.file("./");
     const uri = await window.showSaveDialog({
-      defaultUri: Uri.file(path.join("./", defaultFileName)),
+      defaultUri: Uri.joinPath(baseUri, defaultFileName),
       filters: { "*": [fileExtension] },
     });
     if (!uri) {
       return;
     }
+    await this.stateStorage.setPreviousSaveFolder(path.dirname(uri.fsPath));
     const message =
       data.fileType === "excel"
         ? await createBookFromList(tabItem.list, uri.fsPath, {

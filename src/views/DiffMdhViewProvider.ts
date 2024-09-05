@@ -391,13 +391,16 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     const { title } = tabItem;
     const fileExtension = data.fileType === "excel" ? "xlsx" : "html";
     const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}_diff.${fileExtension}`;
+    const previousFolder = await this.stateStorage.getPreviousSaveFolder();
+    const baseUri = previousFolder ? Uri.file(previousFolder) : Uri.file("./");
     const uri = await window.showSaveDialog({
-      defaultUri: Uri.file(path.join("./", defaultFileName)),
+      defaultUri: Uri.joinPath(baseUri, defaultFileName),
       filters: { "*": [fileExtension] },
     });
     if (!uri) {
       return;
     }
+    await this.stateStorage.setPreviousSaveFolder(path.dirname(uri.fsPath));
     const message =
       data.fileType === "excel"
         ? await createBookFromDiffList(tabItem.list, uri.fsPath, {

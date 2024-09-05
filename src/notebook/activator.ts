@@ -1,4 +1,5 @@
 import { isRDSType, separateMultipleQueries } from "@l-v-yonsama/multi-platform-database-drivers";
+import * as dayjs from "dayjs";
 import * as path from "path";
 import sqlFormatter from "sql-formatter-plus";
 import {
@@ -60,7 +61,6 @@ import { StateStorage } from "../utilities/StateStorage";
 import { MainController } from "./controller";
 import { activateIntellisense } from "./intellisense";
 import { DBNotebookSerializer } from "./serializer";
-import dayjs = require("dayjs");
 
 const PREFIX = "[notebook/activator]";
 
@@ -211,13 +211,16 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       }
       const title = path.basename(notebookEditor?.notebook.uri.fsPath);
       const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}.html`;
+      const previousFolder = await stateStorage.getPreviousSaveFolder();
+      const baseUri = previousFolder ? Uri.file(previousFolder) : Uri.file("./");
       const uri = await window.showSaveDialog({
-        defaultUri: Uri.file(path.join("./", defaultFileName)),
+        defaultUri: Uri.joinPath(baseUri, defaultFileName),
         filters: { "*": ["html"] },
       });
       if (!uri) {
         return;
       }
+      await stateStorage.setPreviousSaveFolder(path.dirname(uri.fsPath));
       const message = await createHtmlFromNotebook(notebookEditor.notebook, uri.fsPath);
       if (message) {
         showWindowErrorMessage(message);

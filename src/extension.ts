@@ -65,6 +65,7 @@ export async function activate(context: ExtensionContext) {
   ScanPanel.setStateStorage(stateStorage);
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
+  HarFilePanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);

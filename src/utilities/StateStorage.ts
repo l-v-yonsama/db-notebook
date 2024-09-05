@@ -29,6 +29,7 @@ const PREFIX = "[StateStorage]";
 
 export const STORAGE_KEY = `${EXTENSION_NAME}-settings`;
 export const SQL_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
+export const PREV_SAVE_FOLDER = `${EXTENSION_NAME}-previous-save-folder`;
 
 type DbResInfo = {
   isInProgress: boolean;
@@ -200,6 +201,14 @@ export class StateStorage {
   }
 
   constructor(private context: ExtensionContext, private secretStorage: SecretStorage) {}
+
+  async getPreviousSaveFolder(): Promise<string> {
+    return this.context.globalState.get<string>(PREV_SAVE_FOLDER, "");
+  }
+
+  async setPreviousSaveFolder(folderPath: string): Promise<void> {
+    this.context.globalState.update(PREV_SAVE_FOLDER, folderPath);
+  }
 
   async getSQLHistoryList(): Promise<SQLHistory[]> {
     return this.context.globalState.get<SQLHistory[]>(SQL_HISTORY_STORAGE_KEY, []);

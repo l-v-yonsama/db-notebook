@@ -15,6 +15,7 @@ import {
 } from "@l-v-yonsama/rdh";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
+import * as path from "path";
 import { commands, ExtensionContext, ProgressLocation, Uri, window } from "vscode";
 import { BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID } from "../constant";
 import { ActionCommand, OutputParams } from "../shared/ActionParams";
@@ -25,7 +26,6 @@ import { createBookFromList } from "../utilities/excelGenerator";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";
-import path = require("path");
 
 const PREFIX = "[CountRecordView]";
 dayjs.extend(utc);
@@ -124,13 +124,16 @@ export class CountRecordViewProvider extends BaseViewProvider {
       return;
     }
     const defaultFileName = `${dayjs().format("MMDD_HHmm")}_count_for_tables.xlsx`;
+    const previousFolder = await this.stateStorage.getPreviousSaveFolder();
+    const baseUri = previousFolder ? Uri.file(previousFolder) : Uri.file("./");
     const uri = await window.showSaveDialog({
-      defaultUri: Uri.file(path.join("./", defaultFileName)),
+      defaultUri: Uri.joinPath(baseUri, defaultFileName),
       filters: { "*": ["xlsx"] },
     });
     if (!uri) {
       return;
     }
+    await this.stateStorage.setPreviousSaveFolder(path.dirname(uri.fsPath));
     const message = await createBookFromList([this.rdh], uri.fsPath, {
       rdh: {
         outputAllOnOneSheet: true,

@@ -17,12 +17,12 @@ import {
   isDateTimeOrDate,
   toDate,
 } from "@l-v-yonsama/rdh";
+import * as dayjs from "dayjs";
 import { EnumValues } from "enum-values";
 import * as Excel from "exceljs";
 import { Fill } from "exceljs";
 import * as os from "os";
 import { getResultsetConfig } from "./configUtil";
-import dayjs = require("dayjs");
 
 // const FONT_NAME_Arial ='Arial';
 const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";

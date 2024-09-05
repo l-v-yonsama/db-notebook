@@ -7,6 +7,7 @@ import {
 import { ResultSetData } from "@l-v-yonsama/rdh";
 import * as dayjs from "dayjs";
 import * as utc from "dayjs/plugin/utc";
+import * as path from "path";
 import { commands, ExtensionContext, Uri, window } from "vscode";
 import { BOTTOM_TOOLS_VIEWID } from "../constant";
 import { ActionCommand, OutputParams } from "../shared/ActionParams";
@@ -18,7 +19,6 @@ import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";
-import path = require("path");
 
 const PREFIX = "[ToolsView]";
 dayjs.extend(utc);
@@ -160,13 +160,16 @@ export class ToolsViewProvider extends BaseViewProvider {
     }
     const fileExtension = data.fileType === "excel" ? "xlsx" : "html";
     const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${this.viewMode}.${fileExtension}`;
+    const previousFolder = await this.stateStorage.getPreviousSaveFolder();
+    const baseUri = previousFolder ? Uri.file(previousFolder) : Uri.file("./");
     const uri = await window.showSaveDialog({
-      defaultUri: Uri.file(path.join("./", defaultFileName)),
+      defaultUri: Uri.joinPath(baseUri, defaultFileName),
       filters: { "*": [fileExtension] },
     });
     if (!uri) {
       return;
     }
+    await this.stateStorage.setPreviousSaveFolder(path.dirname(uri.fsPath));
     const message =
       data.fileType === "excel"
         ? await createBookFromList([this.rdh], uri.fsPath, {

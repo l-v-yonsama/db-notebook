@@ -7,8 +7,10 @@ import {
   ResultSetData,
   ResultSetDataBuilder,
 } from "@l-v-yonsama/rdh";
+import * as dayjs from "dayjs";
 import { promises as fs } from "fs";
 import { Cookie, Header, Response } from "har-format";
+import * as path from "path";
 import {
   NotebookCell,
   NotebookCellKind,
@@ -28,8 +30,6 @@ import { getOutputConfig, getToStringParamByConfig } from "./configUtil";
 import { writeToResourceOnStorage } from "./fsUtil";
 import { createResponseBodyMarkdown } from "./httpUtil";
 import { logError } from "./logger";
-import dayjs = require("dayjs");
-import path = require("path");
 const PREFIX = "[utilities/htmlGenerator]";
 
 type CreateHtmlOptionsParams = {

@@ -4,7 +4,9 @@ import { Disposable, Uri, ViewColumn, Webview, WebviewPanel, window } from "vsco
 import { prettyFileSize, prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
 import { createRdhKey, GeneralColumnType, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
+import * as dayjs from "dayjs";
 import type { Har } from "har-format";
+import * as path from "path";
 import { ActionCommand, OutputParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { HarFilePanelEventData, HarFileTabItem } from "../shared/MessageEventData";
@@ -14,10 +16,9 @@ import { getIconPath, readResource } from "../utilities/fsUtil";
 import { createHtmlFromHarItem } from "../utilities/htmlGenerator";
 import { toNodeRunAxiosEvent } from "../utilities/httpUtil";
 import { log } from "../utilities/logger";
+import { StateStorage } from "../utilities/StateStorage";
 import { createWebviewContent } from "../utilities/webviewUtil";
 import { HttpEventPanel } from "./HttpEventPanel";
-import dayjs = require("dayjs");
-import path = require("path");
 
 const PREFIX = "[HarFilePanel]";
 
@@ -25,6 +26,7 @@ const componentName: ComponentName = "HarFilePanel";
 
 export class HarFilePanel {
   public static currentPanel: HarFilePanel | undefined;
+  private static stateStorage: StateStorage | undefined;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
   private items: HarFileTabItem[] = [];
@@ -43,6 +45,10 @@ export class HarFilePanel {
 
   public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     HarFilePanel.currentPanel = new HarFilePanel(panel, extensionUri);
+  }
+
+  static setStateStorage(storage: StateStorage) {
+    HarFilePanel.stateStorage = storage;
   }
 
   public static render(extensionUri: Uri, harUri: Uri) {
@@ -219,13 +225,16 @@ export class HarFilePanel {
     const { title, res, rdh } = tabItem;
     const fileExtension = "html";
     const defaultFileName = `${dayjs().format("MMDD_HHmm")}_${title}.${fileExtension}`;
+    const previousFolder = await HarFilePanel.stateStorage?.getPreviousSaveFolder();
+    const baseUri = previousFolder ? Uri.file(previousFolder) : Uri.file("./");
     const uri = await window.showSaveDialog({
-      defaultUri: Uri.file(path.join("./", defaultFileName)),
+      defaultUri: Uri.joinPath(baseUri, defaultFileName),
       filters: { "*": [fileExtension] },
     });
     if (!uri) {
       return;
     }
+    await HarFilePanel.stateStorage?.setPreviousSaveFolder(path.dirname(uri.fsPath));
     const message = await createHtmlFromHarItem({ title, res, rdh }, uri.fsPath);
     if (message) {
       showWindowErrorMessage(message);
