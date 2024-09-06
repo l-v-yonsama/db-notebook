@@ -1,12 +1,11 @@
-import * as vscode from "vscode";
-import { Disposable, Uri, ViewColumn, Webview, WebviewPanel, window } from "vscode";
-
 import { prettyFileSize, prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
 import { createRdhKey, GeneralColumnType, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
 import * as dayjs from "dayjs";
 import type { Har } from "har-format";
 import * as path from "path";
+import * as vscode from "vscode";
+import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand, OutputParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { HarFilePanelEventData, HarFileTabItem } from "../shared/MessageEventData";
@@ -15,32 +14,19 @@ import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getIconPath, readResource } from "../utilities/fsUtil";
 import { createHtmlFromHarItem } from "../utilities/htmlGenerator";
 import { toNodeRunAxiosEvent } from "../utilities/httpUtil";
-import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
-import { createWebviewContent } from "../utilities/webviewUtil";
+import { BasePanel } from "./BasePanel";
 import { HttpEventPanel } from "./HttpEventPanel";
 
 const PREFIX = "[HarFilePanel]";
 
-const componentName: ComponentName = "HarFilePanel";
-
-export class HarFilePanel {
+export class HarFilePanel extends BasePanel {
   public static currentPanel: HarFilePanel | undefined;
   private static stateStorage: StateStorage | undefined;
-  private readonly _panel: WebviewPanel;
-  private _disposables: Disposable[] = [];
   private items: HarFileTabItem[] = [];
 
-  private constructor(panel: WebviewPanel, private extensionUri: Uri) {
-    this._panel = panel;
-
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(
-      this._panel.webview,
-      this.extensionUri,
-      componentName
-    );
-    this._setWebviewMessageListener(this._panel.webview);
+  private constructor(panel: WebviewPanel, extensionUri: Uri) {
+    super(panel, extensionUri);
   }
 
   public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
@@ -53,7 +39,7 @@ export class HarFilePanel {
 
   public static render(extensionUri: Uri, harUri: Uri) {
     if (HarFilePanel.currentPanel) {
-      HarFilePanel.currentPanel._panel.reveal(ViewColumn.One);
+      HarFilePanel.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel("HarFileType", "HarFile", ViewColumn.One, {
@@ -69,6 +55,10 @@ export class HarFilePanel {
     }
     // vscode.window.activeColorTheme.kind===ColorThemeKind.Dark
     HarFilePanel.currentPanel.renderSub(harUri);
+  }
+
+  getComponentName(): ComponentName {
+    return "HarFilePanel";
   }
 
   private createTabItem(title: string, res: Har): HarFileTabItem {
@@ -133,7 +123,7 @@ export class HarFilePanel {
           },
         },
       };
-      this._panel.webview.postMessage(msg);
+      this.panel.webview.postMessage(msg);
       return item;
     }
 
@@ -147,69 +137,52 @@ export class HarFilePanel {
         addTabItem: item,
       },
     };
-    this._panel.webview.postMessage(msg2);
+    this.panel.webview.postMessage(msg2);
     return item;
   }
 
-  public dispose() {
-    log(`${PREFIX} dispose`);
-
+  public preDispose(): void {
     HarFilePanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
-    }
   }
 
-  private _setWebviewMessageListener(webview: Webview) {
-    webview.onDidReceiveMessage(
-      async (message: ActionCommand) => {
-        const { command, params } = message;
-        log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
-        switch (command) {
-          case "closeTab":
-            {
-              const { tabId } = params;
-              const idx = this.items.findIndex((it) => it.tabId === tabId);
-              if (idx >= 0) {
-                this.items.splice(idx, 1);
-              }
-              if (this.items.length === 0) {
-                this.dispose();
-              }
-            }
-            break;
-          case "selectTab":
-            {
-              hideStatusMessage();
-            }
-            break;
-          case "selectInnerTab":
-            {
-              const { tabId, innerIndex } = params;
-              const tabItem = this.getTabItemById(tabId);
-              if (!tabItem) {
-                return;
-              }
-
-              const entry = tabItem.res.log.entries[innerIndex];
-              const axiosEvent = toNodeRunAxiosEvent(entry);
-
-              HttpEventPanel.render(this.extensionUri, axiosEvent.title, axiosEvent);
-            }
-            break;
-          case "output":
-            this.output(params);
-            return;
+  protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
+    const { command, params } = message;
+    switch (command) {
+      case "closeTab":
+        {
+          const { tabId } = params;
+          const idx = this.items.findIndex((it) => it.tabId === tabId);
+          if (idx >= 0) {
+            this.items.splice(idx, 1);
+          }
+          if (this.items.length === 0) {
+            this.dispose();
+          }
         }
-      },
-      undefined,
-      this._disposables
-    );
+        break;
+      case "selectTab":
+        {
+          hideStatusMessage();
+        }
+        break;
+      case "selectInnerTab":
+        {
+          const { tabId, innerIndex } = params;
+          const tabItem = this.getTabItemById(tabId);
+          if (!tabItem) {
+            return;
+          }
+
+          const entry = tabItem.res.log.entries[innerIndex];
+          const axiosEvent = toNodeRunAxiosEvent(entry);
+
+          HttpEventPanel.render(this.extensionUri, axiosEvent.title, axiosEvent);
+        }
+        break;
+      case "output":
+        this.output(params);
+        return;
+    }
   }
 
   private getTabItemById(tabId: string): HarFileTabItem | undefined {

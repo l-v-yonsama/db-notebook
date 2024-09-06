@@ -96,7 +96,6 @@ export class ERDiagramSettingsPanel extends BasePanel {
 
   protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
     const { command, params } = message;
-    // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
     switch (command) {
       case "cancel":
         this.dispose();

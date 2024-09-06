@@ -1,41 +1,27 @@
-import * as vscode from "vscode";
-import { Disposable, Uri, ViewColumn, Webview, WebviewPanel, window } from "vscode";
-
-import { ActionCommand, SaveCsvOptionParams } from "../shared/ActionParams";
-import { ComponentName } from "../shared/ComponentName";
-import { CsvParseSettingPanelEventData } from "../shared/MessageEventData";
-import { getIconPath } from "../utilities/fsUtil";
-import { log } from "../utilities/logger";
-import { createWebviewContent } from "../utilities/webviewUtil";
-
 import { CsvParseOptions, parseCsvFromFile } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { basename } from "path";
+import * as vscode from "vscode";
+import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { OPEN_MDH_VIEWER } from "../constant";
+import { ActionCommand, SaveCsvOptionParams } from "../shared/ActionParams";
+import { ComponentName } from "../shared/ComponentName";
+import { CsvParseSettingPanelEventData } from "../shared/MessageEventData";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getIconPath } from "../utilities/fsUtil";
+import { log } from "../utilities/logger";
+import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[CsvParseSettingPanel]";
 
-const componentName: ComponentName = "CsvParseSettingPanel";
-
-export class CsvParseSettingPanel {
+export class CsvParseSettingPanel extends BasePanel {
   public static currentPanel: CsvParseSettingPanel | undefined;
-  private readonly _panel: WebviewPanel;
-  private _disposables: Disposable[] = [];
   private csvUri: Uri | undefined;
   private csvOptions: CsvParseOptions | undefined;
 
-  private constructor(panel: WebviewPanel, private extensionUri: Uri) {
-    this._panel = panel;
-
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-    this._panel.webview.html = createWebviewContent(
-      this._panel.webview,
-      this.extensionUri,
-      componentName
-    );
-    this._setWebviewMessageListener(this._panel.webview);
+  private constructor(panel: WebviewPanel, extensionUri: Uri) {
+    super(panel, extensionUri);
   }
 
   public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
@@ -44,7 +30,7 @@ export class CsvParseSettingPanel {
 
   public static render(extensionUri: Uri, csvUri: Uri) {
     if (CsvParseSettingPanel.currentPanel) {
-      CsvParseSettingPanel.currentPanel._panel.reveal(ViewColumn.Two);
+      CsvParseSettingPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.Two);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
@@ -69,6 +55,10 @@ export class CsvParseSettingPanel {
     CsvParseSettingPanel.currentPanel.renderSub();
   }
 
+  getComponentName(): ComponentName {
+    return "CsvParseSettingPanel";
+  }
+
   async renderSub() {
     if (!this.csvUri) {
       return;
@@ -89,7 +79,7 @@ export class CsvParseSettingPanel {
           rdh: rdb.build(),
         },
       };
-      this._panel.webview.postMessage(msg);
+      this.panel.webview.postMessage(msg);
     } catch (e) {
       const msg: CsvParseSettingPanelEventData = {
         command: "initialize",
@@ -103,67 +93,50 @@ export class CsvParseSettingPanel {
           message: (e as Error).message,
         },
       };
-      this._panel.webview.postMessage(msg);
+      this.panel.webview.postMessage(msg);
     }
   }
 
-  public dispose() {
-    log(`${PREFIX} dispose`);
-
+  public preDispose(): void {
     CsvParseSettingPanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
-    }
   }
 
-  private _setWebviewMessageListener(webview: Webview) {
-    webview.onDidReceiveMessage(
-      async (message: ActionCommand) => {
-        const { command, params } = message;
-        log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
-        switch (command) {
-          case "cancel":
-            this.dispose();
+  protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
+    const { command, params } = message;
+    switch (command) {
+      case "cancel":
+        this.dispose();
+        return;
+      case "ok":
+        {
+          if (!CsvParseSettingPanel.currentPanel) {
             return;
-          case "ok":
-            {
-              if (!CsvParseSettingPanel.currentPanel) {
-                return;
-              }
-              const { preview, ...options } = params as SaveCsvOptionParams;
+          }
+          const { preview, ...options } = params as SaveCsvOptionParams;
 
-              if (preview) {
-                CsvParseSettingPanel.currentPanel.csvOptions = {
-                  toLine: options.fromLine === undefined ? 10 : options.fromLine + 10,
-                  ...options,
-                };
-                await this.renderSub();
-                return;
-              }
-
-              if (!this.csvUri) {
-                return;
-              }
-
-              const { toLine, ...others } = this.csvOptions!;
-              const rdb = await this.parseCsv(this.csvUri.fsPath, { ...others });
-              const title = basename(this.csvUri.fsPath);
-
-              const commandParam: MdhViewParams = { title, list: [rdb.build()] };
-              vscode.commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
-            }
-            this.dispose();
+          if (preview) {
+            CsvParseSettingPanel.currentPanel.csvOptions = {
+              toLine: options.fromLine === undefined ? 10 : options.fromLine + 10,
+              ...options,
+            };
+            await this.renderSub();
             return;
+          }
+
+          if (!this.csvUri) {
+            return;
+          }
+
+          const { toLine, ...others } = this.csvOptions!;
+          const rdb = await this.parseCsv(this.csvUri.fsPath, { ...others });
+          const title = basename(this.csvUri.fsPath);
+
+          const commandParam: MdhViewParams = { title, list: [rdb.build()] };
+          vscode.commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
         }
-      },
-      undefined,
-      this._disposables
-    );
+        this.dispose();
+        return;
+    }
   }
 
   private async parseCsv(
