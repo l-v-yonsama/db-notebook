@@ -20,6 +20,14 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: true };
   }
 
+  getQueryTimeoutMs(): ElementSetting {
+    return { visible: true, label: "Query timeout(ms)", defaultValue: undefined };
+  }
+
+  getLockWaitTimeoutMs(): ElementSetting {
+    return { visible: true, label: "Lock wait timeout(ms)", defaultValue: undefined };
+  }
+
   getIamClientId(): ElementSetting {
     return { visible: false };
   }
@@ -137,6 +145,13 @@ export class SQLiteElementSetting extends RdsElementSetting {
   getTimezone(): ElementSetting {
     return { visible: false };
   }
+  getQueryTimeoutMs(): ElementSetting {
+    return { visible: false };
+  }
+
+  getLockWaitTimeoutMs(): ElementSetting {
+    return { visible: false };
+  }
   accept(setting: ConnectionSetting): boolean {
     const { name, database } = setting;
     if (name === "") {
@@ -166,6 +181,9 @@ export class PostgresElementSetting extends RdsElementSetting {
       visible: true,
       defaultValue: 5432,
     };
+  }
+  getQueryTimeoutMs(): ElementSetting {
+    return { visible: true, label: "Statement timeout(ms)", defaultValue: undefined };
   }
   getSsl(): ElementSetting {
     return {

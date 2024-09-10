@@ -1,21 +1,7 @@
 <template>
-  <vscode-text-field
-    class="child"
-    :class="{ transparent, verr: isError }"
-    :value="modelValue"
-    @input="handleOnInput"
-    @focus="handleOnFocus"
-    @mouseout="handleOnMouseOut"
-    :type="type"
-    :placeholder="placeholderText"
-    :disabled="disabled"
-    :maxlength="maxlength"
-    :min="min"
-    :max="max"
-    :size="size"
-    :readonly="readonly"
-    :title="title"
-  >
+  <vscode-text-field class="child" :class="{ transparent, verr: isError }" :value="modelValue" @input="handleOnInput"
+    @focus="handleOnFocus" @mouseout="handleOnMouseOut" :type="type" :placeholder="placeholderText" :disabled="disabled"
+    :maxlength="maxlength" :min="min" :max="max" :size="size" :readonly="readonly" :title="title">
     <span v-if="isError" slot="end" class="codicon codicon-error"></span>
   </vscode-text-field>
 </template>
@@ -69,7 +55,11 @@ watch(
       }
     }
     isError.value = error;
-    placeholderText.value = props.placeholder ?? error ? "Input required" : "";
+    if (props.placeholder) {
+      placeholderText.value = props.placeholder;
+    } else {
+      placeholderText.value = error ? "Input required" : "";
+    }
   },
   {
     immediate: true,
@@ -97,6 +87,7 @@ function handleOnMouseOut(event: any) {
 vscode-text-field[transparent]::part(root) {
   background-color: transparent !important;
 }
+
 span.codicon-error {
   color: var(--vscode-editorError-foreground) !important;
 }
