@@ -7,6 +7,10 @@ export abstract class BaseElementSetting {
 
   abstract getTimezone(): ElementSetting;
 
+  abstract getQueryTimeoutMs(): ElementSetting;
+
+  abstract getLockWaitTimeoutMs(): ElementSetting;
+
   abstract getDatabase(): ElementSetting;
 
   abstract getIamClientId(): ElementSetting;

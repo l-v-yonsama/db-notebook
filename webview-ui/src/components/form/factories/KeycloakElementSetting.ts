@@ -20,6 +20,14 @@ export class KeycloakElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getQueryTimeoutMs(): ElementSetting {
+    return { visible: false };
+  }
+
+  getLockWaitTimeoutMs(): ElementSetting {
+    return { visible: false };
+  }
+
   getDatabase(): ElementSetting {
     return {
       visible: true,
