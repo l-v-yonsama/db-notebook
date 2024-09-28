@@ -1,6 +1,7 @@
 import type {
   ConnectionSetting,
   DBType,
+  DbDynamoTable,
   DbResource,
   DbSchema,
   DbTable,
@@ -268,7 +269,7 @@ export type ViewConditionPanelEventData = BaseMessageEventData<
   "ViewConditionPanel",
   {
     initialize?: {
-      tableRes: DbTable;
+      tableRes: DbTable | DbDynamoTable;
       limit: number;
       numOfRows: number;
       previewSql: string;

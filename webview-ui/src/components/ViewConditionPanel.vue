@@ -12,6 +12,7 @@ import VsCodeTextField from "./base/VsCodeTextField.vue";
 import RDHViewer from "./RDHViewer.vue";
 import TopLevelConditionVue from "./TopLevelCondition.vue";
 
+import { GeneralColumnType } from "@l-v-yonsama/rdh";
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
@@ -52,6 +53,35 @@ let limitMax = 100000;
 const visibleCondition = ref(true);
 const tableNameWithComment = ref("");
 
+const parseDynamoAttrType = (typeString: string): GeneralColumnType => {
+  if (typeString == null || typeString === '') {
+    return GeneralColumnType.UNKNOWN;
+  }
+  if ('S' === typeString) {
+    return GeneralColumnType.TEXT;
+  } else if ('N' === typeString) {
+    return GeneralColumnType.NUMERIC;
+  } else if ('B' === typeString) {
+    return GeneralColumnType.BINARY;
+  } else if (
+    'SS' === typeString ||
+    'NS' === typeString ||
+    'BS' === typeString
+  ) {
+    return GeneralColumnType.SET;
+  } else if ('M' === typeString) {
+    return GeneralColumnType.JSON;
+  } else if ('L' === typeString) {
+    return GeneralColumnType.ARRAY;
+  } else if ('NULL' === typeString) {
+    return GeneralColumnType.NULL;
+  } else if ('BOOL' === typeString) {
+    return GeneralColumnType.BOOLEAN;
+  }
+  return GeneralColumnType.UNKNOWN;
+};
+
+
 const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void => {
   if (v === undefined) {
     return;
@@ -61,33 +91,53 @@ const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void
   numOfRows.value = v.numOfRows;
   limitMax = Math.max(100000, v.numOfRows);
   previewSql.value = v.previewSql;
-  if (v.tableRes.comment) {
-    tableNameWithComment.value = `${v.tableRes.name} (${v.tableRes.comment})`;
-  } else {
-    tableNameWithComment.value = v.tableRes.name;
-  }
+  let cols: DropdownItem[] = [];
 
-  const items = v.tableRes.children.map((it) => {
-    let label = it.name;
-    if (it.comment) {
-      label += " " + it.comment;
+  if (v.tableRes.resourceType === 'Table') {
+    if (v.tableRes.comment) {
+      tableNameWithComment.value = `${v.tableRes.name} (${v.tableRes.comment})`;
+    } else {
+      tableNameWithComment.value = v.tableRes.name;
     }
 
-    return {
-      label,
-      value: it.name,
-      meta: {
-        colType: it.colType,
-      },
-    };
-  }) as DropdownItem[];
-  items.unshift({
+    cols = v.tableRes.children.map((it) => {
+      let label = it.name;
+      if (it.comment) {
+        label += " " + it.comment;
+      }
+
+      return {
+        label,
+        value: it.name,
+        meta: {
+          colType: (it as any).colType,
+        },
+      };
+    }) as DropdownItem[];
+  } else {
+    tableNameWithComment.value = v.tableRes.name;
+    cols = v.tableRes.children.map((it) => {
+      let label = it.name;
+      if (it.comment) {
+        label += " " + it.comment;
+      }
+
+      return {
+        label,
+        value: it.name,
+        meta: {
+          colType: parseDynamoAttrType((it as any).attrType),
+        },
+      };
+    }) as DropdownItem[];
+  }
+  cols.unshift({
     label: "-",
     value: "",
     meta: {},
   });
   columnItems.value.splice(0, columnItems.value.length);
-  items.forEach((it) => columnItems.value.push(it));
+  cols.forEach((it) => columnItems.value.push(it));
 };
 
 const columnItems = ref([] as DropdownItem[]);
@@ -200,45 +250,25 @@ defineExpose({
         <label for="numOfRows">Current rows:</label>
         <span id="numOfRows">{{ numOfRows }}</span>
         <label v-if="visibleSettingsMode" for="limit">Limit:</label>
-        <VsCodeTextField
-          id="limit"
-          v-if="visibleSettingsMode"
-          v-model="limit"
-          :min="0"
-          :max="limitMax"
-          style="width: 100px"
-          type="number"
-          title="number of rows returned"
-          placeholder="number of rows returned"
-          @change="updateTextDocument()"
-        >
+        <VsCodeTextField id="limit" v-if="visibleSettingsMode" v-model="limit" :min="0" :max="limitMax"
+          style="width: 100px" type="number" title="number of rows returned" placeholder="number of rows returned"
+          @change="updateTextDocument()">
         </VsCodeTextField>
       </div>
       <div class="tool-right">
-        <VsCodeButton
-          @click="cancel"
-          appearance="secondary"
-          title="Cancel"
-          style="margin-right: 5px"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton
-          v-if="visibleSettingsMode"
-          @click="ok(true, false)"
-          appearance="secondary"
-          title="Retlieve in editable mode"
-          style="margin-right: 5px"
-          ><fa icon="pencil" />Retlieve in editable mode</VsCodeButton
-        >
-        <VsCodeButton v-if="visibleSettingsMode" @click="ok(false, false)" title="Retlieve"
-          ><fa icon="check" />Retlieve</VsCodeButton
-        >
-        <VsCodeButton
-          v-if="!visibleSettingsMode"
-          @click="saveValues()"
-          title="Save changes to table"
-          ><fa icon="save" />Save changes to table</VsCodeButton
-        >
+        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
+          <fa icon="times" />Cancel
+        </VsCodeButton>
+        <VsCodeButton v-if="visibleSettingsMode" @click="ok(true, false)" appearance="secondary"
+          title="Retlieve in editable mode" style="margin-right: 5px">
+          <fa icon="pencil" />Retlieve in editable mode
+        </VsCodeButton>
+        <VsCodeButton v-if="visibleSettingsMode" @click="ok(false, false)" title="Retlieve">
+          <fa icon="check" />Retlieve
+        </VsCodeButton>
+        <VsCodeButton v-if="!visibleSettingsMode" @click="saveValues()" title="Save changes to table">
+          <fa icon="save" />Save changes to table
+        </VsCodeButton>
       </div>
     </div>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
@@ -248,21 +278,12 @@ defineExpose({
             <legend>
               <span style="margin-right: 30px">Conditions</span>
 
-              <vscode-checkbox
-                :checked="specifyCondition === true"
-                @change="($e:any) => handleSpecifyConditionOnChange($e.target.checked)"
-                style="margin-right: auto"
-                >Specify</vscode-checkbox
-              >
+              <vscode-checkbox :checked="specifyCondition === true"
+                @change="($e: any) => handleSpecifyConditionOnChange($e.target.checked)"
+                style="margin-right: auto">Specify</vscode-checkbox>
             </legend>
-            <TopLevelConditionVue
-              v-if="visibleCondition && specifyCondition"
-              v-model="editorItem.conditions"
-              :columnItems="columnItems"
-              :rule-base-mode="false"
-              :lv="0"
-              @change="updateTextDocument()"
-            />
+            <TopLevelConditionVue v-if="visibleCondition && specifyCondition" v-model="editorItem.conditions"
+              :columnItems="columnItems" :rule-base-mode="false" :lv="0" @change="updateTextDocument()" />
           </fieldset>
         </div>
         <fieldset class="conditions">
@@ -271,12 +292,7 @@ defineExpose({
         </fieldset>
       </div>
       <div v-else class="spread">
-        <RDHViewer
-          :rdh="rdhForUpdate"
-          :width="sectionWidth"
-          :height="sectionHeight"
-          :ref="setRdhViewerRef"
-        />
+        <RDHViewer :rdh="rdhForUpdate" :width="sectionWidth" :height="sectionHeight" :ref="setRdhViewerRef" />
       </div>
     </div>
   </section>
@@ -289,7 +305,7 @@ section.view-conditional-root {
   display: flex;
   flex-direction: column;
 
-  & > div {
+  &>div {
     margin: 5px;
 
     & .toolbar {
@@ -300,6 +316,7 @@ section.view-conditional-root {
           margin-left: 25px;
           margin-right: 5px;
         }
+
         span {
           text-overflow: ellipsis;
           overflow: hidden;
@@ -315,6 +332,7 @@ section.view-conditional-root {
       fieldset.conditions {
         margin-top: 15px;
       }
+
       p.preview {
         margin: 5px;
         white-space: pre-wrap;

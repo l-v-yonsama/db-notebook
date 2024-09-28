@@ -24,8 +24,10 @@ export const setSqlStatementCompletionItems = (
   example = "DELETE FROM ${1} \nWHERE\n $2";
   list.push(createCompletionItem({ label: "delete", example }));
 
-  example = "TRUNCATE TABLE ${1}";
-  list.push(createCompletionItem({ label: "truncate", example }));
+  if (dbType !== "Aws") {
+    example = "TRUNCATE TABLE ${1}";
+    list.push(createCompletionItem({ label: "truncate", example }));
+  }
 };
 
 const createCompletionItem = ({

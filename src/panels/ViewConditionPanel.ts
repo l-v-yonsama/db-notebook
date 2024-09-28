@@ -1,5 +1,6 @@
 import {
   DBDriverResolver,
+  DbDynamoTable,
   DbTable,
   RDSBaseDriver,
   toDeleteStatement,
@@ -28,7 +29,7 @@ const PREFIX = "[ViewConditionPanel]";
 export class ViewConditionPanel extends BasePanel {
   public static currentPanel: ViewConditionPanel | undefined;
   private static stateStorage?: StateStorage;
-  private tableRes: DbTable | undefined;
+  private tableRes: DbTable | DbDynamoTable | undefined;
   private numOfRows = 0;
   private limit = getDatabaseConfig().limitRows;
   private rdhForUpdate?: ResultSetData;
@@ -45,7 +46,7 @@ export class ViewConditionPanel extends BasePanel {
     ViewConditionPanel.stateStorage = storage;
   }
 
-  public static render(extensionUri: Uri, tableRes: DbTable, numOfRows: number) {
+  public static render(extensionUri: Uri, tableRes: DbTable | DbDynamoTable, numOfRows: number) {
     if (ViewConditionPanel.currentPanel) {
       ViewConditionPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     } else {
@@ -112,7 +113,7 @@ export class ViewConditionPanel extends BasePanel {
     if (!setting) {
       return "";
     }
-    const driver = DBDriverResolver.getInstance().createRDSDriver(setting);
+    const driver = DBDriverResolver.getInstance().createSQLSupportDriver(setting);
     const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
     const isLimitAsTop = driver.isLimitAsTop();
@@ -208,7 +209,7 @@ export class ViewConditionPanel extends BasePanel {
           });
 
           if (ok && result) {
-            const driver = DBDriverResolver.getInstance().createRDSDriver(setting);
+            const driver = DBDriverResolver.getInstance().createSQLSupportDriver(setting);
 
             const { query, binds } = toViewDataQuery({
               tableRes,

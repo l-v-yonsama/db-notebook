@@ -1,4 +1,5 @@
 import {
+  AwsDatabase,
   DBType,
   ProposalKind,
   RdsDatabase,
@@ -40,28 +41,32 @@ import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
 const PREFIX = "[notebook/intellisense]";
 
 const throttleFunc = throttle(300, async (connectionName: string): Promise<void> => {
-  // log(`  ${PREFIX} start throttleFunc`);
+  log(`  ${PREFIX} start throttleFunc`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
-    // log(`  ${PREFIX} end throttleFunc. No connection setting.`);
+    log(`  ${PREFIX} end throttleFunc. No connection setting.`);
     return;
   }
   const { ok, result } = await storage.loadResource(connectionName, false, false);
   if (ok && result) {
-    if (result.db[0] instanceof RdsDatabase) {
-      rdsDatabase = result.db[0];
+    const db0 = result.db[0];
+    if (db0 instanceof RdsDatabase) {
+      sqlDatabase = db0 as RdsDatabase;
+    } else {
+      const dbs = result.db as AwsDatabase[];
+      sqlDatabase = dbs.find((it) => it.serviceType === "DynamoDB");
     }
     dbType = result.dbType;
   }
-  // log(`  ${PREFIX} end throttleFunc with rdsDatabase`);
+  log(`  ${PREFIX} end throttleFunc with sqlDatabase`);
 });
 
 export async function setupDbResource(connectionName: string) {
-  // log(`${PREFIX} setupDbResource`);
+  log(`${PREFIX} setupDbResource`);
   throttleFunc(connectionName);
 }
 
 let storage: StateStorage;
-let rdsDatabase: RdsDatabase | undefined;
+let sqlDatabase: RdsDatabase | AwsDatabase | undefined;
 let dbType: DBType | undefined;
 
 export function activateIntellisense(context: ExtensionContext, stateStorage: StateStorage) {
@@ -149,7 +154,7 @@ function setActivateDecorator(context: ExtensionContext) {
 
 function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookCell | undefined) {
   // log(`${PREFIX} start updateDecorations`);
-  if (cell === undefined || rdsDatabase === undefined || activeEditor === undefined) {
+  if (cell === undefined || sqlDatabase === undefined || activeEditor === undefined) {
     return;
   }
 
@@ -164,7 +169,7 @@ function updateDecorations(activeEditor: TextEditor | undefined, cell: NotebookC
     const sql = document.getText();
     const smallNumbers: DecorationOptions[] = [];
 
-    const resList = getResourcePositions({ sql, db: rdsDatabase });
+    const resList = getResourcePositions({ sql, db: sqlDatabase });
     resList
       .filter((it) => it.comment)
       .forEach((res) => {
@@ -365,8 +370,8 @@ function createSQLIntellisense() {
           //   `${PREFIX} linePrefix:[${linePrefix}] keyword:[${keyword}] parentWord:[${parentWord}]`
           // );
 
-          if (rdsDatabase) {
-            getProposals({ db: rdsDatabase, sql, keyword, lastChar, parentWord }).forEach((s) => {
+          if (sqlDatabase) {
+            getProposals({ db: sqlDatabase, sql, keyword, lastChar, parentWord }).forEach((s) => {
               const item = new CompletionItem({ label: s.label, description: "DB resources" });
               item.kind =
                 s.kind === ProposalKind.ReservedWord

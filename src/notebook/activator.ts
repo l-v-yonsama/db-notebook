@@ -1,4 +1,8 @@
-import { isRDSType, separateMultipleQueries } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  isPartiQLType,
+  isRDSType,
+  separateMultipleQueries,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import * as dayjs from "dayjs";
 import * as path from "path";
 import sqlFormatter from "sql-formatter-plus";
@@ -175,7 +179,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         }
         const conSettings = await stateStorage.getConnectionSettingList();
         const items = conSettings
-          .filter((it) => isRDSType(it.dbType))
+          .filter((it) => isRDSType(it.dbType) || isPartiQLType(it.dbType, it.awsSetting))
           .map((it) => ({
             label: it.name,
             description: it.dbType,
@@ -242,7 +246,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       const conSettings = await stateStorage.getConnectionSettingList();
       const items = conSettings
-        .filter((it) => isRDSType(it.dbType))
+        .filter((it) => isRDSType(it.dbType) || isPartiQLType(it.dbType, it.awsSetting))
         .map((it) => ({
           label: it.name,
           description: it.dbType,

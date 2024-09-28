@@ -59,7 +59,7 @@ export class SqlKernel {
 
     try {
       const resolver = DBDriverResolver.getInstance();
-      const driver = resolver.createRDSDriver(connectionSetting);
+      const driver = resolver.createSQLSupportDriver(connectionSetting);
       const toPositionedParameter = driver.isPositionedParameterAvailable();
       const toPositionalCharacter = driver.getPositionalCharacter();
       const { query, binds } = normalizeQuery({

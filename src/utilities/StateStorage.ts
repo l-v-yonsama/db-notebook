@@ -4,6 +4,7 @@ import {
   DBDriverResolver,
   DBType,
   DbDatabase,
+  DbDynamoTable,
   DbLogGroup,
   DbS3Bucket,
   DbSQSQueue,
@@ -144,6 +145,14 @@ export class StateStorage {
           .findChildren<DbLogGroup>({ resourceType: ResourceType.LogGroup })
           .forEach((logGroupRes) => {
             logGroupRes.meta = {
+              conName: conRes.name,
+            };
+          });
+        // for dynamoDB
+        dbRes
+          .findChildren<DbDynamoTable>({ resourceType: ResourceType.DynamoTable })
+          .forEach((tableRes) => {
+            tableRes.meta = {
               conName: conRes.name,
             };
           });

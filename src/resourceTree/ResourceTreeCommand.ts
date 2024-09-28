@@ -2,12 +2,13 @@ import {
   DBDriverResolver,
   DbConnection,
   DbDatabase,
+  DbDynamoTable,
   DbResource,
   DbSchema,
   DbTable,
-  RDSBaseDriver,
   RdsDatabase,
   RedisDriver,
+  isISQLSupportDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   ExtensionContext,
@@ -143,19 +144,22 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   );
 
   context.subscriptions.push(
-    commands.registerCommand(RETRIEVE_TABLE_RECORDS, async (tableRes: DbTable) => {
+    commands.registerCommand(RETRIEVE_TABLE_RECORDS, async (tableRes: DbTable | DbDynamoTable) => {
       const { conName, schemaName } = tableRes.meta;
       const setting = await stateStorage.getConnectionSettingByName(conName);
       if (!setting) {
         return;
       }
-      const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+      const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
         setting,
         async (driver) => {
-          return await driver.count({
-            table: tableRes.name,
-            schema: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
-          });
+          if (isISQLSupportDriver(driver)) {
+            return await driver.count({
+              table: tableRes.name,
+              schema: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
+            });
+          }
+          return 0;
         }
       );
 

@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.5.19",
+  "version": "0.7.1",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -29,6 +29,7 @@
     "SQLite",
     "Redis",
     "AWS",
+    "DynamoDB",
     "Keycloak",
     "Auth0",
     "editor",
@@ -319,7 +320,7 @@
         },
         {
           "command": "database-notebook.retrieve-table-records",
-          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "when": "view == database-notebook-connections && viewItem =~ /^(Dynamo)?Table.*/",
           "group": "inline"
         },
         {
@@ -1020,8 +1021,8 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.7.2",
-    "@l-v-yonsama/rdh": "^0.1.12",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.8.12",
+    "@l-v-yonsama/rdh": "^0.1.13",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

@@ -1,14 +1,17 @@
 import {
   DbColumn,
   DbConnection,
+  DbDynamoTableColumn,
   DbResource,
   DBType,
   IamClient,
+  parseDynamoAttrType,
   RdsDatabase,
   RedisDatabase,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
+  GeneralColumnType,
   isArray,
   isBinaryLike,
   isBooleanLike,
@@ -25,6 +28,28 @@ import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 
 const PREFIX = "[ResourceTreeProvider]";
+
+const toIconFile = (colType: GeneralColumnType): string => {
+  let iconFile = "circle-outline.svg";
+  if (isNumericLike(colType)) {
+    iconFile = "symbol-numeric.svg";
+  } else if (isDateTimeOrDateOrTime(colType)) {
+    iconFile = "calendar.svg";
+  } else if (isArray(colType)) {
+    iconFile = "symbol-array.svg";
+  } else if (isBinaryLike(colType)) {
+    iconFile = "file-binary.svg";
+  } else if (isBooleanLike(colType)) {
+    iconFile = "symbol-boolean.svg";
+  } else if (isEnumOrSet(colType)) {
+    iconFile = "symbol-enum.svg";
+  } else if (isJsonLike(colType)) {
+    iconFile = "json.svg";
+  } else if (isTextLike(colType)) {
+    iconFile = "symbol-string.svg";
+  }
+  return iconFile;
+};
 
 export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> =
@@ -179,6 +204,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
         scannable = true;
         break;
       case ResourceType.Table:
+      case ResourceType.DynamoTable:
         iconFile = "output.svg";
         break;
       case ResourceType.LogGroup:
@@ -218,27 +244,28 @@ export class DBDatabaseItem extends vscode.TreeItem {
         // for Auth0's group.
         scannable = true;
         break;
+      case ResourceType.DynamoColumn:
+        {
+          const c = resource as DbDynamoTableColumn;
+          iconFile = toIconFile(parseDynamoAttrType(c.attrType));
+          tooltip = new vscode.MarkdownString(encodeHtmlWeak(c.name), true);
+          tooltip.supportHtml = true;
+          tooltip.isTrusted = true;
+          if (c.pk) {
+            description = "(pk)";
+            tooltip.appendMarkdown(`\\\nPARTIAL KEY`);
+          }
+          if (c.sk) {
+            description = "(sk)";
+            tooltip.appendMarkdown(`\\\nSORT KEY`);
+          }
+          tooltip.appendMarkdown("\\\nTo know more, click '$(info)' icon.");
+        }
+        break;
       case ResourceType.Column:
         {
           const c = resource as DbColumn;
-          iconFile = "circle-outline.svg";
-          if (isNumericLike(c.colType)) {
-            iconFile = "symbol-numeric.svg";
-          } else if (isDateTimeOrDateOrTime(c.colType)) {
-            iconFile = "calendar.svg";
-          } else if (isArray(c.colType)) {
-            iconFile = "symbol-array.svg";
-          } else if (isBinaryLike(c.colType)) {
-            iconFile = "file-binary.svg";
-          } else if (isBooleanLike(c.colType)) {
-            iconFile = "symbol-boolean.svg";
-          } else if (isEnumOrSet(c.colType)) {
-            iconFile = "symbol-enum.svg";
-          } else if (isJsonLike(c.colType)) {
-            iconFile = "json.svg";
-          } else if (isTextLike(c.colType)) {
-            iconFile = "symbol-string.svg";
-          }
+          iconFile = toIconFile(c.colType);
           tooltip = new vscode.MarkdownString(encodeHtmlWeak(c.name), true);
           tooltip.supportHtml = true;
           tooltip.isTrusted = true;
