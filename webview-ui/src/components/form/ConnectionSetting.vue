@@ -270,6 +270,10 @@ function createItem(): ConnectionSetting {
       supplyCredentialType: awsCredentialType.value,
       region: region.value,
     };
+    if (awsCredentialType.value !== SupplyCredentials.ExplicitInProperty) {
+      url.value = '';
+      region.value = '';
+    }
   }
   if (DBTypeConst.isIam(dbType.value)) {
     const resourceTypeNames = resourceTypeSelectedForIam.value.join(",").split(",");
