@@ -1,6 +1,7 @@
 import {
   DbColumn,
   DbConnection,
+  DbDynamoTable,
   DbDynamoTableColumn,
   DbResource,
   DBType,
@@ -204,8 +205,22 @@ export class DBDatabaseItem extends vscode.TreeItem {
         scannable = true;
         break;
       case ResourceType.Table:
+        iconFile = "output.svg";
+        break;
       case ResourceType.DynamoTable:
         iconFile = "output.svg";
+        {
+          const dynamoTable = resource as DbDynamoTable;
+          if (dynamoTable.attr?.ItemCount === 1) {
+            description += ` 1 item`;
+          } else {
+            if (dynamoTable.attr?.ItemCount === 0) {
+              description += ` No items`;
+            } else {
+              description += ` ${dynamoTable.attr?.ItemCount} items`;
+            }
+          }
+        }
         break;
       case ResourceType.LogGroup:
         iconFile = "list-ordered.svg";

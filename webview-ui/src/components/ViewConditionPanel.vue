@@ -21,6 +21,7 @@ const sectionHeight = ref(300);
 const sectionWidth = ref(300);
 const rdhForUpdate = ref(null as any);
 const visibleSettingsMode = ref(true);
+const supportEditMode = ref(false);
 
 window.addEventListener("resize", () => resetSectionHeight());
 
@@ -91,6 +92,7 @@ const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void
   numOfRows.value = v.numOfRows;
   limitMax = Math.max(100000, v.numOfRows);
   previewSql.value = v.previewSql;
+  supportEditMode.value = v.supportEditMode;
   let cols: DropdownItem[] = [];
 
   if (v.tableRes.resourceType === 'Table') {
@@ -259,7 +261,7 @@ defineExpose({
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
           <fa icon="times" />Cancel
         </VsCodeButton>
-        <VsCodeButton v-if="visibleSettingsMode" @click="ok(true, false)" appearance="secondary"
+        <VsCodeButton v-if="visibleSettingsMode && supportEditMode" @click="ok(true, false)" appearance="secondary"
           title="Retlieve in editable mode" style="margin-right: 5px">
           <fa icon="pencil" />Retlieve in editable mode
         </VsCodeButton>
