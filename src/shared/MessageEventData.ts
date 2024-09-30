@@ -274,6 +274,7 @@ export type ViewConditionPanelEventData = BaseMessageEventData<
       numOfRows: number;
       previewSql: string;
       supportEditMode: boolean;
+      numOfRowsLabel: string;
     };
     setPreviewSql?: {
       previewSql: string;

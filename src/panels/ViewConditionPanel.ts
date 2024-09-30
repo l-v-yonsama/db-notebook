@@ -31,6 +31,7 @@ export class ViewConditionPanel extends BasePanel {
   private static stateStorage?: StateStorage;
   private tableRes: DbTable | DbDynamoTable | undefined;
   private supportEditMode = false;
+  private numOfRowsLabel = "Current rows";
   private numOfRows = 0;
   private limit = getDatabaseConfig().limitRows;
   private rdhForUpdate?: ResultSetData;
@@ -68,7 +69,13 @@ export class ViewConditionPanel extends BasePanel {
       ViewConditionPanel.currentPanel = new ViewConditionPanel(panel, extensionUri);
     }
     ViewConditionPanel.currentPanel.tableRes = tableRes;
-    ViewConditionPanel.currentPanel.supportEditMode = tableRes instanceof DbTable;
+    if (tableRes instanceof DbTable) {
+      ViewConditionPanel.currentPanel.supportEditMode = true;
+      ViewConditionPanel.currentPanel.numOfRowsLabel = "Current rows";
+    } else {
+      ViewConditionPanel.currentPanel.supportEditMode = false;
+      ViewConditionPanel.currentPanel.numOfRowsLabel = "Estimated rows";
+    }
     ViewConditionPanel.currentPanel.numOfRows = Math.min(100000, numOfRows);
     ViewConditionPanel.currentPanel.renderSub();
   }
@@ -92,6 +99,7 @@ export class ViewConditionPanel extends BasePanel {
           numOfRows: this.numOfRows,
           previewSql,
           supportEditMode: this.supportEditMode,
+          numOfRowsLabel: this.numOfRowsLabel,
         },
       },
     };

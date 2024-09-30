@@ -22,6 +22,7 @@ const sectionWidth = ref(300);
 const rdhForUpdate = ref(null as any);
 const visibleSettingsMode = ref(true);
 const supportEditMode = ref(false);
+const numOfRowsLabel = ref('Current rows');
 
 window.addEventListener("resize", () => resetSectionHeight());
 
@@ -93,6 +94,7 @@ const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void
   limitMax = Math.max(100000, v.numOfRows);
   previewSql.value = v.previewSql;
   supportEditMode.value = v.supportEditMode;
+  numOfRowsLabel.value = v.numOfRowsLabel;
   let cols: DropdownItem[] = [];
 
   if (v.tableRes.resourceType === 'Table') {
@@ -249,7 +251,7 @@ defineExpose({
       <div class="tool-left">
         <label for="tableName">Table:</label>
         <span id="tableName">{{ tableNameWithComment }}</span>
-        <label for="numOfRows">Current rows:</label>
+        <label for="numOfRows">{{ numOfRowsLabel }}:</label>
         <span id="numOfRows">{{ numOfRows }}</span>
         <label v-if="visibleSettingsMode" for="limit">Limit:</label>
         <VsCodeTextField id="limit" v-if="visibleSettingsMode" v-model="limit" :min="0" :max="limitMax"
@@ -310,13 +312,16 @@ section.view-conditional-root {
   &>div {
     margin: 5px;
 
-    & .toolbar {
+    &.toolbar {
       margin-bottom: 20px !important;
 
       .tool-left {
         label {
-          margin-left: 25px;
           margin-right: 5px;
+        }
+
+        label:nth-child(n+2) {
+          margin-left: 25px;
         }
 
         span {
@@ -328,7 +333,7 @@ section.view-conditional-root {
       }
     }
 
-    & .scroll-wrapper {
+    &.scroll-wrapper {
       overflow: auto;
 
       fieldset.conditions {
