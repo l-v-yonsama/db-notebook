@@ -207,7 +207,7 @@ defineExpose({
             <VsCodeTextField id="useDatabaseName" v-model="useDatabaseName" :maxlength="64" :transparent="true"
               :change-on-mouseout="true" title="Shared variable name">
             </VsCodeTextField>
-            <p>Valid only for MySQL. Ignored for other vendors.</p>
+            <p>Valid only for MySQL, SQL Server. Ignored for other vendors.</p>
           </div>
         </div>
       </fieldset>

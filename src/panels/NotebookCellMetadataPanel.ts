@@ -89,7 +89,7 @@ export class NotebookCellMetadataPanel {
     if (connectionName) {
       const dbType =
         NotebookCellMetadataPanel.stateStorage?.getDBTypeByConnectionName(connectionName);
-      preparationVisible = dbType === DBType.MySQL;
+      preparationVisible = dbType === DBType.MySQL || dbType === DBType.SQLServer;
     }
 
     const wsfolder = workspace.workspaceFolders?.[0].uri;
