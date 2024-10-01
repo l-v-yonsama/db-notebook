@@ -12,7 +12,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.4.0",
     "@fortawesome/free-solid-svg-icons": "^6.4.0",
     "@fortawesome/vue-fontawesome": "^3.0.0-5",
-    "@l-v-yonsama/rdh": "^0.1.13",
+    "@l-v-yonsama/rdh": "^0.1.14",
     "@virtual-list/vue": "^1.2.0",
     "@vscode/codicons": "^0.0.32",
     "@vscode/webview-ui-toolkit": "^1.2.1",

@@ -69,6 +69,7 @@ export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
 export const SHOW_NOTEBOOK_ALL_VARIABLES = `${EXTENSION_NAME}.toolbar.show-all-variables`;
 export const SHOW_NOTEBOOK_ALL_RDH = `${EXTENSION_NAME}.toolbar.show-all-rdh`;
 export const SPECIFY_CONNECTION_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-connection-all`;
+export const SPECIFY_USING_DB_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-using-database-all`;
 export const EXPORT_IN_HTML = `${EXTENSION_NAME}.toolbar.export-in-html`;
 
 // NOTEBOOK CELL STATUS-BAR COMMANDS

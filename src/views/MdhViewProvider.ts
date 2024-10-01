@@ -336,6 +336,9 @@ export class MdhViewProvider extends BaseViewProvider {
                   sql,
                   conditions: rdh.queryConditions,
                   meta: rdh.meta,
+                  prepare: rdh.meta?.useDatabase
+                    ? { useDatabaseName: rdh.meta.useDatabase }
+                    : undefined,
                 });
                 if (rdh.meta.tableRule) {
                   afterRdh.meta.tableRule = rdh.meta.tableRule;
@@ -393,12 +396,13 @@ export class MdhViewProvider extends BaseViewProvider {
             }
 
             const rdh = tabItem.list[i];
-            const { type } = rdh.meta;
+            const { type, useDatabase } = rdh.meta;
             const sql = rdh.sqlStatement!;
             const newRdh = await driver.requestSql({
               sql,
               conditions: rdh.queryConditions,
               meta: rdh.meta,
+              prepare: useDatabase ? { useDatabaseName: useDatabase } : undefined,
             });
             if (rdh.meta.tableRule) {
               newRdh.meta.tableRule = rdh.meta.tableRule;

@@ -469,6 +469,9 @@ export class DiffMdhViewProvider extends BaseViewProvider {
                   sql,
                   conditions: rdh.queryConditions,
                   meta: rdh.meta,
+                  prepare: rdh.meta?.useDatabase
+                    ? { useDatabaseName: rdh.meta.useDatabase }
+                    : undefined,
                 });
                 if (rdh.meta.tableRule) {
                   afterRdh.meta.tableRule = rdh.meta.tableRule;

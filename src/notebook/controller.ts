@@ -544,6 +544,7 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
       codeResolverFile,
       savingSharedVariables,
       sharedVariableName,
+      useDatabaseName,
       chart,
     }: CellMeta = cell.metadata;
     let tooltip = "";
@@ -576,6 +577,10 @@ class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
 
     if (savingSharedVariables && sharedVariableName) {
       tooltip += " $(symbol-variable) " + abbr(sharedVariableName, 18);
+    }
+
+    if (useDatabaseName) {
+      tooltip += " $(database) " + abbr(useDatabaseName, 18);
     }
 
     if (chart && chart.type) {

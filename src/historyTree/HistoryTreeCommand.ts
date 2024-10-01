@@ -166,6 +166,9 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
               conditions: {
                 binds,
               },
+              prepare: history.meta?.useDatabase
+                ? { useDatabaseName: history.meta.useDatabase }
+                : undefined,
             });
           }
         );

@@ -26,7 +26,7 @@ export class SqlKernel {
     let stdout = "";
     let stderrs: string[] = [];
     let connectionSetting: ConnectionSetting | undefined = undefined;
-    const { connectionName }: CellMeta = cell.metadata;
+    const { connectionName, useDatabaseName }: CellMeta = cell.metadata;
 
     if (variables._skipSql === true) {
       return {
@@ -81,6 +81,7 @@ export class SqlKernel {
               conditions: {
                 binds,
               },
+              prepare: useDatabaseName ? { useDatabaseName } : undefined,
             });
           },
           {
@@ -103,6 +104,7 @@ export class SqlKernel {
               conditions: {
                 binds,
               },
+              prepare: useDatabaseName ? { useDatabaseName } : undefined,
             });
           }
         );
@@ -121,6 +123,7 @@ export class SqlKernel {
               conditions: {
                 binds,
               },
+              prepare: useDatabaseName ? { useDatabaseName } : undefined,
             });
           }
         );

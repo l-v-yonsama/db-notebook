@@ -1,4 +1,5 @@
 import {
+  DBType,
   isPartiQLType,
   isRDSType,
   separateMultipleQueries,
@@ -40,6 +41,7 @@ import {
   SHOW_NOTEBOOK_ALL_RDH,
   SHOW_NOTEBOOK_ALL_VARIABLES,
   SPECIFY_CONNECTION_TO_ALL_CELLS,
+  SPECIFY_USING_DB_TO_ALL_CELLS,
 } from "../constant";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
@@ -203,6 +205,53 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
             await workspace.applyEdit(edit);
           }
+        }
+      }
+    );
+
+    registerDisposableCommand(
+      SPECIFY_USING_DB_TO_ALL_CELLS,
+      async (e: NotebookToolbarClickEvent) => {
+        const notebookEditor = getToolbarButtonClickedNotebookEditor(e);
+
+        const cells = notebookEditor?.notebook.getCells();
+        if (!cells) {
+          return;
+        }
+        if (cells.every((it) => !isSqlCell(it))) {
+          return;
+        }
+
+        const result = await window.showInputBox({
+          title: "Specify if switching to a database",
+          placeHolder: "Enter database-name",
+          value: "",
+        });
+
+        if (result === undefined) {
+          return;
+        }
+        for (const cell of cells) {
+          if (!isSqlCell(cell)) {
+            continue;
+          }
+          const { useDatabaseName, connectionName } = cell.metadata as CellMeta;
+          if (useDatabaseName === result || connectionName === undefined) {
+            continue;
+          }
+          const dbType = stateStorage.getDBTypeByConnectionName(connectionName);
+          if (dbType === undefined || !(dbType === DBType.MySQL || dbType === DBType.SQLServer)) {
+            continue;
+          }
+
+          const metadata: CellMeta = {
+            ...cell.metadata,
+            useDatabaseName: result === "" ? undefined : result,
+          };
+          const edit = new WorkspaceEdit();
+          const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+          edit.set(cell.notebook.uri, [nbEdit]);
+          await workspace.applyEdit(edit);
         }
       }
     );

@@ -320,6 +320,7 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
   {
     initialize?: {
       metadata: CellMeta;
+      preparationVisible: boolean;
       connectionSettingNames: string[];
       codeFileItems: { label: string; value: string }[];
       ruleFileItems: { label: string; value: string }[];

@@ -27,6 +27,7 @@ export type CellMeta = {
   ruleFile?: string;
   codeResolverFile?: string;
   sharedVariableName?: string;
+  useDatabaseName?: string;
   chart?: CellMetaChart;
   readonly [key: string]: any;
 };

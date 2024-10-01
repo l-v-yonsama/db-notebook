@@ -30,6 +30,7 @@ const chartTypeItems: DropdownItem[] = [
 const chartLabelItems: DropdownItem[] = [];
 const chartDataItems: DropdownItem[] = [];
 
+const preparationVisible = ref(false);
 const showComment = ref(false);
 const codeResolverFile = ref("");
 const ruleFile = ref("");
@@ -48,6 +49,7 @@ const chartDataX = ref("");
 const chartDataY = ref("");
 const savingSharedVariables = ref(false);
 const sharedVariableName = ref("");
+const useDatabaseName = ref("");
 
 const initialized = ref(false);
 const sectionHeight = ref(300);
@@ -67,6 +69,7 @@ const initialize = async (v: NotebookCellMetadataPanelEventData["value"]["initia
   const keys = v.columnItems;
 
   await nextTick();
+  preparationVisible.value = v.preparationVisible;
   showComment.value = v.metadata.showComment === true;
 
   codeResolverFile.value = v.metadata.codeResolverFile ?? "";
@@ -103,6 +106,7 @@ const initialize = async (v: NotebookCellMetadataPanelEventData["value"]["initia
 
   savingSharedVariables.value = v.metadata.savingSharedVariables === true;
   sharedVariableName.value = v.metadata.sharedVariableName ?? "";
+  useDatabaseName.value = v.metadata.useDatabaseName ?? "";
 
   initialized.value = true;
 };
@@ -130,6 +134,7 @@ const save = () => {
         ruleFile: ruleFile.value,
         savingSharedVariables: savingSharedVariables.value,
         sharedVariableName: sharedVariableName.value,
+        useDatabaseName: preparationVisible.value ? useDatabaseName.value : undefined,
         chart:
           chartType.value === "Unused"
             ? undefined
@@ -194,6 +199,18 @@ defineExpose({
     </div>
     <section v-if="!initialized" class="content">Initializing...</section>
     <section v-else class="content scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+      <fieldset v-if="preparationVisible">
+        <legend>Preparation for query execution</legend>
+        <div>
+          <div>
+            <label for="useDatabaseName">Use Database name (Optional):</label>
+            <VsCodeTextField id="useDatabaseName" v-model="useDatabaseName" :maxlength="64" :transparent="true"
+              :change-on-mouseout="true" title="Shared variable name">
+            </VsCodeTextField>
+            <p>Valid only for MySQL. Ignored for other vendors.</p>
+          </div>
+        </div>
+      </fieldset>
       <fieldset>
         <legend>SQL Editor</legend>
         <div>

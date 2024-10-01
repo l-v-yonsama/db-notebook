@@ -1,3 +1,4 @@
+import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { RdhKey, ResultSetData } from "@l-v-yonsama/rdh";
 import * as path from "path";
 import {
@@ -15,6 +16,7 @@ import {
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { NotebookCellMetadataPanelEventData } from "../shared/MessageEventData";
+import { CellMeta } from "../types/Notebook";
 import { StateStorage } from "../utilities/StateStorage";
 import { createWebviewContent } from "../utilities/webviewUtil";
 
@@ -77,10 +79,17 @@ export class NotebookCellMetadataPanel {
     if (!this.cell) {
       return;
     }
+    let preparationVisible = false;
     const connectionSettingNames =
       NotebookCellMetadataPanel.stateStorage?.getConnectionSettingNames();
     if (!connectionSettingNames) {
       return;
+    }
+    const { connectionName }: CellMeta = this.cell.metadata;
+    if (connectionName) {
+      const dbType =
+        NotebookCellMetadataPanel.stateStorage?.getDBTypeByConnectionName(connectionName);
+      preparationVisible = dbType === DBType.MySQL;
     }
 
     const wsfolder = workspace.workspaceFolders?.[0].uri;
@@ -130,6 +139,7 @@ export class NotebookCellMetadataPanel {
             ...this.cell.metadata,
             markWithinQuery: this.cell.metadata.markWithinQuery !== false,
           },
+          preparationVisible,
           connectionSettingNames: ["", ...connectionSettingNames],
           codeFileItems,
           ruleFileItems,
@@ -186,6 +196,9 @@ export class NotebookCellMetadataPanel {
               }
               if (newMetadata.sharedVariableName === "") {
                 delete newMetadata.sharedVariableName;
+              }
+              if (newMetadata.useDatabaseName === "") {
+                delete newMetadata.useDatabaseName;
               }
               if (params.metadata.chart === undefined) {
                 delete newMetadata.chart;

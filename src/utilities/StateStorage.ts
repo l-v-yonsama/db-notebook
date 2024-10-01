@@ -308,6 +308,12 @@ export class StateStorage {
     return list.some((it) => it.name === name);
   }
 
+  getDBTypeByConnectionName(name: string): DBType | undefined {
+    const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
+    const setting = list.find((it) => it.name === name);
+    return setting?.dbType;
+  }
+
   async addConnectionSetting(setting: ConnectionSetting): Promise<boolean> {
     const list = await this.getConnectionSettingList();
     if (list.some((it) => it.name === setting.name)) {
