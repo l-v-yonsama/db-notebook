@@ -121,6 +121,7 @@ const props = withDefaults(defineProps<Props>(), {
     host: "",
     port: 0,
     database: "",
+    useDatabaseName: '',
     dbType: DBTypeConst.DBType.MySQL,
     user: "",
     password: "",
@@ -162,6 +163,7 @@ const name = ref(props.item.name);
 const host = ref(props.item.host);
 const port = ref(props.item.port);
 const database = ref(props.item.database);
+const useDatabaseName = ref(props.item.useDatabaseName);
 const dbType = ref(props.item.dbType);
 const user = ref(props.item.user);
 const password = ref(props.item.password);
@@ -306,6 +308,7 @@ function createItem(): ConnectionSetting {
     host: host.value,
     port: toNum(port.value),
     database: database.value,
+    useDatabaseName: useDatabaseName.value,
     dbType: dbType.value,
     user: user.value,
     password: password.value,
@@ -380,6 +383,7 @@ function setDefault() {
   clientId.value = elmSettings.value.getIamClientId().defaultValue ?? "";
   clientSecret.value = elmSettings.value.getIamClientSecret().defaultValue ?? "";
   database.value = elmSettings.value.getDatabase().defaultValue ?? "";
+  useDatabaseName.value = elmSettings.value.getUseDatabaseName().defaultValue ?? "";
   port.value = elmSettings.value.getPort().defaultValue ?? 0;
   useSsl.value = false;
 }
@@ -444,6 +448,13 @@ defineExpose({
         <VsCodeTextField v-else v-show="elmSettings.getDatabase().visible" id="database" v-model="database"
           :placeholder="elmSettings.getDatabase().placeholder ?? ''"></VsCodeTextField>
       </template>
+
+      <LabeledText v-show="elmSettings.getUseDatabaseName().visible" id="useDatabaseName" v-model="useDatabaseName"
+        :isShowMode="isShowMode" :label="elmSettings.getUseDatabaseName().label ?? ''"
+        :placeholder="elmSettings.getUseDatabaseName().placeholder ?? ''" />
+      <p v-if="elmSettings.getUseDatabaseName().visible">
+        (After connecting, use as current database.)
+      </p>
 
       <LabeledText v-show="elmSettings.getIamClientId().visible" id="clientId" v-model="clientId"
         :isShowMode="isShowMode" :label="elmSettings.getIamClientId().label ?? ''"

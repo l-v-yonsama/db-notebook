@@ -16,6 +16,10 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: true, label: "Password" };
   }
 
+  getUseDatabaseName(): ElementSetting {
+    return { visible: false, defaultValue: "" };
+  }
+
   getTimezone(): ElementSetting {
     return { visible: true };
   }
@@ -102,6 +106,15 @@ export class MysqlElementSetting extends RdsElementSetting {
       placeholder: "Database name",
       label: "DB name",
       defaultValue: "mysql",
+    };
+  }
+
+  getUseDatabaseName(): ElementSetting {
+    return {
+      visible: true,
+      placeholder: "Use database name",
+      label: "Use DB name (Optional)",
+      defaultValue: "",
     };
   }
 

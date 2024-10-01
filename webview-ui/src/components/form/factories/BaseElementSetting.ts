@@ -13,6 +13,8 @@ export abstract class BaseElementSetting {
 
   abstract getDatabase(): ElementSetting;
 
+  abstract getUseDatabaseName(): ElementSetting;
+
   abstract getIamClientId(): ElementSetting;
 
   abstract getIamClientSecret(): ElementSetting;
@@ -45,6 +47,10 @@ export abstract class BaseElementSetting {
 }
 
 export abstract class BaseNoSqlElementSetting extends BaseElementSetting {
+  getUseDatabaseName(): ElementSetting {
+    return { visible: false, defaultValue: "" };
+  }
+
   getSqlServerAuthenticationType(): ElementSetting {
     return { visible: false };
   }
