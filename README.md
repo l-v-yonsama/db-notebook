@@ -74,6 +74,10 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/17_sql_to_dbn.gif)
 
+- Access to Aws( DynamoDB ) through the Notebook
+  - On the DB Notebook, specify the number of counts in the LIMIT clause
+  - ![](./docs/images/18_dynamoDB.png)
+
 <details>
 
 <summary>Screenshots ( Convenient visualization of result sets )</summary>
@@ -139,6 +143,11 @@ It also provides a CSV and Har file preview feature.
 </div>
 
 </details>
+
+## Tips
+
+1. You can specify a default connection definition each time you add a new SQL cell to the notebook
+   - ![](./docs/images/tips/01_default_connection.png)
 
 ## Examples
 

@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.7.7",
+  "version": "0.7.9",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -247,6 +247,16 @@
           "command": "database-notebook.retrieve-resources",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
           "group": "others@3"
+        },
+        {
+          "command": "database-notebook.specify-default-connection-for-sql-cell",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:false.+$/",
+          "group": "others@4"
+        },
+        {
+          "command": "database-notebook.clear-default-connection-for-sql-cell",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:true.+$/",
+          "group": "others@4"
         },
         {
           "command": "database-notebook.show-connection-setting",
@@ -663,6 +673,18 @@
           "dark": "media/dark/list-tree.svg",
           "light": "media/light/list-tree.svg"
         }
+      },
+      {
+        "command": "database-notebook.specify-default-connection-for-sql-cell",
+        "title": "Specify default connection for new SQL cell",
+        "shortTitle": "Specify default con.",
+        "icon": "$(database)"
+      },
+      {
+        "command": "database-notebook.clear-default-connection-for-sql-cell",
+        "title": "Clear default connection for new SQL cell",
+        "shortTitle": "Clear default con.",
+        "icon": "$(database)"
       },
       {
         "command": "database-notebook.get-locks",

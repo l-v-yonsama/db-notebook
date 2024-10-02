@@ -19,6 +19,7 @@ import {
   window,
 } from "vscode";
 import {
+  CLEAR_DEFAULT_CON_FOR_SQL_CELL,
   COUNT_FOR_ALL_TABLES,
   CREATE_CONNECTION_SETTING,
   CREATE_ER_DIAGRAM,
@@ -39,6 +40,7 @@ import {
   SHOW_CONNECTION_SETTING,
   SHOW_RESOURCE_PROPERTIES,
   SHOW_SCAN_PANEL,
+  SPECIFY_DEFAULT_CON_FOR_SQL_CELL,
   WRITE_ER_DIAGRAM_TO_CLIPBOARD,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
@@ -118,6 +120,16 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     } catch (e) {
       showWindowErrorMessage(e);
     }
+    dbResourceTree.changeConnectionTreeData(conRes);
+  });
+
+  commands.registerCommand(SPECIFY_DEFAULT_CON_FOR_SQL_CELL, async (conRes: DbConnection) => {
+    stateStorage.setDefaultConnectionName(conRes.name);
+    dbResourceTree.changeConnectionTreeData(conRes);
+  });
+
+  commands.registerCommand(CLEAR_DEFAULT_CON_FOR_SQL_CELL, async (conRes: DbConnection) => {
+    stateStorage.setDefaultConnectionName("");
     dbResourceTree.changeConnectionTreeData(conRes);
   });
 

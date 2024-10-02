@@ -28,6 +28,7 @@ const uid = new ShortUniqueId();
 
 const PREFIX = "[StateStorage]";
 
+export const DEFAULT_CON_NAME_KEY = `${EXTENSION_NAME}-DEFAULT-CON-NAME`;
 export const STORAGE_KEY = `${EXTENSION_NAME}-settings`;
 export const SQL_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
 export const PREV_SAVE_FOLDER = `${EXTENSION_NAME}-previous-save-folder`;
@@ -210,6 +211,13 @@ export class StateStorage {
   }
 
   constructor(private context: ExtensionContext, private secretStorage: SecretStorage) {}
+
+  getDefaultConnectionName(): string {
+    return this.context.globalState.get<string>(DEFAULT_CON_NAME_KEY, "");
+  }
+  setDefaultConnectionName(name: string): void {
+    this.context.globalState.update(DEFAULT_CON_NAME_KEY, name);
+  }
 
   async getPreviousSaveFolder(): Promise<string> {
     return this.context.globalState.get<string>(PREV_SAVE_FOLDER, "");

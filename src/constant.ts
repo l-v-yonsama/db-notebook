@@ -18,6 +18,8 @@ export const BOTTOM_TOOLS_VIEWID = `${EXTENSION_NAME}.view.bottom.tools`;
 //---------------------------------------------------
 export const REFRESH_RESOURCES = `${EXTENSION_NAME}.refresh-resources`;
 export const RETRIEVE_RESOURCES = `${EXTENSION_NAME}.retrieve-resources`;
+export const SPECIFY_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.specify-default-connection-for-sql-cell`;
+export const CLEAR_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.clear-default-connection-for-sql-cell`;
 export const GET_LOCKS = `${EXTENSION_NAME}.get-locks`;
 export const GET_SESSIONS = `${EXTENSION_NAME}.get-sessions`;
 export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;

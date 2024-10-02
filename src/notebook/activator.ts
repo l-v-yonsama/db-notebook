@@ -8,6 +8,7 @@ import * as dayjs from "dayjs";
 import * as path from "path";
 import sqlFormatter from "sql-formatter-plus";
 import {
+  commands,
   ExtensionContext,
   NotebookCell,
   NotebookCellData,
@@ -17,10 +18,9 @@ import {
   Range,
   TextEdit,
   Uri,
-  WorkspaceEdit,
-  commands,
   window,
   workspace,
+  WorkspaceEdit,
 } from "vscode";
 import {
   CELL_EXECUTE_EXPLAIN,
@@ -186,6 +186,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
             label: it.name,
             description: it.dbType,
           }));
+        items.push({ label: "<None>", description: "(set as unspecified)" as DBType });
         const result = await window.showQuickPick(items);
         if (result) {
           for (const cell of cells) {
@@ -198,7 +199,11 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
             const metadata: CellMeta = {
               ...cell.metadata,
             };
-            metadata.connectionName = result.label;
+            if (result.label === "<None>") {
+              delete metadata.connectionName;
+            } else {
+              metadata.connectionName = result.label;
+            }
             const edit = new WorkspaceEdit();
             const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
             edit.set(cell.notebook.uri, [nbEdit]);
@@ -300,6 +305,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
           label: it.name,
           description: it.dbType,
         }));
+      items.push({ label: "<None>", description: "(set as unspecified)" as DBType });
       const result = await window.showQuickPick(items);
       if (result) {
         targetCells.forEach((cell) => {
@@ -309,7 +315,11 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
           const metadata: CellMeta = {
             ...cell.metadata,
           };
-          metadata.connectionName = result.label;
+          if (result.label === "<None>") {
+            delete metadata.connectionName;
+          } else {
+            metadata.connectionName = result.label;
+          }
           const edit = new WorkspaceEdit();
           const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
           edit.set(cell.notebook.uri, [nbEdit]);

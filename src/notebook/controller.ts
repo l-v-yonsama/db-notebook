@@ -12,6 +12,7 @@ import {
   NotebookCellStatusBarItemProvider,
   NotebookController,
   NotebookDocument,
+  NotebookEdit,
   notebooks,
   Range,
   TextEdit,
@@ -110,6 +111,24 @@ export class MainController {
         if (e.notebook.notebookType !== NOTEBOOK_TYPE) {
           return;
         }
+
+        e.contentChanges.forEach((change) => {
+          change.addedCells.forEach((cell) => {
+            if (cell.document.languageId === "sql") {
+              const cm = cell.metadata as CellMeta;
+              if (!cm.connectionName) {
+                const metadata: CellMeta = {
+                  ...cell.metadata,
+                };
+                metadata.connectionName = this.stateStorage.getDefaultConnectionName();
+                const edit = new WorkspaceEdit();
+                const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+                edit.set(cell.notebook.uri, [nbEdit]);
+                workspace.applyEdit(edit);
+              }
+            }
+          });
+        });
         this.setActiveContext(e.notebook);
       })
     );

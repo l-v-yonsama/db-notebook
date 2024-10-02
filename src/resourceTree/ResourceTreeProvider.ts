@@ -52,6 +52,8 @@ const toIconFile = (colType: GeneralColumnType): string => {
   return iconFile;
 };
 
+let defaultConName = "";
+
 export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> =
     new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
@@ -80,10 +82,16 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
         this.conResList.push(conRes);
       }
     }
+    this.resetDefaultConnectionName();
     this._onDidChangeTreeData.fire();
   }
 
+  async resetDefaultConnectionName(): Promise<void> {
+    defaultConName = this.stateStorage.getDefaultConnectionName();
+  }
+
   changeConnectionTreeData(conRes: DbConnection): void {
+    this.resetDefaultConnectionName();
     this._onDidChangeTreeData.fire(conRes);
     this._onDidChangeTreeData.fire();
   }
@@ -129,13 +137,18 @@ export class ConnectionListItem extends vscode.TreeItem {
     if (conRes.isInProgress) {
       this.iconPath = new vscode.ThemeIcon("loading~spin");
     } else {
-      this.iconPath = {
-        dark: path.join(mediaDir, "dark", "debug-disconnect.svg"),
-        light: path.join(mediaDir, "light", "debug-disconnect.svg"),
-      };
+      if (conRes.name === defaultConName) {
+        this.iconPath = {
+          dark: path.join(mediaDir, "dark", "debug-disconnect.svg"),
+          light: path.join(mediaDir, "light", "debug-disconnect.svg"),
+        };
+      } else {
+        this.iconPath = new vscode.ThemeIcon("debug-disconnect");
+      }
     }
+    const clearableDefault = conRes.name === defaultConName;
     this.description = `(${conRes.dbType})`;
-    this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},${conRes.isInProgress}`;
+    this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},CD:${clearableDefault},${conRes.isInProgress}`;
 
     this.command = {
       title: "Show resource property",
