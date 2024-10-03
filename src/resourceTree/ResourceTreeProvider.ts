@@ -22,32 +22,31 @@ import {
   isNumericLike,
   isTextLike,
 } from "@l-v-yonsama/rdh";
-import * as path from "path";
 import * as vscode from "vscode";
-import { mediaDir, SHOW_CONNECTION_SETTING, SHOW_RESOURCE_PROPERTIES } from "../constant";
+import { SHOW_CONNECTION_SETTING, SHOW_RESOURCE_PROPERTIES } from "../constant";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 
 const PREFIX = "[ResourceTreeProvider]";
 
-const toIconFile = (colType: GeneralColumnType): string => {
-  let iconFile = "circle-outline.svg";
+const toIconFileName = (colType: GeneralColumnType): string => {
+  let iconFile = "circle-outline";
   if (isNumericLike(colType)) {
-    iconFile = "symbol-numeric.svg";
+    iconFile = "symbol-numeric";
   } else if (isDateTimeOrDateOrTime(colType)) {
-    iconFile = "calendar.svg";
+    iconFile = "calendar";
   } else if (isArray(colType)) {
-    iconFile = "symbol-array.svg";
+    iconFile = "symbol-array";
   } else if (isBinaryLike(colType)) {
-    iconFile = "file-binary.svg";
+    iconFile = "file-binary";
   } else if (isBooleanLike(colType)) {
-    iconFile = "symbol-boolean.svg";
+    iconFile = "symbol-boolean";
   } else if (isEnumOrSet(colType)) {
-    iconFile = "symbol-enum.svg";
+    iconFile = "symbol-constant";
   } else if (isJsonLike(colType)) {
-    iconFile = "json.svg";
+    iconFile = "json";
   } else if (isTextLike(colType)) {
-    iconFile = "symbol-string.svg";
+    iconFile = "symbol-string";
   }
   return iconFile;
 };
@@ -138,10 +137,10 @@ export class ConnectionListItem extends vscode.TreeItem {
       this.iconPath = new vscode.ThemeIcon("loading~spin");
     } else {
       if (conRes.name === defaultConName) {
-        this.iconPath = {
-          dark: path.join(mediaDir, "dark", "debug-disconnect.svg"),
-          light: path.join(mediaDir, "light", "debug-disconnect.svg"),
-        };
+        this.iconPath = new vscode.ThemeIcon(
+          "debug-disconnect",
+          new vscode.ThemeColor("errorForeground")
+        );
       } else {
         this.iconPath = new vscode.ThemeIcon("debug-disconnect");
       }
@@ -166,7 +165,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
   ) {
     super(resource.name, state);
 
-    let iconFile = "database.svg";
+    let iconPath = new vscode.ThemeIcon("database");
     let description = resource.comment || "";
     let scannable = false;
     let showSessions = false;
@@ -176,7 +175,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.RdsDatabase:
         {
           const res = resource as RdsDatabase;
-          iconFile = "database.svg";
+          iconPath = new vscode.ThemeIcon("database");
           const { dbType } = res.meta;
           if (
             dbType === DBType.MySQL ||
@@ -188,40 +187,40 @@ export class DBDatabaseItem extends vscode.TreeItem {
         }
         break;
       case ResourceType.AwsDatabase:
-        iconFile = "database.svg";
+        iconPath = new vscode.ThemeIcon("database");
         break;
       case ResourceType.KeycloakDatabase:
-        iconFile = "database.svg";
+        iconPath = new vscode.ThemeIcon("database");
         break;
       case ResourceType.Auth0Database:
-        iconFile = "database.svg";
+        iconPath = new vscode.ThemeIcon("database");
         scannable = true;
         break;
       case ResourceType.RedisDatabase:
         {
           const res = resource as RedisDatabase;
-          iconFile = "database.svg";
+          iconPath = new vscode.ThemeIcon("database");
           description = `${res.numOfKeys} keys`;
           scannable = true;
         }
         break;
       case ResourceType.Schema:
       case ResourceType.Owner:
-        iconFile = "account.svg";
+        iconPath = new vscode.ThemeIcon("account");
         break;
       case ResourceType.Bucket:
-        iconFile = "build.svg";
+        iconPath = new vscode.ThemeIcon("package");
         scannable = true;
         break;
       case ResourceType.Queue:
-        iconFile = "git-commit.svg";
+        iconPath = new vscode.ThemeIcon("git-commit");
         scannable = true;
         break;
       case ResourceType.Table:
-        iconFile = "output.svg";
+        iconPath = new vscode.ThemeIcon("table");
         break;
       case ResourceType.DynamoTable:
-        iconFile = "output.svg";
+        iconPath = new vscode.ThemeIcon("table");
         {
           const dynamoTable = resource as DbDynamoTable;
           if (dynamoTable.attr?.ItemCount === 1) {
@@ -236,12 +235,12 @@ export class DBDatabaseItem extends vscode.TreeItem {
         }
         break;
       case ResourceType.LogGroup:
-        iconFile = "list-ordered.svg";
+        iconPath = new vscode.ThemeIcon("list-ordered");
         scannable = true;
         break;
       case ResourceType.IamClient:
         {
-          iconFile = "hubot.svg";
+          iconPath = new vscode.ThemeIcon("hubot");
           const client = resource as IamClient;
           if (client.meta?.scannable) {
             // Keycloak
@@ -258,24 +257,24 @@ export class DBDatabaseItem extends vscode.TreeItem {
         }
         break;
       case ResourceType.IamRealm:
-        iconFile = "inbox.svg";
+        iconPath = new vscode.ThemeIcon("inbox");
         scannable = true;
         break;
       case ResourceType.IamGroup:
-        iconFile = "build.svg";
+        iconPath = new vscode.ThemeIcon("activate-breakpoints");
         // for Keycloak's group.
         // can't search by keyword.
         // scannable = true;
         break;
       case ResourceType.IamOrganization:
-        iconFile = "build.svg";
+        iconPath = new vscode.ThemeIcon("organization");
         // for Auth0's group.
         scannable = true;
         break;
       case ResourceType.DynamoColumn:
         {
           const c = resource as DbDynamoTableColumn;
-          iconFile = toIconFile(parseDynamoAttrType(c.attrType));
+          iconPath = new vscode.ThemeIcon(toIconFileName(parseDynamoAttrType(c.attrType)));
           tooltip = new vscode.MarkdownString(encodeHtmlWeak(c.name), true);
           tooltip.supportHtml = true;
           tooltip.isTrusted = true;
@@ -293,7 +292,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.Column:
         {
           const c = resource as DbColumn;
-          iconFile = toIconFile(c.colType);
+          iconPath = new vscode.ThemeIcon(toIconFileName(c.colType));
           tooltip = new vscode.MarkdownString(encodeHtmlWeak(c.name), true);
           tooltip.supportHtml = true;
           tooltip.isTrusted = true;
@@ -305,10 +304,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
         }
         break;
     }
-    this.iconPath = {
-      dark: path.join(mediaDir, "dark", iconFile),
-      light: path.join(mediaDir, "light", iconFile),
-    };
+    this.iconPath = iconPath;
 
     this.description = description;
     let contextValue = resource.resourceType;

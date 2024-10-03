@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -125,27 +125,27 @@
         {
           "id": "database-notebook-view-rdh",
           "title": "ResultSets",
-          "icon": "media/dark/database.svg"
+          "icon": "$(database)"
         },
         {
           "id": "database-notebook-view-diff-rdh",
           "title": "Diff in ResultSets",
-          "icon": "media/dark/database.svg"
+          "icon": "$(database)"
         },
         {
           "id": "database-notebook-view-count-for-all-tables",
           "title": "Count for all tables",
-          "icon": "media/dark/symbol-numeric.svg"
+          "icon": "$(symbol-numeric)"
         },
         {
           "id": "database-notebook-view-charts",
           "title": "Charts",
-          "icon": "media/dark/symbol-numeric.svg"
+          "icon": "$(symbol-numeric)"
         },
         {
           "id": "database-notebook-view-tools",
           "title": "Tools",
-          "icon": "media/dark/symbol-numeric.svg"
+          "icon": "$(symbol-numeric)"
         }
       ]
     },
@@ -528,20 +528,14 @@
         "title": "Create a new blank DB record rule",
         "shortTitle": "Database Record rule",
         "category": "Database Notebook",
-        "icon": {
-          "dark": "media/dark/checklist.svg",
-          "light": "media/light/checklist.svg"
-        }
+        "icon": "$(checklist)"
       },
       {
         "command": "database-notebook.create-blank-code-resolver",
         "title": "Create a new blank Code label resolver",
         "shortTitle": "Code label resolver",
         "category": "Database Notebook",
-        "icon": {
-          "dark": "media/dark/checklist.svg",
-          "light": "media/light/checklist.svg"
-        }
+        "icon": "$(checklist)"
       },
       {
         "command": "database-notebook.create-blank-notebook",
@@ -552,127 +546,85 @@
       {
         "command": "database-notebook.create-er-diagram",
         "title": "Create ER diagram",
-        "icon": {
-          "dark": "media/dark/git-pull-request.svg",
-          "light": "media/light/git-pull-request.svg"
-        },
+        "icon": "$(git-pull-request)",
         "category": "er-diagram"
       },
       {
         "command": "database-notebook.create-er-diagram-with-settings",
         "title": "Create ER diagram with settings",
-        "icon": {
-          "dark": "media/dark/git-pull-request.svg",
-          "light": "media/light/git-pull-request.svg"
-        },
+        "icon": "$(git-pull-request)",
         "category": "er-diagram"
       },
       {
         "command": "database-notebook.write-er-diagram-to-clipboard",
         "title": "Write ER diagram to clipboard",
-        "icon": {
-          "dark": "media/dark/git-pull-request.svg",
-          "light": "media/light/git-pull-request.svg"
-        },
+        "icon": "$(clippy)",
         "category": "er-diagram"
       },
       {
         "command": "database-notebook.create-insert-script-with-settings",
         "title": "Create Insert script with settings",
-        "icon": {
-          "dark": "media/dark/git-pull-request.svg",
-          "light": "media/light/git-pull-request.svg"
-        },
+        "icon": "$(add)",
         "category": "create-script"
       },
       {
         "command": "database-notebook.create-connection-setting",
         "title": "Create connection setting",
-        "icon": {
-          "dark": "media/dark/add.svg",
-          "light": "media/light/add.svg"
-        },
+        "icon": "$(add)",
         "category": "connection-setting"
       },
       {
         "command": "database-notebook.show-connection-setting",
         "title": "Show setting",
-        "icon": {
-          "dark": "media/dark/info.svg",
-          "light": "media/light/info.svg"
-        },
+        "icon": "$(info)",
         "category": "connection-setting"
       },
       {
         "command": "database-notebook.edit-connection-setting",
         "title": "Edit setting",
-        "icon": {
-          "dark": "media/dark/edit.svg",
-          "light": "media/light/edit.svg"
-        },
+        "icon": "$(edit)",
         "category": "connection-setting"
       },
       {
         "command": "database-notebook.duplicate-connection-setting",
         "title": "Duplicate setting",
-        "icon": {
-          "dark": "media/dark/files.svg",
-          "light": "media/light/files.svg"
-        },
+        "icon": "$(files)",
         "category": "connection-setting"
       },
       {
         "command": "database-notebook.delete-connection-setting",
         "title": "Delete setting",
-        "icon": {
-          "dark": "media/dark/trash.svg",
-          "light": "media/light/trash.svg"
-        },
+        "icon": "$(trash)",
         "category": "connection-setting"
       },
       {
         "command": "database-notebook.connect",
         "title": "Connect to Database",
-        "icon": {
-          "dark": "media/dark/pass.svg",
-          "light": "media/light/pass.svg"
-        },
+        "icon": "$(pass)",
         "category": "connect-disconnect"
       },
       {
         "command": "database-notebook.disconnect",
         "title": "Disconnect to Database",
-        "icon": {
-          "dark": "media/dark/error.svg",
-          "light": "media/light/error.svg"
-        },
+        "icon": "$(error)",
         "category": "connect-disconnect"
       },
       {
         "command": "database-notebook.show-resource-properties",
         "title": "Show resouce properties",
-        "icon": {
-          "dark": "media/dark/info.svg",
-          "light": "media/light/info.svg"
-        }
+        "icon": "$(info)"
       },
       {
         "command": "database-notebook.refresh-resources",
         "title": "Refresh Setting Panel",
         "shortTitle": "Refresh",
-        "icon": {
-          "dark": "media/dark/refresh.svg",
-          "light": "media/light/refresh.svg"
-        }
+        "icon": "$(refresh)"
       },
       {
         "command": "database-notebook.retrieve-resources",
         "title": "Retrieve DB Resources",
         "shortTitle": "Retrieve",
-        "icon": {
-          "dark": "media/dark/list-tree.svg",
-          "light": "media/light/list-tree.svg"
-        }
+        "icon": "$(list-tree)"
       },
       {
         "command": "database-notebook.specify-default-connection-for-sql-cell",
@@ -816,10 +768,7 @@
         "command": "database-notebook.refresh-sql-histories",
         "title": "Refresh SQL histories",
         "shortTitle": "Refresh",
-        "icon": {
-          "dark": "media/dark/refresh.svg",
-          "light": "media/light/refresh.svg"
-        }
+        "icon": "$(refresh)"
       },
       {
         "command": "database-notebook.delete-all-sql-histories",
