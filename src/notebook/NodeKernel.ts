@@ -83,8 +83,11 @@ export class NodeKernel {
       });
 
       const variables = require('${winToLinuxPath(path.join(nodeModules, "store"))}');
-      const {DBDriverResolver,ResultSetDataBuilder,normalizeQuery,parseContentType,decodeJwt} = require('${winToLinuxPath(
+      const {DBDriverResolver,normalizeQuery,parseContentType,decodeJwt} = require('${winToLinuxPath(
         path.join(nodeModules, "@l-v-yonsama/multi-platform-database-drivers")
+      )}');
+      const {ResultSetDataBuilder} = require('${winToLinuxPath(
+        path.join(nodeModules, "@l-v-yonsama/rdh")
       )}');
       const getConnectionSettingByName = (s) => {
         const settings = ${stringify(this.connectionSettings)};

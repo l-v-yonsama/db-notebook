@@ -299,7 +299,6 @@ export class ViewConditionPanel extends BasePanel {
             const toPositionedParameter = driver.isPositionedParameterAvailable();
             const toPositionalCharacter = driver.getPositionalCharacter();
             const sqlLang = driver.getSqlLang();
-            const specifyValuesWithBindParameters = sqlLang === "sql";
 
             let errorMessage = "";
             for (let i = 0; i < insertList.length; i++) {
@@ -311,7 +310,7 @@ export class ViewConditionPanel extends BasePanel {
                   columns: rdh.keys,
                   values,
                   bindOption: {
-                    specifyValuesWithBindParameters,
+                    specifyValuesWithBindParameters: true,
                     toPositionedParameter,
                     toPositionalCharacter,
                   },
@@ -352,7 +351,7 @@ export class ViewConditionPanel extends BasePanel {
                   values,
                   conditions,
                   bindOption: {
-                    specifyValuesWithBindParameters,
+                    specifyValuesWithBindParameters: true,
                     toPositionedParameter,
                     toPositionalCharacter,
                   },
@@ -393,7 +392,7 @@ export class ViewConditionPanel extends BasePanel {
                   columns: rdh.keys,
                   conditions,
                   bindOption: {
-                    specifyValuesWithBindParameters,
+                    specifyValuesWithBindParameters: true,
                     toPositionedParameter,
                     toPositionalCharacter,
                   },

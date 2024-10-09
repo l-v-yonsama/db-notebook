@@ -1,8 +1,10 @@
 import {
   createUndoChangeSQL,
   DBDriverResolver,
+  DBType,
   RDSBaseDriver,
   runRuleEngine,
+  SQLLang,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   diff,
@@ -218,6 +220,13 @@ export class DiffMdhViewProvider extends BaseViewProvider {
           let undoChangeStatements: string[] | undefined = undefined;
           if (tableName && undoable) {
             const undoChangeResult = diffToUndoChanges(rdh1, rdh2);
+            let sqlLang: SQLLang = "sql";
+            if (rdh1.meta.connectionName) {
+              const dbType = this.stateStorage?.getDBTypeByConnectionName(rdh1.meta.connectionName);
+              if (dbType === DBType.Aws) {
+                sqlLang = "partiql";
+              }
+            }
             const list = createUndoChangeSQL({
               schemaName,
               tableName,
@@ -226,6 +235,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
                 specifyValuesWithBindParameters: false,
               },
               diffResult: undoChangeResult,
+              sqlLang,
             });
             undoChangeStatements = list.map((it) => it.query);
           }
@@ -351,20 +361,34 @@ export class DiffMdhViewProvider extends BaseViewProvider {
         continue;
       }
       contents.push(`const con${i + 1} = getConnectionSettingByName('${conName}');`);
-      contents.push(
-        `const result${i + 1} = await DBDriverResolver.getInstance().flowTransaction(con${
-          i + 1
-        }, async (driver) => {`
-      );
+      if (setting.dbType === DBType.Aws) {
+        contents.push(
+          `const result${i + 1} = await DBDriverResolver.getInstance().workflow(con${
+            i + 1
+          }, async (driver) => {`
+        );
+      } else {
+        contents.push(
+          `const result${i + 1} = await DBDriverResolver.getInstance().flowTransaction(con${
+            i + 1
+          }, async (driver) => {`
+        );
+      }
       undoList.forEach((it, index) => {
         contents.push(`  // ${index + 1}:${it.rdh1.meta.tableName}`);
         it.undoChangeStatements?.forEach((sql) => {
-          contents.push(`  await requestSql(driver, "${sql.replace('"', '\\"')}");`);
+          contents.push(
+            `  await requestSql(driver, "${sql.replace(/"/g, '\\"').replace(/\n/g, "\\n")}");`
+          );
         });
         contents.push("");
       });
-      contents.push(`},{ transactionControlType: 'rollbackOnError' }`);
-      contents.push(`);`);
+      if (setting.dbType === DBType.Aws) {
+        contents.push(`});`);
+      } else {
+        contents.push(`},{ transactionControlType: 'rollbackOnError' }`);
+        contents.push(`);`);
+      }
       contents.push(`console.log('result${i + 1}', JSON.stringify(result${i + 1}, null, 2));`);
     }
     contents.push(``);
