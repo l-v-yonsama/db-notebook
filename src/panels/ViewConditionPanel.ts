@@ -1,8 +1,8 @@
 import {
+  BaseSQLSupportDriver,
   DBDriverResolver,
   DbDynamoTable,
   DbTable,
-  RDSBaseDriver,
   toDeleteStatement,
   toInsertStatement,
   toUpdateStatement,
@@ -68,12 +68,15 @@ export class ViewConditionPanel extends BasePanel {
       );
       ViewConditionPanel.currentPanel = new ViewConditionPanel(panel, extensionUri);
     }
+
+    // Clone resource
     ViewConditionPanel.currentPanel.tableRes = tableRes;
-    if (tableRes instanceof DbTable) {
+
+    if (ViewConditionPanel.currentPanel.tableRes instanceof DbTable) {
       ViewConditionPanel.currentPanel.supportEditMode = true;
       ViewConditionPanel.currentPanel.numOfRowsLabel = "Current rows";
     } else {
-      ViewConditionPanel.currentPanel.supportEditMode = false;
+      ViewConditionPanel.currentPanel.supportEditMode = true;
       ViewConditionPanel.currentPanel.numOfRowsLabel = "Estimated rows";
     }
     ViewConditionPanel.currentPanel.numOfRows = Math.min(100000, numOfRows);
@@ -129,6 +132,7 @@ export class ViewConditionPanel extends BasePanel {
     const toPositionalCharacter = driver.getPositionalCharacter();
     const isLimitAsTop = driver.isLimitAsTop();
     const isSchemaSpecificationSvailable = driver.isSchemaSpecificationSvailable();
+    const sqlLang = driver.getSqlLang();
 
     try {
       const { query } = toViewDataNormalizedQuery({
@@ -139,6 +143,7 @@ export class ViewConditionPanel extends BasePanel {
         limitAsTop: isLimitAsTop,
         conditions: specfyCondition ? conditions : undefined,
         limit: this.limit,
+        sqlLang,
       });
 
       return query + "";
@@ -190,7 +195,7 @@ export class ViewConditionPanel extends BasePanel {
           }
 
           const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
-            RDSBaseDriver,
+            BaseSQLSupportDriver,
             ResultSetData
           >(setting, async (driver) => {
             const { query, binds } = toViewDataNormalizedQuery({
@@ -201,6 +206,7 @@ export class ViewConditionPanel extends BasePanel {
               conditions: specfyCondition ? conditions : undefined,
               limit: this.limit,
               limitAsTop: driver.isLimitAsTop(),
+              sqlLang: driver.getSqlLang(),
             });
 
             log(`${PREFIX} query:[${query}]`);
@@ -287,11 +293,14 @@ export class ViewConditionPanel extends BasePanel {
         cancellable: true,
       },
       async (progress, token) => {
-        return await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+        return await DBDriverResolver.getInstance().workflow<BaseSQLSupportDriver>(
           setting,
           async (driver) => {
             const toPositionedParameter = driver.isPositionedParameterAvailable();
             const toPositionalCharacter = driver.getPositionalCharacter();
+            const sqlLang = driver.getSqlLang();
+            const specifyValuesWithBindParameters = sqlLang === "sql";
+
             let errorMessage = "";
             for (let i = 0; i < insertList.length; i++) {
               const prefix = `INSERT[${i + 1}/${insertList.length}] `;
@@ -302,10 +311,11 @@ export class ViewConditionPanel extends BasePanel {
                   columns: rdh.keys,
                   values,
                   bindOption: {
-                    specifyValuesWithBindParameters: true,
+                    specifyValuesWithBindParameters,
                     toPositionedParameter,
                     toPositionalCharacter,
                   },
+                  sqlLang,
                 });
                 log(`${prefix} sql:[${query}]`);
                 log(`${prefix} binds:${JSON.stringify(binds)}`);
@@ -342,10 +352,11 @@ export class ViewConditionPanel extends BasePanel {
                   values,
                   conditions,
                   bindOption: {
-                    specifyValuesWithBindParameters: true,
+                    specifyValuesWithBindParameters,
                     toPositionedParameter,
                     toPositionalCharacter,
                   },
+                  sqlLang,
                 });
 
                 log(`${prefix} sql:[${query}]`);
@@ -382,10 +393,11 @@ export class ViewConditionPanel extends BasePanel {
                   columns: rdh.keys,
                   conditions,
                   bindOption: {
-                    specifyValuesWithBindParameters: true,
+                    specifyValuesWithBindParameters,
                     toPositionedParameter,
                     toPositionalCharacter,
                   },
+                  sqlLang,
                 });
                 log(`${prefix} sql:[${query}]`);
                 log(`${prefix} binds:${JSON.stringify(binds)}`);

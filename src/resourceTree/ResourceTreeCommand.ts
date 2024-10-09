@@ -1,4 +1,5 @@
 import {
+  BaseSQLSupportDriver,
   DBDriverResolver,
   DbConnection,
   DbDatabase,
@@ -8,7 +9,6 @@ import {
   DbTable,
   RdsDatabase,
   RedisDriver,
-  isISQLSupportDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   ExtensionContext,
@@ -162,18 +162,16 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       if (!setting) {
         return;
       }
-      const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
-        setting,
-        async (driver) => {
-          if (isISQLSupportDriver(driver)) {
+      const { ok, message, result } =
+        await DBDriverResolver.getInstance().workflow<BaseSQLSupportDriver>(
+          setting,
+          async (driver) => {
             return await driver.count({
               table: tableRes.name,
               schema: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
             });
           }
-          return 0;
-        }
-      );
+        );
 
       if (ok && result !== undefined) {
         ViewConditionPanel.render(context.extensionUri, tableRes, result);
