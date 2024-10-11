@@ -16,3 +16,7 @@ export type ShowCellDetailParams = {
   required?: boolean;
   value: any;
 };
+
+export type ShowRecordParams = {
+  value: any;
+};

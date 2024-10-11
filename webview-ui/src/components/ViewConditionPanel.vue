@@ -95,6 +95,7 @@ const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void
   previewSql.value = v.previewSql;
   supportEditMode.value = v.supportEditMode;
   numOfRowsLabel.value = v.numOfRowsLabel;
+  visibleSettingsMode.value = true;
   let cols: DropdownItem[] = [];
 
   if (v.tableRes.resourceType === 'Table') {

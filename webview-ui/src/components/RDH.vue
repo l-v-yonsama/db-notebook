@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CellFocusParams, ShowCellDetailParams } from "@/types/RdhEvents";
+import type { CellFocusParams, ShowCellDetailParams, ShowRecordParams } from "@/types/RdhEvents";
 import type {
   EditRowDeleteValues,
   EditRowInsertValues,
@@ -93,6 +93,7 @@ const editable = props.rdh.meta?.editable === true;
 const emit = defineEmits<{
   (event: "onClickCell", value: CellFocusParams): void;
   (event: "onShowDetailPane", value: ShowCellDetailParams): void;
+  (event: "onShowRecordAtDetailPane", value: ShowRecordParams): void;
 }>();
 
 const visible = ref(true);
@@ -109,8 +110,8 @@ const { ruleViolationSummary } = props.rdh.meta;
 
 const legend = ruleViolationSummary
   ? Object.keys(ruleViolationSummary)
-      .map((k, idx) => `*${idx + 1}: ${k}: ${ruleViolationSummary[k]}`)
-      .join(" , ")
+    .map((k, idx) => `*${idx + 1}: ${k}: ${ruleViolationSummary[k]}`)
+    .join(" , ")
   : "";
 
 const height = computed(() => (legend.length > 0 ? Math.max(props.height - 16, 0) : props.height));
@@ -417,6 +418,23 @@ const showDetail = (item: RowValues, key: ColKey, value: any) => {
   emit("onShowDetailPane", params);
 };
 
+const showDetailAll = (item: RowValues) => {
+  const o = JSON.parse(JSON.stringify(item));
+  delete o.editType;
+  delete o.$meta;
+  delete o.$resolvedLabels;
+  delete o.$changeInNumbers;
+  delete o.$ruleViolationMarks;
+  delete o.$fileValues;
+  delete o.$changeInNumbers;
+  delete o.$beforeKeyValues;
+  delete o.$beforeValues;
+  const params: ShowRecordParams = {
+    value: o
+  };
+  emit("onShowRecordAtDetailPane", params);
+};
+
 const copyToClipboard = (text: string) => {
   navigator?.clipboard?.writeText(text);
 };
@@ -513,54 +531,29 @@ defineExpose({
 <template>
   <section>
     <section class="table" :class="{ readonly: !editable }">
-      <VirtualList
-        v-if="visible"
-        :items="list"
-        :table="true"
-        class="list-table"
-        :style="{ height: `${height}px` }"
-      >
+      <VirtualList v-if="visible" :items="list" :table="true" class="list-table" :style="{ height: `${height}px` }">
         <template #prepend>
           <thead>
             <tr>
               <th v-if="editable" class="ctrl">CONTROL</th>
               <th class="row">ROW</th>
-              <th
-                v-for="(key, idx) of columns"
-                :key="idx"
-                :title="key.name"
-                :style="{ width: `${key.width}px` }"
-              >
-                <span class="codicon" :class="key.typeClass"></span
-                ><span
-                  class="label"
-                  :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }"
-                  >{{ key.name }}</span
-                >
-                <a class="widen" @click="key.width += 100"
-                  ><span class="codicon codicon-arrow-both"></span
-                ></a>
+              <th v-for="(key, idx) of columns" :key="idx" :title="key.name" :style="{ width: `${key.width}px` }">
+                <span class="codicon" :class="key.typeClass"></span><span class="label"
+                  :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }">{{ key.name }}</span>
+                <a class="widen" @click="key.width += 100"><span class="codicon codicon-arrow-both"></span></a>
               </th>
             </tr>
             <tr v-if="withComment || editable">
               <th v-if="editable" class="ctrl">
                 <div style="display: flex !important">
-                  <VsCodeButton
-                    v-if="editable"
-                    @click="addRow"
-                    title="Add row"
-                    appearance="secondary"
-                    ><fa icon="plus" />Add</VsCodeButton
-                  >
+                  <VsCodeButton v-if="editable" @click="addRow" title="Add row" appearance="secondary">
+                    <fa icon="plus" />Add
+                  </VsCodeButton>
                 </div>
               </th>
               <th class="row"></th>
-              <th
-                v-for="(key, idx) of columns"
-                :key="idx"
-                :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }"
-                :title="key.comment"
-              >
+              <th v-for="(key, idx) of columns" :key="idx"
+                :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }" :title="key.comment">
                 {{ key.comment }}
               </th>
             </tr>
@@ -569,12 +562,8 @@ defineExpose({
                 <div style="display: flex !important"></div>
               </th>
               <th class="row">[TYPE]</th>
-              <th
-                v-for="(key, idx) of columns"
-                :key="idx"
-                :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }"
-                :title="key.gtype"
-              >
+              <th v-for="(key, idx) of columns" :key="idx"
+                :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }" :title="key.gtype">
                 {{ key.gtype }}
               </th>
             </tr>
@@ -584,107 +573,65 @@ defineExpose({
           <tr :style="rowStyle(item, index)" :class="{ selectedRow: index === selectedRowIndex }">
             <td v-if="editable" class="ctrl">
               <div>
-                <VsCodeButton
-                  v-if="editable"
-                  :disabled="item.editType === 'ins'"
-                  @click="editRow(index)"
-                  title="Update row"
-                  appearance="secondary"
-                  ><fa icon="pencil"
-                /></VsCodeButton>
-                <VsCodeButton
-                  v-if="editable"
-                  @click="deleteRow(index)"
-                  title="Delete row"
-                  appearance="secondary"
-                  ><fa icon="trash"
-                /></VsCodeButton>
+                <VsCodeButton v-if="editable" :disabled="item.editType === 'ins'" @click="editRow(index)"
+                  title="Update row" appearance="secondary">
+                  <fa icon="pencil" />
+                </VsCodeButton>
+                <VsCodeButton v-if="editable" @click="deleteRow(index)" title="Delete row" appearance="secondary">
+                  <fa icon="trash" />
+                </VsCodeButton>
               </div>
             </td>
-            <td
-              class="row"
-              @click="onClickCell({ rowPos: index, colPos: -1, key: '', rowValues: item })"
-            >
+            <td class="row" @click="onClickCell({ rowPos: index, colPos: -1, key: '', rowValues: item })">
               {{ toEditTypeMark(item.editType) }}
               {{ index + 1 }}
+              <div class="cell-actions" v-if="!editable">
+                <VsCodeButton @click.stop="showDetailAll(item)" appearance="secondary" class="show-detail">
+                  <fa icon="eye" size="sm" />
+                </VsCodeButton>
+              </div>
             </td>
-            <td
-              class="vcell"
-              v-for="(key, idx) of columns"
-              :key="idx"
-              :style="cellStyle(item, key)"
-              @click="onClickCell({ rowPos: index, colPos: idx, key: key.name, rowValues: item })"
-            >
-              <VsCodeTextField
-                v-if="item.editType === 'ins' || item.editType === 'upd'"
-                v-model="item[key.name]"
-                :readonly="false"
-                :required="key.required"
-                :transparent="true"
-                :maxlength="1000"
-                :size="key.inputSize"
-                style="width: 99%"
-              ></VsCodeTextField>
+            <td class="vcell" v-for="(key, idx) of columns" :key="idx" :style="cellStyle(item, key)"
+              @click="onClickCell({ rowPos: index, colPos: idx, key: key.name, rowValues: item })">
+              <VsCodeTextField v-if="item.editType === 'ins' || item.editType === 'upd'" v-model="item[key.name]"
+                :readonly="false" :required="key.required" :transparent="true" :maxlength="1000" :size="key.inputSize"
+                style="width: 99%"></VsCodeTextField>
               <template v-else>
                 <template v-if="item.$fileValues[key.name]">
-                  <FileAnnotationView
-                    :text="item[key.name]"
-                    :annotation="item.$fileValues[key.name]"
-                  />
+                  <FileAnnotationView :text="item[key.name]" :annotation="item.$fileValues[key.name]" />
                 </template>
                 <template v-else>
-                  <p
-                    :class="{
-                      'code-value': item.$resolvedLabels[key.name],
-                      'is-null': item[key.name] == null,
-                    }"
-                    :title="item[key.name]"
-                  >
+                  <p :class="{
+                    'code-value': item.$resolvedLabels[key.name],
+                    'is-null': item[key.name] == null,
+                  }" :title="item[key.name]">
                     <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
                       item.$ruleViolationMarks[key.name]
-                    }}</span>
+                      }}</span>
                     <span class="val">{{ item[key.name] }}</span>
                   </p>
-                  <span
-                    v-if="item.$resolvedLabels[key.name]"
-                    class="marker-box code-label"
-                    :class="{
-                      'marker-info': item.$resolvedLabels[key.name]?.isUndefined === false,
-                      'marker-error': item.$resolvedLabels[key.name]?.isUndefined,
-                    }"
-                    >{{ item.$resolvedLabels[key.name]?.label }}</span
-                  >
-                  <span
-                    v-if="item.$changeInNumbers[key.name]"
-                    class="marker-box code-label"
-                    :class="{
-                      'marker-info': item.$changeInNumbers[key.name]?.value >= 0,
-                      'marker-error': item.$changeInNumbers[key.name]?.value < 0,
-                    }"
-                    >{{ item.$changeInNumbers[key.name]?.value >= 0 ? " +" : " " }}
-                    {{ item.$changeInNumbers[key.name]?.value }}</span
-                  >
-                  <div
-                    class="cell-actions"
-                    v-if="
-                      item[key.name] !== undefined &&
-                      item[key.name] !== null &&
-                      item[key.name] !== ''
-                    "
-                  >
-                    <VsCodeButton
-                      v-if="key.visibleDetailPane"
-                      @click.stop="showDetail(item, key, item[key.name])"
-                      appearance="secondary"
-                      class="show-detail"
-                      ><fa icon="eye"
-                    /></VsCodeButton>
-                    <VsCodeButton
-                      @click.stop="copyToClipboard(item[key.name])"
-                      appearance="secondary"
-                      class="copy-to-clipboard"
-                      ><fa icon="clipboard"
-                    /></VsCodeButton>
+                  <span v-if="item.$resolvedLabels[key.name]" class="marker-box code-label" :class="{
+                    'marker-info': item.$resolvedLabels[key.name]?.isUndefined === false,
+                    'marker-error': item.$resolvedLabels[key.name]?.isUndefined,
+                  }">{{ item.$resolvedLabels[key.name]?.label }}</span>
+                  <span v-if="item.$changeInNumbers[key.name]" class="marker-box code-label" :class="{
+                    'marker-info': item.$changeInNumbers[key.name]?.value >= 0,
+                    'marker-error': item.$changeInNumbers[key.name]?.value < 0,
+                  }">{{ item.$changeInNumbers[key.name]?.value >= 0 ? " +" : " " }}
+                    {{ item.$changeInNumbers[key.name]?.value }}</span>
+                  <div class="cell-actions" v-if="
+                    item[key.name] !== undefined &&
+                    item[key.name] !== null &&
+                    item[key.name] !== ''
+                  ">
+                    <VsCodeButton v-if="key.visibleDetailPane" @click.stop="showDetail(item, key, item[key.name])"
+                      appearance="secondary" class="show-detail">
+                      <fa icon="eye" />
+                    </VsCodeButton>
+                    <VsCodeButton @click.stop="copyToClipboard(item[key.name])" appearance="secondary"
+                      class="copy-to-clipboard">
+                      <fa icon="clipboard" />
+                    </VsCodeButton>
                   </div>
                 </template>
               </template>
@@ -714,6 +661,7 @@ thead {
 
 tr {
   &.selectedRow {
+
     td.ctrl,
     td.row {
       background-color: var(--vscode-editorGroupHeader-tabsBackground);
@@ -745,14 +693,15 @@ th {
     z-index: 1;
     background-color: var(--vscode-editorPane-background);
 
-    & > div {
+    &>div {
       display: none;
 
-      & > vscode-button {
+      &>vscode-button {
         flex: 1;
       }
     }
-    &:hover > div {
+
+    &:hover>div {
       display: flex;
       flex-direction: row;
       column-gap: 3px;
@@ -769,6 +718,21 @@ td {
     padding-right: 5px;
   }
 
+  &.row {
+    position: relative;
+
+    &>.cell-actions {
+      display: none;
+      position: absolute;
+      right: 2px;
+      top: 4px;
+    }
+
+    &:hover>.cell-actions {
+      display: inline-block;
+    }
+  }
+
   &.vcell {
     text-overflow: ellipsis;
     overflow: hidden;
@@ -776,7 +740,7 @@ td {
     position: relative;
     padding-right: 2px;
 
-    & > a.download-link {
+    &>a.download-link {
       display: inline-block;
       position: absolute;
       left: 4px;
@@ -785,7 +749,7 @@ td {
       padding: 1px;
     }
 
-    & > .code-label {
+    &>.code-label {
       display: inline-block;
       position: absolute;
       right: 4px;
@@ -794,21 +758,22 @@ td {
       padding: 1px;
     }
 
-    &:hover > .code-label {
+    &:hover>.code-label {
       display: none;
     }
 
-    & > .cell-actions {
+    &>.cell-actions {
       display: none;
       position: absolute;
       right: 1px;
       top: 2px;
     }
-    &:hover > .cell-actions {
+
+    &:hover>.cell-actions {
       display: inline-block;
     }
 
-    & > p {
+    &>p {
       display: inline-block;
       margin: 5px 0px 5px 2px;
       overflow: hidden;
@@ -816,7 +781,7 @@ td {
       white-space: nowrap;
       width: 100%;
 
-      & > span.val {
+      &>span.val {
         margin-right: 2px;
       }
 
@@ -846,14 +811,15 @@ th {
   white-space: nowrap;
   position: relative;
 
-  & > a.widen {
+  &>a.widen {
     cursor: pointer;
     display: none;
     position: absolute;
     right: 2px;
     top: 2px;
   }
-  &:hover > a.widen {
+
+  &:hover>a.widen {
     display: inline-block;
   }
 }
@@ -862,6 +828,7 @@ span.codicon {
   margin-right: 2px;
   vertical-align: middle;
 }
+
 span.label {
   display: inline-block;
   vertical-align: middle;
@@ -870,12 +837,15 @@ span.label {
   overflow: hidden;
   white-space: nowrap;
 }
+
 p.rule-violation-legend {
   margin: 0 5px;
 }
+
 p.code-value {
   text-align: left;
 }
+
 /* tr.inserted {
   background-color: var(--vscode-diffEditor-insertedTextBackground) !important;
 }
