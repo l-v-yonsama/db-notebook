@@ -38,6 +38,7 @@ import {
   RETRIEVE_RESOURCES,
   RETRIEVE_TABLE_RECORDS,
   SHOW_CONNECTION_SETTING,
+  SHOW_DYNAMO_QUERY_PANEL,
   SHOW_RESOURCE_PROPERTIES,
   SHOW_SCAN_PANEL,
   SPECIFY_DEFAULT_CON_FOR_SQL_CELL,
@@ -45,6 +46,7 @@ import {
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
 import { CreateInsertScriptSettingsPanel } from "../panels/CreateInsertScriptSettingsPanel";
+import { DynamoQueryPanel } from "../panels/DynamoQueryPanel";
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
 import { ScanPanel } from "../panels/ScanPanel";
 import { ViewConditionPanel } from "../panels/ViewConditionPanel";
@@ -202,6 +204,13 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   context.subscriptions.push(
     commands.registerCommand(SHOW_SCAN_PANEL, async (target: DbResource) => {
       ScanPanel.render(context.extensionUri, target);
+    })
+  );
+
+  // Show dynamo query panel
+  context.subscriptions.push(
+    commands.registerCommand(SHOW_DYNAMO_QUERY_PANEL, async (target: DbDynamoTable) => {
+      DynamoQueryPanel.render(context.extensionUri, target);
     })
   );
 

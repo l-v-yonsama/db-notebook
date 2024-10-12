@@ -474,7 +474,7 @@ export const createHtmlFromRdhList = async (
       )
     );
 
-    const cell = {
+    const cell: any = {
       index,
       kind: NotebookCellKind.Code,
       notebook: null as unknown as NotebookDocument,
@@ -486,6 +486,10 @@ export const createHtmlFromRdhList = async (
       outputs,
       executionSummary: undefined,
     };
+    if (rdh.sqlStatement === "" && rdh.meta.queryInput) {
+      cell.document.languageId = "json";
+      cell.document.getText = () => rdh.meta.queryInput ?? "";
+    }
 
     cells.push(cell);
   });

@@ -25,6 +25,7 @@ import type {
 } from "./ActionParams";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ComponentName } from "./ComponentName";
+import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
 import type { ModeType } from "./ModeType";
 import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
@@ -39,6 +40,7 @@ export type MessageEventData =
   | HarFilePanelEventData
   | DiffMdhViewEventData
   | ScanPanelEventData
+  | DynamoQueryPanelEventData
   | ViewConditionPanelEventData
   | VariablesPanelEventData
   | WriteHttpEventToClipboardParamsPanelEventData
@@ -132,6 +134,33 @@ export type CreateInsertScriptSettingsPanelEventData = BaseMessageEventData<
     };
     setPreviewSql?: {
       previewSql: string;
+    };
+  }
+>;
+
+export type DynamoQueryPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-preview-input",
+  "DynamoQueryPanel",
+  {
+    initialize?: {
+      tableRes: DbDynamoTable;
+      previewInput: string;
+      numOfRows: number;
+      limit: number;
+      pkName: string;
+      skName: string;
+      pkValue: string;
+      skValue: string;
+      pkAttr: string;
+      skAttr: string;
+      skOpe: string;
+      target: string;
+      sortDesc: boolean;
+      filters: DynamoQueryFilter[];
+      columnItems: { value: string | number; label: string }[];
+    };
+    setPreviewInput?: {
+      previewInput: string;
     };
   }
 >;

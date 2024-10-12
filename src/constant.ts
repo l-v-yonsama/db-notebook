@@ -32,6 +32,7 @@ export const DUPLICATE_CONNECTION_SETTING = `${EXTENSION_NAME}.duplicate-connect
 export const DELETE_CONNECTION_SETTING = `${EXTENSION_NAME}.delete-connection-setting`;
 
 export const SHOW_SCAN_PANEL = `${EXTENSION_NAME}.show-scan-panel`;
+export const SHOW_DYNAMO_QUERY_PANEL = `${EXTENSION_NAME}.show-dynamo-query-panel`;
 export const SHOW_METADATA_RDH = `${EXTENSION_NAME}.show-metadata-rdh`;
 export const SHOW_RESOURCE_PROPERTIES = `${EXTENSION_NAME}.show-resource-properties`;
 export const CREATE_ER_DIAGRAM = `${EXTENSION_NAME}.create-er-diagram`;

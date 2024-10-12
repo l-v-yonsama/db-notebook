@@ -3,6 +3,7 @@ export type ComponentName =
   | "ChartsView"
   | "MdhView"
   | "DiffMdhView"
+  | "DynamoQueryPanel"
   | "ExportHtmlParamsPanel"
   | "ScanPanel"
   | "VariablesPanel"

@@ -25,6 +25,7 @@ import { HelpProvider } from "./help/HelpProvider";
 import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
 import { activateNotebook } from "./notebook/activator";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
+import { DynamoQueryPanel } from "./panels/DynamoQueryPanel";
 import { HarFilePanel } from "./panels/HarFilePanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 import { ScanPanel } from "./panels/ScanPanel";
@@ -63,6 +64,7 @@ export async function activate(context: ExtensionContext) {
   log(`${PREFIX} start activation.`);
 
   ScanPanel.setStateStorage(stateStorage);
+  DynamoQueryPanel.setStateStorage(stateStorage);
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
   HarFilePanel.setStateStorage(stateStorage);

@@ -14,6 +14,7 @@ import DiffMdhView from "./components/views/DiffMdhView.vue";
 import MdhView from "./components/views/MdhView.vue";
 import ToolsView from "./components/views/ToolsView.vue";
 
+import DynamoQueryPanel from "./components/DynamoQueryPanel.vue";
 import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
@@ -38,6 +39,7 @@ const httpEventPanelRef = ref<InstanceType<typeof HttpEventPanel>>();
 const harFilePanelRef = ref<InstanceType<typeof HarFilePanel>>();
 const diffMdhViewRef = ref<InstanceType<typeof DiffMdhView>>();
 const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
+const dynamoQueryPanelRef = ref<InstanceType<typeof DynamoQueryPanel>>();
 const viewConditionPanelRef = ref<InstanceType<typeof ViewConditionPanel>>();
 const variablesPanelRef = ref<InstanceType<typeof VariablesPanel>>();
 const writeHttpEventToClipboardParamsPanelRef =
@@ -85,6 +87,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     case "ScanPanel":
       scanPanelRef.value?.recieveMessage(data);
       break;
+    case "DynamoQueryPanel":
+      dynamoQueryPanelRef.value?.recieveMessage(data);
+      break;
     case "ViewConditionPanel":
       viewConditionPanelRef.value?.recieveMessage(data);
       break;
@@ -126,15 +131,10 @@ onMounted(() => {
 
     <HttpEventPanel v-if="currentComponentName === 'HttpEventPanel'" ref="httpEventPanelRef" />
 
-    <CreateInsertScriptSettingsPanel
-      v-if="currentComponentName === 'CreateInsertScriptSettingsPanel'"
-      ref="createInsertScriptSettingsPanelRef"
-    />
+    <CreateInsertScriptSettingsPanel v-if="currentComponentName === 'CreateInsertScriptSettingsPanel'"
+      ref="createInsertScriptSettingsPanelRef" />
 
-    <CsvParseSettingPanel
-      v-if="currentComponentName === 'CsvParseSettingPanel'"
-      ref="csvParseSettingPanelRef"
-    />
+    <CsvParseSettingPanel v-if="currentComponentName === 'CsvParseSettingPanel'" ref="csvParseSettingPanelRef" />
 
     <HarFilePanel v-if="currentComponentName === 'HarFilePanel'" ref="harFilePanelRef" />
 
@@ -142,43 +142,29 @@ onMounted(() => {
 
     <ScanPanel v-if="currentComponentName === 'ScanPanel'" ref="scanPanelRef" />
 
-    <ViewConditionPanel
-      v-if="currentComponentName === 'ViewConditionPanel'"
-      ref="viewConditionPanelRef"
-    />
+    <DynamoQueryPanel v-if="currentComponentName === 'DynamoQueryPanel'" ref="dynamoQueryPanelRef" />
+
+    <ViewConditionPanel v-if="currentComponentName === 'ViewConditionPanel'" ref="viewConditionPanelRef" />
 
     <VariablesPanel v-if="currentComponentName === 'VariablesPanel'" ref="variablesPanelRef" />
 
-    <WriteHttpEventToClipboardParamsPanel
-      v-if="currentComponentName === 'WriteHttpEventToClipboardParamsPanel'"
-      ref="writeHttpEventToClipboardParamsPanelRef"
-    />
+    <WriteHttpEventToClipboardParamsPanel v-if="currentComponentName === 'WriteHttpEventToClipboardParamsPanel'"
+      ref="writeHttpEventToClipboardParamsPanelRef" />
 
-    <ERDiagramSettings
-      v-if="currentComponentName === 'ERDiagramSettingsPanel'"
-      ref="eRDiagramSettingsPanelRef"
-    />
+    <ERDiagramSettings v-if="currentComponentName === 'ERDiagramSettingsPanel'" ref="eRDiagramSettingsPanelRef" />
 
     <CountRecordView v-if="currentComponentName === 'CountRecordView'" ref="countRecordViewRef" />
 
     <ChartsView v-if="currentComponentName === 'ChartsView'" ref="chartsViewRef" />
 
-    <NotebookCellMetadataPanel
-      v-if="currentComponentName === 'NotebookCellMetadataPanel'"
-      ref="notebookCellMetadataPanelRef"
-    />
+    <NotebookCellMetadataPanel v-if="currentComponentName === 'NotebookCellMetadataPanel'"
+      ref="notebookCellMetadataPanelRef" />
 
-    <RecordRuleEditor
-      v-if="currentComponentName === 'RecordRuleEditor'"
-      ref="recordRuleEditorRef"
-    />
+    <RecordRuleEditor v-if="currentComponentName === 'RecordRuleEditor'" ref="recordRuleEditorRef" />
 
-    <CodeResolverEditor
-      v-if="currentComponentName === 'CodeResolverEditor'"
-      ref="codeResolverEditorRef"
-    />
+    <CodeResolverEditor v-if="currentComponentName === 'CodeResolverEditor'" ref="codeResolverEditorRef" />
 
     <ToolsView v-if="currentComponentName === 'ToolsView'" ref="toolsViewRef" />
 
-</main>
+  </main>
 </template>

@@ -232,7 +232,9 @@ export class MdhViewProvider extends BaseViewProvider {
   private createTabItem(title: string, list: ResultSetData[]): RdhTabItem {
     const rdhConfig = getResultsetConfig();
     const tabId = createHash("md5").update(title).digest("hex");
-    const refreshable = list.every((it) => it.meta.type === "select" || it.meta.type === "show");
+    const refreshable = list.every(
+      (it) => (it.meta.type === "select" || it.meta.type === "show") && it.sqlStatement
+    );
     const item: RdhTabItem = {
       tabId,
       title,
