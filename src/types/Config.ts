@@ -3,6 +3,9 @@ export type SQLFormatterConfigType = {
   uppercase?: boolean;
   linesBetweenQueries?: number;
 };
+export type SQLSeparatorConfigType = {
+  keepSemicoron: boolean;
+};
 export type NodeConfigType = {
   commandPath?: string;
   dataEncoding: NodeProcessDataEncodingType;
