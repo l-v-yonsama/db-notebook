@@ -6,6 +6,7 @@ import {
   OutputConfigType,
   ResultsetConfigType,
   SQLFormatterConfigType,
+  SQLSeparatorConfigType,
 } from "../types/Config";
 
 export const getFormatterConfig = (): SQLFormatterConfigType => {
@@ -15,6 +16,14 @@ export const getFormatterConfig = (): SQLFormatterConfigType => {
     uppercase: settings.get("uppercase", false),
     linesBetweenQueries: settings.get("linesBetweenQueries", 2),
     indent: " ".repeat(settings.get("tabWidth", 2)),
+  };
+};
+
+export const getSQLSeparatorConfig = (): SQLSeparatorConfigType => {
+  const settings = workspace.getConfiguration("sql-separator", null);
+
+  return {
+    keepSemicoron: settings.get("keepSemicoron", false),
   };
 };
 

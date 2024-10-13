@@ -1,9 +1,4 @@
-import {
-  DBType,
-  isPartiQLType,
-  isRDSType,
-  separateMultipleQueries,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import { DBType, isPartiQLType, isRDSType } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as dayjs from "dayjs";
 import * as path from "path";
 import sqlFormatter from "sql-formatter-plus";
@@ -51,7 +46,7 @@ import { activateStatusBar } from "../statusBar";
 import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
-import { getFormatterConfig } from "../utilities/configUtil";
+import { getFormatterConfig, getSQLSeparatorConfig } from "../utilities/configUtil";
 import { readResource } from "../utilities/fsUtil";
 import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
 import { log } from "../utilities/logger";
@@ -111,7 +106,8 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         window.showErrorMessage("No text data");
         return;
       }
-      const queries = separateMultipleQueries(text);
+      const { keepSemicoron } = getSQLSeparatorConfig();
+      const queries = separateMultipleQueries(text, keepSemicoron);
       if (queries.length === 0) {
         window.showErrorMessage("No query data");
         return;
@@ -461,4 +457,38 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   );
 
   log(`${PREFIX} end activateNotebook.`);
+}
+
+// Remove this function when separateMultipleQueries in db-drivers is modified
+// TODO: DELETE
+function separateMultipleQueries(text: string, keepSemicolon: boolean = false): string[] {
+  const quotePattern1 = /('(.*?)(?<!\\)')/; // Handles single, double quotes
+  const quotePattern2 = /("(.*?)(?<!\\)")/; // Handles single, double quotes
+  const commentPattern = /--.*?(?=[\r\n]|$)|\/\*[\s\S]*?\*\//; // Handles single line and multi-line comments
+  const delimiterPattern = /;/;
+  const queries: string[] = [];
+  let currentToken: string[] = [];
+  // Aggregate regex pattern
+  const pattern = new RegExp(
+    `(${quotePattern1.source}|${quotePattern2.source}|${commentPattern.source}|${delimiterPattern.source}|[\r\n]+|.)`,
+    "g"
+  );
+  text.match(pattern)?.forEach((token) => {
+    if (token === ";") {
+      if (currentToken.length > 0) {
+        if (keepSemicolon) {
+          queries.push(currentToken.join("").trim() + ";"); // Add the semicolon back
+        } else {
+          queries.push(currentToken.join("").trim());
+        }
+        currentToken = [];
+      }
+    } else {
+      currentToken.push(token);
+    }
+  });
+  if (currentToken.length > 0) {
+    queries.push(currentToken.join("").trim());
+  }
+  return queries.filter((it) => it.replace(/[\r\n]+/g, " ").trim().length > 0);
 }
