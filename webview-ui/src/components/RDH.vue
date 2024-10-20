@@ -301,6 +301,12 @@ function toValue(key: RdhKey, value: any): any {
     }
     return "(BINARY)";
   }
+  if (isEnumOrSet(key.type) || isArray(key.type)) {
+    return value.toString();
+  }
+  if (isJsonLike(key.type)) {
+    return JSON.stringify(value);
+  }
 
   return value;
 }
@@ -607,7 +613,7 @@ defineExpose({
                   }" :title="item[key.name]">
                     <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
                       item.$ruleViolationMarks[key.name]
-                      }}</span>
+                    }}</span>
                     <span class="val">{{ item[key.name] }}</span>
                   </p>
                   <span v-if="item.$resolvedLabels[key.name]" class="marker-box code-label" :class="{
@@ -690,7 +696,7 @@ th {
     max-width: 80px;
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: 2;
     background-color: var(--vscode-editorPane-background);
 
     &>div {

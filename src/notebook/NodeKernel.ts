@@ -60,8 +60,9 @@ export class NodeKernel {
 
     return `
     (async () => {
-      const myfs = require('fs');
+      const myfs = require('fs');      
       const execa = require('${winToLinuxPath(path.join(nodeModules, "execa"))}');
+      const jmespath = require('${winToLinuxPath(path.join(nodeModules, "jmespath"))}');
       const fstringify = require('${winToLinuxPath(
         path.join(nodeModules, "fast-json-stable-stringify")
       )}');

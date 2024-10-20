@@ -30,7 +30,7 @@ const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector(".view-conditional-root");
   if (sectionWrapper?.clientHeight) {
     // Don't make it any less because the side-scrolling bar will disappear.
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 50, 100);
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 52, 100);
   }
   if (sectionWrapper?.clientWidth) {
     sectionWidth.value = Math.max(sectionWrapper.clientWidth - 14, 100);
@@ -314,7 +314,7 @@ section.view-conditional-root {
     margin: 5px;
 
     &.toolbar {
-      margin-bottom: 20px !important;
+      margin-bottom: 7px !important;
 
       .tool-left {
         label {

@@ -153,6 +153,7 @@ It also provides a CSV and Har file preview feature.
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
+- [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 
 ## Keyboard shortcuts
 
