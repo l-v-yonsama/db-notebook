@@ -406,8 +406,8 @@ export class ScanPanel extends BasePanel {
           keyword: keyword,
           limit: limit ?? 100,
           jsonExpansion,
-          startTime: startTime ? dayjs(startTime).valueOf() : undefined,
-          endTime: endTime ? dayjs(endTime).valueOf() : undefined,
+          startTime: this.getEpochTimeInSec(startTime),
+          endTime: this.getEpochTimeInSec(endTime),
           withValue: {
             limitSize: 100_000,
           },
@@ -472,6 +472,13 @@ export class ScanPanel extends BasePanel {
       return;
     }
     vscode.commands.executeCommand(OPEN_DIFF_MDH_VIEWER, diffParams);
+  }
+
+  private getEpochTimeInSec(dt: any): number | undefined {
+    if (dt === undefined || dt === null) {
+      return undefined;
+    }
+    return Math.round(dayjs(dt).valueOf() / 1000);
   }
 
   private async openLogStreamScanPanel(data: any) {
