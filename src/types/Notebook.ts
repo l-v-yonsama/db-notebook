@@ -28,6 +28,8 @@ export type CellMeta = {
   codeResolverFile?: string;
   sharedVariableName?: string;
   useDatabaseName?: string;
+  logGroupName?: string;
+  logGroupStartTimeOffset?: "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "12h" | "1d" | "1w";
   chart?: CellMetaChart;
   readonly [key: string]: any;
 };

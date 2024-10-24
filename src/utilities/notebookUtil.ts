@@ -12,6 +12,10 @@ export const isSqlCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql";
 };
 
+export const isCwqlCell = (cell: NotebookCell): boolean => {
+  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "cwql";
+};
+
 export const isJsCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "javascript";
 };

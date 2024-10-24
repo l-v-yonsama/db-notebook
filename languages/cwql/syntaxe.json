@@ -1,0 +1,39 @@
+{
+  "scopeName": "source.cloudwatch",
+  "patterns": [
+    {
+      "name": "keyword.control.cloudwatch",
+      "match": "\\b(display|fields|filter|pattern|diff|parse|sort|stats|limit|dedup|unmask|asc|desc)\\b"
+    },
+    {
+      "name": "keyword.operator.cloudwatch",
+      "match": "==|>=|<=|>|<"
+    },
+    {
+      "name": "constant.character.cloudwatch",
+      "match": "@[a-zA-Z0-9_-]+"
+    },
+    {
+      "name": "constant.numeric.cloudwatch",
+      "match": "\\b\\d+\\b"
+    },
+    {
+      "name": "string.quoted.single.cloudwatch",
+      "begin": "'",
+      "end": "'"
+    },
+    {
+      "name": "string.quoted.double.cloudwatch",
+      "begin": "\"",
+      "end": "\""
+    },
+    {
+      "name": "comment.line.cloudwatch",
+      "begin": "#",
+      "end": "$"
+    }
+  ],
+  "repository": {},
+  "injections": {},
+  "uuid": "b1e7a1e0-5c3e-11ec-bf63-0242ac139012"
+}

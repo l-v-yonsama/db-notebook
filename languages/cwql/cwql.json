@@ -1,0 +1,6 @@
+{
+  "id": "cwql",
+  "aliases": ["CloudWatch logs Query", "CloudWatch", "cloudwatch"],
+  "extensions": [".cwql"],
+  "configuration": "./languages/cwql/language-configuration.json"
+}

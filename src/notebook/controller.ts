@@ -27,6 +27,8 @@ import {
   CELL_OPEN_MDH,
   CELL_SHOW_METADATA_SETTINGS,
   CELL_SPECIFY_CONNECTION_TO_USE,
+  CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
+  CELL_SPECIFY_LOG_GROUP_TO_USE,
   NOTEBOOK_TYPE,
   OPEN_CHARTS_VIEWER,
   REFRESH_SQL_HISTORIES,
@@ -44,6 +46,7 @@ import { createResponseBodyMarkdown } from "../utilities/httpUtil";
 import { log, logError } from "../utilities/logger";
 import {
   hasAnyRdhOutputCell,
+  isCwqlCell,
   isJsonCell,
   isPreExecution,
   isSqlCell,
@@ -51,6 +54,7 @@ import {
   readRuleFile,
 } from "../utilities/notebookUtil";
 import { StateStorage } from "../utilities/StateStorage";
+import { AwsKernel } from "./awsKernel";
 import { setupDbResource } from "./intellisense";
 import { jsonKernelRun } from "./JsonKernel";
 import { NodeKernel } from "./NodeKernel";
@@ -62,6 +66,7 @@ type NoteSession = {
   executionOrder: number;
   kernel: NodeKernel | undefined;
   sqlKernel: SqlKernel | undefined;
+  awsKernel: AwsKernel | undefined;
   interrupted: boolean;
 };
 
@@ -69,7 +74,7 @@ export class MainController {
   readonly controllerId = `${NOTEBOOK_TYPE}-controller`;
   readonly notebookType = NOTEBOOK_TYPE;
   readonly label = "Database Notebook";
-  readonly supportedLanguages = ["sql", "javascript", "json"];
+  readonly supportedLanguages = ["sql", "javascript", "json", "cwql"];
 
   private readonly _controller: NotebookController;
   private readonly noteSessions = new Map<string, NoteSession>();
@@ -166,6 +171,20 @@ export class MainController {
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
+        new LogGroupSettingProvider(stateStorage)
+      )
+    );
+
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new LogGroupQueryTimeSettingProvider(stateStorage)
+      )
+    );
+
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
         new CellMetadataProvider(stateStorage)
       )
     );
@@ -210,7 +229,7 @@ export class MainController {
     // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
     if (noteSession) {
-      const { kernel, sqlKernel } = noteSession;
+      const { kernel, sqlKernel, awsKernel } = noteSession;
       try {
         noteSession.interrupted = true;
         if (kernel) {
@@ -222,6 +241,9 @@ export class MainController {
           sqlKernel.interrupt();
         } else {
           // log(`${PREFIX} No sqlKernel`);
+        }
+        if (awsKernel) {
+          awsKernel.interrupt();
         }
       } catch (e) {
         if (e instanceof Error) {
@@ -252,6 +274,7 @@ export class MainController {
       executionOrder: 0,
       kernel,
       sqlKernel: undefined,
+      awsKernel: undefined,
       interrupted: false,
     };
     this.noteSessions.set(notebook.uri.path, noteSession);
@@ -539,6 +562,11 @@ export class MainController {
       }
 
       return r;
+    } else if (isCwqlCell(cell)) {
+      noteSession.awsKernel = new AwsKernel(this.stateStorage);
+      const r = await noteSession.awsKernel.run(cell, noteSession.kernel.getStoredVariables());
+      noteSession.awsKernel = undefined;
+      return r;
     } else if (isJsonCell(cell)) {
       return await jsonKernelRun(cell, noteSession.kernel);
     }
@@ -662,7 +690,7 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
 
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    if (!isSqlCell(cell)) {
+    if (!isSqlCell(cell) && !isCwqlCell(cell)) {
       return undefined;
     }
 
@@ -680,6 +708,55 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
     }
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_SPECIFY_CONNECTION_TO_USE;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class LogGroupSettingProvider implements NotebookCellStatusBarItemProvider {
+  constructor(private stateStorage: StateStorage) {}
+
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isCwqlCell(cell)) {
+      return undefined;
+    }
+
+    const { connectionName, logGroupName }: CellMeta = cell.metadata;
+    if (!connectionName) {
+      return undefined;
+    }
+
+    let tooltip = "";
+    if (logGroupName) {
+      tooltip = "$(list-ordered) Use " + abbr(logGroupName, 40);
+    } else {
+      tooltip = "$(error) Specify logGroup";
+    }
+    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_LOG_GROUP_TO_USE;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class LogGroupQueryTimeSettingProvider implements NotebookCellStatusBarItemProvider {
+  constructor(private stateStorage: StateStorage) {}
+
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isCwqlCell(cell)) {
+      return undefined;
+    }
+
+    const { logGroupStartTimeOffset }: CellMeta = cell.metadata;
+
+    let tooltip = "";
+    if (logGroupStartTimeOffset) {
+      tooltip = "$(calendar) " + logGroupStartTimeOffset;
+    } else {
+      tooltip = "$(error) Specify start time offset";
+    }
+    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE;
     item.tooltip = tooltip;
     return item;
   }

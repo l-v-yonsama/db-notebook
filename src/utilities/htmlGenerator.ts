@@ -818,6 +818,12 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
         if (rdh.meta.tableName) {
           s += `<span class="tag is-info is-light">${escapeHtml(rdh.meta.tableName)}</span>`;
         }
+        if (rdh.meta.logGroupName) {
+          s += `<span class="tag is-info is-light">${escapeHtml(rdh.meta.logGroupName)}</span>`;
+        }
+        if (rdh.meta.logStreamName) {
+          s += `<span class="tag is-info is-light">${escapeHtml(rdh.meta.logStreamName)}</span>`;
+        }
       }
       if (axiosEvent) {
         const { response, request } = axiosEvent.entry;

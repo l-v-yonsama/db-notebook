@@ -2,6 +2,7 @@ import {
   DBType,
   isPartiQLType,
   isRDSType,
+  ResourceType,
   separateMultipleQueries,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as dayjs from "dayjs";
@@ -32,6 +33,8 @@ import {
   CELL_OPEN_MDH,
   CELL_SHOW_METADATA_SETTINGS,
   CELL_SPECIFY_CONNECTION_TO_USE,
+  CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
+  CELL_SPECIFY_LOG_GROUP_TO_USE,
   CELL_TOOLBAR_FORMAT,
   CREATE_NEW_NOTEBOOK,
   CREATE_NOTEBOOK_FROM_SQL,
@@ -59,6 +62,7 @@ import {
   getSelectedCells,
   getToolbarButtonClickedNotebookEditor,
   hasAnyRdhOutputCell,
+  isCwqlCell,
   isJsonCell,
   isSqlCell,
 } from "../utilities/notebookUtil";
@@ -328,6 +332,116 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         });
       }
     });
+
+    registerDisposableCommand(CELL_SPECIFY_LOG_GROUP_TO_USE, async (cell: NotebookCell) => {
+      const { connectionName }: CellMeta = cell.metadata;
+      if (connectionName === undefined) {
+        return;
+      }
+      const conSettings = await stateStorage.getConnectionSettingByName(connectionName);
+      if (conSettings === undefined || conSettings.dbType !== DBType.Aws) {
+        return;
+      }
+      const cw = stateStorage.getCloudwatchDatabase(connectionName);
+      if (!cw) {
+        return;
+      }
+
+      const items = (cw?.children || [])
+        ?.filter((it) => it.resourceType === ResourceType.LogGroup)
+        .map((it) => ({
+          label: it.name,
+          description: `(storedBytes:${it.getProperties().storedBytes})`,
+        }));
+      items.push({ label: "<None>", description: "(set as unspecified)" });
+      const result = await window.showQuickPick(items);
+      if (result) {
+        if (cell.metadata?.logGroupName === result.label) {
+          return;
+        }
+        const metadata: CellMeta = {
+          ...cell.metadata,
+        };
+        if (result.label === "<None>") {
+          delete metadata.logGroupName;
+        } else {
+          metadata.logGroupName = result.label;
+        }
+        const edit = new WorkspaceEdit();
+        const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+        edit.set(cell.notebook.uri, [nbEdit]);
+
+        workspace.applyEdit(edit);
+      }
+    });
+
+    registerDisposableCommand(
+      CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
+      async (cell: NotebookCell) => {
+        if (!isCwqlCell(cell)) {
+          return undefined;
+        }
+
+        const items = [
+          {
+            label: "1m",
+            description: "1 minute",
+          },
+          {
+            label: "5m",
+            description: "5 minutes",
+          },
+          {
+            label: "15m",
+            description: "15 minutes",
+          },
+          {
+            label: "30m",
+            description: "30 minutes",
+          },
+          {
+            label: "1h",
+            description: "1 hour",
+          },
+          {
+            label: "6h",
+            description: "6 hours",
+          },
+          {
+            label: "12h",
+            description: "12 hours",
+          },
+          {
+            label: "1d",
+            description: "1 day",
+          },
+          {
+            label: "1w",
+            description: "1 week",
+          },
+        ];
+        items.push({ label: "<None>", description: "(set as unspecified)" });
+        const result = await window.showQuickPick(items);
+        if (result) {
+          if (cell.metadata?.logGroupStartTimeOffset === result.label) {
+            return;
+          }
+          const metadata: CellMeta = {
+            ...cell.metadata,
+          };
+          if (result.label === "<None>") {
+            delete metadata.logGroupStartTimeOffset;
+          } else {
+            metadata.logGroupStartTimeOffset = result.label as any;
+          }
+          const edit = new WorkspaceEdit();
+          const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+          edit.set(cell.notebook.uri, [nbEdit]);
+
+          workspace.applyEdit(edit);
+        }
+      }
+    );
 
     registerDisposableCommand(CELL_OPEN_MDH, async (cell: NotebookCell) => {
       const filePath = window.activeNotebookEditor?.notebook.uri.fsPath;

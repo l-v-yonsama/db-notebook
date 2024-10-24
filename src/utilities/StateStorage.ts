@@ -1,5 +1,6 @@
 import {
   Auth0Database,
+  AwsDatabase,
   ConnectionSetting,
   DBDriverResolver,
   DBType,
@@ -50,6 +51,14 @@ export class StateStorage {
       return this.resMap.get(connectionName)?.res;
     }
     return undefined;
+  }
+
+  getCloudwatchDatabase(connectionName: string): AwsDatabase | undefined {
+    const dbs = this.getResourceByName(connectionName) as AwsDatabase[];
+    if (dbs === undefined) {
+      return;
+    }
+    return dbs.find((it) => it.name === "Cloudwatch");
   }
 
   getFirstRdsDatabaseByName(connectionName: string): RdsDatabase | undefined {

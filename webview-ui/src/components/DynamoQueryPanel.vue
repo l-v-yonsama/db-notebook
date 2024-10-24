@@ -164,7 +164,7 @@ const ok = (preview: boolean) => {
     limit: limit.value === "" ? 100 : Number(limit.value),
     preview
   };
-  console.log("l158 ", params);
+
   vscode.postCommand({
     command: "ok",
     params,
