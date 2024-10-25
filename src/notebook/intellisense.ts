@@ -32,6 +32,7 @@ import { NOTEBOOK_TYPE } from "../constant";
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
 import { isJsCell, isJsonCell, isSqlCell } from "../utilities/notebookUtil";
+import { setCloudwatchQueryCompletionItems } from "./intellisenses/awsCloudwatchQuery";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
 import { setNodeExecaCompletionItems } from "./intellisenses/nodeExeca";
@@ -75,6 +76,7 @@ export function activateIntellisense(context: ExtensionContext, stateStorage: St
 
   context.subscriptions.push(createJsIntellisense());
   context.subscriptions.push(createSQLIntellisense());
+  context.subscriptions.push(createCloudwatchQueryIntellisense());
   setActivateDecorator(context);
   log(`${PREFIX} end activateIntellisense`);
 }
@@ -384,6 +386,25 @@ function createSQLIntellisense() {
         }
 
         setSqlStatementCompletionItems(list, dbType);
+
+        return list;
+      },
+    }
+  );
+}
+
+function createCloudwatchQueryIntellisense() {
+  return languages.registerCompletionItemProvider(
+    [{ language: "cwql", notebookType: NOTEBOOK_TYPE }],
+    {
+      provideCompletionItems(
+        document: TextDocument,
+        position: Position,
+        token: CancellationToken,
+        context: CompletionContext
+      ) {
+        const list: CompletionItem[] = [];
+        setCloudwatchQueryCompletionItems(list);
 
         return list;
       },
