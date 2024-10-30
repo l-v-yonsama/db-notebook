@@ -226,18 +226,18 @@ Decoded id token payload= {
   sub: '07d42af8-90c1-700e-d06f-dafaa556d1cc',
   email_verified: true,
   gender: 'male',
-  iss: 'https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_6B0JIKlJP',
-  'cognito:username': 'yonsama010',
+  iss: 'https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_XXXXX',
+  'cognito:username': 'yonsamaXXXXX',
   locale: 'en-US',
   origin_jti: 'a770a7ae-1560-42eb-b9c4-74f32bc9e124',
-  aud: '63c35pra6tui4vlgt06nr8la2f',
+  aud: '63c35pra6tui4vlgt06nrXXXXX',
   event_id: '469ef935-7fb6-472f-9cb3-a64e588f0097',
   token_use: 'id',
   auth_time: 1729378360,
   exp: 1729381960,
   iat: 1729378360,
   jti: '17413e8c-e1b8-4372-9e90-14b2c836647d',
-  email: 'l.v.yoshioka+010@gmail.com'
+  email: 'l.XXXXX@gmail.com'
 }
 ```
 
