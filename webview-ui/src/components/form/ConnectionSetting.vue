@@ -16,6 +16,8 @@ import type {
   AwsSetting,
   ConnectionSetting,
   IamSolutionSetting,
+  ResourceFilter,
+  ResourceFilterDetail,
   SQLServerSetting,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
@@ -64,6 +66,26 @@ const sqlServerAuthenticationTypeItems: DropdownItem[] = [
     value: "Use Connect String",
   },
 ];
+
+const resourceFilterTypeItems: DropdownItem[] = [
+  {
+    label: "No filter",
+    value: "",
+  },
+  {
+    label: "Prefix",
+    value: "prefix",
+  },
+  {
+    label: "Suffix",
+    value: "suffix",
+  },
+  {
+    label: "Substring",
+    value: "include",
+  },
+];
+
 
 type Props = {
   mode: ModeType;
@@ -213,6 +235,17 @@ const sqlServerClientSecret = ref(props.item.sqlServer?.clientSecret ?? "");
 const sqlServerTenantId = ref(props.item.sqlServer?.tenantId ?? "");
 const sqlServerConnectString = ref(props.item.sqlServer?.connectString ?? "");
 
+// resource filters
+const schemaFilterType = ref(props.item.resourceFilter?.schema?.type ?? "");
+const schemaFilterValue = ref(props.item.resourceFilter?.schema?.value ?? "");
+const tableFilterType = ref(props.item.resourceFilter?.table?.type ?? "");
+const tableFilterValue = ref(props.item.resourceFilter?.table?.value ?? "");
+const groupFilterType = ref(props.item.resourceFilter?.group?.type ?? "");
+const groupFilterValue = ref(props.item.resourceFilter?.group?.value ?? "");
+const bucketFilterType = ref(props.item.resourceFilter?.bucket?.type ?? "");
+const bucketFilterValue = ref(props.item.resourceFilter?.bucket?.value ?? "");
+
+
 const elmSettings = computed(() => {
   const it = ElementSettingFactory.create({
     dbType: dbType.value,
@@ -261,6 +294,7 @@ function createItem(): ConnectionSetting {
   let awsSetting: AwsSetting | undefined = undefined;
   let iamSolution: IamSolutionSetting | undefined = undefined;
   let sqlServer: SQLServerSetting | undefined = undefined;
+  let resourceFilter: ResourceFilter | undefined = undefined;
 
   if (DBTypeConst.isAws(dbType.value)) {
     const awsServiceNames = awsServiceSelected.value.join(",").split(",");
@@ -300,6 +334,33 @@ function createItem(): ConnectionSetting {
       connectString: sqlServerConnectString.value,
     };
   }
+  if (elmSettings.value.getResourceFilters().visible) {
+    resourceFilter = {};
+    if (elmSettings.value.getSchemaResourceFilter().visible && schemaFilterType.value) {
+      resourceFilter.schema = {
+        type: schemaFilterType.value as ResourceFilterDetail['type'],
+        value: schemaFilterValue.value,
+      };
+    }
+    if (elmSettings.value.getTableResourceFilter().visible && tableFilterType.value) {
+      resourceFilter.table = {
+        type: tableFilterType.value as ResourceFilterDetail['type'],
+        value: tableFilterValue.value,
+      };
+    }
+    if (elmSettings.value.getGroupResourceFilter().visible && groupFilterType.value) {
+      resourceFilter.group = {
+        type: groupFilterType.value as ResourceFilterDetail['type'],
+        value: groupFilterValue.value,
+      };
+    }
+    if (elmSettings.value.getBucketResourceFilter().visible && bucketFilterType.value) {
+      resourceFilter.bucket = {
+        type: bucketFilterType.value as ResourceFilterDetail['type'],
+        value: bucketFilterValue.value,
+      };
+    }
+  }
 
   const a: ConnectionSetting = {
     name: name.value,
@@ -314,6 +375,7 @@ function createItem(): ConnectionSetting {
     awsSetting,
     iamSolution,
     sqlServer,
+    resourceFilter
   };
 
   if (useSsl.value) {
@@ -382,6 +444,16 @@ function setDefault() {
   database.value = elmSettings.value.getDatabase().defaultValue ?? "";
   port.value = elmSettings.value.getPort().defaultValue ?? 0;
   useSsl.value = false;
+
+  // resource filters
+  schemaFilterType.value = "";
+  schemaFilterValue.value = "";
+  tableFilterType.value = "";
+  tableFilterValue.value = "";
+  groupFilterType.value = "";
+  groupFilterValue.value = "";
+  bucketFilterType.value = "";
+  bucketFilterValue.value = "";
 }
 
 const stopProgress = () => {
@@ -565,6 +637,71 @@ defineExpose({
       <VsCodeTextField v-if="!isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs"
         v-model="lockWaitTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 30000"></VsCodeTextField>
 
+      <!-- Resource filters -->
+      <fieldset class="resource-filters" v-if="elmSettings.getResourceFilters().visible">
+        <legend>Resource filters</legend>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Target</th>
+              <th>Filter type</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="elmSettings.getSchemaResourceFilter().visible">
+              <td>Schema</td>
+              <td>
+                <span v-if="isShowMode">{{ schemaFilterType === '' ? '<None>' : schemaFilterType }}</span>
+                <VsCodeDropdown v-else v-model="schemaFilterType" :items="resourceFilterTypeItems" />
+              </td>
+              <td>
+                <span v-if="isShowMode">{{ schemaFilterValue }}</span>
+                <VsCodeTextField v-else v-model="schemaFilterValue" :disabled="schemaFilterType === ''"
+                  placeholder="filter value" />
+              </td>
+            </tr>
+            <tr v-if="elmSettings.getTableResourceFilter().visible">
+              <td>Table</td>
+              <td>
+                <span v-if="isShowMode">{{ tableFilterType === '' ? '<None>' : tableFilterType }}</span>
+                <VsCodeDropdown v-else v-model="tableFilterType" :items="resourceFilterTypeItems" />
+              </td>
+              <td>
+                <span v-if="isShowMode">{{ tableFilterValue }}</span>
+                <VsCodeTextField v-else v-model="tableFilterValue" :disabled="tableFilterType === ''"
+                  placeholder="filter value" />
+              </td>
+            </tr>
+            <tr v-if="elmSettings.getGroupResourceFilter().visible">
+              <td>Group</td>
+              <td>
+                <span v-if="isShowMode">{{ groupFilterType === '' ? '<None>' : groupFilterType }}</span>
+                <VsCodeDropdown v-else v-model="groupFilterType" :items="resourceFilterTypeItems" />
+              </td>
+              <td>
+                <span v-if="isShowMode">{{ groupFilterValue }}</span>
+                <VsCodeTextField v-else v-model="groupFilterValue" :disabled="groupFilterType === ''"
+                  placeholder="filter value" />
+              </td>
+            </tr>
+            <tr v-if="elmSettings.getBucketResourceFilter().visible">
+              <td>Bucket</td>
+              <td>
+                <span v-if="isShowMode">{{ bucketFilterType === '' ? '<None>' : bucketFilterType }}</span>
+                <VsCodeDropdown v-else v-model="bucketFilterType" :items="resourceFilterTypeItems" />
+              </td>
+              <td>
+                <span v-if="isShowMode">{{ bucketFilterValue }}</span>
+                <VsCodeTextField v-else v-model="bucketFilterValue" :disabled="bucketFilterType === ''"
+                  placeholder="filter value" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </fieldset>
 
       <div v-if="!isShowMode" class="commands">
         <VsCodeButton @click="test" :disabled="!acceptValues || isInProgress">
@@ -618,5 +755,18 @@ div.commands {
   flex-direction: row;
   justify-content: space-around;
   width: 100%;
+}
+
+fieldset.resource-filters {
+  table {
+    border-collapse: collapse;
+    border: solid 0.5px;
+
+    td,
+    th {
+      padding: 3px;
+      border: 0.5px solid;
+    }
+  }
 }
 </style>

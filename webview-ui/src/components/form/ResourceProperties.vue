@@ -27,7 +27,7 @@ const copyToClipboard = (text: string) => {
 <template>
   <section class="wrapper">
     <table>
-      <tr v-for="(item, idx) of list" :key="idx">
+      <tr v-for="(item, idx) of list" :key="idx" :title="item.v">
         <th>
           <p :title="item.k">
             {{ abbr(item.k, 24) }}
@@ -36,7 +36,8 @@ const copyToClipboard = (text: string) => {
         <td>
           <p class="ellipsis" :title="item.v">
             {{ item.v }}
-            <VsCodeButton @click.stop="copyToClipboard(item.v)" appearance="secondary" class="copy-to-clipboard xxs">
+            <VsCodeButton @click.stop="copyToClipboard(item.v)" appearance="secondary" class="copy-to-clipboard xxs"
+              title="Copy to clipboard">
               <fa icon="clipboard" size="xs" />
             </VsCodeButton>
           </p>
@@ -61,6 +62,7 @@ p {
 }
 
 .copy-to-clipboard {
+  display: none;
   position: absolute;
   right: 4px;
   top: 0;
@@ -91,5 +93,9 @@ td {
 
 p.ellipsis {
   position: relative;
+}
+
+p.ellipsis:hover>.copy-to-clipboard {
+  display: inline-block;
 }
 </style>

@@ -81,6 +81,16 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getResourceFilters(): ElementSetting {
+    return { visible: true };
+  }
+  getSchemaResourceFilter(): ElementSetting {
+    return { visible: true, label: "Schema filter", defaultValue: "" };
+  }
+  getTableResourceFilter(): ElementSetting {
+    return { visible: true, label: "Table filter", defaultValue: "" };
+  }
+
   accept(setting: ConnectionSetting): boolean {
     const { name, database, user, password } = setting;
     if (name === "") {
@@ -152,6 +162,11 @@ export class SQLiteElementSetting extends RdsElementSetting {
   getLockWaitTimeoutMs(): ElementSetting {
     return { visible: false };
   }
+
+  getSchemaResourceFilter(): ElementSetting {
+    return { visible: false };
+  }
+
   accept(setting: ConnectionSetting): boolean {
     const { name, database } = setting;
     if (name === "") {

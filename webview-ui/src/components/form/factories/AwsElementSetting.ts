@@ -81,6 +81,22 @@ export class AwsElementSetting extends BaseNoSqlElementSetting {
     return { visible: false };
   }
 
+  getResourceFilters(): ElementSetting {
+    return { visible: true };
+  }
+
+  getTableResourceFilter(): ElementSetting {
+    return { visible: true, label: "Table", defaultValue: "" };
+  }
+
+  getGroupResourceFilter(): ElementSetting {
+    return { visible: true, label: "Group", defaultValue: "" };
+  }
+
+  getBucketResourceFilter(): ElementSetting {
+    return { visible: true, label: "Bucket", defaultValue: "" };
+  }
+
   accept(setting: ConnectionSetting): boolean {
     const { name, awsSetting, user, password } = setting;
     if (name === "" || awsSetting === undefined) {

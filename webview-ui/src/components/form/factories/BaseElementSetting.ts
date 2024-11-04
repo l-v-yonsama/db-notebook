@@ -42,6 +42,22 @@ export abstract class BaseElementSetting {
   abstract getSqlServerClientSecret(): ElementSetting;
 
   abstract getSqlServerConnectString(): ElementSetting;
+
+  getResourceFilters(): ElementSetting {
+    return { visible: false };
+  }
+  getSchemaResourceFilter(): ElementSetting {
+    return { visible: false };
+  }
+  getTableResourceFilter(): ElementSetting {
+    return { visible: false };
+  }
+  getGroupResourceFilter(): ElementSetting {
+    return { visible: false };
+  }
+  getBucketResourceFilter(): ElementSetting {
+    return { visible: false };
+  }
 }
 
 export abstract class BaseNoSqlElementSetting extends BaseElementSetting {
