@@ -84,6 +84,10 @@ const resourceFilterTypeItems: DropdownItem[] = [
     label: "Substring",
     value: "include",
   },
+  {
+    label: "Regex",
+    value: "regex",
+  },
 ];
 
 
@@ -500,7 +504,7 @@ defineExpose({
 
       <label v-show="elmSettings.getDatabase().visible" for="database">{{
         elmSettings.getDatabase().label ?? "Database"
-      }}</label>
+        }}</label>
       <template v-if="dbType === 'SQLite'">
         <VsCodeButton v-if="!isShowMode" @click="selectDatabaseFile">
           <fa icon="database" />Select
@@ -625,14 +629,14 @@ defineExpose({
 
       <label v-show="elmSettings.getQueryTimeoutMs().visible" for="queryTimeoutMs">{{
         elmSettings.getQueryTimeoutMs().label
-      }}(Optional)</label>
+        }}(Optional)</label>
       <p v-if="isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs">{{ queryTimeoutMs }}</p>
       <VsCodeTextField v-if="!isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs"
         v-model="queryTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 60000"></VsCodeTextField>
 
       <label v-show="elmSettings.getLockWaitTimeoutMs().visible" for="lockTimeoutMs">{{
         elmSettings.getLockWaitTimeoutMs().label
-      }}(Optional)</label>
+        }}(Optional)</label>
       <p v-if="isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs">{{ lockWaitTimeoutMs }}</p>
       <VsCodeTextField v-if="!isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs"
         v-model="lockWaitTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 30000"></VsCodeTextField>
@@ -700,7 +704,7 @@ defineExpose({
             </tr>
           </tbody>
         </table>
-
+        <p>Filters are case-insensitive.</p>
       </fieldset>
 
       <div v-if="!isShowMode" class="commands">
@@ -767,6 +771,11 @@ fieldset.resource-filters {
       padding: 3px;
       border: 0.5px solid;
     }
+  }
+
+  p {
+    opacity: 0.8;
+    margin: 5px 0 0 0;
   }
 }
 </style>

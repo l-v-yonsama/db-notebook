@@ -90,7 +90,8 @@ defineExpose({
       <pane v-if="showDetailPane" size="30">
         <section>
           <div class="toolbar">
-            <VsCodeButton @click.stop="copyToClipboard" appearance="secondary" class="copy-to-clipboard">
+            <VsCodeButton @click.stop="copyToClipboard" appearance="secondary" class="copy-to-clipboard"
+              title="Copy to clipboard">
               <fa icon="clipboard" />
             </VsCodeButton>
             <VsCodeButton @click.stop="close" title="Close"><span class="codicon codicon-chrome-close"></span>

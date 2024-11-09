@@ -592,7 +592,8 @@ defineExpose({
               {{ toEditTypeMark(item.editType) }}
               {{ index + 1 }}
               <div class="cell-actions" v-if="!editable">
-                <VsCodeButton @click.stop="showDetailAll(item)" appearance="secondary" class="show-detail">
+                <VsCodeButton @click.stop="showDetailAll(item)" appearance="secondary" class="show-detail"
+                  title="View details">
                   <fa icon="eye" size="sm" />
                 </VsCodeButton>
               </div>
@@ -631,11 +632,11 @@ defineExpose({
                     item[key.name] !== ''
                   ">
                     <VsCodeButton v-if="key.visibleDetailPane" @click.stop="showDetail(item, key, item[key.name])"
-                      appearance="secondary" class="show-detail">
+                      appearance="secondary" class="show-detail" title="View details">
                       <fa icon="eye" />
                     </VsCodeButton>
                     <VsCodeButton @click.stop="copyToClipboard(item[key.name])" appearance="secondary"
-                      class="copy-to-clipboard">
+                      class="copy-to-clipboard" title="Copy to clipboard">
                       <fa icon="clipboard" />
                     </VsCodeButton>
                   </div>
