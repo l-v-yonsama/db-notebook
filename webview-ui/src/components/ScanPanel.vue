@@ -407,88 +407,42 @@ defineExpose({
       <button @click="output({ fileType: 'excel' })" title="Output as Excel">
         <fa icon="file-excel" />
       </button>
-      <SecondarySelectionAction
-        :items="outputDetailItems"
-        title="Output as Excel"
-        @onSelect="(v:any) => output({ fileType: 'excel'  })"
-      />
     </div>
     <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-      <VsCodeTabHeader
-        v-for="tabItem in tabItems"
-        :id="tabItem.tabId"
-        :key="tabItem.tabId"
-        :title="`${tabItem.title}:${tabItem.dbType}`"
-        :is-active="isActiveTabId(tabItem.tabId)"
-        :closable="true"
-        @click="showTab(tabItem.tabId)"
-        @close="removeTabItem(tabItem.tabId, true)"
-      >
+      <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
+        :title="`${tabItem.title}:${tabItem.dbType}`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
+        @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
       </VsCodeTabHeader>
-      <vscode-panel-view
-        v-for="tabItem of tabItems"
-        :id="'view-' + tabItem.tabId"
-        :key="tabItem.tabId"
-      >
+      <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
         <section :style="{ width: `${splitterWidth}px` }">
           <div class="toolbar" :style="{ width: `${splitterWidth}px` }">
             <div v-if="isMultiLineKeyword" class="multiple">
               <div class="left">
                 <label v-if="tabItem.startDt.visible" for="startTime">{{
                   tabItem.startDt.label
-                }}</label
-                ><VsCodeTextField
-                  v-if="tabItem.startDt.visible"
-                  id="startTime"
-                  v-model="tabItem.startDt.value"
-                  type="date"
-                  :title="tabItem.startDt.description"
-                ></VsCodeTextField>
+                  }}</label>
+                <VsCodeTextField v-if="tabItem.startDt.visible" id="startTime" v-model="tabItem.startDt.value"
+                  type="date" :title="tabItem.startDt.description"></VsCodeTextField>
 
-                <label v-if="tabItem.endDt.visible" for="endTime">{{ tabItem.endDt.label }}</label
-                ><VsCodeTextField
-                  v-if="tabItem.endDt.visible"
-                  id="endTime"
-                  v-model="tabItem.endDt.value"
-                  type="date"
-                  :title="tabItem.endDt.description"
-                ></VsCodeTextField>
-                <label v-if="tabItem.limit.visible" for="limit">{{ tabItem.limit.label }}</label
-                ><VsCodeTextField
-                  v-if="tabItem.limit.visible"
-                  id="limit"
-                  style="width: 125px"
-                  v-model="tabItem.limit.value"
-                  type="number"
-                  :min="0"
-                  :size="9"
-                  :title="tabItem.limit.description"
-                ></VsCodeTextField>
+                <label v-if="tabItem.endDt.visible" for="endTime">{{ tabItem.endDt.label }}</label>
+                <VsCodeTextField v-if="tabItem.endDt.visible" id="endTime" v-model="tabItem.endDt.value" type="date"
+                  :title="tabItem.endDt.description"></VsCodeTextField>
+                <label v-if="tabItem.limit.visible" for="limit">{{ tabItem.limit.label }}</label>
+                <VsCodeTextField v-if="tabItem.limit.visible" id="limit" style="width: 125px"
+                  v-model="tabItem.limit.value" type="number" :min="0" :size="9" :title="tabItem.limit.description">
+                </VsCodeTextField>
               </div>
               <div class="right">
                 <label v-if="tabItem.keyword.visible" for="keyword">{{
                   tabItem.keyword.label
-                }}</label
-                ><VsCodeTextArea
-                  v-if="tabItem.keyword.visible"
-                  id="keyword"
-                  v-model="tabItem.keyword.value"
-                  :maxlength="512"
-                  :rows="6"
-                  :title="tabItem.keyword.description"
-                  placeholder="Enter a keyword"
-                  style="height: 97%"
-                >
+                  }}</label>
+                <VsCodeTextArea v-if="tabItem.keyword.visible" id="keyword" v-model="tabItem.keyword.value"
+                  :maxlength="512" :rows="6" :title="tabItem.keyword.description" placeholder="Enter a keyword"
+                  style="height: 97%">
                 </VsCodeTextArea>
 
-                <VsCodeButton
-                  v-show="openLogStreamParams.visible"
-                  appearance="secondary"
-                  class="openStream"
-                  @click="openStream"
-                  :disabled="inProgress || !openLogStreamParams.canAction"
-                  title="Open logStream"
-                >
+                <VsCodeButton v-show="openLogStreamParams.visible" appearance="secondary" class="openStream"
+                  @click="openStream" :disabled="inProgress || !openLogStreamParams.canAction" title="Open logStream">
                   <span class="codicon codicon-link-external"></span>Open logStream
                 </VsCodeButton>
 
@@ -498,92 +452,44 @@ defineExpose({
               </div>
             </div>
             <div v-else class="single">
-              <VsCodeButton
-                v-show="deleteKeyParams.visible"
-                appearance="secondary"
-                class="deleteKey"
-                @click="deleteKey"
-                :disabled="inProgress || !deleteKeyParams.canAction"
-                title="Delete a key"
-              >
+              <VsCodeButton v-show="deleteKeyParams.visible" appearance="secondary" class="deleteKey" @click="deleteKey"
+                :disabled="inProgress || !deleteKeyParams.canAction" title="Delete a key">
                 <span class="codicon codicon-trash"></span>Delete key
               </VsCodeButton>
 
               <label v-if="tabItem.resourceType.visible" for="resource-type">Resource</label>
-              <VsCodeRadioGroupVue
-                v-if="tabItem.resourceType.visible"
-                id="resource-type"
-                v-model="tabItem.resourceType.value"
-                :items="tabItem.resourceType.items"
-                style="z-index: 15"
-              />
+              <VsCodeRadioGroupVue v-if="tabItem.resourceType.visible" id="resource-type"
+                v-model="tabItem.resourceType.value" :items="tabItem.resourceType.items" style="z-index: 15" />
 
               <label v-if="tabItem.startDt.visible" for="startTime">{{
                 tabItem.startDt.label
-              }}</label
-              ><VsCodeTextField
-                v-if="tabItem.startDt.visible"
-                id="startTime"
-                v-model="tabItem.startDt.value"
-                type="date"
-                :title="tabItem.startDt.description"
-              ></VsCodeTextField>
-              <label v-if="tabItem.endDt.visible" for="endTime">{{ tabItem.endDt.label }}</label
-              ><VsCodeTextField
-                v-if="tabItem.endDt.visible"
-                id="endTime"
-                v-model="tabItem.endDt.value"
-                type="date"
-                :title="tabItem.endDt.description"
-              ></VsCodeTextField>
-              <label v-if="tabItem.limit.visible" for="limit">{{ tabItem.limit.label }}</label
-              ><VsCodeTextField
-                v-if="tabItem.limit.visible"
-                id="limit"
-                class="limit"
-                v-model="tabItem.limit.value"
-                type="number"
-                :min="0"
-                :size="9"
-                :title="tabItem.limit.description"
-              ></VsCodeTextField>
-              <vscode-checkbox
-                v-if="tabItem.jsonExpansion.visible"
-                :checked="tabItem.jsonExpansion.value === true"
-                @change="($e:any) => tabItem.jsonExpansion.value = ($e.target.checked==true)"
-                style="margin-right: auto"
-                >JSON expansion</vscode-checkbox
-              >
-              <label v-if="tabItem.keyword.visible" for="keyword">{{ tabItem.keyword.label }}</label
-              ><VsCodeTextField
-                v-if="tabItem.keyword.visible"
-                id="keyword"
-                v-model="tabItem.keyword.value"
-                :maxlength="128"
-                :title="tabItem.keyword.description"
-                placeholder="Enter a keyword"
-                style="max-width: 120px"
-              >
+                }}</label>
+              <VsCodeTextField v-if="tabItem.startDt.visible" id="startTime" v-model="tabItem.startDt.value" type="date"
+                :title="tabItem.startDt.description"></VsCodeTextField>
+              <label v-if="tabItem.endDt.visible" for="endTime">{{ tabItem.endDt.label }}</label>
+              <VsCodeTextField v-if="tabItem.endDt.visible" id="endTime" v-model="tabItem.endDt.value" type="date"
+                :title="tabItem.endDt.description"></VsCodeTextField>
+              <label v-if="tabItem.limit.visible" for="limit">{{ tabItem.limit.label }}</label>
+              <VsCodeTextField v-if="tabItem.limit.visible" id="limit" class="limit" v-model="tabItem.limit.value"
+                type="number" :min="0" :size="9" :title="tabItem.limit.description"></VsCodeTextField>
+              <vscode-checkbox v-if="tabItem.jsonExpansion.visible" :checked="tabItem.jsonExpansion.value === true"
+                @change="($e: any) => tabItem.jsonExpansion.value = ($e.target.checked == true)"
+                style="margin-right: auto">JSON expansion</vscode-checkbox>
+              <label v-if="tabItem.keyword.visible" for="keyword">{{ tabItem.keyword.label }}</label>
+              <VsCodeTextField v-if="tabItem.keyword.visible" id="keyword" v-model="tabItem.keyword.value"
+                :maxlength="128" :title="tabItem.keyword.description" placeholder="Enter a keyword"
+                style="max-width: 120px">
               </VsCodeTextField>
               <VsCodeButton @click="search" :disabled="inProgress" title="scan">
                 <fa icon="search" />Search
               </VsCodeButton>
-              <SecondarySelectionAction
-                :items="compareDetailItems"
-                :disabled="!comparable"
-                title="Compare"
-                @onSelect="(v:any) => compare()"
-              />
+              <SecondarySelectionAction :items="compareDetailItems" :disabled="!comparable" title="Compare"
+                @onSelect="(v: any) => compare()" />
             </div>
           </div>
           <div class="spPaneWrapper">
-            <RDHViewer
-              v-if="tabItem.rdh != undefined"
-              :rdh="tabItem.rdh"
-              :width="splitterWidth"
-              :height="splitterHeight"
-              @onClickCell="onClickCell"
-            />
+            <RDHViewer v-if="tabItem.rdh != undefined" :rdh="tabItem.rdh" :width="splitterWidth"
+              :height="splitterHeight" @onClickCell="onClickCell" />
           </div>
         </section>
       </vscode-panel-view>
@@ -629,17 +535,19 @@ vscode-panel-view {
       column-gap: 5px;
       margin-bottom: 2px;
     }
+
     .right {
       display: flex;
       flex-grow: 1;
       flex-direction: column;
 
-      & > .openStream {
+      &>.openStream {
         position: absolute;
         right: 92px;
         top: -1px;
       }
-      & > .search {
+
+      &>.search {
         position: absolute;
         right: 6px;
         top: -1px;

@@ -44,6 +44,10 @@ export type DatabaseConfigType = {
 export type OutputConfigType = {
   maxRows: number;
   maxCharactersInCell: number;
+  excel: {
+    displayToc: boolean;
+    displayTableNameAndStatement: boolean;
+  };
   html: {
     displayToc: boolean;
     displayGraphs: boolean;

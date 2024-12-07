@@ -59,6 +59,10 @@ export const getOutputConfig = (): OutputConfigType => {
   return {
     maxRows: settings.get("Max rows in output file", 10000),
     maxCharactersInCell: settings.get("Max characters in cell in output file", 10000),
+    excel: {
+      displayToc: settings.get("Excel: display TOC", true),
+      displayTableNameAndStatement: settings.get("Excel: display table-name, sql-statement", true),
+    },
     html: {
       displayToc: settings.get("Html: display TOC", true),
       displayGraphs: settings.get("Html: display graphs", true),

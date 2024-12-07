@@ -413,6 +413,7 @@ export class ScanPanel extends BasePanel {
           },
         };
 
+        log(`${PREFIX} search(${JSON.stringify(input)})`);
         return await scannable.scan(input);
       }
     );

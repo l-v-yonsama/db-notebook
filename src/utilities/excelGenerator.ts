@@ -22,7 +22,7 @@ import { EnumValues } from "enum-values";
 import * as Excel from "exceljs";
 import { Fill } from "exceljs";
 import * as os from "os";
-import { getResultsetConfig } from "./configUtil";
+import { getOutputConfig, getResultsetConfig } from "./configUtil";
 
 // const FONT_NAME_Arial ='Arial';
 const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";
@@ -162,6 +162,7 @@ function createQueryResultSheet(
 ): number {
   let plusNo = 0;
   const rdhConfig = getResultsetConfig();
+  const outputCondig = getOutputConfig();
 
   const { tableName, comment, ruleViolationSummary } = rdh.meta;
   // table name / comment
@@ -170,47 +171,49 @@ function createQueryResultSheet(
   if (comment) {
     titleValue += ` (${comment})`;
   }
-  cell.value = "■ " + titleValue;
-  plusNo++;
-
-  // sql statement
-  if (rdh.sqlStatement) {
+  if (outputCondig.excel.displayTableNameAndStatement) {
+    cell.value = "■ " + titleValue;
     plusNo++;
-    const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
-    cell = sheet.getCell(baseRowNo + plusNo, 2);
-    cell.value = "SQL";
-    setTableHeaderCell(cell);
-    sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + lines.length - 1}`);
-    lines.forEach((line) => {
-      cell = sheet.getCell(baseRowNo + plusNo, 3);
-      cell.value = line;
-      plusNo++;
-    });
-    if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
-      cell = sheet.getCell(baseRowNo + plusNo, 2);
-      cell.value = "BINDS";
-      setTableHeaderCell(cell);
-      // テーブル見出しの行分もマージするので -1 は不要
-      sheet.mergeCells(
-        `B${baseRowNo + plusNo}:B${baseRowNo + plusNo + rdh.queryConditions?.binds.length}`
-      );
 
-      cell = sheet.getCell(baseRowNo + plusNo, 3);
-      cell.value = "Position";
-      setTableHeaderCell(cell);
-      cell = sheet.getCell(baseRowNo + plusNo, 4);
-      cell.value = "Value";
-      setTableHeaderCell(cell);
+    // sql statement
+    if (rdh.sqlStatement) {
       plusNo++;
-      rdh.queryConditions?.binds.forEach((v, idx) => {
+      const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
+      cell = sheet.getCell(baseRowNo + plusNo, 2);
+      cell.value = "SQL";
+      setTableHeaderCell(cell);
+      sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + lines.length - 1}`);
+      lines.forEach((line) => {
         cell = sheet.getCell(baseRowNo + plusNo, 3);
-        cell.value = `$${idx + 1}`;
-        cell = sheet.getCell(baseRowNo + plusNo, 4);
-        cell.value = v;
+        cell.value = line;
         plusNo++;
       });
+      if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
+        cell = sheet.getCell(baseRowNo + plusNo, 2);
+        cell.value = "BINDS";
+        setTableHeaderCell(cell);
+        // テーブル見出しの行分もマージするので -1 は不要
+        sheet.mergeCells(
+          `B${baseRowNo + plusNo}:B${baseRowNo + plusNo + rdh.queryConditions?.binds.length}`
+        );
+
+        cell = sheet.getCell(baseRowNo + plusNo, 3);
+        cell.value = "Position";
+        setTableHeaderCell(cell);
+        cell = sheet.getCell(baseRowNo + plusNo, 4);
+        cell.value = "Value";
+        setTableHeaderCell(cell);
+        plusNo++;
+        rdh.queryConditions?.binds.forEach((v, idx) => {
+          cell = sheet.getCell(baseRowNo + plusNo, 3);
+          cell.value = `$${idx + 1}`;
+          cell = sheet.getCell(baseRowNo + plusNo, 4);
+          cell.value = v;
+          plusNo++;
+        });
+      }
+      plusNo++;
     }
-    plusNo++;
   }
 
   if (ruleViolationSummary) {
@@ -233,34 +236,43 @@ function createQueryResultSheet(
   }
 
   // resulet set
-  cell = sheet.getCell(baseRowNo + plusNo, 2);
-  cell.value = "No";
-  setTableHeaderCell(cell);
+  const { displayRowno } = rdhConfig;
+
+  if (displayRowno) {
+    cell = sheet.getCell(baseRowNo + plusNo, 2);
+    cell.value = "No";
+    setTableHeaderCell(cell);
+  }
 
   rdh.keys.forEach((column: RdhKey, idx: number) => {
-    const cellPhy = sheet.getCell(baseRowNo + plusNo, idx + 3);
+    let colBasePos = displayRowno ? 3 : 2;
+    const cellPhy = sheet.getCell(baseRowNo + plusNo, colBasePos + idx);
     cellPhy.value = column.name;
     setTableHeaderCell(cellPhy);
 
     if (rdhConfig.header.displayComment) {
-      const cellLog = sheet.getCell(baseRowNo + plusNo + 1, idx + 3);
+      const cellLog = sheet.getCell(baseRowNo + plusNo + 1, colBasePos + idx);
       cellLog.value = column.comment;
       setTableHeaderCell(cellLog);
     }
     if (rdhConfig.header.displayType) {
       const cellType = sheet.getCell(
         baseRowNo + plusNo + (rdhConfig.header.displayComment ? 2 : 1),
-        idx + 3
+        colBasePos + idx
       );
       cellType.value = EnumValues.getNameFromValue(GeneralColumnType, column.type);
       setTableHeaderCell(cellType);
     }
   });
   if (rdhConfig.header.displayComment && rdhConfig.header.displayType) {
-    sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 2}`);
+    if (displayRowno) {
+      sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 2}`);
+    }
     plusNo += 3;
   } else if (rdhConfig.header.displayComment || rdhConfig.header.displayType) {
-    sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 1}`);
+    if (displayRowno) {
+      sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 1}`);
+    }
     plusNo += 2;
   } else {
     plusNo += 1;
@@ -269,8 +281,11 @@ function createQueryResultSheet(
   if (rdh.rows.length > 0) {
     rdh.rows.forEach((rdhRow, ri: number) => {
       const values = rdhRow.values;
-      sheet.getCell(baseRowNo + plusNo, 2).value = ri + 1;
+      if (displayRowno) {
+        sheet.getCell(baseRowNo + plusNo, 2).value = ri + 1;
+      }
       rdh.keys.forEach((column: RdhKey, colIdx: number) => {
+        let colBasePos = displayRowno ? 3 : 2;
         let ruleMarker: string | undefined = undefined;
         let resolvedLabel: string | undefined = undefined;
 
@@ -292,11 +307,11 @@ function createQueryResultSheet(
             const base64 = v;
             const extension = getImageTypeFromContentType(values.contentTypeInfo.contentType)!;
             addImageInSheet(book, sheet, base64, extension, {
-              tl: { col: colIdx + 2, row: baseRowNo + plusNo - 1 },
-              br: { col: colIdx + 2 + 1, row: baseRowNo + plusNo },
+              tl: { col: colBasePos + colIdx - 1, row: baseRowNo + plusNo - 1 },
+              br: { col: colBasePos + colIdx, row: baseRowNo + plusNo },
             } as any);
           } else {
-            const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
+            const cell = sheet.getCell(baseRowNo + plusNo, colBasePos + colIdx);
             setAnyValueByIndex(cell, values?.downloadUrl, { isHyperText: true });
           }
         } else {
@@ -306,7 +321,7 @@ function createQueryResultSheet(
             "Rul"
           );
           let format = getCellFormat(column.type);
-          const cell = sheet.getCell(baseRowNo + plusNo, colIdx + 3);
+          const cell = sheet.getCell(baseRowNo + plusNo, colBasePos + colIdx);
           let isHyperText = column.meta && column.meta.is_hyperlink === true;
           if (ruleAnnonations.length) {
             ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
@@ -381,42 +396,41 @@ async function createBookFromList(
 ): Promise<string> {
   let errorMessage = "";
   var workbook = new Excel.Workbook();
+  const outputCondig = getOutputConfig();
 
   try {
     // TOC
-    let tocSheet = workbook.addWorksheet("TOC", {
-      pageSetup: {
-        paperSize: 9,
-        orientation: "portrait",
-        margins: {
-          left: 0.5,
-          right: 0.5,
-          top: 0.75,
-          bottom: 0.75,
-          header: 0.3,
-          footer: 0.3,
+    let tocSheet: Excel.Worksheet | undefined = undefined;
+    if (outputCondig.excel.displayToc) {
+      tocSheet = workbook.addWorksheet("TOC", {
+        pageSetup: {
+          paperSize: 9,
+          orientation: "portrait",
+          margins: {
+            left: 0.5,
+            right: 0.5,
+            top: 0.75,
+            bottom: 0.75,
+            header: 0.3,
+            footer: 0.3,
+          },
         },
-      },
-    });
-    createCommonHeader(tocSheet);
-    tocSheet.getColumn("A").width = 2;
-    tocSheet.getColumn("B").width = 2;
-    tocSheet.getColumn("C").width = 4;
-    tocSheet.getColumn("D").width = 20;
-    tocSheet.getColumn("E").width = 16;
-    // const logo_path = path.join(FileUtil.getStaticDir(), 'images/logo/logo_transparent.png');
-    // if (logo_path) {
-    //   const logo_base64 = <string>FileUtil.syncReadFile(logo_path, 'base64');
-    //   addImageInSheet(workbook, toc_sheet, logo_base64, 'png', {
-    //     tl: { col: 0, row: 0 },
-    //     br: { col: 5, row: 20 }
-    //   });
-    // }
+      });
+      createCommonHeader(tocSheet);
+      tocSheet.getColumn("A").width = 2;
+      tocSheet.getColumn("B").width = 2;
+      tocSheet.getColumn("C").width = 4;
+      tocSheet.getColumn("D").width = 20;
+      tocSheet.getColumn("E").width = 16;
+    }
 
     let tocRowNo = 3;
-    let cell = tocSheet.getCell(`C${tocRowNo}`);
-    cell.value = "Table of contents.";
-    cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
+    let cell: Excel.Cell;
+    if (outputCondig.excel.displayToc) {
+      cell = tocSheet!.getCell(`C${tocRowNo}`);
+      cell.value = "Table of contents.";
+      cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
+    }
 
     tocRowNo += 4;
 
@@ -424,11 +438,15 @@ async function createBookFromList(
       (it) => !ResultSetDataBuilder.from(it).hasAnyAnnotation(["Lnt"])
     );
     // RESULTSETS
-    cell = tocSheet.getCell(`C${tocRowNo}`);
-    cell.value = "■ Resultsets";
+    if (outputCondig.excel.displayToc) {
+      cell = tocSheet!.getCell(`C${tocRowNo}`);
+      cell.value = "■ Resultsets";
+    }
     tocRowNo++;
     const tocRecords = createQueryResultListSheet(workbook, generalList, options);
-    tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+    if (outputCondig.excel.displayToc) {
+      tocRowNo += writeTocRecords(tocSheet!, tocRecords, tocRowNo);
+    }
 
     tocRowNo += 2;
 
@@ -437,12 +455,16 @@ async function createBookFromList(
       .map((rdh) => getRecordRuleResults(rdh))
       .filter((it) => it !== undefined) as RecordRuleValidationResult[];
     if (ruleResultList.length) {
-      cell = tocSheet.getCell(`C${tocRowNo}`);
-      cell.value = "■ Record Rules";
+      if (outputCondig.excel.displayToc) {
+        cell = tocSheet!.getCell(`C${tocRowNo}`);
+        cell.value = "■ Record Rules";
+      }
       tocRowNo++;
       // create a sheet.
       const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
-      tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+      if (outputCondig.excel.displayToc) {
+        tocRowNo += writeTocRecords(tocSheet!, tocRecords, tocRowNo);
+      }
     }
   } catch (e) {
     console.error(e);
@@ -504,42 +526,41 @@ async function createBookFromDiffList(
   var workbook = new Excel.Workbook();
   const displayOnlyChanged = options?.diff?.displayOnlyChanged === true;
   const rdhConfig = getResultsetConfig();
+  const outputCondig = getOutputConfig();
 
   try {
     // TOC
-    let tocSheet = workbook.addWorksheet("TOC", {
-      pageSetup: {
-        paperSize: 9,
-        orientation: "portrait",
-        margins: {
-          left: 0.5,
-          right: 0.5,
-          top: 0.75,
-          bottom: 0.75,
-          header: 0.3,
-          footer: 0.3,
+    let tocSheet: Excel.Worksheet | undefined = undefined;
+    if (outputCondig.excel.displayToc) {
+      tocSheet = workbook.addWorksheet("TOC", {
+        pageSetup: {
+          paperSize: 9,
+          orientation: "portrait",
+          margins: {
+            left: 0.5,
+            right: 0.5,
+            top: 0.75,
+            bottom: 0.75,
+            header: 0.3,
+            footer: 0.3,
+          },
         },
-      },
-    });
-    createCommonHeader(tocSheet);
-    tocSheet.getColumn("A").width = 2;
-    tocSheet.getColumn("B").width = 2;
-    tocSheet.getColumn("C").width = 4;
-    tocSheet.getColumn("D").width = 20;
-    tocSheet.getColumn("E").width = 16;
-    // const logo_path = path.join(FileUtil.getStaticDir(), 'images/logo/logo_transparent.png');
-    // if (logo_path) {
-    //   const logo_base64 = <string>FileUtil.syncReadFile(logo_path, 'base64');
-    //   addImageInSheet(workbook, toc_sheet, logo_base64, 'png', {
-    //     tl: { col: 0, row: 0 },
-    //     br: { col: 5, row: 20 }
-    //   });
-    // }
+      });
+      createCommonHeader(tocSheet);
+      tocSheet.getColumn("A").width = 2;
+      tocSheet.getColumn("B").width = 2;
+      tocSheet.getColumn("C").width = 4;
+      tocSheet.getColumn("D").width = 20;
+      tocSheet.getColumn("E").width = 16;
+    }
 
     let tocRowNo = 3;
-    let cell = tocSheet.getCell(`C${tocRowNo}`);
-    cell.value = "Table of contents.";
-    cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
+    let cell: Excel.Cell;
+    if (outputCondig.excel.displayToc) {
+      cell = tocSheet!.getCell(`C${tocRowNo}`);
+      cell.value = "Table of contents.";
+      cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
+    }
 
     tocRowNo += 4;
 
@@ -564,41 +585,44 @@ async function createBookFromDiffList(
 
     const beforeDate = diffList.map((it) => it.rdh1.created).find((it) => it !== undefined);
     const afterDate = diffList.map((it) => it.rdh2.created).find((it) => it !== undefined);
-    tocSheet.getCell("H4").value = "Before time:";
-    tocSheet.getCell("H4").alignment = {
-      horizontal: "right",
-    };
-    tocSheet.mergeCells("H4:I4");
-    tocSheet.getCell("H5").value = "After  time:";
-    tocSheet.getCell("H5").alignment = {
-      horizontal: "right",
-    };
-    tocSheet.mergeCells("H5:I5");
-    tocSheet.getCell("J4").value = `${dayjs(beforeDate).format("HH:mm:ss")}`;
-    tocSheet.getCell("J5").value = `${dayjs(afterDate).format("HH:mm:ss")}`;
 
-    // RESULTSETS
-    cell = tocSheet.getCell(`C${tocRowNo}`);
-    cell.value = "■ Resultsets";
-    tocRowNo++;
-    // header
-    [
-      "No",
-      "Title(Table)",
-      "comment",
-      "Inserted",
-      "Deleted",
-      "Updated",
-      "Link to",
-      "Link to",
-    ].forEach((title, idx) => {
-      const cell = tocSheet.getCell(tocRowNo, 3 + idx);
-      cell.value = title;
-      setTableHeaderCell(cell);
-    });
-    tocSheet.mergeCells(`I${tocRowNo}:J${tocRowNo}`);
+    if (outputCondig.excel.displayToc) {
+      tocSheet!.getCell("H4").value = "Before time:";
+      tocSheet!.getCell("H4").alignment = {
+        horizontal: "right",
+      };
+      tocSheet!.mergeCells("H4:I4");
+      tocSheet!.getCell("H5").value = "After  time:";
+      tocSheet!.getCell("H5").alignment = {
+        horizontal: "right",
+      };
+      tocSheet!.mergeCells("H5:I5");
+      tocSheet!.getCell("J4").value = `${dayjs(beforeDate).format("HH:mm:ss")}`;
+      tocSheet!.getCell("J5").value = `${dayjs(afterDate).format("HH:mm:ss")}`;
 
-    tocRowNo++;
+      // RESULTSETS
+      cell = tocSheet!.getCell(`C${tocRowNo}`);
+      cell.value = "■ Resultsets";
+      tocRowNo++;
+      // header
+      [
+        "No",
+        "Title(Table)",
+        "comment",
+        "Inserted",
+        "Deleted",
+        "Updated",
+        "Link to",
+        "Link to",
+      ].forEach((title, idx) => {
+        const cell = tocSheet!.getCell(tocRowNo, 3 + idx);
+        cell.value = title;
+        setTableHeaderCell(cell);
+      });
+      tocSheet!.mergeCells(`I${tocRowNo}:J${tocRowNo}`);
+
+      tocRowNo++;
+    }
 
     diffList.forEach((item, idx) => {
       const no = idx + 1;
@@ -606,22 +630,24 @@ async function createBookFromDiffList(
       pairList[0].rdh = rdh1;
       pairList[1].rdh = rdh2;
 
-      tocSheet.getCell(`C${tocRowNo}`).value = no;
-      tocSheet.getCell(`D${tocRowNo}`).value = title;
-      tocSheet.getCell(`E${tocRowNo}`).value = rdh1.meta.comment ?? "";
-      tocSheet.getCell(`F${tocRowNo}`).value = diffResult.inserted;
-      tocSheet.getCell(`G${tocRowNo}`).value = diffResult.deleted;
-      tocSheet.getCell(`H${tocRowNo}`).value = diffResult.updated;
+      if (outputCondig.excel.displayToc) {
+        tocSheet!.getCell(`C${tocRowNo}`).value = no;
+        tocSheet!.getCell(`D${tocRowNo}`).value = title;
+        tocSheet!.getCell(`E${tocRowNo}`).value = rdh1.meta.comment ?? "";
+        tocSheet!.getCell(`F${tocRowNo}`).value = diffResult.inserted;
+        tocSheet!.getCell(`G${tocRowNo}`).value = diffResult.deleted;
+        tocSheet!.getCell(`H${tocRowNo}`).value = diffResult.updated;
 
-      tocSheet.getCell(`I${tocRowNo}`).value = {
-        text: "Before" + no,
-        hyperlink: `#before!A${pairList[0].rowNo}`,
-      };
-      tocSheet.getCell(`J${tocRowNo}`).value = {
-        text: "After" + no,
-        hyperlink: `#after!A${pairList[1].rowNo}`,
-      };
-      tocRowNo += 1;
+        tocSheet!.getCell(`I${tocRowNo}`).value = {
+          text: "Before" + no,
+          hyperlink: `#before!A${pairList[0].rowNo}`,
+        };
+        tocSheet!.getCell(`J${tocRowNo}`).value = {
+          text: "After" + no,
+          hyperlink: `#after!A${pairList[1].rowNo}`,
+        };
+        tocRowNo += 1;
+      }
 
       // create a sheet.
       for (const cur of pairList) {
@@ -632,54 +658,58 @@ async function createBookFromDiffList(
         const { tableName, comment, ruleViolationSummary } = rdh.meta;
 
         cur.tableRowNoList.push(cur.rowNo);
-        // table name
-        const cellTitle = sheet.getCell(cur.rowNo, 1);
-        let titleValue = title;
-        if (comment) {
-          titleValue += ` (${comment})`;
-        }
-        if (diffResult.message) {
-          titleValue += ` [${diffResult.message}]`;
-        }
-        cellTitle.value = "■ " + titleValue;
-        cur.rowNo++;
-
-        // sql statement
-        if (rdh.sqlStatement) {
+        if (outputCondig.excel.displayTableNameAndStatement) {
+          // table name
+          const cellTitle = sheet.getCell(cur.rowNo, 1);
+          let titleValue = title;
+          if (comment) {
+            titleValue += ` (${comment})`;
+          }
+          if (diffResult.message) {
+            titleValue += ` [${diffResult.message}]`;
+          }
+          cellTitle.value = "■ " + titleValue;
           cur.rowNo++;
-          const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
-          cell = sheet.getCell(cur.rowNo, 1);
-          cell.value = "SQL";
-          setTableHeaderCell(cell);
-          sheet.mergeCells(`A${cur.rowNo}:A${cur.rowNo + lines.length - 1}`);
-          lines.forEach((line) => {
-            cell = sheet.getCell(cur.rowNo, 2);
-            cell.value = line;
-            cur.rowNo++;
-          });
-          if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
-            cell = sheet.getCell(cur.rowNo, 1);
-            cell.value = "BINDS";
-            setTableHeaderCell(cell);
-            // テーブル見出しの行分もマージするので -1 は不要
-            sheet.mergeCells(`A${cur.rowNo}:A${cur.rowNo + rdh.queryConditions?.binds.length}`);
 
-            cell = sheet.getCell(cur.rowNo, 2);
-            cell.value = "Position";
-            setTableHeaderCell(cell);
-            cell = sheet.getCell(cur.rowNo, 3);
-            cell.value = "Value";
-            setTableHeaderCell(cell);
+          // sql statement
+          if (rdh.sqlStatement) {
             cur.rowNo++;
-            rdh.queryConditions?.binds.forEach((v, idx) => {
+            const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
+            cell = sheet.getCell(cur.rowNo, 1);
+            cell.value = "SQL";
+            setTableHeaderCell(cell);
+            sheet.mergeCells(`A${cur.rowNo}:A${cur.rowNo + lines.length - 1}`);
+            lines.forEach((line) => {
               cell = sheet.getCell(cur.rowNo, 2);
-              cell.value = `$${idx + 1}`;
-              cell = sheet.getCell(cur.rowNo, 3);
-              cell.value = v;
+              cell.value = line;
               cur.rowNo++;
             });
+            if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
+              cell = sheet.getCell(cur.rowNo, 1);
+              cell.value = "BINDS";
+              setTableHeaderCell(cell);
+              // テーブル見出しの行分もマージするので -1 は不要
+              sheet.mergeCells(`A${cur.rowNo}:A${cur.rowNo + rdh.queryConditions?.binds.length}`);
+
+              cell = sheet.getCell(cur.rowNo, 2);
+              cell.value = "Position";
+              setTableHeaderCell(cell);
+              cell = sheet.getCell(cur.rowNo, 3);
+              cell.value = "Value";
+              setTableHeaderCell(cell);
+              cur.rowNo++;
+              rdh.queryConditions?.binds.forEach((v, idx) => {
+                cell = sheet.getCell(cur.rowNo, 2);
+                cell.value = `$${idx + 1}`;
+                cell = sheet.getCell(cur.rowNo, 3);
+                cell.value = v;
+                cur.rowNo++;
+              });
+            }
+            cur.rowNo++;
           }
-          cur.rowNo++;
+        } else {
+          cur.rowNo++; // for Link to before/after sheet space
         }
 
         if (ruleViolationSummary) {
@@ -702,24 +732,30 @@ async function createBookFromDiffList(
         }
 
         const startIndex = cur.rowNo;
-        cell = sheet.getCell(cur.rowNo, 1);
-        cell.value = "No";
-        setTableHeaderCell(cell);
+
+        const { displayRowno } = rdhConfig;
+
+        if (displayRowno) {
+          cell = sheet.getCell(cur.rowNo, 1);
+          cell.value = "No";
+          setTableHeaderCell(cell);
+        }
 
         rdh.keys.forEach((column: RdhKey, idx: number) => {
-          const cellPhy = sheet.getCell(startIndex, idx + 2);
+          let colBasePos = displayRowno ? 2 : 1;
+          const cellPhy = sheet.getCell(startIndex, colBasePos + idx);
           cellPhy.value = column.name;
           setTableHeaderCell(cellPhy);
 
           if (rdhConfig.header.displayComment) {
-            const cellLog = sheet.getCell(startIndex + 1, idx + 2);
+            const cellLog = sheet.getCell(startIndex + 1, colBasePos + idx);
             cellLog.value = column.comment;
             setTableHeaderCell(cellLog);
           }
 
           if (rdhConfig.header.displayType) {
             const rowIdx = rdhConfig.header.displayComment ? startIndex + 2 : startIndex + 1;
-            const cellType = sheet.getCell(rowIdx, idx + 2);
+            const cellType = sheet.getCell(rowIdx, colBasePos + idx);
             cellType.value = EnumValues.getNameFromValue(GeneralColumnType, column.type);
             setTableHeaderCell(cellType);
           }
@@ -728,10 +764,14 @@ async function createBookFromDiffList(
         cur.rowNo++;
         if (rdhConfig.header.displayComment && rdhConfig.header.displayType) {
           cur.rowNo += 2;
-          sheet.mergeCells(`A${startIndex}:A${startIndex + 2}`);
+          if (displayRowno) {
+            sheet.mergeCells(`A${startIndex}:A${startIndex + 2}`);
+          }
         } else if (rdhConfig.header.displayComment || rdhConfig.header.displayType) {
           cur.rowNo++;
-          sheet.mergeCells(`A${startIndex}:A${startIndex + 1}`);
+          if (displayRowno) {
+            sheet.mergeCells(`A${startIndex}:A${startIndex + 1}`);
+          }
         }
 
         rdh.rows
@@ -748,25 +788,28 @@ async function createBookFromDiffList(
             if (!inserted && !removed) {
               updated = RowHelper.hasAnnotation(rdhRow, "Upd");
             }
-            const rowNo = ri + 1;
             const values = rdhRow.values;
-            let cell = sheet.getCell(cur.rowNo, 1);
-            cell.value = rowNo;
-            if (inserted) {
-              fillCell(cell, "Add");
-            } else if (removed) {
-              fillCell(cell, "Del");
-            } else if (updated) {
-              fillCell(cell, "Upd");
+            if (displayRowno) {
+              const rowNo = ri + 1;
+              let cell = sheet.getCell(cur.rowNo, 1);
+              cell.value = rowNo;
+              if (inserted) {
+                fillCell(cell, "Add");
+              } else if (removed) {
+                fillCell(cell, "Del");
+              } else if (updated) {
+                fillCell(cell, "Upd");
+              }
             }
 
             rdh.keys.forEach((column: RdhKey, colIdx: number) => {
+              let colBasePos = displayRowno ? 2 : 1;
               let annotationMessage: any = undefined;
               let ruleMarker: string | undefined = undefined;
               let resolvedLabel: string | undefined = undefined;
               let format = getCellFormat(column.type);
               const v = values[column.name];
-              const cell = sheet.getCell(cur.rowNo, colIdx + 2);
+              const cell = sheet.getCell(cur.rowNo, colBasePos + colIdx);
 
               const isHyperText = column.meta && column.meta.is_hyperlink === true;
               const ruleAnnonations = RowHelper.filterAnnotationByKeyOf<RuleAnnotation>(
@@ -851,11 +894,15 @@ async function createBookFromDiffList(
     if (undoList.length) {
       // create a sheet.
       tocRowNo += 2;
-      cell = tocSheet.getCell(`C${tocRowNo}`);
-      cell.value = "■ Undo changes";
+      if (tocSheet) {
+        cell = tocSheet.getCell(`C${tocRowNo}`);
+        cell.value = "■ Undo changes";
+      }
       tocRowNo++;
       const tocRecords = createUndoChangeSheet(workbook, undoList);
-      tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+      if (tocSheet) {
+        tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+      }
     }
 
     // RECORD RULES
@@ -865,12 +912,16 @@ async function createBookFromDiffList(
         .map((it) => getRecordRuleResults(it.rdh2))
         .filter((it) => it !== undefined) as RecordRuleValidationResult[];
       if (ruleResultList.length) {
-        cell = tocSheet.getCell(`C${tocRowNo}`);
-        cell.value = "■ Record Rules";
+        if (tocSheet) {
+          cell = tocSheet.getCell(`C${tocRowNo}`);
+          cell.value = "■ Record Rules";
+        }
         tocRowNo++;
         // create a sheet.
         const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
-        tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+        if (tocSheet) {
+          tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
+        }
       }
     }
 
@@ -921,6 +972,7 @@ function createRecordRulesSheet(
   workbook: Excel.Workbook,
   list: RecordRuleValidationResult[]
 ): TocRecords {
+  const outputCondig = getOutputConfig();
   const tocRecords: TocRecords = {
     headers: [
       { label: "No", key: "no" },
@@ -934,7 +986,9 @@ function createRecordRulesSheet(
     views: [{ state: "frozen", ySplit: 3 }],
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
-  sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
+  if (outputCondig.excel.displayToc) {
+    sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
+  }
   sheet.mergeCells("A1:C1");
   sheet.autoFilter = "B3:D3";
   sheet.getColumn("A").width = 2;
@@ -1017,6 +1071,7 @@ function createUndoChangeSheet(
   workbook: Excel.Workbook,
   list: UndoChangeSheetParams[]
 ): TocRecords {
+  const outputCondig = getOutputConfig();
   const tocRecords: TocRecords = {
     headers: [
       { label: "No", key: "no" },
@@ -1029,9 +1084,10 @@ function createUndoChangeSheet(
     views: [{ state: "frozen", ySplit: 3 }],
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
-  sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
+  if (outputCondig.excel.displayToc) {
+    sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
+  }
   sheet.mergeCells("A1:C1");
-  sheet.autoFilter = "B3:D3";
   sheet.getColumn("A").width = 2;
   sheet.getColumn("B").width = 12;
   sheet.getColumn("C").width = 8;
