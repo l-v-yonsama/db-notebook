@@ -389,8 +389,8 @@ const rowStyle = (p: any, rowIndex: number): any => {
     return { "background-color": "rgba(255, 83, 112, 0.25) !important" };
   } else if (hasAnnotationsOf(meta, "Upd")) {
     return { "background-color": "rgba(112, 83, 255, 0.17) !important" };
-  } else if (hasAnnotationsOf(meta, "Rul")) {
-    return { "background-color": "rgba(232, 232, 83, 0.09) !important" };
+    // } else if (hasAnnotationsOf(meta, "Rul")) {
+    // return { "background-color": "rgba(232, 232, 83, 0.09) !important" };
   }
   if (rowIndex === selectedRowIndex.value) {
     return { "background-color": "rgba(232, 232, 232, 0.09) !important" };
@@ -614,7 +614,7 @@ defineExpose({
                   }" :title="item[key.name]">
                     <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
                       item.$ruleViolationMarks[key.name]
-                    }}</span>
+                      }}</span>
                     <span class="val">{{ item[key.name] }}</span>
                   </p>
                   <span v-if="item.$resolvedLabels[key.name]" class="marker-box code-label" :class="{

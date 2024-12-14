@@ -414,13 +414,13 @@ defineExpose({
         @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
       </VsCodeTabHeader>
       <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
-        <section :style="{ width: `${splitterWidth}px` }">
+        <section v-if="isActiveTabId(tabItem.tabId)" :style="{ width: `${splitterWidth}px` }">
           <div class="toolbar" :style="{ width: `${splitterWidth}px` }">
             <div v-if="isMultiLineKeyword" class="multiple">
               <div class="left">
                 <label v-if="tabItem.startDt.visible" for="startTime">{{
                   tabItem.startDt.label
-                  }}</label>
+                }}</label>
                 <VsCodeTextField v-if="tabItem.startDt.visible" id="startTime" v-model="tabItem.startDt.value"
                   type="date" :title="tabItem.startDt.description"></VsCodeTextField>
 
@@ -435,7 +435,7 @@ defineExpose({
               <div class="right">
                 <label v-if="tabItem.keyword.visible" for="keyword">{{
                   tabItem.keyword.label
-                  }}</label>
+                }}</label>
                 <VsCodeTextArea v-if="tabItem.keyword.visible" id="keyword" v-model="tabItem.keyword.value"
                   :maxlength="512" :rows="6" :title="tabItem.keyword.description" placeholder="Enter a keyword"
                   style="height: 97%">
@@ -463,7 +463,7 @@ defineExpose({
 
               <label v-if="tabItem.startDt.visible" for="startTime">{{
                 tabItem.startDt.label
-                }}</label>
+              }}</label>
               <VsCodeTextField v-if="tabItem.startDt.visible" id="startTime" v-model="tabItem.startDt.value" type="date"
                 :title="tabItem.startDt.description"></VsCodeTextField>
               <label v-if="tabItem.endDt.visible" for="endTime">{{ tabItem.endDt.label }}</label>

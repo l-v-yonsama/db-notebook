@@ -231,7 +231,8 @@ defineExpose({
       </VsCodeTabHeader>
       <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
         <section :style="{ width: `${sectionWidth}px` }">
-          <div :id="'chart-' + tabItem.tabId" v-if="activeChartTabItem" class="spPaneWrapper">
+          <div :id="'chart-' + tabItem.tabId" v-if="activeChartTabItem && isActiveTabId(tabItem.tabId)"
+            class="spPaneWrapper">
             <PairPlotChart v-if="activeChartTabItem.type === 'pairPlot'"
               :showDataLabels="activeChartTabItem.showDataLabels"
               :showTitle="activeChartTabItem.pairPlotChartParams.showTitle" :title="activeChartTabItem.title"

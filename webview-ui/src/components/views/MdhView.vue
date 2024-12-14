@@ -408,7 +408,7 @@ defineExpose({
         </VsCodeTabHeader>
         <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
           <section :style="{ width: `${splitterWidth}px` }">
-            <div v-if="activeInnerRdh" class="spPaneWrapper">
+            <div v-if="activeInnerRdh && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
               <RDHViewer :rdh="activeInnerRdh" :config="tabItem.config" :width="splitterWidth" :height="splitterHeight"
                 :ref="setRdhViewerRef" />
             </div>

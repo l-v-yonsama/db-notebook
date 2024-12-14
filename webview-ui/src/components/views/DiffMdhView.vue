@@ -315,14 +315,14 @@ defineExpose({
             <splitpanes class="default-theme"
               :style="{ 'max-width': `${splitterWidth}px`, 'height': `${splitterHeight}px` }">
               <pane min-size="5">
-                <div v-if="activeInnerRdh1" class="spPaneWrapper">
+                <div v-if="activeInnerRdh1 && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
                   <RDHViewer :rdh="activeInnerRdh1" :width="splitterWidth" :height="splitterHeight"
                     :showOnlyChanged="displayOnlyChanged">
                   </RDHViewer>
                 </div>
               </pane>
               <pane min-size="5">
-                <div v-if="activeInnerRdh2" class="spPaneWrapper">
+                <div v-if="activeInnerRdh2 && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
                   <RDHViewer :rdh="activeInnerRdh2" :width="splitterWidth" :height="splitterHeight"
                     :showOnlyChanged="displayOnlyChanged">
                   </RDHViewer>
