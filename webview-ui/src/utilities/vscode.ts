@@ -7,6 +7,7 @@ export * from "../../../src/shared/ComponentName";
 export * from "../../../src/shared/CreateScriptConditionParams";
 export * from "../../../src/shared/DynamoDBConditionParams";
 export * from "../../../src/shared/ExtChartJs";
+export * from "../../../src/shared/LMPromptCreateConditionParams";
 export * from "../../../src/shared/MessageEventData";
 export * from "../../../src/shared/ModeType";
 export * from "../../../src/shared/RecordRule";

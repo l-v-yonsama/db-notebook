@@ -331,6 +331,19 @@ export class StateStorage {
     return setting?.dbType;
   }
 
+  getDBProductByConnectionName(name: string): string | undefined {
+    const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
+    const setting = list.find((it) => it.name === name);
+    const dbType = setting?.dbType;
+    if (dbType) {
+      if (dbType === "Aws") {
+        return "DynamoDB";
+      }
+      return dbType || "";
+    }
+    return undefined;
+  }
+
   async addConnectionSetting(setting: ConnectionSetting): Promise<boolean> {
     const list = await this.getConnectionSettingList();
     if (list.some((it) => it.name === setting.name)) {

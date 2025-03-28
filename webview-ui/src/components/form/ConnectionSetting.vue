@@ -46,6 +46,10 @@ const sqlServerAuthenticationTypeItems: DropdownItem[] = [
     value: "default",
   },
   {
+    label: "Windows Auth...(NTLM)",
+    value: "ntlm",
+  },
+  {
     label: "Azure AD Default",
     value: "azure-active-directory-default",
   },
@@ -173,6 +177,7 @@ const props = withDefaults(defineProps<Props>(), {
       tenantId: "",
       clientSecret: "",
       token: "",
+      domain: ""
     },
     ssl: {
       use: false,
@@ -238,6 +243,7 @@ const sqlServerClientId = ref(props.item.sqlServer?.clientId ?? "");
 const sqlServerClientSecret = ref(props.item.sqlServer?.clientSecret ?? "");
 const sqlServerTenantId = ref(props.item.sqlServer?.tenantId ?? "");
 const sqlServerConnectString = ref(props.item.sqlServer?.connectString ?? "");
+const sqlServerDomain = ref(props.item.sqlServer?.domain ?? "");
 
 // resource filters
 const schemaFilterType = ref(props.item.resourceFilter?.schema?.type ?? "");
@@ -336,6 +342,7 @@ function createItem(): ConnectionSetting {
       clientSecret: sqlServerClientSecret.value,
       tenantId: sqlServerTenantId.value,
       connectString: sqlServerConnectString.value,
+      domain: sqlServerDomain.value,
     };
   }
   if (elmSettings.value.getResourceFilters().visible) {
@@ -491,6 +498,8 @@ defineExpose({
       <p v-if="isShowMode" v-show="elmSettings.getSqlServerAuthenticationType().visible" id="authenticationType">
         {{ sqlServerAuthenticationType }}
       </p>
+
+      <!-- SQL Server -->
       <VsCodeDropdown v-else v-show="elmSettings.getSqlServerAuthenticationType().visible" id="authenticationType"
         v-model="sqlServerAuthenticationType" :items="sqlServerAuthenticationTypeItems"></VsCodeDropdown>
 
@@ -504,7 +513,7 @@ defineExpose({
 
       <label v-show="elmSettings.getDatabase().visible" for="database">{{
         elmSettings.getDatabase().label ?? "Database"
-        }}</label>
+      }}</label>
       <template v-if="dbType === 'SQLite'">
         <VsCodeButton v-if="!isShowMode" @click="selectDatabaseFile">
           <fa icon="database" />Select
@@ -585,6 +594,7 @@ defineExpose({
         @change="($e: InputEvent) => handleUseSsl($e)" style="margin-right: auto">Use
         SSL(sslmode=no-verify)</vscode-checkbox>
 
+      <!-- SQL Server -->
       <div v-if="dbType === 'SQLServer'" class="sql-server">
         <label v-if="isShowMode" for="encryption">Encryption</label>
         <p v-if="isShowMode" id="encryption">{{ isSqlServerEncrypt }}</p>
@@ -608,6 +618,9 @@ defineExpose({
           default
           schema</vscode-checkbox>
 
+        <LabeledText v-show="elmSettings.getSqlServerDomain().visible" id="sqlServerDomain" v-model="sqlServerDomain"
+          :isShowMode="isShowMode" :label="elmSettings.getSqlServerDomain().label ?? ''"
+          :placeholder="elmSettings.getSqlServerDomain().placeholder ?? ''" />
         <LabeledText v-show="elmSettings.getSqlServerTenantId().visible" id="sqlServerTenantId"
           v-model="sqlServerTenantId" :isShowMode="isShowMode" :showModeValue="maskedSqlServerTenantId"
           :label="elmSettings.getSqlServerTenantId().label ?? ''"
@@ -629,14 +642,14 @@ defineExpose({
 
       <label v-show="elmSettings.getQueryTimeoutMs().visible" for="queryTimeoutMs">{{
         elmSettings.getQueryTimeoutMs().label
-        }}(Optional)</label>
+      }}(Optional)</label>
       <p v-if="isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs">{{ queryTimeoutMs }}</p>
       <VsCodeTextField v-if="!isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs"
         v-model="queryTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 60000"></VsCodeTextField>
 
       <label v-show="elmSettings.getLockWaitTimeoutMs().visible" for="lockTimeoutMs">{{
         elmSettings.getLockWaitTimeoutMs().label
-        }}(Optional)</label>
+      }}(Optional)</label>
       <p v-if="isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs">{{ lockWaitTimeoutMs }}</p>
       <VsCodeTextField v-if="!isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs"
         v-model="lockWaitTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 30000"></VsCodeTextField>

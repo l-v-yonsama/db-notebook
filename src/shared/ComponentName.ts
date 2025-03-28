@@ -11,6 +11,7 @@ export type ComponentName =
   | "CreateInsertScriptSettingsPanel"
   | "HarFilePanel"
   | "HttpEventPanel"
+  | "LMPromptCreatePanel"
   | "ViewConditionPanel"
   | "WriteHttpEventToClipboardParamsPanel"
   | "DBFormView"

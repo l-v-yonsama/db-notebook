@@ -27,6 +27,7 @@ import { activateNotebook } from "./notebook/activator";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
 import { DynamoQueryPanel } from "./panels/DynamoQueryPanel";
 import { HarFilePanel } from "./panels/HarFilePanel";
+import { LMPromptCreatePanel } from "./panels/LMPromptCreatePanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 import { ScanPanel } from "./panels/ScanPanel";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
@@ -68,6 +69,7 @@ export async function activate(context: ExtensionContext) {
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
   HarFilePanel.setStateStorage(stateStorage);
+  LMPromptCreatePanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);

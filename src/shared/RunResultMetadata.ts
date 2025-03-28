@@ -14,6 +14,30 @@ export type JSONCellValues = {
   };
 };
 
+export type LMContent = {
+  row: number;
+  col: number;
+  message: string;
+  reference?: {
+    title: string;
+    url: string;
+  };
+};
+
+export type LMResult = {
+  model?: {
+    id: string;
+    vendor: string;
+    family: string;
+    version: string;
+    name?: string;
+  };
+  contents: LMContent[];
+  ok: boolean;
+  markdownText: string;
+  elapsedTime: number;
+};
+
 export type RunResultMetadata = {
   tableName?: string;
   type?: string;
@@ -21,6 +45,7 @@ export type RunResultMetadata = {
   explainRdh?: ResultSetData;
   analyzedRdh?: ResultSetData;
   axiosEvent?: NodeRunAxiosEvent;
+  lmResult?: LMResult;
   updateJSONCellValues?: JSONCellValues[];
   [key: string]: any;
 };

@@ -65,6 +65,10 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getSqlServerDomain(): ElementSetting {
+    return { visible: false };
+  }
+
   getSqlServerClientId(): ElementSetting {
     return { visible: false };
   }
@@ -225,11 +229,36 @@ export class SQLServerElementSetting extends RdsElementSetting {
   }
   getHost(): ElementSetting {
     const type = this.params.sqlServerAuthenticationType;
+    let label = "Server";
+    let defaultValue = "<SERVERNAME>.database.windows.net";
+    let placeholder = "<SERVERNAME>.database.windows.net";
+    switch (type) {
+      case "default":
+        label = "Host";
+        defaultValue = "127.0.0.1";
+        placeholder = "";
+        break;
+      case "ntlm":
+        label = "Server";
+        defaultValue = "";
+        placeholder = "Server name or IP address";
+        break;
+    }
     return {
       visible: type !== "Use Connect String",
-      label: type === "default" ? "Host" : "Server",
-      defaultValue: type === "default" ? "127.0.0.1" : "<SERVERNAME>.database.windows.net",
-      placeholder: type === "default" ? "" : "<SERVERNAME>.database.windows.net",
+      label,
+      defaultValue,
+      placeholder,
+    };
+  }
+
+  getSqlServerDomain(): ElementSetting {
+    const type = this.params.sqlServerAuthenticationType;
+    return {
+      visible: type == "ntlm",
+      label: "Domain",
+      defaultValue: "",
+      placeholder: "Domain name",
     };
   }
   getPort(): ElementSetting<number> {
@@ -288,7 +317,7 @@ export class SQLServerElementSetting extends RdsElementSetting {
     const isOptional =
       type === "azure-active-directory-default" || type === "azure-active-directory-msi-vm";
     return {
-      visible: type !== "Use Connect String" && type !== "default",
+      visible: type !== "Use Connect String" && type !== "default" && type !== "ntlm",
       defaultValue: "",
       label: isOptional ? "ClientId(Optional)" : "ClientId",
       placeholder: "A client id to use",

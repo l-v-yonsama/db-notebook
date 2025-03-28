@@ -1,7 +1,16 @@
 import type { NotebookCellKind, Uri } from "vscode";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
-export type SQLMode = "Query" | "Explain" | "ExplainAnalyze";
+export type SQLMode = "None" | "Query" | "Explain" | "ExplainAnalyze";
+
+export type LMEvaluateTarget = "Query";
+
+export type LMPromptCreateConditions = {
+  translateResponse: boolean;
+  withTableDefinition: boolean;
+  withRetrievedExecutionPlan: boolean;
+  languageModelId: string;
+};
 
 export type CellMetaChart = {
   title: string;
@@ -31,6 +40,7 @@ export type CellMeta = {
   logGroupName?: string;
   logGroupStartTimeOffset?: "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "12h" | "1d" | "1w";
   chart?: CellMetaChart;
+  lmPromptCreateConditions?: LMPromptCreateConditions;
   readonly [key: string]: any;
 };
 
@@ -60,6 +70,7 @@ export type RunResult = {
   stdout: string;
   stderr: string;
   skipped: boolean;
+  evaluated?: boolean;
   status: "skipped" | "executed" | "error";
   metadata?: RunResultMetadata;
 };

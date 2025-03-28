@@ -31,25 +31,26 @@ import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 
 export type MessageEventData =
-  | MdhViewEventData
-  | CountRecordViewEventData
   | ChartsViewEventData
-  | HttpEventPanelEventData
+  | CodeResolverEditorEventData
+  | CountRecordViewEventData
   | CreateInsertScriptSettingsPanelEventData
   | CsvParseSettingPanelEventData
-  | HarFilePanelEventData
-  | DiffMdhViewEventData
-  | ScanPanelEventData
-  | DynamoQueryPanelEventData
-  | ViewConditionPanelEventData
-  | VariablesPanelEventData
-  | WriteHttpEventToClipboardParamsPanelEventData
-  | NotebookCellMetadataPanelEventData
-  | ERDiagramSettingsPanelEventData
-  | RecordRuleEditorEventData
-  | CodeResolverEditorEventData
   | DBFormEventData
-  | ToolsViewEventData;
+  | DiffMdhViewEventData
+  | DynamoQueryPanelEventData
+  | ERDiagramSettingsPanelEventData
+  | HarFilePanelEventData
+  | HttpEventPanelEventData
+  | LMPromptCreatePanelEventData
+  | MdhViewEventData
+  | NotebookCellMetadataPanelEventData
+  | RecordRuleEditorEventData
+  | ScanPanelEventData
+  | ToolsViewEventData
+  | VariablesPanelEventData
+  | ViewConditionPanelEventData
+  | WriteHttpEventToClipboardParamsPanelEventData;
 
 export type BaseMessageEventDataCommand = "stop-progress" | "loading" | "initialize";
 
@@ -354,6 +355,27 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
       codeFileItems: { label: string; value: string }[];
       ruleFileItems: { label: string; value: string }[];
       columnItems: RdhKey[];
+    };
+  }
+>;
+
+export type LMPromptCreatePanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-prompts",
+  "LMPromptCreatePanel",
+  {
+    initialize?: {
+      hasExplainPlan: boolean;
+      assistantPromptText: string;
+      userPromptText: string;
+      languageModels: { label: string; value: string }[];
+      languageModelId: string;
+      translateResponse: boolean;
+      withTableDefinition: boolean;
+      withRetrievedExecutionPlan: boolean;
+    };
+    setPrompts?: {
+      assistantPromptText: string;
+      userPromptText: string;
     };
   }
 >;

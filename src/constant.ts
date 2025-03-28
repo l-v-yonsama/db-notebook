@@ -91,6 +91,7 @@ export const CELL_EXECUTE_EXPLAIN = `${EXTENSION_NAME}.cell-execute-explain`;
 export const CELL_EXECUTE_EXPLAIN_ANALYZE = `${EXTENSION_NAME}.cell-execute-explain-analyze`;
 
 // NOTEBOOK CELL TITLE (CELL TOOLBAR-ACTION)
+export const CELL_TOOLBAR_LM = `${EXTENSION_NAME}.cell-toolbar-lm`;
 export const CELL_TOOLBAR_FORMAT = `${EXTENSION_NAME}.cell-toolbar-format`;
 
 //---------------------------------------------------

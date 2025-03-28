@@ -1,6 +1,7 @@
 import { runRuleEngine } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr, resolveCodeLabel, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import {
+  CancellationTokenSource,
   commands,
   ExtensionContext,
   NotebookCell,
@@ -34,7 +35,7 @@ import {
   REFRESH_SQL_HISTORIES,
 } from "../constant";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
-import { CellMeta, RunResult, SQLMode } from "../types/Notebook";
+import { CellMeta, LMEvaluateTarget, RunResult, SQLMode } from "../types/Notebook";
 import { ChartsViewParams } from "../types/views";
 import {
   getNodeConfig,
@@ -43,6 +44,7 @@ import {
 } from "../utilities/configUtil";
 import { existsFileOnWorkspace, initializeStorageTmpPath } from "../utilities/fsUtil";
 import { createResponseBodyMarkdown } from "../utilities/httpUtil";
+import { runLm } from "../utilities/lmUtil";
 import { log, logError } from "../utilities/logger";
 import {
   hasAnyRdhOutputCell,
@@ -67,6 +69,7 @@ type NoteSession = {
   kernel: NodeKernel | undefined;
   sqlKernel: SqlKernel | undefined;
   awsKernel: AwsKernel | undefined;
+  cancellationTokenSourceList: CancellationTokenSource[] | undefined;
   interrupted: boolean;
 };
 
@@ -80,6 +83,7 @@ export class MainController {
   private readonly noteSessions = new Map<string, NoteSession>();
   private readonly noteVariables = new Map<string, { [key: string]: any }>();
   private sqlMode: SQLMode | undefined = undefined;
+  private lmEvaluateTarget: LMEvaluateTarget | undefined = undefined;
 
   constructor(private context: ExtensionContext, private stateStorage: StateStorage) {
     this._controller = notebooks.createNotebookController(
@@ -202,6 +206,10 @@ export class MainController {
     this.sqlMode = sqlMode;
   }
 
+  setLMEvaluateTarget(lmEvaluateTarget: LMEvaluateTarget): void {
+    this.lmEvaluateTarget = lmEvaluateTarget;
+  }
+
   setActiveContext(notebook: NotebookDocument) {
     const cells = notebook?.getCells() ?? [];
     const visibleVariables = cells.some((cell) => cell.outputs.length > 0);
@@ -229,7 +237,7 @@ export class MainController {
     // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
     if (noteSession) {
-      const { kernel, sqlKernel, awsKernel } = noteSession;
+      const { kernel, sqlKernel, awsKernel, cancellationTokenSourceList } = noteSession;
       try {
         noteSession.interrupted = true;
         if (kernel) {
@@ -245,6 +253,11 @@ export class MainController {
         if (awsKernel) {
           awsKernel.interrupt();
         }
+        if (cancellationTokenSourceList) {
+          for (const cts of cancellationTokenSourceList) {
+            cts.cancel();
+          }
+        }
       } catch (e) {
         if (e instanceof Error) {
           log(`${PREFIX} interruptHandler Error:${e.message}`);
@@ -254,6 +267,7 @@ export class MainController {
       }
     }
     this.sqlMode = undefined;
+    this.lmEvaluateTarget = undefined;
   }
 
   async execute(cell: NotebookCell) {
@@ -275,6 +289,7 @@ export class MainController {
       kernel,
       sqlKernel: undefined,
       awsKernel: undefined,
+      cancellationTokenSourceList: [],
       interrupted: false,
     };
     this.noteSessions.set(notebook.uri.path, noteSession);
@@ -318,6 +333,7 @@ export class MainController {
     let stdout = "";
     let stderr = "";
     let skipped = false;
+    let evaluated = false;
     let status = "skipped";
     let metadata: RunResultMetadata | undefined = undefined;
     const cellMeta: CellMeta = cell.metadata;
@@ -329,6 +345,7 @@ export class MainController {
       stdout = r.stdout;
       stderr = r.stderr;
       skipped = r.skipped;
+      evaluated = r.evaluated || false;
       status = r.status;
       metadata = {
         ...r.metadata,
@@ -342,7 +359,7 @@ export class MainController {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stderr(stderr)], metadata));
         success = false;
       }
-      if (skipped) {
+      if (skipped && !evaluated) {
         outputs.push(
           new NotebookCellOutput(
             [NotebookCellOutputItem.text("### `SKIPPED!`", "text/markdown")],
@@ -352,7 +369,8 @@ export class MainController {
       }
 
       if (metadata) {
-        const { rdh, explainRdh, analyzedRdh, axiosEvent, updateJSONCellValues } = metadata;
+        const { rdh, explainRdh, analyzedRdh, axiosEvent, updateJSONCellValues, lmResult } =
+          metadata;
 
         if (rdh) {
           const toMarkdownConfig = getToStringParamByConfig({
@@ -422,6 +440,15 @@ export class MainController {
                   "text/markdown"
                 ),
               ],
+              metadata
+            )
+          );
+        }
+
+        if (lmResult && lmResult.markdownText) {
+          outputs.push(
+            new NotebookCellOutput(
+              [NotebookCellOutputItem.text(lmResult.markdownText, "text/markdown")],
               metadata
             )
           );
@@ -560,6 +587,12 @@ export class MainController {
         });
         commands.executeCommand(REFRESH_SQL_HISTORIES);
       }
+
+      if (this.lmEvaluateTarget && r.metadata) {
+        await runLm(this.stateStorage, cell, r.metadata, noteSession.cancellationTokenSourceList);
+        r.evaluated = true;
+      }
+      this.lmEvaluateTarget = undefined;
 
       return r;
     } else if (isCwqlCell(cell)) {

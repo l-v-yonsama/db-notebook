@@ -36,6 +36,7 @@ import {
   CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
   CELL_SPECIFY_LOG_GROUP_TO_USE,
   CELL_TOOLBAR_FORMAT,
+  CELL_TOOLBAR_LM,
   CREATE_NEW_NOTEBOOK,
   CREATE_NOTEBOOK_FROM_SQL,
   EXPORT_IN_HTML,
@@ -47,6 +48,7 @@ import {
   SPECIFY_USING_DB_TO_ALL_CELLS,
 } from "../constant";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
+import { LMPromptCreatePanel } from "../panels/LMPromptCreatePanel";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
 import { VariablesPanel } from "../panels/VariablesPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -516,6 +518,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   }
 
   // Notebook cell-toolbar commands
+  {
+    registerDisposableCommand(CELL_TOOLBAR_LM, async (cell: NotebookCell) => {
+      LMPromptCreatePanel.setMainController(controller);
+      LMPromptCreatePanel.render(context.extensionUri, cell);
+    });
+  }
   {
     registerDisposableCommand(CELL_TOOLBAR_FORMAT, async (cell: NotebookCell) => {
       const doc = cell.document;

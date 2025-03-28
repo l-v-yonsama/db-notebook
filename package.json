@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0.",
-  "version": "0.7.25",
+  "version": "0.8.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -532,6 +532,11 @@
       ],
       "notebook/cell/title": [
         {
+          "command": "database-notebook.cell-toolbar-lm",
+          "group": "inline",
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' ) "
+        },
+        {
           "command": "database-notebook.cell-toolbar-format",
           "group": "inline",
           "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
@@ -782,6 +787,12 @@
         "title": "Execute explain analyze (Displays actual execution time and statistics)",
         "shortTitle": "Explain analyze",
         "icon": "$(debug-alt-small)"
+      },
+      {
+        "command": "database-notebook.cell-toolbar-lm",
+        "title": "Activate the AI Assistant",
+        "shortTitle": "Activate AI",
+        "icon": "$(robot)"
       },
       {
         "command": "database-notebook.cell-toolbar-format",
@@ -1056,7 +1067,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.9.22",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-0.9.24.tgz",
     "@l-v-yonsama/rdh": "^0.2.3",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

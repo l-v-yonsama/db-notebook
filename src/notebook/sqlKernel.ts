@@ -27,13 +27,15 @@ export class SqlKernel {
     let stderrs: string[] = [];
     let connectionSetting: ConnectionSetting | undefined = undefined;
     const { connectionName, useDatabaseName }: CellMeta = cell.metadata;
+    let metadata: RunResult["metadata"] = {};
 
-    if (variables._skipSql === true) {
+    if (variables._skipSql === true || sqlMode === "None") {
       return {
         stdout,
         stderr: "",
         skipped: true,
         status: "skipped",
+        metadata,
       };
     }
     if (connectionName) {
@@ -44,6 +46,7 @@ export class SqlKernel {
         stderr: "Specify the connection name to be used.",
         skipped: false,
         status: "error",
+        metadata,
       };
     }
     if (!connectionSetting) {
@@ -52,10 +55,9 @@ export class SqlKernel {
         stderr: "Missing connection " + connectionName,
         skipped: false,
         status: "error",
+        metadata,
       };
     }
-
-    let metadata: RunResult["metadata"] = {};
 
     try {
       const resolver = DBDriverResolver.getInstance();

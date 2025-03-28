@@ -35,6 +35,8 @@ export abstract class BaseElementSetting {
 
   abstract getSqlServerAuthenticationType(): ElementSetting;
 
+  abstract getSqlServerDomain(): ElementSetting;
+
   abstract getSqlServerClientId(): ElementSetting;
 
   abstract getSqlServerTenantId(): ElementSetting;
@@ -62,6 +64,10 @@ export abstract class BaseElementSetting {
 
 export abstract class BaseNoSqlElementSetting extends BaseElementSetting {
   getSqlServerAuthenticationType(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerDomain(): ElementSetting {
     return { visible: false };
   }
 
