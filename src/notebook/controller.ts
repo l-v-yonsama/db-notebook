@@ -504,7 +504,7 @@ export class MainController {
         );
       }
     }
-    execution.replaceOutput(outputs);
+    await execution.replaceOutput(outputs);
     execution.end(success, Date.now());
 
     if (noteSession.kernel && cellMeta.savingSharedVariables && cellMeta.sharedVariableName) {

@@ -558,12 +558,18 @@ const createHtml = async (
           s: escapeHtml(cell.document.getText()),
         };
 
-        if (cell.outputs.some((it) => (it.metadata as RunResultMetadata)?.status === "skipped")) {
+        if (
+          cell.outputs.some(
+            (it) =>
+              (it.metadata as RunResultMetadata)?.status === "skipped" &&
+              (it.metadata as RunResultMetadata)?.lmResult === undefined
+          )
+        ) {
           htmlContents.push(
             `<div class="notification is-warning is-light" style="padding:10px; margin-bottom:10px;font-size:small;">Skipped</div>`
           );
         } else {
-          cell.outputs.forEach((output) => {
+          cell.outputs.forEach((output, oidx) => {
             output.items.forEach((item) => {
               switch (item.mime) {
                 case "text/plain":
@@ -741,6 +747,19 @@ const createHtml = async (
                   ),
                 };
               }
+              if (metadata.lmResult) {
+                htmlContents.push(
+                  `<div class="notification is-primary is-light" style="padding:10px; margin-bottom:10px;font-size:small;">`
+                );
+                htmlContents.push(`</div>`);
+                const lmId = `lm_id${id}_${oidx}`;
+                htmlContents.push(`<div id="${lmId}" class="block">`);
+                htmlContents.push("</div>");
+                markdownValues[lmId] = {
+                  lang: "Markup",
+                  s: escapeHtml(metadata.lmResult.markdownText),
+                };
+              }
             }
           });
         }
@@ -795,8 +814,18 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
     s += '<span class="tag is-info is-light">Not executed</span>';
     return s;
   }
-  if (cell.outputs.some((it) => (it.metadata as RunResultMetadata)?.status === "skipped")) {
+  if (
+    cell.outputs.some(
+      (it) =>
+        (it.metadata as RunResultMetadata)?.status === "skipped" &&
+        (it.metadata as RunResultMetadata)?.lmResult === undefined
+    )
+  ) {
     s += '<span class="tag is-warning is-light">Skipped</span>';
+    return s;
+  }
+  if (cell.outputs.some((it) => (it.metadata as RunResultMetadata)?.lmResult !== undefined)) {
+    s += '<span class="tag is-warning is-light">Evaluated</span>';
     return s;
   }
 

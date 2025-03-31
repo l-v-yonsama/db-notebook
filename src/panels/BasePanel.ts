@@ -22,7 +22,7 @@ export abstract class BasePanel {
   }
 
   protected async loading(progress: number): Promise<void> {
-    this.panel.webview.postMessage({
+    await this.panel.webview.postMessage({
       command: "loading",
       componentName: this.getComponentName(),
       value: {

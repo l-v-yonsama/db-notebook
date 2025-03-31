@@ -76,18 +76,18 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
           },
         },
       };
-      webviewPanel.webview.postMessage(msg);
+      await webviewPanel.webview.postMessage(msg);
     };
 
-    const changeDocumentSubscription = workspace.onDidChangeTextDocument((e) => {
+    const changeDocumentSubscription = workspace.onDidChangeTextDocument(async (e) => {
       if (e.document.uri.toString() === document.uri.toString()) {
-        updateWebview();
+        await updateWebview();
       }
     });
 
-    const changeViewStateSubscription = webviewPanel.onDidChangeViewState((e) => {
+    const changeViewStateSubscription = webviewPanel.onDidChangeViewState(async (e) => {
       if (e.webviewPanel.visible) {
-        updateWebview();
+        await updateWebview();
       }
     });
 
@@ -109,7 +109,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
       }
     });
 
-    updateWebview();
+    await updateWebview();
   }
 
   private async updateTextDocument(

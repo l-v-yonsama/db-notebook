@@ -1,4 +1,10 @@
-import { AwsDatabase, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  AwsDatabase,
+  DBDriverResolver,
+  isRDSType,
+  RDSBaseDriver,
+  RdsDatabase,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   commands,
   lm,
@@ -72,7 +78,7 @@ export class LMPromptCreatePanel extends BasePanel {
           return;
         }
 
-        const prompt = this.createPrompt();
+        const prompt = await this.createPrompt();
         if (!prompt) {
           return;
         }
@@ -118,7 +124,7 @@ export class LMPromptCreatePanel extends BasePanel {
     }
   }
 
-  private createPrompt(): { assistant: string; user: string } | undefined {
+  private async createPrompt(): Promise<{ assistant: string; user: string } | undefined> {
     if (!this.cell) {
       return undefined;
     }
@@ -140,7 +146,37 @@ export class LMPromptCreatePanel extends BasePanel {
       (it) => it.metadata?.explainRdh || it.metadata?.analyzedRdh
     )?.metadata;
 
-    return createPrompt({
+    const setting = await LMPromptCreatePanel.stateStorage?.getConnectionSettingByName(
+      connectionName
+    );
+    if (!setting) {
+      return undefined;
+    }
+
+    if (isRDSType(setting.dbType)) {
+      const { ok, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+        setting,
+        async (driver) => {
+          return await createPrompt({
+            db: dbs[0] as RdsDatabase,
+            rdsDriver: driver,
+            dbProduct,
+            sql: this.cell!.document.getText(),
+            explainRdh: explainOutputMetadata?.explainRdh ?? explainOutputMetadata?.analyzedRdh,
+            translateResponse: this.translateResponse,
+            withTableDefinition: this.withTableDefinition,
+            withRetrievedExecutionPlan: this.withRetrievedExecutionPlan,
+            withJSONResponseFormartForEngine: false,
+          });
+        }
+      );
+
+      if (ok && result) {
+        return result;
+      }
+    }
+
+    return await createPrompt({
       db: dbs[0] as AwsDatabase | RdsDatabase,
       dbProduct,
       sql: this.cell.document.getText(),
@@ -217,7 +253,7 @@ export class LMPromptCreatePanel extends BasePanel {
       this.withRetrievedExecutionPlan = false;
     }
 
-    const prompt = this.createPrompt();
+    const prompt = await this.createPrompt();
     if (!prompt) {
       return;
     }

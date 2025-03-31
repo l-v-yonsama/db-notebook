@@ -39,9 +39,9 @@ export function activateCodeResolverEditor(context: ExtensionContext, stateStora
         await writeToResource(uri, JSON.stringify(resolver, null, 1));
         // window.showInformationMessage(`Successfully saved, please open it.\n${uri.fsPath}`);
 
-        commands.executeCommand("vscode.openWith", uri, CODE_RESOLVER_TYPE);
+        await commands.executeCommand("vscode.openWith", uri, CODE_RESOLVER_TYPE);
       } catch (e) {
-        showWindowErrorMessage(e);
+        await showWindowErrorMessage(e);
       }
     })
   );

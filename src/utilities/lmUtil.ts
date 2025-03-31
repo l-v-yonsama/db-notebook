@@ -1,6 +1,9 @@
 import {
   AwsDatabase,
   createTableDefinisionsForPrompt,
+  DBDriverResolver,
+  isRDSType,
+  RDSBaseDriver,
   RdsDatabase,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
@@ -17,15 +20,22 @@ Assume that bind variables and placeholders are used correctly and do not need t
 
 type CreatePromptParams = {
   db: AwsDatabase | RdsDatabase;
+  rdsDriver?: RDSBaseDriver;
   explainRdh?: ResultSetData;
   dbProduct: string;
   sql: string;
   withJSONResponseFormartForEngine: boolean;
 } & Omit<LMPromptCreateConditions, "languageModelId">;
 
-export const createPrompt = (params: CreatePromptParams): { assistant: string; user: string } => {
+type CreatePromptResult = {
+  assistant: string;
+  user: string;
+};
+
+export const createPrompt = async (params: CreatePromptParams): Promise<CreatePromptResult> => {
   const {
     db,
+    rdsDriver,
     dbProduct,
     sql,
     explainRdh,
@@ -37,9 +47,10 @@ export const createPrompt = (params: CreatePromptParams): { assistant: string; u
   const assistantContents: string[] = [];
   let tableDefinitionsContent: string | undefined = undefined;
   if (withTableDefinition) {
-    tableDefinitionsContent = createTableDefinisionsForPrompt({
+    tableDefinitionsContent = await createTableDefinisionsForPrompt({
       db,
       sql,
+      rdsDriver,
     });
   }
 
@@ -190,16 +201,48 @@ export const runLm = async (
     (it) => it.metadata?.explainRdh || it.metadata?.analyzedRdh
   )?.metadata;
 
-  const prompt = createPrompt({
-    db: dbs[0] as AwsDatabase | RdsDatabase,
-    dbProduct,
-    sql: cell.document.getText(),
-    explainRdh: explainOutputMetadata?.explainRdh ?? explainOutputMetadata?.analyzedRdh,
-    translateResponse: lmPromptCreateConditions.translateResponse,
-    withTableDefinition: lmPromptCreateConditions.withTableDefinition,
-    withRetrievedExecutionPlan: lmPromptCreateConditions.withRetrievedExecutionPlan,
-    withJSONResponseFormartForEngine: true,
-  });
+  const setting = await stateStorage.getConnectionSettingByName(connectionName);
+  if (!setting) {
+    return undefined;
+  }
+
+  let prompt: CreatePromptResult | undefined = undefined;
+
+  if (isRDSType(setting.dbType)) {
+    const { ok, result } = await DBDriverResolver.getInstance().workflow<
+      RDSBaseDriver,
+      CreatePromptResult
+    >(setting, async (driver) => {
+      return await createPrompt({
+        db: dbs[0] as RdsDatabase,
+        rdsDriver: driver,
+        dbProduct,
+        sql: cell.document.getText(),
+        explainRdh: explainOutputMetadata?.explainRdh ?? explainOutputMetadata?.analyzedRdh,
+        translateResponse: lmPromptCreateConditions.translateResponse,
+        withTableDefinition: lmPromptCreateConditions.withTableDefinition,
+        withRetrievedExecutionPlan: lmPromptCreateConditions.withRetrievedExecutionPlan,
+        withJSONResponseFormartForEngine: true,
+      });
+    });
+
+    if (ok && result) {
+      prompt = result;
+    }
+  }
+
+  if (!prompt) {
+    prompt = await createPrompt({
+      db: dbs[0] as AwsDatabase | RdsDatabase,
+      dbProduct,
+      sql: cell.document.getText(),
+      explainRdh: explainOutputMetadata?.explainRdh ?? explainOutputMetadata?.analyzedRdh,
+      translateResponse: lmPromptCreateConditions.translateResponse,
+      withTableDefinition: lmPromptCreateConditions.withTableDefinition,
+      withRetrievedExecutionPlan: lmPromptCreateConditions.withRetrievedExecutionPlan,
+      withJSONResponseFormartForEngine: true,
+    });
+  }
 
   const messages = [
     LanguageModelChatMessage.Assistant(prompt.assistant),
