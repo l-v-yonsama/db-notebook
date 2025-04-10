@@ -61,6 +61,7 @@ export type ActionCommand =
   | UpdateCodeResolverTextDocumentActionCommand
   | CountAllTablesActionCommand
   | OkActionCommand
+  | ExecuteActionCommand
   | KillActionCommand;
 
 export type NameWithComment = {
@@ -127,6 +128,8 @@ export type SaveConnectionSettingActionCommand = {
 export type CancelActionCommand = BaseActionCommand<"cancel">;
 
 export type OkActionCommand = BaseActionCommand<"ok">;
+
+export type ExecuteActionCommand = BaseActionCommand<"execute">;
 
 export type UpdateTextDocumentActionCommand = BaseActionCommand<
   "updateTextDocument",

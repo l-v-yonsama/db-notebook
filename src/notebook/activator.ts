@@ -70,7 +70,7 @@ import {
 } from "../utilities/notebookUtil";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
 import { StateStorage } from "../utilities/StateStorage";
-import { MainController } from "./controller";
+import { MainController, resetCellContext } from "./controller";
 import { activateIntellisense } from "./intellisense";
 import { DBNotebookSerializer } from "./serializer";
 
@@ -314,7 +314,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       items.push({ label: "<None>", description: "(set as unspecified)" as DBType });
       const result = await window.showQuickPick(items);
       if (result) {
-        targetCells.forEach((cell) => {
+        targetCells.forEach(async (cell) => {
           if (cell.metadata?.connectionName === result.label) {
             return;
           }
@@ -330,7 +330,8 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
           const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
           edit.set(cell.notebook.uri, [nbEdit]);
 
-          workspace.applyEdit(edit);
+          await workspace.applyEdit(edit);
+          resetCellContext(cell);
         });
       }
     });
@@ -579,6 +580,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
     window.onDidChangeNotebookEditorSelection((e) => {
       const cell = e.notebookEditor.notebook.cellAt(e.selections[0]?.start);
       commands.executeCommand("setContext", "cellLangId", cell.document.languageId);
+      resetCellContext(cell);
     })
   );
 

@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import "./assets/scss/main.scss";
 import type { ComponentName, MessageEventData } from "./utilities/vscode";
 
+import Chat2QueryPanel from "./components/Chat2QueryPanel.vue";
 import CreateInsertScriptSettingsPanel from "./components/CreateInsertScriptSettingsPanel.vue";
 import CsvParseSettingPanel from "./components/CsvParseSettingPanel.vue";
 import DBFormView from "./components/DBFormView.vue";
@@ -39,6 +40,7 @@ const createInsertScriptSettingsPanelRef =
 const httpEventPanelRef = ref<InstanceType<typeof HttpEventPanel>>();
 const harFilePanelRef = ref<InstanceType<typeof HarFilePanel>>();
 const lMPromptCreatePanelRef = ref<InstanceType<typeof LMPromptCreatePanel>>();
+const chat2QueryPanelRef = ref<InstanceType<typeof Chat2QueryPanel>>();
 const diffMdhViewRef = ref<InstanceType<typeof DiffMdhView>>();
 const scanPanelRef = ref<InstanceType<typeof ScanPanel>>();
 const dynamoQueryPanelRef = ref<InstanceType<typeof DynamoQueryPanel>>();
@@ -67,6 +69,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "ChartsView":
       chartsViewRef.value?.recieveMessage(data);
+      break;
+    case "Chat2QueryPanel":
+      chat2QueryPanelRef.value?.recieveMessage(data);
       break;
     case "CountRecordView":
       countRecordViewRef.value?.recieveMessage(data);
@@ -137,6 +142,8 @@ onMounted(() => {
     <HttpEventPanel v-if="currentComponentName === 'HttpEventPanel'" ref="httpEventPanelRef" />
 
     <LMPromptCreatePanel v-if="currentComponentName === 'LMPromptCreatePanel'" ref="lMPromptCreatePanelRef" />
+
+    <Chat2QueryPanel v-if="currentComponentName === 'Chat2QueryPanel'" ref="chat2QueryPanelRef" />
 
     <CreateInsertScriptSettingsPanel v-if="currentComponentName === 'CreateInsertScriptSettingsPanel'"
       ref="createInsertScriptSettingsPanelRef" />

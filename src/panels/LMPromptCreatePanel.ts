@@ -7,6 +7,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   commands,
+  env,
   lm,
   NotebookCell,
   NotebookEdit,
@@ -39,6 +40,7 @@ export class LMPromptCreatePanel extends BasePanel {
   private withTableDefinition = false;
   private withRetrievedExecutionPlan = false;
   private languageModelId = "";
+  private isEnLanguageUser = env.language === "en";
 
   protected constructor(panel: WebviewPanel, extensionUri: Uri) {
     super(panel, extensionUri);
@@ -217,6 +219,7 @@ export class LMPromptCreatePanel extends BasePanel {
   }
 
   async renderSub() {
+    let errorMessage = "";
     if (!this.cell) {
       return;
     }
@@ -224,33 +227,36 @@ export class LMPromptCreatePanel extends BasePanel {
     const models = await lm.selectChatModels({
       vendor: "copilot",
     });
+    let languageModels: { label: string; value: string }[] = [];
     if (models.length === 0) {
-      window.showErrorMessage("No model found. Please try again later.");
-      return;
-    }
-    const languageModels = models.map((model) => ({
-      label: model.name ? model.name : `${model.vendor} (${model.family})`,
-      value: model.id,
-    }));
-
-    const { connectionName, lmPromptCreateConditions }: CellMeta = this.cell.metadata;
-    if (!connectionName) {
-      return;
-    }
-    if (lmPromptCreateConditions) {
-      this.languageModelId = lmPromptCreateConditions.languageModelId;
-      this.translateResponse = lmPromptCreateConditions.translateResponse;
-      this.withTableDefinition = lmPromptCreateConditions.withTableDefinition;
-      this.withRetrievedExecutionPlan = lmPromptCreateConditions.withRetrievedExecutionPlan;
+      errorMessage =
+        "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.";
+      window.showErrorMessage(errorMessage);
     } else {
-      this.languageModelId = languageModels[0].value;
-      const gpt4oModel = models.find((model) => model.family.toLocaleLowerCase() === "gpt-4o");
-      if (gpt4oModel) {
-        this.languageModelId = gpt4oModel.id;
+      languageModels = models.map((model) => ({
+        label: model.name ? model.name : `${model.vendor} (${model.family})`,
+        value: model.id,
+      }));
+
+      const { connectionName, lmPromptCreateConditions }: CellMeta = this.cell.metadata;
+      if (!connectionName) {
+        return;
       }
-      this.translateResponse = true;
-      this.withTableDefinition = false;
-      this.withRetrievedExecutionPlan = false;
+      if (lmPromptCreateConditions) {
+        this.languageModelId = lmPromptCreateConditions.languageModelId;
+        this.translateResponse = lmPromptCreateConditions.translateResponse;
+        this.withTableDefinition = lmPromptCreateConditions.withTableDefinition;
+        this.withRetrievedExecutionPlan = lmPromptCreateConditions.withRetrievedExecutionPlan;
+      } else {
+        this.languageModelId = languageModels[0].value;
+        const gpt4oModel = models.find((model) => model.family.toLocaleLowerCase() === "gpt-4o");
+        if (gpt4oModel) {
+          this.languageModelId = gpt4oModel.id;
+        }
+        this.translateResponse = this.isEnLanguageUser ? false : true;
+        this.withTableDefinition = false;
+        this.withRetrievedExecutionPlan = false;
+      }
     }
 
     const prompt = await this.createPrompt();
@@ -273,6 +279,7 @@ export class LMPromptCreatePanel extends BasePanel {
       componentName: "LMPromptCreatePanel",
       value: {
         initialize: {
+          errorMessage,
           languageModels,
           languageModelId: this.languageModelId,
           assistantPromptText: prompt.assistant,

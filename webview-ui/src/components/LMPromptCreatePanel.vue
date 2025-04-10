@@ -41,6 +41,7 @@ const translateResponse = ref(true);
 const withTableDefinition = ref(false);
 const withRetrievedExecutionPlan = ref(false);
 const languageModelId = ref("");
+const errorMessage = ref("");
 
 const initialize = (v: LMPromptCreatePanelEventData["value"]["initialize"]): void => {
   if (v === undefined) {
@@ -55,6 +56,7 @@ const initialize = (v: LMPromptCreatePanelEventData["value"]["initialize"]): voi
     });
   }
 
+  errorMessage.value = v.errorMessage;
   hasExplainPlan.value = v.hasExplainPlan === true;
   translateResponse.value = v.translateResponse === true;
   withTableDefinition.value = v.withTableDefinition === true;
@@ -144,41 +146,47 @@ defineExpose({
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
           <fa icon="times" />Cancel
         </VsCodeButton>
-        <VsCodeButton @click="ok(false)" title="Write to clipboard">
-          <fa icon="check" />Check sql
+        <VsCodeButton :disabled="errorMessage.length > 0" @click="ok(false)" title="Evaluate the sql">
+          <fa icon="check" />Evaluate sql
         </VsCodeButton>
       </div>
     </div>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
-      <div class="settings">
-        <div class="editor">
+      <div v-if="errorMessage">
+        <p>{{ errorMessage }}</p>
+      </div>
+      <template v-else>
+        <div class="settings">
+          <div class="editor">
+            <fieldset class="conditions">
+              <legend>
+                <span style="margin-right: 30px">Conditions</span>
+              </legend>
+              <vscode-checkbox :checked="translateResponse"
+                @change="($e: any) => handleTranslateResponseOnChange($e.target.checked)"
+                style="margin-right: auto">Translate response</vscode-checkbox>
+              <vscode-checkbox :checked="withTableDefinition"
+                @change="($e: any) => handleWithTableDefinitionOnChange($e.target.checked)"
+                style="margin-right: auto">Provide
+                table definitions</vscode-checkbox>
+              <vscode-checkbox :checked="withRetrievedExecutionPlan" :disabled="!hasExplainPlan"
+                @change="($e: any) => handleWithRetrievedExecutionPlanOnChange($e.target.checked)"
+                style="margin-right: auto">Include retrieved "Execution Plan" *</vscode-checkbox>
+              <p v-if="!hasExplainPlan" style="margin-left: 8px; font-size: small; opacity: 0.7;">* Get an “Explain
+                plan”
+                in advance</p>
+            </fieldset>
+          </div>
           <fieldset class="conditions">
-            <legend>
-              <span style="margin-right: 30px">Conditions</span>
-            </legend>
-            <vscode-checkbox :checked="translateResponse"
-              @change="($e: any) => handleTranslateResponseOnChange($e.target.checked)"
-              style="margin-right: auto">Translate response</vscode-checkbox>
-            <vscode-checkbox :checked="withTableDefinition"
-              @change="($e: any) => handleWithTableDefinitionOnChange($e.target.checked)"
-              style="margin-right: auto">Provide
-              table definitions</vscode-checkbox>
-            <vscode-checkbox :checked="withRetrievedExecutionPlan" :disabled="!hasExplainPlan"
-              @change="($e: any) => handleWithRetrievedExecutionPlanOnChange($e.target.checked)"
-              style="margin-right: auto">Include retrieved "Execution Plan" *</vscode-checkbox>
-            <p v-if="!hasExplainPlan" style="margin-left: 8px; font-size: small; opacity: 0.7;">* Get an “Explain plan”
-              in advance</p>
+            <legend>AssistantPrompt</legend>
+            <p class="preview" v-text="assistantPromptText"></p>
+          </fieldset>
+          <fieldset class="conditions">
+            <legend>UserPrompt</legend>
+            <p class="preview" v-text="userPromptText"></p>
           </fieldset>
         </div>
-        <fieldset class="conditions">
-          <legend>AssistantPrompt</legend>
-          <p class="preview" v-text="assistantPromptText"></p>
-        </fieldset>
-        <fieldset class="conditions">
-          <legend>UserPrompt</legend>
-          <p class="preview" v-text="userPromptText"></p>
-        </fieldset>
-      </div>
+      </template>
     </div>
   </section>
 </template>

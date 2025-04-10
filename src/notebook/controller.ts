@@ -122,7 +122,7 @@ export class MainController {
         }
 
         e.contentChanges.forEach((change) => {
-          change.addedCells.forEach((cell) => {
+          change.addedCells.forEach(async (cell) => {
             if (cell.document.languageId === "sql") {
               const cm = cell.metadata as CellMeta;
               if (!cm.connectionName) {
@@ -133,8 +133,9 @@ export class MainController {
                 const edit = new WorkspaceEdit();
                 const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
                 edit.set(cell.notebook.uri, [nbEdit]);
-                workspace.applyEdit(edit);
+                await workspace.applyEdit(edit);
               }
+              resetCellContext(cell);
             }
           });
         });
@@ -857,3 +858,12 @@ class PreExecutionProvider implements NotebookCellStatusBarItemProvider {
     return item;
   }
 }
+
+export const resetCellContext = (cell: NotebookCell) => {
+  const meta = cell.metadata as CellMeta;
+  if (!meta) {
+    return;
+  }
+
+  commands.executeCommand("setContext", "cellMetaConnectionName", meta.connectionName ?? "");
+};

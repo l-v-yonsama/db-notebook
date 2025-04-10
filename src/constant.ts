@@ -41,6 +41,8 @@ export const WRITE_ER_DIAGRAM_TO_CLIPBOARD = `${EXTENSION_NAME}.write-er-diagram
 
 export const CREATE_INSERT_SCRIPT_WITH_SETTINGS = `${EXTENSION_NAME}.create-insert-script-with-settings`;
 
+export const OPEN_CHAT_2_QUERY = `${EXTENSION_NAME}.open-chat-2-query`;
+
 //---------------------------------------------------
 // SQL HISTORIES TREE
 //---------------------------------------------------

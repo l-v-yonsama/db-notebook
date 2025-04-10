@@ -33,6 +33,7 @@ It also provides a CSV and Har file preview feature.
   - CSV file preview
   - Har file preview
 - Evaluate SQL statements with AI
+- Generate SQL queries effortlessly with AI
 
 ## Screenshots
 
@@ -78,6 +79,10 @@ It also provides a CSV and Har file preview feature.
 - Evaluate SQL statements with AI
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/19_lm.gif)
+
+- Generate SQL queries effortlessly with AI
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/20_chat2query.gif)
 
 - Access to Aws( DynamoDB ) through the Notebook
   - On the DB Notebook, specify the number of counts in the LIMIT clause

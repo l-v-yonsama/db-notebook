@@ -64,7 +64,7 @@ const initialize = (v: ERDiagramSettingsPanelEventData["value"]["initialize"]): 
     allTableItems.value.push({
       name: table.name,
       comment: table.comment ?? "",
-      selected: v.params.selectedTable?.name === table.name ?? false,
+      selected: v.params.selectedTable?.name === table.name,
       referencedFrom: getReferenceTableNames(table.foreignKeys?.referencedFrom),
       referenceTo: getReferenceTableNames(table.foreignKeys?.referenceTo),
       isAll: true,
@@ -210,22 +210,17 @@ defineExpose({
         <VsCodeTextField id="title" v-model="title" style="width: calc(100% - 45px)" />
       </div>
       <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton
-          :disabled="zeroSelection"
-          @click="action('writeToClipboard')"
-          appearance="secondary"
-          title="Write ER diagram to clipboard"
-          ><fa icon="clipboard" />Write to clipboard</VsCodeButton
-        >
-        <VsCodeButton
-          :disabled="zeroSelection"
-          @click="action('createERDiagram')"
-          title="Create ER diagram in a new Notebook"
-          ><fa icon="plus" />Create in a new Notebook</VsCodeButton
-        >
+        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
+          <fa icon="times" />Cancel
+        </VsCodeButton>
+        <VsCodeButton :disabled="zeroSelection" @click="action('writeToClipboard')" appearance="secondary"
+          title="Write ER diagram to clipboard">
+          <fa icon="clipboard" />Write to clipboard
+        </VsCodeButton>
+        <VsCodeButton :disabled="zeroSelection" @click="action('createERDiagram')"
+          title="Create ER diagram in a new Notebook">
+          <fa icon="plus" />Create in a new Notebook
+        </VsCodeButton>
       </div>
     </div>
     <section class="content">
@@ -258,9 +253,7 @@ defineExpose({
                         <td>{{ item.name }}</td>
                         <td>{{ item.comment }}</td>
                         <td rowspan="2">
-                          <VsCodeButton :disabled="item.selected" @click="selectTable(item)"
-                            >Select</VsCodeButton
-                          >
+                          <VsCodeButton :disabled="item.selected" @click="selectTable(item)">Select</VsCodeButton>
                         </td>
                       </tr>
                       <tr class="bottom" v-if="!item.selected">
@@ -294,27 +287,15 @@ defineExpose({
                         <td>{{ item.name }}</td>
                         <td>{{ item.comment }}</td>
                         <td>
-                          <input
-                            type="checkbox"
-                            :checked="item.isAll"
-                            @change="resetAll(item, !item.isAll)"
-                          />
+                          <input type="checkbox" :checked="item.isAll" @change="resetAll(item, !item.isAll)" />
                         </td>
                         <td>
-                          <input
-                            type="checkbox"
-                            :disabled="item.isAll"
-                            :checked="item.isKeys"
-                            @change="resetKeys(item, !item.isKeys)"
-                          />
+                          <input type="checkbox" :disabled="item.isAll" :checked="item.isKeys"
+                            @change="resetKeys(item, !item.isKeys)" />
                         </td>
                         <td>
-                          <input
-                            type="checkbox"
-                            :disabled="item.isAll"
-                            :checked="item.isNotNull"
-                            @change="resetNotNull(item, !item.isNotNull)"
-                          />
+                          <input type="checkbox" :disabled="item.isAll" :checked="item.isNotNull"
+                            @change="resetNotNull(item, !item.isNotNull)" />
                         </td>
                         <td>
                           <VsCodeButton @click="item.selected = false">Unselect</VsCodeButton>
@@ -353,17 +334,21 @@ table {
 tr.top {
   border-top: calc(var(--border-width) * 1px) solid var(--dropdown-border);
 }
+
 tr.bottom {
   border-bottom: calc(var(--border-width) * 1px) solid var(--dropdown-border);
 }
+
 td {
   text-align: center;
   vertical-align: top;
 }
+
 th {
   height: 20px;
   padding: 2px;
 }
+
 th,
 td {
   text-overflow: ellipsis;
@@ -371,16 +356,20 @@ td {
   white-space: nowrap;
   max-width: 180px;
 }
+
 .border-left {
   border-left: calc(var(--border-width) * 1px) solid var(--dropdown-border);
 }
+
 .border-right {
   border-right: calc(var(--border-width) * 1px) solid var(--dropdown-border);
 }
+
 .control {
   width: 110px;
   max-width: 110px;
 }
+
 div.scroll-wrapper {
   overflow: auto;
 }

@@ -32,6 +32,7 @@ import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 
 export type MessageEventData =
   | ChartsViewEventData
+  | Chat2QueryPanelEventData
   | CodeResolverEditorEventData
   | CountRecordViewEventData
   | CreateInsertScriptSettingsPanelEventData
@@ -364,6 +365,7 @@ export type LMPromptCreatePanelEventData = BaseMessageEventData<
   "LMPromptCreatePanel",
   {
     initialize?: {
+      errorMessage: string;
       hasExplainPlan: boolean;
       assistantPromptText: string;
       userPromptText: string;
@@ -376,6 +378,39 @@ export type LMPromptCreatePanelEventData = BaseMessageEventData<
     setPrompts?: {
       assistantPromptText: string;
       userPromptText: string;
+    };
+  }
+>;
+
+export type Chat2QueryPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-prompts" | "set-results",
+  "Chat2QueryPanel",
+  {
+    initialize?: {
+      allTables: DbTable[];
+      selectedTableNames: string[];
+      assistantPromptText: string;
+      userPromptText: string;
+      languageModels: { label: string; value: string }[];
+      languageModelId: string;
+      queryContent: string;
+      translateResponse: boolean;
+      withTableDefinition: boolean;
+      withSampleData: boolean;
+      errorMessage: string;
+      screenMode: "setting" | "generating" | "generated";
+    };
+    setPrompts?: {
+      assistantPromptText: string;
+      userPromptText: string;
+    };
+    setResult?: {
+      screenMode: "setting" | "generating" | "generated";
+      elapsedTime: string;
+      modelName: string;
+      explanation: string;
+      queryText: string;
+      errorMessage: string;
     };
   }
 >;

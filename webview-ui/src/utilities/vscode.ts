@@ -2,6 +2,7 @@ import type { WebviewApi } from "vscode-webview";
 import type { ActionCommand } from "../../../src/shared/ActionParams";
 
 export * from "../../../src/shared/ActionParams";
+export * from "../../../src/shared/Chat2QueryConditionParams";
 export * from "../../../src/shared/CodeResolverParams";
 export * from "../../../src/shared/ComponentName";
 export * from "../../../src/shared/CreateScriptConditionParams";

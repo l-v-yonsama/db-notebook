@@ -24,6 +24,7 @@ import {
 import { HelpProvider } from "./help/HelpProvider";
 import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
 import { activateNotebook } from "./notebook/activator";
+import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
 import { DynamoQueryPanel } from "./panels/DynamoQueryPanel";
 import { HarFilePanel } from "./panels/HarFilePanel";
@@ -70,6 +71,7 @@ export async function activate(context: ExtensionContext) {
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
   HarFilePanel.setStateStorage(stateStorage);
   LMPromptCreatePanel.setStateStorage(stateStorage);
+  Chat2QueryPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);

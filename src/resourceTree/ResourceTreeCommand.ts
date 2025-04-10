@@ -32,6 +32,7 @@ import {
   FLUSH_DB,
   GET_LOCKS,
   GET_SESSIONS,
+  OPEN_CHAT_2_QUERY,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_TOOLS_VIEWER,
   REFRESH_RESOURCES,
@@ -45,6 +46,7 @@ import {
   WRITE_ER_DIAGRAM_TO_CLIPBOARD,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
+import { Chat2QueryPanel } from "../panels/Chat2QueryPanel";
 import { CreateInsertScriptSettingsPanel } from "../panels/CreateInsertScriptSettingsPanel";
 import { DynamoQueryPanel } from "../panels/DynamoQueryPanel";
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
@@ -180,6 +182,18 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       } else {
         showWindowErrorMessage(message);
       }
+    })
+  );
+
+  context.subscriptions.push(
+    commands.registerCommand(OPEN_CHAT_2_QUERY, async (schemaRes: DbSchema) => {
+      const { conName } = schemaRes.meta;
+      const setting = await stateStorage.getConnectionSettingByName(conName);
+      if (!setting) {
+        return;
+      }
+
+      Chat2QueryPanel.render(context.extensionUri, conName, schemaRes);
     })
   );
 

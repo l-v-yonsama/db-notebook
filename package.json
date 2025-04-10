@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0. Evaluate SQL statements with AI.",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -418,6 +418,16 @@
           "command": "database-notebook.histories.delete",
           "when": "view == database-notebook-histories",
           "group": "inline"
+        },
+        {
+          "command": "database-notebook.open-chat-2-query",
+          "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.open-chat-2-query",
+          "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
+          "group": "db-resourc@10"
         }
       ],
       "view/title": [
@@ -534,7 +544,7 @@
         {
           "command": "database-notebook.cell-toolbar-lm",
           "group": "inline",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' ) "
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' ) && cellMetaConnectionName !== '' "
         },
         {
           "command": "database-notebook.cell-toolbar-format",
@@ -855,6 +865,12 @@
         "command": "database-notebook.open-diff-mdh-viewer",
         "title": "Open Resultset Diff",
         "icon": "$(git-compare)"
+      },
+      {
+        "command": "database-notebook.open-chat-2-query",
+        "title": "Open Chat to query",
+        "shortTitle": "Chat to query",
+        "icon": "$(robot)"
       }
     ],
     "keybindings": [
@@ -1067,7 +1083,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.9.27",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.9.29",
     "@l-v-yonsama/rdh": "^0.2.3",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

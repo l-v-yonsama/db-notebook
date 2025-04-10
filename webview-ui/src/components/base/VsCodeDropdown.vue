@@ -2,11 +2,8 @@
   <!-- <vscode-radio-group :value="modelValue || value" @change="handleOnChange">
     <slot></slot>
   </vscode-radio-group> -->
-  <vscode-dropdown
-    :value="modelValue"
-    :class="{ transparent, verr: isError }"
-    @change="handleOnChange"
-  >
+  <vscode-dropdown :value="modelValue" :class="{ transparent, verr: isError }" :disabled="disabled"
+    @change="handleOnChange">
     <!-- <vscode-option value="" aria-disabled="true" style="display: none">-- Select --</vscode-option> -->
     <vscode-option v-for="(item, index) in items" :key="index" :value="item.value">
       {{ item.label }}
@@ -30,6 +27,7 @@ type Props = {
   modelValue: string | number;
   transparent?: boolean;
   required?: boolean;
+  disabled?: boolean;
 };
 
 const props = withDefaults(defineProps<Props>(), {

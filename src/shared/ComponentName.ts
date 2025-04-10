@@ -1,6 +1,7 @@
 export type ComponentName =
   | "CountRecordView"
   | "ChartsView"
+  | "Chat2QueryPanel"
   | "MdhView"
   | "DiffMdhView"
   | "DynamoQueryPanel"
