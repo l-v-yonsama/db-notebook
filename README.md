@@ -90,7 +90,7 @@ It also provides a CSV and Har file preview feature.
 
 <details>
 
-<summary>Screenshots ( Convenient visualization of result sets )</summary>
+<summary>Screenshots ( Convenient visualization of result sets ) ( Click here )</summary>
 
 <div>
 
@@ -118,7 +118,7 @@ It also provides a CSV and Har file preview feature.
 
 <details>
 
-<summary>Screenshots ( Access to the Keycloak from the side panel )</summary>
+<summary>Screenshots ( Access to the Keycloak from the side panel ) ( Click here )</summary>
 
 <div>
 
@@ -136,7 +136,7 @@ It also provides a CSV and Har file preview feature.
 
 <details>
 
-<summary>Screenshots ( File viewer )</summary>
+<summary>Screenshots ( File viewer ) ( Click here )</summary>
 
 <div>
 

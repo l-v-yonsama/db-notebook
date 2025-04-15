@@ -25,6 +25,7 @@ import { LMPromptCreateConditionParams } from "../shared/LMPromptCreateCondition
 import { LMPromptCreatePanelEventData } from "../shared/MessageEventData";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { CellMeta } from "../types/Notebook";
+import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { createPrompt } from "../utilities/lmUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -127,14 +128,26 @@ export class LMPromptCreatePanel extends BasePanel {
   }
 
   private async createPrompt(): Promise<{ assistant: string; user: string } | undefined> {
-    if (!this.cell) {
+    if (!this.cell || !LMPromptCreatePanel.stateStorage) {
       return undefined;
     }
     const { connectionName }: CellMeta = this.cell.metadata;
     if (!connectionName) {
       return undefined;
     }
-    const dbs = LMPromptCreatePanel.stateStorage?.getResourceByName(connectionName);
+    let dbs = LMPromptCreatePanel.stateStorage.getResourceByName(connectionName);
+    if (dbs === undefined) {
+      const { ok, message, result } = await LMPromptCreatePanel.stateStorage.loadResource(
+        connectionName,
+        false,
+        true
+      );
+      if (ok && result?.db) {
+        dbs = result.db;
+      } else {
+        showWindowErrorMessage(message);
+      }
+    }
     if (!dbs || dbs.length === 0) {
       return undefined;
     }
