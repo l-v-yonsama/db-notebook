@@ -146,10 +146,8 @@ export class LMPromptCreatePanel extends BasePanel {
         dbs = result.db;
       } else {
         showWindowErrorMessage(message);
+        return undefined; // エラー時に早期リターン
       }
-    }
-    if (!dbs || dbs.length === 0) {
-      return undefined;
     }
     const dbProduct =
       LMPromptCreatePanel.stateStorage?.getDBProductByConnectionName(connectionName);
@@ -167,13 +165,17 @@ export class LMPromptCreatePanel extends BasePanel {
     if (!setting) {
       return undefined;
     }
+    if (dbs === undefined || dbs.length === 0) {
+      return undefined;
+    }
 
     if (isRDSType(setting.dbType)) {
+      const db = dbs[0] as RdsDatabase;
       const { ok, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
         setting,
         async (driver) => {
           return await createPrompt({
-            db: dbs[0] as RdsDatabase,
+            db,
             rdsDriver: driver,
             dbProduct,
             sql: this.cell!.document.getText(),
