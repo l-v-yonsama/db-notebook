@@ -8,32 +8,32 @@ It also provides a CSV and Har file preview feature.
 
 ## Features
 
-- Various databases accesss in Notebooks, Sidebars and panels UI
+- Access various databases through Notebooks, Sidebars, and panel UIs
   - MySQL, PostgreSQL, SQL Server, SQLite, Redis, AWS, Keycloak, Auth0
 - Execute & stop SQL, JavaScript code in node.js
 - Execute SQL mode
   - Execute query (Default)
-  - Execute explain plan (Devises a query plan)
+  - Execute explain plan (Generates a query plan).
   - Execute explain analyze (Displays actual execution time and statistics)
 - SQL history management
 - Variable sharing between notebook cells
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
-- Count the number of all tables belonging to the schema
-- Provide IntelliSense using DB resource names and comments
-- Convenient visualization of result sets
+- Count all tables in the schema
+- Provide IntelliSense with database resource names and comments
+- Intuitive visualization of result sets
   - Difference display using comparison key (Primary or Unique key)
   - Label display using code label resolver
   - Verify result sets comply with a rule.
   - Output in Excel file format
   - Generate descriptive statistics
   - Support graphs
-- Create and execute "Undo changes sql statements"
-- Output notebook in HTML file format
+- Create and execute SQL statements to undo changes
+- Export notebook as an HTML file
 - File preview
   - CSV file preview
   - Har file preview
 - Evaluate SQL statements with AI
-- Generate SQL queries effortlessly with AI
+- Generate SQL queries with AI
 
 ## Screenshots
 
@@ -48,7 +48,7 @@ It also provides a CSV and Har file preview feature.
 - Execute SQL mode
 
   - Execute query (Default)
-  - Execute explain plan (Devises a query plan)
+  - Execute explain plan (Generates a query plan).
   - Execute explain analyze (Displays actual
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/13_sql_mode.gif)
 
@@ -64,11 +64,11 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/12_format.gif)
 
-- Count the number of all tables belonging to the schema
+- Count all tables in the schema
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/15_count_for_all_tables.gif)
 
-- Output notebook in HTML file format
+- Export notebook as an HTML file
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/16_html_report.gif)
 
@@ -80,7 +80,7 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/19_lm.gif)
 
-- Generate SQL queries effortlessly with AI
+- Generate SQL queries with AI
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/20_chat2query.gif)
 
@@ -90,13 +90,13 @@ It also provides a CSV and Har file preview feature.
 
 <details>
 
-<summary>Screenshots ( Convenient visualization of result sets ) ( Click here )</summary>
+<summary>Screenshots ( Intuitive visualization of result sets ) ( Click here )</summary>
 
 <div>
 
 ### Difference display using comparison key (Primary or Unique key)
 
-- Create and execute "Undo changes sql statements"
+- Create and execute SQL statements to undo changes
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/05_diff.gif)
 

@@ -287,65 +287,31 @@ defineExpose({
     </div>
 
     <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-      <VsCodeTabHeader
-        v-for="tabItem in tabItems"
-        :id="tabItem.tabId"
-        :key="tabItem.tabId"
-        :title="`${tabItem.title}`"
-        :is-active="isActiveTabId(tabItem.tabId)"
-        :closable="true"
-        @click="showTab(tabItem.tabId)"
-        @close="removeTabItem(tabItem.tabId, true)"
-      >
+      <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId" :title="`${tabItem.title}`"
+        :is-active="isActiveTabId(tabItem.tabId)" :closable="true" @click="showTab(tabItem.tabId)"
+        @close="removeTabItem(tabItem.tabId, true)">
       </VsCodeTabHeader>
-      <vscode-panel-view
-        v-for="tabItem of tabItems"
-        :id="'view-' + tabItem.tabId"
-        :key="tabItem.tabId"
-        class="panel-view"
-      >
+      <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId"
+        class="panel-view">
         <div v-if="eventRdh" class="toolbar">
-          <label for="keyword"><fa icon="search" style="margin-right: 3px" />URL</label>
-          <VsCodeTextField
-            id="keyword"
-            v-model="keyword"
-            placeholder="Enter a keyword"
-            @change="resetActiveInnerRdh"
-          >
+          <label for="keyword">
+            <fa icon="search" style="margin-right: 3px" />URL
+          </label>
+          <VsCodeTextField id="keyword" v-model="keyword" placeholder="Enter a keyword" @change="resetActiveInnerRdh">
           </VsCodeTextField>
           <label for="status-type">Status</label>
-          <VsCodeDropdown
-            id="status-type"
-            v-model="statusType"
-            :items="statusTypeItems"
-            style="z-index: 15"
-            @change="resetActiveInnerRdh"
-          />
+          <VsCodeDropdown id="status-type" v-model="statusType" :items="statusTypeItems" style="z-index: 15"
+            @change="resetActiveInnerRdh" />
           <label for="method-type">Method</label>
-          <VsCodeDropdown
-            id="method-type"
-            v-model="methodType"
-            :items="methodTypeItems"
-            style="z-index: 15"
-            @change="resetActiveInnerRdh"
-          />
+          <VsCodeDropdown id="method-type" v-model="methodType" :items="methodTypeItems" style="z-index: 15"
+            @change="resetActiveInnerRdh" />
           <label for="content-type">Content-type</label>
-          <VsCodeDropdown
-            id="content-type"
-            v-model="contentType"
-            :items="contentTypeItems"
-            style="z-index: 15; width: 160px"
-            @change="resetActiveInnerRdh"
-          />
+          <VsCodeDropdown id="content-type" v-model="contentType" :items="contentTypeItems"
+            style="z-index: 15; width: 160px" @change="resetActiveInnerRdh" />
         </div>
         <section :style="{ width: `${splitterWidth}px` }">
           <div v-if="eventRdh" class="spPaneWrapper">
-            <RDHViewer
-              :rdh="eventRdh"
-              :width="splitterWidth"
-              :height="splitterHeight"
-              @onClickCell="onClickCell"
-            />
+            <RDHViewer :rdh="eventRdh" :width="splitterWidth" :height="splitterHeight" @onClickCell="onClickCell" />
           </div>
         </section>
       </vscode-panel-view>

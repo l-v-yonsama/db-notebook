@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0. Evaluate SQL statements with AI.",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -662,7 +662,7 @@
       },
       {
         "command": "database-notebook.show-resource-properties",
-        "title": "Show resouce properties",
+        "title": "Show resource properties",
         "icon": "$(info)"
       },
       {
@@ -719,12 +719,12 @@
       },
       {
         "command": "database-notebook.show-scan-panel",
-        "title": "Open scan pannel",
+        "title": "Open scan panel",
         "icon": "$(book)"
       },
       {
         "command": "database-notebook.show-dynamo-query-panel",
-        "title": "Open Dynamo query pannel",
+        "title": "Open Dynamo query panel",
         "icon": "$(filter)"
       },
       {
@@ -739,17 +739,18 @@
       },
       {
         "command": "database-notebook.cell.mark-cell-as-skip",
-        "title": "Mark cell as skip or not",
+        "title": "Toggle skip state",
+        "shortTitle": "Toggle skip",
         "icon": "$(debug-step-over)"
       },
       {
         "command": "database-notebook.cell.mark-cell-as-pre-execution",
-        "title": "Mark cell as Pre-execution",
+        "title": "Mark cell as pre-execution",
         "icon": "$(debug-step-into)"
       },
       {
         "command": "database-notebook.cell.show-metadata-setting",
-        "title": "Show settings",
+        "title": "Show metadata settings",
         "icon": "$(gear)"
       },
       {
@@ -776,8 +777,8 @@
       },
       {
         "command": "database-notebook.toolbar.export-in-html",
-        "title": "Output in html",
-        "shortTitle": "Output html",
+        "title": "Output in HTML",
+        "shortTitle": "Output HTML",
         "icon": "$(output)"
       },
       {
@@ -823,7 +824,7 @@
       },
       {
         "command": "database-notebook.show-har-file",
-        "title": "Preview har file",
+        "title": "Preview HAR file",
         "category": "DB Notebook HAR Viewer"
       },
       {
@@ -868,8 +869,8 @@
       },
       {
         "command": "database-notebook.open-chat-2-query",
-        "title": "Open Chat to query",
-        "shortTitle": "Chat to query",
+        "title": "Open Chat-to-query",
+        "shortTitle": "Chat-to-query",
         "icon": "$(robot)"
       }
     ],

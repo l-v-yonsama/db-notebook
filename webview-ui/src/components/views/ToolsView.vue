@@ -120,8 +120,8 @@ defineExpose({
         <VsCodeButton @click="close" appearance="secondary" title="Close view">
           <fa icon="times" />Close view
         </VsCodeButton>
-        <VsCodeButton @click="output('html')" appearance="secondary" title="Output as Html">
-          <fa icon="file-lines" />Output as Html
+        <VsCodeButton @click="output('html')" appearance="secondary" title="Output as HTML">
+          <fa icon="file-lines" />Output as HTML
         </VsCodeButton>
         <VsCodeButton @click="output('excel')" appearance="secondary" title="Output as Excel">
           <fa icon="file-excel" />Output as Excel

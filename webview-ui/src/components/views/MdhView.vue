@@ -382,12 +382,12 @@ defineExpose({
           writeToClipboard({
             fileType: 'text',
           })
-          " :disabled="inProgress" title="Write to clipboard">
+          " :disabled="inProgress" title="Copy to clipboard">
           <fa icon="clipboard" />
         </button>
-        <SecondarySelectionAction :items="writeToClipboardDetailItems" title="Write to clipboard"
+        <SecondarySelectionAction :items="writeToClipboardDetailItems" title="Copy to clipboard"
           @onSelect="writeToClipboard" />
-        <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as Html">
+        <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as HTML">
           <fa icon="file-lines" />
         </button>
         <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">

@@ -167,40 +167,23 @@ defineExpose({
         <label v-if="langType === 'sql'" for="tableName">Table:</label>
         <span v-if="langType === 'sql'" id="tableName">{{ tableNameWithComment }}</span>
         <label for="langType">Lang:</label>
-        <VsCodeRadioGroupVue
-          id="langType"
-          v-model="langType"
-          :items="langItems"
-          @change="($e:any) => handleLnagTypeOnChange($e.target?.value)"
-        />
+        <VsCodeRadioGroupVue id="langType" v-model="langType" :items="langItems"
+          @change="($e: any) => handleLnagTypeOnChange($e.target?.value)" />
         <label v-if="langType === 'javascript'" for="numOfRecords"> Num of records </label>
-        <VsCodeDropdown
-          v-if="langType === 'javascript'"
-          id="numOfRecords"
-          v-model="numOfRecords"
-          :items="numOfRecordsItems"
-          style="z-index: 15"
-          @change="handleNumOfRecordsOnChange()"
-        />
+        <VsCodeDropdown v-if="langType === 'javascript'" id="numOfRecords" v-model="numOfRecords"
+          :items="numOfRecordsItems" style="z-index: 15" @change="handleNumOfRecordsOnChange()" />
       </div>
       <div class="tool-right">
-        <VsCodeButton
-          @click="cancel"
-          appearance="secondary"
-          title="Cancel"
-          style="margin-right: 5px"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton
-          @click="ok(true, false)"
-          appearance="secondary"
-          title="Open in notebook"
-          style="margin-right: 5px"
-          ><fa icon="book" />Open in notebook</VsCodeButton
-        >
-        <VsCodeButton @click="ok(false, false)" title="Write to clipboard"
-          ><fa icon="clipboard" />Write to clipboard</VsCodeButton
-        >
+        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
+          <fa icon="times" />Cancel
+        </VsCodeButton>
+        <VsCodeButton @click="ok(true, false)" appearance="secondary" title="Open in notebook"
+          style="margin-right: 5px">
+          <fa icon="book" />Open in notebook
+        </VsCodeButton>
+        <VsCodeButton @click="ok(false, false)" title="Copy to clipboard">
+          <fa icon="clipboard" />Copy to clipboard
+        </VsCodeButton>
       </div>
     </div>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
@@ -210,31 +193,18 @@ defineExpose({
             <legend>
               <span style="margin-right: 30px">Conditions</span>
             </legend>
-            <vscode-checkbox
-              :checked="assignSchemaName"
-              @change="($e:any) => handleAssignSchemaNameOnChange($e.target.checked)"
-              style="margin-right: auto"
-              >With schema name</vscode-checkbox
-            >
-            <vscode-checkbox
-              :checked="withComments"
-              @change="($e:any) => handleWithCommentsOnChange($e.target.checked)"
-              style="margin-right: auto"
-              >With comments</vscode-checkbox
-            >
-            <vscode-checkbox
-              :checked="onlyNotNullColumns"
-              @change="($e:any) => handleOnlyNotNullColumnsOnChange($e.target.checked)"
-              style="margin-right: auto"
-              >Only "NOT NULL" Columns</vscode-checkbox
-            >
-            <vscode-checkbox
-              :disabled="langType === 'javascript'"
-              :checked="compactSql"
-              @change="($e:any) => handleCompactSqlOnChange($e.target.checked)"
-              style="margin-right: auto"
-              >Compact SQL</vscode-checkbox
-            >
+            <vscode-checkbox :checked="assignSchemaName"
+              @change="($e: any) => handleAssignSchemaNameOnChange($e.target.checked)" style="margin-right: auto">With
+              schema name</vscode-checkbox>
+            <vscode-checkbox :checked="withComments"
+              @change="($e: any) => handleWithCommentsOnChange($e.target.checked)" style="margin-right: auto">With
+              comments</vscode-checkbox>
+            <vscode-checkbox :checked="onlyNotNullColumns"
+              @change="($e: any) => handleOnlyNotNullColumnsOnChange($e.target.checked)" style="margin-right: auto">Only
+              "NOT NULL" Columns</vscode-checkbox>
+            <vscode-checkbox :disabled="langType === 'javascript'" :checked="compactSql"
+              @change="($e: any) => handleCompactSqlOnChange($e.target.checked)" style="margin-right: auto">Compact
+              SQL</vscode-checkbox>
           </fieldset>
         </div>
         <fieldset class="conditions">
@@ -262,6 +232,7 @@ section.script-creation-root {
         margin-left: 25px;
         margin-right: 5px;
       }
+
       span {
         text-overflow: ellipsis;
         overflow: hidden;
@@ -278,6 +249,7 @@ section.script-creation-root {
     fieldset.conditions {
       margin-top: 15px;
     }
+
     p.preview {
       margin: 5px;
       white-space: pre-wrap;

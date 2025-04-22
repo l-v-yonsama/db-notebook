@@ -215,7 +215,7 @@ defineExpose({
         </VsCodeButton>
         <VsCodeButton :disabled="zeroSelection" @click="action('writeToClipboard')" appearance="secondary"
           title="Write ER diagram to clipboard">
-          <fa icon="clipboard" />Write to clipboard
+          <fa icon="clipboard" />Copy to clipboard
         </VsCodeButton>
         <VsCodeButton :disabled="zeroSelection" @click="action('createERDiagram')"
           title="Create ER diagram in a new Notebook">

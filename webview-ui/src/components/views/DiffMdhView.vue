@@ -41,7 +41,7 @@ const initialized = ref(false);
 const compareDetailItems = [
   {
     kind: "selection",
-    label: "Compare with before content",
+    label: "Compare with previous content",
     value: { base: "before" },
   },
   {
@@ -64,7 +64,7 @@ const moreDetailItems = [
   },
   {
     kind: "selection",
-    label: "Display only the rows that have changed",
+    label: "Display only changed rows",
     value: { displayFilter: "onlyChanged" },
     when: () => !displayOnlyChanged.value,
   },
@@ -289,18 +289,18 @@ defineExpose({
         <VsCodeDropdown v-if="innerTabVisible" v-model="innerTabIndex" :items="innerTabItems" style="z-index: 15"
           @change="resetActiveInnerRdh"></VsCodeDropdown>
         <button @click="compare({ base: 'before' })" :disabled="inProgress || !comparable"
-          title="Compare with before content">
+          title="Compare with previous content">
           <fa icon="code-compare" />
         </button>
         <SecondarySelectionAction :disabled="inProgress || !comparable" :items="compareDetailItems" title="Compare"
           @onSelect="compare" />
-        <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as Html">
+        <button @click="output({ fileType: 'html' })" :disabled="inProgress" title="Output as HTML">
           <fa icon="file-lines" />
         </button>
         <button @click="output({ fileType: 'excel' })" :disabled="inProgress" title="Output as Excel">
           <fa icon="file-excel" />
         </button>
-        <button :disabled="!hasUndoChangeSql" @click="createUndoChangeSql" title="Create undo change sql">
+        <button :disabled="!hasUndoChangeSql" @click="createUndoChangeSql" title="Create Undo Changes SQL">
           <fa icon="rotate-left" />
         </button>
         <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />

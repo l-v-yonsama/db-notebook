@@ -147,7 +147,7 @@ defineExpose({
           <fa icon="times" />Cancel
         </VsCodeButton>
         <VsCodeButton :disabled="errorMessage.length > 0" @click="ok(false)" title="Evaluate the sql">
-          <fa icon="check" />Evaluate sql
+          <fa icon="check" />Evaluate SQL
         </VsCodeButton>
       </div>
     </div>
