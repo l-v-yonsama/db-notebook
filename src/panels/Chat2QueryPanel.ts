@@ -366,7 +366,7 @@ export class Chat2QueryPanel extends BasePanel {
         break;
       case "before":
         assistantContents.push(
-          `Begin the output with a one-sentence explanation written as a SQL comment using (--), followed by the SQL query itself.`
+          `Begin the output with a one-sentence explanation written as an SQL comment using (--), followed by the SQL query itself.`
         );
         break;
       case "inline":
