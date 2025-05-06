@@ -283,11 +283,14 @@ function toValue(key: RdhKey, value: any): any {
   }
   if (isDateTimeOrDate(key.type)) {
     if (key.type === "date") {
-      if (props.config?.dateFormat === "YYYY-MM-DD HH:mm:ss") {
-        return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
+      if (props.config?.dateFormat) {
+        return dayjs(value).format(props.config?.dateFormat);
       }
       return dayjs(value).format("YYYY-MM-DD");
     } else {
+      if (props.config?.timestampFormat) {
+        return dayjs(value).format(props.config?.timestampFormat);
+      }
       return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
     }
   }

@@ -9,6 +9,7 @@ import type {
   OutputParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
+import { sleep } from "@l-v-yonsama/rdh";
 import {
   provideVSCodeDesignSystem,
   vsCodePanels,
@@ -168,6 +169,8 @@ const initialize = async (params: DiffMdhViewEventData["value"]["initialize"]) =
 const addTabItem = async (tabItem: DiffTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
+    initialized.value = false;
+    await sleep(200);
     tabItems.value.unshift(tabItem);
   }
   await nextTick();
@@ -198,6 +201,7 @@ const setSearchResult = async ({ tabId, value }: { tabId: string; value: DiffTab
   if (idx < 0) {
     return;
   }
+
   tabItems.value.splice(idx, 1);
   await nextTick();
   await addTabItem(value);
@@ -283,7 +287,7 @@ defineExpose({
 
 <template>
   <section class="MdhView">
-    <section v-if="!initialized" class="content">Initializing...{{ initialized }}</section>
+    <section v-if="!initialized" class="content">Just a moment, please.</section>
     <template v-else>
       <div class="tab-container-actions">
         <VsCodeDropdown v-if="innerTabVisible" v-model="innerTabIndex" :items="innerTabItems" style="z-index: 15"

@@ -242,6 +242,7 @@ export class MdhViewProvider extends BaseViewProvider {
       refreshable,
       config: {
         dateFormat: rdhConfig.dateFormat,
+        timestampFormat: rdhConfig.timestampFormat,
         binaryToHex: rdhConfig.binaryToHex,
       },
     };

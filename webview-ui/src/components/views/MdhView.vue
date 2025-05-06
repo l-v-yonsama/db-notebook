@@ -10,7 +10,7 @@ import type {
   WriteToClipboardParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import { isNumericLike, type ResultSetData } from "@l-v-yonsama/rdh";
+import { isNumericLike, sleep, type ResultSetData } from "@l-v-yonsama/rdh";
 import {
   provideVSCodeDesignSystem,
   vsCodePanels,
@@ -176,9 +176,12 @@ const initialize = async (params: MdhViewEventData["value"]["initialize"]) => {
 const addTabItem = async (tabItem: RdhTabItem) => {
   const idx = tabItems.value.findIndex((it) => it.tabId === tabItem.tabId);
   if (idx < 0) {
+    initialized.value = false;
+    await sleep(200);
     tabItems.value.unshift(tabItem);
   }
   await nextTick();
+
   await showTab(tabItem.tabId);
   initialized.value = true;
 };
@@ -207,12 +210,15 @@ const setSearchResult = async ({ tabId, value }: { tabId: string; value: ResultS
   if (!tabItem) {
     return;
   }
+  initialized.value = false;
+  await sleep(200);
   tabItem.list.splice(0, tabItem.list.length);
   await nextTick();
   tabItem.list.push(...value);
   await nextTick();
 
   await showTab(tabId);
+  initialized.value = true;
   inProgress.value = false;
   setTimeout(resetSpPaneWrapperHeight, 200);
 };
@@ -361,7 +367,7 @@ defineExpose({
 
 <template>
   <section class="MdhView">
-    <section v-if="!initialized" class="content">Initializing...{{ initialized }}</section>
+    <section v-if="!initialized" class="content">Just a moment, please.</section>
     <template v-else>
 
       <div v-if="contentMode == 'tab'" class="tab-container-actions">

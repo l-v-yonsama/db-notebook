@@ -40,6 +40,7 @@ export const getResultsetConfig = (): ResultsetConfigType => {
     maxCharactersInCell: settings.get("Max characters in cell", 100),
     maxRowsInPreview: settings.get("Max rows in preview", 10),
     dateFormat: settings.get("Date format", "YYYY-MM-DD"),
+    timestampFormat: settings.get("Timestamp format", "YYYY-MM-DD HH:mm:ss"),
     eol: settings.get("End of Line", "\n"),
     binaryToHex: settings.get("Binary to Hex", false),
   };
@@ -82,6 +83,7 @@ export const getToStringParamByConfig = (options?: Partial<ToStringParam>): ToSt
     withCodeLabel: true,
     withRuleViolation: true,
     dateFormat: rdh.dateFormat,
+    timestampFormat: rdh.timestampFormat,
     eol: rdh.eol,
     binaryToHex: rdh.binaryToHex,
   };

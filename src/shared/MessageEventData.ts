@@ -63,6 +63,7 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
 
 export type RdhViewConfig = {
   dateFormat: ToStringParam["dateFormat"];
+  timestampFormat: ToStringParam["timestampFormat"];
   binaryToHex: ToStringParam["binaryToHex"];
 };
 
