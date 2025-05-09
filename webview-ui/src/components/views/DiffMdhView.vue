@@ -287,7 +287,7 @@ defineExpose({
 
 <template>
   <section class="MdhView">
-    <section v-if="!initialized" class="content">Just a moment, please.</section>
+    <section v-if="!initialized" class="centered-content">Just a moment, please.</section>
     <template v-else>
       <div class="tab-container-actions">
         <VsCodeDropdown v-if="innerTabVisible" v-model="innerTabIndex" :items="innerTabItems" style="z-index: 15"

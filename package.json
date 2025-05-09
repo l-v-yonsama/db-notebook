@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0. Evaluate SQL statements with AI.",
-  "version": "0.8.8",
+  "version": "0.8.10",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -1097,7 +1097,7 @@
   },
   "dependencies": {
     "@l-v-yonsama/multi-platform-database-drivers": "^0.9.30",
-    "@l-v-yonsama/rdh": "^0.2.4",
+    "@l-v-yonsama/rdh": "^0.2.6",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

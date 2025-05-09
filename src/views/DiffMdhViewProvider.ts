@@ -7,7 +7,7 @@ import {
   SQLLang,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
-  diff,
+  asyncDiff,
   diffToUndoChanges,
   RdhHelper,
   resolveCodeLabel,
@@ -155,7 +155,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     undoable: boolean,
     list1: ResultSetData[],
     list2: ResultSetData[]
-  ): Promise<DiffTabItem> {
+  ): Promise<DiffTabItem | undefined> {
     let subTitle = "";
     if (list1.length) {
       let before = dayjs(list1[0].created).format("HH:mm");
@@ -172,7 +172,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     const createTabId = () => createHash("md5").update(title).digest("hex");
     const tabId = createTabId();
 
-    const item: DiffTabItem = {
+    let item: DiffTabItem | undefined = {
       tabId,
       title,
       subTitle,
@@ -197,12 +197,21 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             message: `Comparing [${i + 1}/${list1.length}] ${rdh2.meta.tableName}`,
             increment,
           });
+
           if (token.isCancellationRequested) {
+            item = undefined;
+            showWindowErrorMessage("Cancelled");
             return;
           }
 
           await sleep(10);
-          const diffResult = diff(rdh1, rdh2);
+          const diffResult = await asyncDiff(rdh1, rdh2, token);
+          if (diffResult.ok === false) {
+            item = undefined;
+            showWindowErrorMessage(diffResult.message);
+            return;
+          }
+
           if (rdh1.meta.tableRule) {
             await runRuleEngine(rdh1);
           }
@@ -240,7 +249,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             undoChangeStatements = list.map((it) => it.query);
           }
 
-          item.list.push({
+          item!.list.push({
             tabId: createTabId(),
             title: rdh1.meta.tableName ?? "",
             diffResult,
@@ -249,7 +258,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             rdh2,
           });
 
-          item.hasUndoChangeSql = item.list.some(
+          item!.hasUndoChangeSql = item!.list.some(
             (it) => (it.undoChangeStatements?.length ?? 0) > 0
           );
         }
@@ -276,6 +285,15 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     if (item) {
       // Reset
       const tmpItem = await this.createTabItem("tmp", comparable, undoable, list1, list2);
+      if (!tmpItem) {
+        if (this.items.length === 0) {
+          this.webviewView = undefined;
+          this.currentTabId = undefined;
+          this.currentInnerIndex = undefined;
+          await commands.executeCommand("setContext", BOTTOM_DIFF_MDH_VIEWID + ".visible", false);
+        }
+        return;
+      }
       item.list = tmpItem.list;
       item.subTitle = tmpItem.subTitle;
 
@@ -295,6 +313,15 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     }
 
     item = await this.createTabItem(title, comparable, undoable, list1, list2);
+    if (!item) {
+      if (this.items.length === 0) {
+        this.webviewView = undefined;
+        this.currentTabId = undefined;
+        this.currentInnerIndex = undefined;
+        await commands.executeCommand("setContext", BOTTOM_DIFF_MDH_VIEWID + ".visible", false);
+      }
+      return;
+    }
     this.items.push(item);
     this.currentTabId = item.tabId;
 

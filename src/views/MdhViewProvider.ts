@@ -24,6 +24,7 @@ import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getResultsetConfig } from "../utilities/configUtil";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
+import { log } from "../utilities/logger";
 import { rdhListToText } from "../utilities/rdhToText";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
@@ -170,6 +171,11 @@ export class MdhViewProvider extends BaseViewProvider {
   }
 
   protected onDidChangeVisibility(visible: boolean): void {
+    log(
+      `${this.getComponentName()} onDidChangeVisibility visible:[${visible}]currentTabId:[${
+        this.currentTabId
+      }]`
+    );
     if (visible === true && this.currentTabId) {
       this.postMessage<MdhViewEventData>({
         command: "initialize",

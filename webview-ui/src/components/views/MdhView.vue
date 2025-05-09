@@ -34,6 +34,7 @@ const splitterHeight = ref(300);
 const innerTabIndex = ref(-1);
 const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh = ref(null as any);
+const numOfRows = ref(0);
 const contentMode = ref("tab" as "tab" | "keys");
 const noCompareKeys = ref(false);
 const activeTabRdhList = ref([] as ResultSetData[]);
@@ -142,10 +143,14 @@ const resetActiveInnerRdh = async () => {
 
   const tabItem = getActiveTabItem();
   if (!tabItem || innerTabIndex.value < 0) {
+    numOfRows.value = 0;
     return;
   }
 
   const newRdh = tabItem.list[innerTabIndex.value];
+  numOfRows.value = newRdh.rows.length;
+  await sleep(100);
+
   editable.value = newRdh.meta?.editable === true;
   refreshable.value = tabItem.refreshable;
   describable.value =
@@ -367,7 +372,7 @@ defineExpose({
 
 <template>
   <section class="MdhView">
-    <section v-if="!initialized" class="content">Just a moment, please.</section>
+    <section v-if="!initialized" class="centered-content">Just a moment, please.</section>
     <template v-else>
 
       <div v-if="contentMode == 'tab'" class="tab-container-actions">
@@ -418,6 +423,8 @@ defineExpose({
               <RDHViewer :rdh="activeInnerRdh" :config="tabItem.config" :width="splitterWidth" :height="splitterHeight"
                 :ref="setRdhViewerRef" />
             </div>
+            <div v-else class="centered-content">Drawing {{ numOfRows.toLocaleString() }} rows now. Just a moment,
+              please.</div>
           </section>
         </vscode-panel-view>
       </vscode-panels>
