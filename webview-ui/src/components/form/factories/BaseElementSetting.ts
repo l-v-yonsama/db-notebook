@@ -7,6 +7,10 @@ export abstract class BaseElementSetting {
 
   abstract getTimezone(): ElementSetting;
 
+  getConnectTimeoutMs(): ElementSetting {
+    return { visible: false };
+  }
+
   abstract getQueryTimeoutMs(): ElementSetting;
 
   abstract getLockWaitTimeoutMs(): ElementSetting;
@@ -44,6 +48,16 @@ export abstract class BaseElementSetting {
   abstract getSqlServerClientSecret(): ElementSetting;
 
   abstract getSqlServerConnectString(): ElementSetting;
+
+  abstract getMqttClientId(): ElementSetting;
+
+  getProtocol(): ElementSetting {
+    return { visible: false };
+  }
+
+  getProtocolVersion(): ElementSetting {
+    return { visible: false };
+  }
 
   getResourceFilters(): ElementSetting {
     return { visible: false };
@@ -84,6 +98,10 @@ export abstract class BaseNoSqlElementSetting extends BaseElementSetting {
   }
 
   getSqlServerConnectString(): ElementSetting {
+    return { visible: false };
+  }
+
+  getMqttClientId(): ElementSetting {
     return { visible: false };
   }
 }

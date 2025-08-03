@@ -1,4 +1,5 @@
 import { window } from "vscode";
+import { logError } from "./logger";
 
 export const showWindowErrorMessage = async (o: unknown): Promise<void> => {
   let message = "";
@@ -7,5 +8,6 @@ export const showWindowErrorMessage = async (o: unknown): Promise<void> => {
   } else {
     message = "" + o;
   }
+  logError(message);
   await window.showErrorMessage(message);
 };

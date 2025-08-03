@@ -1,4 +1,4 @@
-import { runRuleEngine } from "@l-v-yonsama/multi-platform-database-drivers";
+import { DBType, runRuleEngine } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr, resolveCodeLabel, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import {
   CancellationTokenSource,
@@ -22,6 +22,7 @@ import {
   WorkspaceEdit,
 } from "vscode";
 import {
+  CELL_MARK_CELL_AS_MQTT,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
@@ -30,6 +31,10 @@ import {
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
   CELL_SPECIFY_LOG_GROUP_TO_USE,
+  CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN,
+  CELL_SPECIFY_MQTT_QOS_TO_USE,
+  CELL_SPECIFY_MQTT_RETAIN_TO_USE,
+  CELL_SPECIFY_MQTT_TOPIC_TO_USE,
   NOTEBOOK_TYPE,
   OPEN_CHARTS_VIEWER,
   REFRESH_SQL_HISTORIES,
@@ -43,13 +48,19 @@ import {
   getToStringParamByConfig,
 } from "../utilities/configUtil";
 import { existsFileOnWorkspace, initializeStorageTmpPath } from "../utilities/fsUtil";
-import { createResponseBodyMarkdown } from "../utilities/httpUtil";
+import {
+  createMqttPublishResultMarkdownText,
+  createResponseBodyMarkdown,
+} from "../utilities/httpUtil";
 import { runLm } from "../utilities/lmUtil";
 import { log, logError } from "../utilities/logger";
 import {
   hasAnyRdhOutputCell,
   isCwqlCell,
-  isJsonCell,
+  isJsCell,
+  isJsonValueCell,
+  isMarkupCell,
+  isMqttCell,
   isPreExecution,
   isSqlCell,
   readCodeResolverFile,
@@ -59,6 +70,7 @@ import { StateStorage } from "../utilities/StateStorage";
 import { AwsKernel } from "./awsKernel";
 import { setupDbResource } from "./intellisense";
 import { jsonKernelRun } from "./JsonKernel";
+import { MqttKernel } from "./MqttKernel";
 import { NodeKernel } from "./NodeKernel";
 import { SqlKernel } from "./sqlKernel";
 
@@ -69,6 +81,7 @@ type NoteSession = {
   kernel: NodeKernel | undefined;
   sqlKernel: SqlKernel | undefined;
   awsKernel: AwsKernel | undefined;
+  mqttKernel: MqttKernel | undefined;
   cancellationTokenSourceList: CancellationTokenSource[] | undefined;
   interrupted: boolean;
 };
@@ -77,7 +90,7 @@ export class MainController {
   readonly controllerId = `${NOTEBOOK_TYPE}-controller`;
   readonly notebookType = NOTEBOOK_TYPE;
   readonly label = "Database Notebook";
-  readonly supportedLanguages = ["sql", "javascript", "json", "cwql"];
+  readonly supportedLanguages = ["sql", "javascript", "json", "cwql", "plaintext"];
 
   private readonly _controller: NotebookController;
   private readonly noteSessions = new Map<string, NoteSession>();
@@ -176,6 +189,31 @@ export class MainController {
     context.subscriptions.push(
       notebooks.registerNotebookCellStatusBarItemProvider(
         NOTEBOOK_TYPE,
+        new MarkCellAsMqttProvider(stateStorage)
+      )
+    );
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new MqttTopicProvider())
+    );
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new MqttQosProvider(stateStorage)
+      )
+    );
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new MqttRetainProvider())
+    );
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
+        new MqttSubscribeExpandJsonColumnProvider(stateStorage)
+      )
+    );
+
+    context.subscriptions.push(
+      notebooks.registerNotebookCellStatusBarItemProvider(
+        NOTEBOOK_TYPE,
         new LogGroupSettingProvider(stateStorage)
       )
     );
@@ -238,7 +276,7 @@ export class MainController {
     // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
     if (noteSession) {
-      const { kernel, sqlKernel, awsKernel, cancellationTokenSourceList } = noteSession;
+      const { kernel, sqlKernel, awsKernel, mqttKernel, cancellationTokenSourceList } = noteSession;
       try {
         noteSession.interrupted = true;
         if (kernel) {
@@ -253,6 +291,9 @@ export class MainController {
         }
         if (awsKernel) {
           awsKernel.interrupt();
+        }
+        if (mqttKernel) {
+          mqttKernel.interrupt();
         }
         if (cancellationTokenSourceList) {
           for (const cts of cancellationTokenSourceList) {
@@ -290,6 +331,7 @@ export class MainController {
       kernel,
       sqlKernel: undefined,
       awsKernel: undefined,
+      mqttKernel: undefined,
       cancellationTokenSourceList: [],
       interrupted: false,
     };
@@ -370,8 +412,15 @@ export class MainController {
       }
 
       if (metadata) {
-        const { rdh, explainRdh, analyzedRdh, axiosEvent, updateJSONCellValues, lmResult } =
-          metadata;
+        const {
+          rdh,
+          explainRdh,
+          analyzedRdh,
+          axiosEvent,
+          mqttPublishResult,
+          updateJSONCellValues,
+          lmResult,
+        } = metadata;
 
         if (rdh) {
           const toMarkdownConfig = getToStringParamByConfig({
@@ -445,6 +494,19 @@ export class MainController {
             )
           );
         }
+        if (mqttPublishResult) {
+          outputs.push(
+            new NotebookCellOutput(
+              [
+                NotebookCellOutputItem.text(
+                  createMqttPublishResultMarkdownText(mqttPublishResult),
+                  "text/markdown"
+                ),
+              ],
+              metadata
+            )
+          );
+        }
 
         if (lmResult && lmResult.markdownText) {
           outputs.push(
@@ -458,7 +520,7 @@ export class MainController {
         if (updateJSONCellValues) {
           for (const updateJsonCell of updateJSONCellValues) {
             const { cellIndex, replaceAll, data } = updateJsonCell;
-            const jsonCells = notebook.getCells().filter((it) => isJsonCell(it));
+            const jsonCells = notebook.getCells().filter((it) => isJsonValueCell(it));
             if (cellIndex < jsonCells.length) {
               const jsonCell = jsonCells[cellIndex];
               const doc = jsonCell.document;
@@ -538,6 +600,17 @@ export class MainController {
       throw new Error("Missing kernel");
     }
     if (isSqlCell(cell)) {
+      if (
+        this.stateStorage.getDBTypeByConnectionName(cell.metadata.connectionName) === DBType.Mqtt
+      ) {
+        noteSession.mqttKernel = new MqttKernel(this.stateStorage);
+        const r = await noteSession.mqttKernel.requestSql(
+          cell,
+          noteSession.kernel.getStoredVariables()
+        );
+        noteSession.mqttKernel = undefined;
+        return r;
+      }
       noteSession.sqlKernel = new SqlKernel(this.stateStorage);
       const r = await noteSession.sqlKernel.run(
         cell,
@@ -601,7 +674,12 @@ export class MainController {
       const r = await noteSession.awsKernel.run(cell, noteSession.kernel.getStoredVariables());
       noteSession.awsKernel = undefined;
       return r;
-    } else if (isJsonCell(cell)) {
+    } else if (isMqttCell(cell)) {
+      noteSession.mqttKernel = new MqttKernel(this.stateStorage);
+      const r = await noteSession.mqttKernel.run(cell, noteSession.kernel.getStoredVariables());
+      noteSession.mqttKernel = undefined;
+      return r;
+    } else if (isJsonValueCell(cell)) {
       return await jsonKernelRun(cell, noteSession.kernel);
     }
 
@@ -724,7 +802,7 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
 
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    if (!isSqlCell(cell) && !isCwqlCell(cell)) {
+    if (!isSqlCell(cell) && !isCwqlCell(cell) && !isMqttCell(cell)) {
       return undefined;
     }
 
@@ -743,6 +821,142 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_SPECIFY_CONNECTION_TO_USE;
     item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class MarkCellAsMqttProvider implements NotebookCellStatusBarItemProvider {
+  constructor(private stateStorage: StateStorage) {}
+
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (isCwqlCell(cell) || isSqlCell(cell) || isMarkupCell(cell) || isJsCell(cell)) {
+      return undefined;
+    }
+
+    const { publishParams }: CellMeta = cell.metadata;
+
+    let tooltip = "";
+    let text = "";
+    if (publishParams) {
+      if (cell.document.languageId === "json") {
+        tooltip = "Mark cell as General JSON";
+        text = "$(arrow-swap) MQTT JSON";
+      } else {
+        tooltip = "Mark cell as General Plain text";
+        text = "$(arrow-swap) MQTT Plain text";
+      }
+    } else {
+      if (cell.document.languageId === "json") {
+        tooltip = "Mark cell as MQTT";
+        text = "$(arrow-swap) General JSON";
+      } else {
+        tooltip = "Mark cell as MQTT";
+        text = "$(arrow-swap) Genaral Plain text";
+      }
+    }
+    const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_MARK_CELL_AS_MQTT;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class MqttTopicProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isMqttCell(cell)) {
+      return undefined;
+    }
+
+    const { publishParams }: CellMeta = cell.metadata;
+    if (!publishParams) {
+      return undefined;
+    }
+
+    let text = "";
+    let tooltip = "";
+    if (publishParams.topicName) {
+      text = `$(output) Topic:(${abbr(publishParams.topicName, 16)})`;
+      tooltip = publishParams.topicName;
+    } else {
+      text = "$(error) Specify subscription";
+      tooltip = "Specify subscription";
+    }
+    const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_MQTT_TOPIC_TO_USE;
+    item.tooltip = text;
+    return item;
+  }
+}
+
+class MqttRetainProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isMqttCell(cell)) {
+      return undefined;
+    }
+
+    const { publishParams }: CellMeta = cell.metadata;
+    if (!publishParams) {
+      return undefined;
+    }
+
+    const text = `Retain:(${publishParams.retain === true ? "TRUE" : "FALSE"})`;
+    const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_MQTT_RETAIN_TO_USE;
+    item.tooltip = text;
+    return item;
+  }
+}
+
+class MqttQosProvider implements NotebookCellStatusBarItemProvider {
+  constructor(private stateStorage: StateStorage) {}
+
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isMqttCell(cell)) {
+      return undefined;
+    }
+
+    const { publishParams }: CellMeta = cell.metadata;
+    if (!publishParams) {
+      return undefined;
+    }
+
+    let tooltip = "";
+    if (publishParams.qos !== undefined) {
+      tooltip = `QOS:(${publishParams.qos})`;
+    } else {
+      tooltip = "$(error) Specify QOS";
+    }
+    const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_MQTT_QOS_TO_USE;
+    item.tooltip = tooltip;
+    return item;
+  }
+}
+
+class MqttSubscribeExpandJsonColumnProvider implements NotebookCellStatusBarItemProvider {
+  constructor(private stateStorage: StateStorage) {}
+
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isSqlCell(cell)) {
+      return undefined;
+    }
+    if (this.stateStorage.getDBTypeByConnectionName(cell.metadata.connectionName) !== DBType.Mqtt) {
+      return undefined;
+    }
+
+    let { subscribeParams }: CellMeta = cell.metadata;
+    if (!subscribeParams) {
+      subscribeParams = {
+        expandJsonColumn: false,
+      };
+    }
+
+    const text = `Expand JSON column:(${
+      subscribeParams.expandJsonColumn === true ? "TRUE" : "FALSE"
+    })`;
+    const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN;
+    item.tooltip = text;
     return item;
   }
 }
@@ -838,7 +1052,7 @@ class HttpResponseProvider implements NotebookCellStatusBarItemProvider {
 
 class PreExecutionProvider implements NotebookCellStatusBarItemProvider {
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    if (!isJsonCell(cell)) {
+    if (!isJsonValueCell(cell)) {
       return undefined;
     }
 

@@ -11,6 +11,7 @@ import { ComponentName } from "./shared/ComponentName";
 import { DBFormEventData } from "./shared/MessageEventData";
 import { ModeType } from "./shared/ModeType";
 import { showWindowErrorMessage } from "./utilities/alertUtil";
+import { log } from "./utilities/logger";
 import { StateStorage } from "./utilities/StateStorage";
 import { createWebviewContent } from "./utilities/webviewUtil";
 
@@ -73,8 +74,9 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
       switch (command) {
         case "selectFileActionCommand":
           {
+            const { targetAttribute, ...others } = params;
             const r = await vscode.window.showOpenDialog({
-              ...params,
+              ...others,
             });
 
             let selectedFilePath = "";
@@ -87,6 +89,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
               value: {
                 subComponentName: "ConnectionSetting",
                 selectedFilePath,
+                targetAttribute,
               },
             };
             this.webviewView?.webview.postMessage(msg);
@@ -94,6 +97,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           break;
         case "testConnectionSetting":
           {
+            log(`Test connection ${params.dbType}`);
             const driver = DBDriverResolver.getInstance().createDriver(params);
             const message = await driver.test(true);
             if (message) {

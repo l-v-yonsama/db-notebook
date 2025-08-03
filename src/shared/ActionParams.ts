@@ -33,10 +33,12 @@ export type OutputParams = TabIdParam & {
 export type ActionCommand =
   | CancelActionCommand
   | CompareActionCommand
+  | ConnectActionCommand
   | CreateERDiagramActionCommand
   | CreateCodeResolverEditorActionCommand
   | CreateUndoChangeSqlActionCommand
   | CreateRequestScriptActionCommand
+  | DisconnectActionCommand
   | SaveCompareKeysActionCommand
   | SaveNotebookCellMetadataActionCommand
   | OutputActionCommand
@@ -61,6 +63,8 @@ export type ActionCommand =
   | UpdateCodeResolverTextDocumentActionCommand
   | CountAllTablesActionCommand
   | OkActionCommand
+  | SubscribeActionCommand
+  | UnsubscribeActionCommand
   | ExecuteActionCommand
   | KillActionCommand;
 
@@ -78,9 +82,18 @@ export type ShowErrorActionCommand = BaseActionCommand<"showError", { message: s
 
 export type KillActionCommand = BaseActionCommand<"kill", { sessionOrPid: number | undefined }>;
 
+export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
+export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;
+export type SubscribeActionCommand = BaseActionCommand<"subscribe", { subscriptionName: string }>;
+export type UnsubscribeActionCommand = BaseActionCommand<
+  "unsubscribe",
+  { subscriptionName: string }
+>;
+
 export type SelectFileActionCommand = BaseActionCommand<
   "selectFileActionCommand",
   {
+    targetAttribute: string;
     /**
      * Allow to select files, defaults to `true`.
      */

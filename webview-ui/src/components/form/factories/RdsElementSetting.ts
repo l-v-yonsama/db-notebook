@@ -95,6 +95,10 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: true, label: "Table filter", defaultValue: "" };
   }
 
+  getMqttClientId(): ElementSetting {
+    return { visible: false };
+  }
+
   accept(setting: ConnectionSetting): boolean {
     const { name, database, user, password } = setting;
     if (name === "") {

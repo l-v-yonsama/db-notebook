@@ -1,5 +1,6 @@
 import {
   CancellationToken,
+  commands,
   ExtensionContext,
   WebviewView,
   WebviewViewProvider,
@@ -44,6 +45,11 @@ export abstract class BaseViewProvider implements WebviewViewProvider {
     this.setWebviewMessageListener(webviewView);
 
     this.webviewView = webviewView;
+  }
+
+  protected async closeView(viewId: string) {
+    this.webviewView = undefined;
+    await commands.executeCommand("setContext", `${viewId}.visible`, false);
   }
 
   abstract getComponentName(): ComponentName;

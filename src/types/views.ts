@@ -1,3 +1,4 @@
+import type { DbSubscription } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
 import type { CellMetaChart } from "./Notebook";
 
@@ -20,4 +21,10 @@ export type ChartsViewParams = CellMetaChart & {
   showAxisTitle?: boolean;
   pointRadius?: number;
   rdh: ResultSetData;
+};
+
+export type SubscriptionPayloadsViewParams = {
+  conName: string;
+  subscriptionRes: DbSubscription;
+  rdh?: ResultSetData;
 };

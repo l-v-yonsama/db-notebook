@@ -4,6 +4,7 @@ import {
   faBook,
   faCheck,
   faCirclePlay,
+  faCircleXmark,
   faClipboard,
   faCodeCompare,
   faDatabase,
@@ -35,6 +36,7 @@ library.add(faBook);
 library.add(faCheck);
 library.add(faClipboard);
 library.add(faCirclePlay);
+library.add(faCircleXmark);
 library.add(faCodeCompare);
 library.add(faDatabase);
 library.add(faEye);

@@ -16,6 +16,7 @@ import type {
   AwsSetting,
   ConnectionSetting,
   IamSolutionSetting,
+  MqttSetting,
   ResourceFilter,
   ResourceFilterDetail,
   SQLServerSetting,
@@ -94,6 +95,42 @@ const resourceFilterTypeItems: DropdownItem[] = [
   },
 ];
 
+const protocolTypeItems: DropdownItem[] = [
+  {
+    label: "mqtt",
+    value: "mqtt",
+  },
+  {
+    label: "mqtts",
+    value: "mqtts",
+  }
+];
+
+const protocolVersionItems: DropdownItem[] = [
+  {
+    label: "v3.1",
+    value: "3",
+  },
+  {
+    label: "v3.1.1",
+    value: "4",
+  },
+  {
+    label: "v5.0",
+    value: "5",
+  }
+];
+
+const SQLITE_DATABASE_FILE_FILTERS: { [name: string]: string[] } = {
+  SQLite: ["sqlite", "sqlite3", "db", "db3", "sdb", "sdb3", "database"],
+  All: ["*"],
+};
+
+
+const CA_FILE_FILTERS: { [name: string]: string[] } = {
+  All: ["*"],
+};
+
 
 type Props = {
   mode: ModeType;
@@ -143,6 +180,15 @@ const maskedSqlServerClientSecret = computed((): string =>
   maskedString(sqlServerClientSecret.value ?? "")
 );
 const maskedSqlServerTenantId = computed((): string => maskedString(sqlServerTenantId.value ?? ""));
+const protocolVersionText = computed((): string => {
+  if (protocolVersion.value === '3') {
+    return 'v3.1';
+  } else if (protocolVersion.value === '4') {
+    return 'v3.1.1';
+  }
+  return 'v5.0';
+});
+
 
 const props = withDefaults(defineProps<Props>(), {
   mode: "create",
@@ -155,6 +201,7 @@ const props = withDefaults(defineProps<Props>(), {
     user: "",
     password: "",
     timezone: "",
+    connectTimeoutMs: undefined,
     queryTimeoutMs: undefined,
     lockWaitTimeoutMs: undefined,
     url: "",
@@ -179,6 +226,14 @@ const props = withDefaults(defineProps<Props>(), {
       token: "",
       domain: ""
     },
+    mqttSetting: {
+      protocol: 'mqtt',
+      ca: '',
+      cert: '',
+      key: '',
+      clientId: '',
+      subscriptionList: []
+    },
     ssl: {
       use: false,
     },
@@ -197,6 +252,7 @@ const dbType = ref(props.item.dbType);
 const user = ref(props.item.user);
 const password = ref(props.item.password);
 const timezone = ref(props.item.timezone);
+const connectTimeoutMs = ref(props.item.connectTimeoutMs);
 const queryTimeoutMs = ref(props.item.queryTimeoutMs);
 const lockWaitTimeoutMs = ref(props.item.lockWaitTimeoutMs);
 const url = ref(props.item.url);
@@ -208,7 +264,7 @@ const awsCredentialType = ref(
 const awsServiceSelected = ref(props.item.awsSetting?.services ?? []);
 
 const dbTypeItems = DBTypeConst.DBTypeValues.map((it) => ({
-  label: it,
+  label: it === 'Mqtt' ? 'Mqtt(experimental)' : it,
   value: it,
 }));
 const regionItems = ["", ...AwsRegionConst.AwsRegionValues].map((it) => ({ label: it, value: it }));
@@ -254,6 +310,17 @@ const groupFilterType = ref(props.item.resourceFilter?.group?.type ?? "");
 const groupFilterValue = ref(props.item.resourceFilter?.group?.value ?? "");
 const bucketFilterType = ref(props.item.resourceFilter?.bucket?.type ?? "");
 const bucketFilterValue = ref(props.item.resourceFilter?.bucket?.value ?? "");
+
+// mqtt
+const protocolType = ref(props.item.mqttSetting?.protocol ?? 'mqtt');
+const protocolVersion = ref((props.item.mqttSetting?.protocolVersion ?? 4).toString());
+const mqttCa = ref(props.item.mqttSetting?.ca ?? '');
+const mqttCert = ref(props.item.mqttSetting?.cert ?? '');
+const mqttKey = ref(props.item.mqttSetting?.key ?? '');
+const mqttClientId = ref(props.item.mqttSetting?.clientId ?? '');
+const mqttRejectUnauthorized = ref(props.item.mqttSetting?.rejectUnauthorized ?? true);
+const mqttClean = ref(props.item.mqttSetting?.clean ?? true);
+let mqttSubscriptionList = props.item.mqttSetting?.subscriptionList ?? [];
 
 
 const elmSettings = computed(() => {
@@ -305,6 +372,7 @@ function createItem(): ConnectionSetting {
   let iamSolution: IamSolutionSetting | undefined = undefined;
   let sqlServer: SQLServerSetting | undefined = undefined;
   let resourceFilter: ResourceFilter | undefined = undefined;
+  let mqttSetting: MqttSetting | undefined = undefined;
 
   if (DBTypeConst.isAws(dbType.value)) {
     const awsServiceNames = awsServiceSelected.value.join(",").split(",");
@@ -343,6 +411,19 @@ function createItem(): ConnectionSetting {
       tenantId: sqlServerTenantId.value,
       connectString: sqlServerConnectString.value,
       domain: sqlServerDomain.value,
+    };
+  }
+  if (dbType.value === 'Mqtt') {
+    mqttSetting = {
+      protocol: protocolType.value,
+      protocolVersion: toNum(protocolVersion.value) as 3 | 4 | 5,
+      clientId: mqttClientId.value,
+      rejectUnauthorized: mqttRejectUnauthorized.value,
+      clean: mqttClean.value,
+      ca: mqttCa.value,
+      cert: mqttCert.value,
+      key: mqttKey.value,
+      subscriptionList: JSON.parse(JSON.stringify(mqttSubscriptionList))
     };
   }
   if (elmSettings.value.getResourceFilters().visible) {
@@ -386,6 +467,7 @@ function createItem(): ConnectionSetting {
     awsSetting,
     iamSolution,
     sqlServer,
+    mqttSetting,
     resourceFilter
   };
 
@@ -393,6 +475,10 @@ function createItem(): ConnectionSetting {
     a["ssl"] = {
       use: true,
     };
+  }
+  const ct = connectTimeoutMs.value as string | undefined;
+  if (ct != undefined && ct !== '') {
+    a.connectTimeoutMs = toNum(ct);
   }
   const qt = queryTimeoutMs.value as string | undefined;
   if (qt != undefined && qt !== '') {
@@ -422,21 +508,20 @@ function test() {
   });
 }
 
-function selectDatabaseFile() {
+function selectFile(targetAttribute: string, title: string, filters?: { [name: string]: string[] }) {
   vscode.postCommand({
     command: "selectFileActionCommand",
     params: {
+      targetAttribute,
       canSelectFiles: true,
       canSelectFolders: false,
       canSelectMany: false,
-      title: "Select an sqlite database file.",
-      filters: {
-        SQLite: ["sqlite", "sqlite3", "db", "db3", "sdb", "sdb3", "database"],
-        All: ["*"],
-      },
+      title,
+      filters,
     },
   });
 }
+
 
 function setDefault() {
   if (props.mode !== "update") {
@@ -447,6 +532,11 @@ function setDefault() {
   user.value = elmSettings.value.getUser().defaultValue ?? "";
   password.value = "";
   timezone.value = "";
+  if (elmSettings.value.getConnectTimeoutMs().visible) {
+    connectTimeoutMs.value = toNum(elmSettings.value.getConnectTimeoutMs().defaultValue);
+  } else {
+    connectTimeoutMs.value = undefined;
+  }
   queryTimeoutMs.value = undefined;
   lockWaitTimeoutMs.value = undefined;
   url.value = elmSettings.value.getUrl().defaultValue ?? "";
@@ -455,6 +545,21 @@ function setDefault() {
   database.value = elmSettings.value.getDatabase().defaultValue ?? "";
   port.value = elmSettings.value.getPort().defaultValue ?? 0;
   useSsl.value = false;
+
+  if (elmSettings.value.getProtocol().visible) {
+    protocolType.value = 'mqtt';
+  }
+  if (elmSettings.value.getProtocolVersion().visible) {
+    protocolVersion.value = '4';
+  }
+  if (elmSettings.value.getMqttClientId().visible) {
+    mqttClientId.value = elmSettings.value.getMqttClientId().defaultValue ?? '';
+  }
+  mqttRejectUnauthorized.value = true;
+  mqttClean.value = true;
+  mqttCa.value = '';
+  mqttCert.value = '';
+  mqttKey.value = '';
 
   // resource filters
   schemaFilterType.value = "";
@@ -471,8 +576,21 @@ const stopProgress = () => {
   isInProgress.value = false;
 };
 
-const selectedFile = (filePath: string) => {
-  database.value = filePath;
+const selectedFile = (filePath: string, targetAttribute: string) => {
+  switch (targetAttribute) {
+    case 'database':
+      database.value = filePath;
+      break;
+    case 'ca':
+      mqttCa.value = filePath;
+      break;
+    case 'cert':
+      mqttCert.value = filePath;
+      break;
+    case 'key':
+      mqttKey.value = filePath;
+      break;
+  }
 };
 defineExpose({
   stopProgress,
@@ -494,18 +612,36 @@ defineExpose({
       <VsCodeTextField v-else id="name" v-model="name" :disabled="mode === 'update'" :maxlength="128"></VsCodeTextField>
       <p v-if="isDuplicateName" class="marker-error">Duplicate name</p>
 
+      <!-- SQL Server -->
       <label v-if="elmSettings.getSqlServerAuthenticationType().visible" for="authenticationType">Authentication</label>
       <p v-if="isShowMode" v-show="elmSettings.getSqlServerAuthenticationType().visible" id="authenticationType">
         {{ sqlServerAuthenticationType }}
       </p>
-
-      <!-- SQL Server -->
       <VsCodeDropdown v-else v-show="elmSettings.getSqlServerAuthenticationType().visible" id="authenticationType"
         v-model="sqlServerAuthenticationType" :items="sqlServerAuthenticationTypeItems"></VsCodeDropdown>
 
+      <!-- PROTOCOL -->
+      <label v-if="elmSettings.getProtocol().visible" for="protocol">{{ elmSettings.getProtocol().label }}</label>
+      <p v-if="isShowMode" v-show="elmSettings.getProtocol().visible" id="protocol">
+        {{ protocolType }}
+      </p>
+      <VsCodeDropdown v-else v-show="elmSettings.getProtocol().visible" id="protocol" v-model="protocolType"
+        :items="protocolTypeItems"></VsCodeDropdown>
+
+      <!-- PROTOCOL-VERSION -->
+      <label v-if="elmSettings.getProtocolVersion().visible" for="protocolVersion">{{
+        elmSettings.getProtocolVersion().label }}</label>
+      <p v-if="isShowMode" v-show="elmSettings.getProtocolVersion().visible" id="protocolVersion">
+        {{ protocolVersionText }}
+      </p>
+      <VsCodeDropdown v-else v-show="elmSettings.getProtocolVersion().visible" id="protocolVersion"
+        v-model="protocolVersion" :items="protocolVersionItems"></VsCodeDropdown>
+
+      <!-- HOST -->
       <LabeledText v-show="elmSettings.getHost().visible" id="host" v-model="host" :isShowMode="isShowMode"
         :label="elmSettings.getHost().label ?? ''" :placeholder="elmSettings.getHost().placeholder ?? ''" />
 
+      <!-- PORT -->
       <label v-show="elmSettings.getPort().visible" for="port">Port</label>
       <p v-if="isShowMode" v-show="elmSettings.getPort().visible" id="port">{{ port }}</p>
       <VsCodeTextField v-else v-show="elmSettings.getPort().visible" id="port" v-model="port" type="number">
@@ -515,7 +651,8 @@ defineExpose({
         elmSettings.getDatabase().label ?? "Database"
         }}</label>
       <template v-if="dbType === 'SQLite'">
-        <VsCodeButton v-if="!isShowMode" @click="selectDatabaseFile">
+        <VsCodeButton v-if="!isShowMode"
+          @click="selectFile('database', 'Select an sqlite database file.', SQLITE_DATABASE_FILE_FILTERS)">
           <fa icon="database" />Select
         </VsCodeButton>
         <p>{{ database }}</p>
@@ -640,6 +777,13 @@ defineExpose({
           :placeholder="elmSettings.getSqlServerConnectString().placeholder ?? ''" />
       </div>
 
+      <label v-show="elmSettings.getConnectTimeoutMs().visible" for="connectTimeoutMs">{{
+        elmSettings.getConnectTimeoutMs().label
+        }}(Optional)</label>
+      <p v-if="isShowMode && elmSettings.getConnectTimeoutMs().visible" id="connectTimeoutMs">{{ connectTimeoutMs }}</p>
+      <VsCodeTextField v-if="!isShowMode && elmSettings.getConnectTimeoutMs().visible" id="connectTimeoutMs"
+        v-model="connectTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 60000"></VsCodeTextField>
+
       <label v-show="elmSettings.getQueryTimeoutMs().visible" for="queryTimeoutMs">{{
         elmSettings.getQueryTimeoutMs().label
         }}(Optional)</label>
@@ -653,6 +797,57 @@ defineExpose({
       <p v-if="isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs">{{ lockWaitTimeoutMs }}</p>
       <VsCodeTextField v-if="!isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs"
         v-model="lockWaitTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 30000"></VsCodeTextField>
+
+      <!-- MQTT -->
+      <div v-if="dbType === 'Mqtt'" class="mqtt">
+        <LabeledText v-show="elmSettings.getMqttClientId().visible" id="mqttClientId" v-model="mqttClientId"
+          :isShowMode="isShowMode" label="ClientId(Optional)"
+          :placeholder="elmSettings.getMqttClientId().placeholder ?? ''" />
+
+        <div>
+          <label v-if="isShowMode" for="mqttRejectUnauthorized">RejectUnauthorized</label>
+          <p v-if="isShowMode" id="mqttRejectUnauthorized">{{ mqttRejectUnauthorized }}</p>
+          <vscode-checkbox id="mqttRejectUnauthorized" v-if="!isShowMode" :checked="mqttRejectUnauthorized"
+            @change="($e: any) => { mqttRejectUnauthorized = $e.target.checked; }"
+            style="margin-right: auto">RejectUnauthorized</vscode-checkbox>
+        </div>
+
+        <div>
+          <label v-if="isShowMode" for="mqttClean">Clean</label>
+          <p v-if="isShowMode" id="mqttClean">{{ mqttClean }}</p>
+          <vscode-checkbox id="mqttClean" v-if="!isShowMode" :checked="mqttClean"
+            @change="($e: any) => { mqttClean = $e.target.checked; }" style="margin-right: auto">Clean</vscode-checkbox>
+        </div>
+
+        <!-- CA File -->
+        <label for="caFile">CA certificate File</label>
+        <VsCodeButton v-if="!isShowMode" @click="selectFile('ca', 'Select a CA certificate file.', CA_FILE_FILTERS)">
+          <fa icon="file" />Select
+        </VsCodeButton>
+        <p class="file-placeholder" v-if="!isShowMode">(e.g.: AmazonRootCA1.pem, ca.crt)</p>
+        <p>{{ mqttCa }}</p>
+        <br v-if="!isShowMode" />
+
+        <!-- Client certificate File -->
+        <label for="caFile">Client certificate File</label>
+        <VsCodeButton v-if="!isShowMode"
+          @click="selectFile('cert', 'Select a Client certificate file.', CA_FILE_FILTERS)">
+          <fa icon="file" />Select
+        </VsCodeButton>
+        <p class="file-placeholder" v-if="!isShowMode">(e.g.: client.crt, certificate.pem)</p>
+        <p>{{ mqttCert }}</p>
+        <br v-if="!isShowMode" />
+
+        <!-- Client private key File -->
+        <label for="caFile">Client private key File</label>
+        <VsCodeButton v-if="!isShowMode"
+          @click="selectFile('ca', 'Select a Client private key file.', CA_FILE_FILTERS)">
+          <fa icon="file" />Select
+        </VsCodeButton>
+        <p class="file-placeholder" v-if="!isShowMode">(e.g.: private.pem.key, client.key)</p>
+        <p>{{ mqttKey }}</p>
+        <br v-if="!isShowMode" />
+      </div>
 
       <!-- Resource filters -->
       <fieldset class="resource-filters" v-if="elmSettings.getResourceFilters().visible">
@@ -753,10 +948,16 @@ div.settings {
   }
 
   &>p,
-  &>div>p {
+  &>div>p,
+  &>div>div>p {
     margin: 0.3rem 0 0 0.3rem;
     opacity: 0.7;
   }
+
+  vscode-button {
+    margin-left: 3px;
+  }
+
 }
 
 div.first {
@@ -773,6 +974,11 @@ div.commands {
   justify-content: space-around;
   width: 100%;
 }
+
+.file-placeholder {
+  font-size: x-small;
+}
+
 
 fieldset.resource-filters {
   table {

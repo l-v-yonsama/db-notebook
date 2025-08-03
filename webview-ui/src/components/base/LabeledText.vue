@@ -4,19 +4,12 @@
     <p v-if="isShowMode" :id="id">
       {{ showModeValue ? showModeValue : modelValue }}
     </p>
-    <VsCodeTextField
-      v-else
-      :id="id"
-      v-model="v"
-      :placeholder="placeholder"
-      :maxlength="128"
-      @change="changeCondition"
-    ></VsCodeTextField>
+    <VsCodeTextField v-else :id="id" v-model="inputValue" :placeholder="placeholder" :maxlength="128"></VsCodeTextField>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed } from "vue";
 import VsCodeTextField from "./VsCodeTextField.vue";
 
 const props = defineProps<{
@@ -28,15 +21,15 @@ const props = defineProps<{
   id: string;
 }>();
 
-const v = ref(props.modelValue);
-
-const changeCondition = (e: any) => {
-  emit("update:modelValue", v.value);
-};
-
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: string | number | Date | undefined): void;
 }>();
+
+const inputValue = computed({
+  get: () => props.modelValue,
+  set: (val) => emit('update:modelValue', val)
+});
+
 </script>
 <style lang="scss" scoped>
 div.labeld-text {
@@ -44,6 +37,7 @@ div.labeld-text {
     margin: 0.3rem 0 0 0.3rem;
     opacity: 0.7;
   }
+
   label {
     display: block;
     margin: 0.5rem 0 1px 0;

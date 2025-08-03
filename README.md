@@ -9,7 +9,7 @@ It also provides a CSV and Har file preview feature.
 ## Features
 
 - Access various databases through Notebooks, Sidebars, and panel UIs
-  - MySQL, PostgreSQL, SQL Server, SQLite, Redis, AWS, Keycloak, Auth0
+  - MySQL, PostgreSQL, SQL Server, SQLite, Redis, AWS, Keycloak, Auth0, MQTT
 - Execute & stop SQL, JavaScript code in node.js
 - Execute SQL mode
   - Execute query (Default)
@@ -34,6 +34,9 @@ It also provides a CSV and Har file preview feature.
   - Har file preview
 - Evaluate SQL statements with AI
 - Generate SQL queries with AI
+- MQTT Client
+  - Intuitive publish/subscribe interface
+  - Query subscribed payloads using SQLite directly from the notebook
 
 ## Screenshots
 
@@ -85,8 +88,13 @@ It also provides a CSV and Har file preview feature.
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/20_chat2query.gif)
 
 - Access to Aws( DynamoDB ) through the Notebook
+
   - On the DB Notebook, specify the number of counts in the LIMIT clause
   - ![](./docs/images/18_dynamoDB.png)
+
+- MQTT Client
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/21_mqtt.gif)
+  - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
 
 <details>
 
@@ -164,6 +172,7 @@ It also provides a CSV and Har file preview feature.
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
+- [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
 
 ## Keyboard shortcuts
 

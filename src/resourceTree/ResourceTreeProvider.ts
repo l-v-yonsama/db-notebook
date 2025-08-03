@@ -4,8 +4,10 @@ import {
   DbDynamoTable,
   DbDynamoTableColumn,
   DbResource,
+  DbSubscription,
   DBType,
   IamClient,
+  MqttDatabase,
   parseDynamoAttrType,
   RdsDatabase,
   RedisDatabase,
@@ -95,6 +97,11 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     this._onDidChangeTreeData.fire();
   }
 
+  changeDbResourceTreeData(dbRes: DbResource): void {
+    this._onDidChangeTreeData.fire(dbRes);
+    this._onDidChangeTreeData.fire();
+  }
+
   getTreeItem(element: DbResource): vscode.TreeItem {
     let state = vscode.TreeItemCollapsibleState.None;
     if (element.resourceType === ResourceType.Connection) {
@@ -142,12 +149,20 @@ export class ConnectionListItem extends vscode.TreeItem {
           new vscode.ThemeColor("errorForeground")
         );
       } else {
-        this.iconPath = new vscode.ThemeIcon("debug-disconnect");
+        if (conRes.isConnected) {
+          this.iconPath = new vscode.ThemeIcon("pass");
+        } else {
+          this.iconPath = new vscode.ThemeIcon("debug-disconnect");
+        }
       }
     }
     const clearableDefault = conRes.name === defaultConName;
     this.description = `(${conRes.dbType})`;
-    this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},CD:${clearableDefault},${conRes.isInProgress}`;
+    if (conRes.dbType === DBType.Mqtt) {
+      this.description += ` (${conRes.isConnected ? "connected" : "disconnected"})`;
+    }
+    const support = DBType.Mqtt !== conRes.dbType;
+    this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},CD:${clearableDefault},connected:${conRes.isConnected},support:${support},${conRes.isInProgress}`;
 
     this.command = {
       title: "Show resource property",
@@ -204,6 +219,13 @@ export class DBDatabaseItem extends vscode.TreeItem {
           scannable = true;
         }
         break;
+      case ResourceType.MqttDatabase:
+        {
+          const res = resource as MqttDatabase;
+          iconPath = new vscode.ThemeIcon("database");
+          scannable = false;
+        }
+        break;
       case ResourceType.Schema:
       case ResourceType.Owner:
         iconPath = new vscode.ThemeIcon("account");
@@ -231,6 +253,19 @@ export class DBDatabaseItem extends vscode.TreeItem {
             } else {
               description += ` ${dynamoTable.attr?.ItemCount} items`;
             }
+          }
+        }
+        break;
+      case ResourceType.Subscription:
+        {
+          const subscriptionRes = resource as DbSubscription;
+          if (subscriptionRes.isSubscribed) {
+            let numOfPayloads = subscriptionRes.meta?.numOfPayloads ?? 0;
+            iconPath = new vscode.ThemeIcon("pass");
+            description = ` ${numOfPayloads} payloads`;
+          } else {
+            iconPath = new vscode.ThemeIcon("output");
+            description = `(unsubscribed)`;
           }
         }
         break;
@@ -309,6 +344,10 @@ export class DBDatabaseItem extends vscode.TreeItem {
     this.description = description;
     let contextValue = resource.resourceType;
 
+    if (resource.resourceType === ResourceType.Subscription) {
+      const subscription = resource as DbSubscription;
+      contextValue += `,isSubscribed=${subscription.isSubscribed}`;
+    }
     contextValue += ",properties";
     if (showSessions) {
       contextValue += ",showSessions";
@@ -316,9 +355,11 @@ export class DBDatabaseItem extends vscode.TreeItem {
     if (scannable) {
       contextValue += ",scannable";
     }
+
     if (tooltip) {
       this.tooltip = tooltip;
     }
+
     this.contextValue = contextValue;
     this.command = {
       title: "Show resource property",

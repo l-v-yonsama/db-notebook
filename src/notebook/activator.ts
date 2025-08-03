@@ -2,6 +2,7 @@ import {
   DBType,
   isPartiQLType,
   isRDSType,
+  MqttQoS,
   ResourceType,
   separateMultipleQueries,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -27,6 +28,7 @@ import {
   CELL_EXECUTE_EXPLAIN,
   CELL_EXECUTE_EXPLAIN_ANALYZE,
   CELL_EXECUTE_QUERY,
+  CELL_MARK_CELL_AS_MQTT,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
   CELL_MARK_CELL_AS_SKIP,
   CELL_OPEN_HTTP_RESPONSE,
@@ -35,6 +37,10 @@ import {
   CELL_SPECIFY_CONNECTION_TO_USE,
   CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
   CELL_SPECIFY_LOG_GROUP_TO_USE,
+  CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN,
+  CELL_SPECIFY_MQTT_QOS_TO_USE,
+  CELL_SPECIFY_MQTT_RETAIN_TO_USE,
+  CELL_SPECIFY_MQTT_TOPIC_TO_USE,
   CELL_TOOLBAR_FORMAT,
   CELL_TOOLBAR_LM,
   CREATE_NEW_NOTEBOOK,
@@ -65,7 +71,8 @@ import {
   getToolbarButtonClickedNotebookEditor,
   hasAnyRdhOutputCell,
   isCwqlCell,
-  isJsonCell,
+  isJsonValueCell,
+  isMqttCell,
   isSqlCell,
 } from "../utilities/notebookUtil";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
@@ -187,7 +194,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         }
         const conSettings = await stateStorage.getConnectionSettingList();
         const items = conSettings
-          .filter((it) => isRDSType(it.dbType) || isPartiQLType(it.dbType, it.awsSetting))
+          .filter(
+            (it) =>
+              it.dbType === DBType.Mqtt ||
+              isRDSType(it.dbType) ||
+              isPartiQLType(it.dbType, it.awsSetting)
+          )
           .map((it) => ({
             label: it.name,
             description: it.dbType,
@@ -296,6 +308,14 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
   // Notebook cell statusbar commands
   {
+    const updateCellMetadata = async (cell: NotebookCell, metadata: CellMeta) => {
+      const edit = new WorkspaceEdit();
+      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
+      edit.set(cell.notebook.uri, [nbEdit]);
+
+      await workspace.applyEdit(edit);
+    };
+
     registerDisposableCommand(CELL_SPECIFY_CONNECTION_TO_USE, async (cell?: NotebookCell) => {
       let targetCells: NotebookCell[] = [];
       if (cell === null || cell === undefined) {
@@ -306,7 +326,17 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       const conSettings = await stateStorage.getConnectionSettingList();
       const items = conSettings
-        .filter((it) => isRDSType(it.dbType) || isPartiQLType(it.dbType, it.awsSetting))
+        .filter((it) => {
+          if (isMqttCell(targetCells[0])) {
+            return it.dbType === DBType.Mqtt;
+          } else {
+            return (
+              it.dbType === DBType.Mqtt ||
+              isRDSType(it.dbType) ||
+              isPartiQLType(it.dbType, it.awsSetting)
+            );
+          }
+        })
         .map((it) => ({
           label: it.name,
           description: it.dbType,
@@ -326,14 +356,159 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
           } else {
             metadata.connectionName = result.label;
           }
-          const edit = new WorkspaceEdit();
-          const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-          edit.set(cell.notebook.uri, [nbEdit]);
+          await updateCellMetadata(cell, metadata);
 
-          await workspace.applyEdit(edit);
           resetCellContext(cell);
         });
       }
+    });
+
+    registerDisposableCommand(CELL_MARK_CELL_AS_MQTT, async (cell: NotebookCell) => {
+      let tooltip = "";
+
+      const { publishParams }: CellMeta = cell.metadata;
+      if (publishParams) {
+        if (cell.document.languageId === "json") {
+          tooltip = "Mark cell as General JSON";
+        } else {
+          tooltip = "Mark cell as General Plain text";
+        }
+      } else {
+        if (cell.document.languageId === "json") {
+          tooltip = "Mark cell as MQTT";
+        } else {
+          tooltip = "Mark cell as MQTT";
+        }
+      }
+      const answer = await window.showInformationMessage(
+        `Are you sure to ${tooltip}?`,
+        "YES",
+        "NO"
+      );
+      if (answer !== "YES") {
+        return;
+      }
+
+      const metadata: CellMeta = {
+        ...cell.metadata,
+      };
+      if (metadata.publishParams) {
+        delete metadata.publishParams;
+      } else {
+        metadata.publishParams = {
+          qos: 0,
+          retain: false,
+          topicName: "",
+        };
+      }
+      await updateCellMetadata(cell, metadata);
+    });
+
+    registerDisposableCommand(CELL_SPECIFY_MQTT_TOPIC_TO_USE, async (cell: NotebookCell) => {
+      const { publishParams }: CellMeta = cell.metadata;
+      if (!publishParams) {
+        return;
+      }
+
+      const result = await window.showInputBox({
+        title: "Specify topic name",
+        placeHolder: "Enter topic name(e.g. sensor/temp)",
+        prompt:
+          "Spaces, control characters, consecutive slashes, '+', and '#' are not allowed in subscription topic names.",
+        value: "",
+        validateInput: (input: string): string | undefined => {
+          if (!input || input.trim() === "") {
+            return "Topic name must not be empty!";
+          }
+          if (input.includes(" ")) {
+            return "Topic name must not contain spaces!";
+          }
+          if (/[\u0000-\u001F\u007F]/.test(input)) {
+            return "Topic name must not contain control characters!";
+          }
+          if (input.includes("//")) {
+            return "Topic name must not contain consecutive slashes!";
+          }
+          if (input.includes("+") || input.includes("#")) {
+            return "Topic name must not contain '+' or '#'.";
+          }
+          return undefined;
+        },
+      });
+
+      if (result === undefined) {
+        return;
+      }
+      if (result) {
+        if (publishParams.topicName === result) {
+          return;
+        }
+        const metadata: CellMeta = {
+          ...cell.metadata,
+        };
+
+        metadata.publishParams!.topicName = result;
+
+        await updateCellMetadata(cell, metadata);
+      }
+    });
+
+    registerDisposableCommand(CELL_SPECIFY_MQTT_QOS_TO_USE, async (cell: NotebookCell) => {
+      const { publishParams }: CellMeta = cell.metadata;
+      if (!publishParams) {
+        return;
+      }
+
+      const items = [
+        { label: "0", description: "(at most once)" },
+        { label: "1", description: "(at least once)" },
+        { label: "2", description: "(exactoly once)" },
+      ];
+      const result = await window.showQuickPick(items);
+      if (result) {
+        const resultQos = Number(result.label) as MqttQoS;
+        if (publishParams?.qos === resultQos) {
+          return;
+        }
+        const metadata: CellMeta = {
+          ...cell.metadata,
+        };
+
+        metadata.publishParams!.qos = resultQos;
+
+        await updateCellMetadata(cell, metadata);
+      }
+    });
+
+    registerDisposableCommand(CELL_SPECIFY_MQTT_RETAIN_TO_USE, async (cell: NotebookCell) => {
+      const { publishParams }: CellMeta = cell.metadata;
+      if (!publishParams) {
+        return;
+      }
+
+      publishParams.retain = !publishParams.retain;
+      const metadata: CellMeta = {
+        ...cell.metadata,
+      };
+
+      await updateCellMetadata(cell, metadata);
+    });
+
+    registerDisposableCommand(CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN, async (cell: NotebookCell) => {
+      let { subscribeParams }: CellMeta = cell.metadata;
+      if (!subscribeParams) {
+        subscribeParams = {
+          expandJsonColumn: false,
+        };
+      }
+
+      subscribeParams.expandJsonColumn = !subscribeParams.expandJsonColumn;
+      const metadata: CellMeta = {
+        ...cell.metadata,
+        subscribeParams,
+      };
+
+      await updateCellMetadata(cell, metadata);
     });
 
     registerDisposableCommand(CELL_SPECIFY_LOG_GROUP_TO_USE, async (cell: NotebookCell) => {
@@ -370,11 +545,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         } else {
           metadata.logGroupName = result.label;
         }
-        const edit = new WorkspaceEdit();
-        const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-        edit.set(cell.notebook.uri, [nbEdit]);
-
-        workspace.applyEdit(edit);
+        await updateCellMetadata(cell, metadata);
       }
     });
 
@@ -437,11 +608,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
           } else {
             metadata.logGroupStartTimeOffset = result.label as any;
           }
-          const edit = new WorkspaceEdit();
-          const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-          edit.set(cell.notebook.uri, [nbEdit]);
-
-          workspace.applyEdit(edit);
+          await updateCellMetadata(cell, metadata);
         }
       }
     );
@@ -490,11 +657,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         } else {
           metadata.markAsSkip = true;
         }
-        const edit = new WorkspaceEdit();
-        const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-        edit.set(cell.notebook.uri, [nbEdit]);
-
-        workspace.applyEdit(edit);
+        updateCellMetadata(cell, metadata);
       });
     });
     registerDisposableCommand(CELL_MARK_CELL_AS_PRE_EXECUTION, async (cell: NotebookCell) => {
@@ -506,11 +669,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       } else {
         metadata.markAsRunInOrderAtJsonCell = true;
       }
-      const edit = new WorkspaceEdit();
-      const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
-      edit.set(cell.notebook.uri, [nbEdit]);
-
-      await workspace.applyEdit(edit);
+      await updateCellMetadata(cell, metadata);
     });
 
     registerDisposableCommand(CELL_SHOW_METADATA_SETTINGS, async (cell: NotebookCell) => {
@@ -535,9 +694,16 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       if (isSqlCell(cell)) {
         edit = new TextEdit(range, sqlFormatter.format(doc.getText(), getFormatterConfig()));
-      } else if (isJsonCell(cell)) {
+      } else if (isJsonValueCell(cell)) {
         const jsonObj = JSON.parse(doc.getText());
         edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
+      } else if (isMqttCell(cell)) {
+        if (doc.languageId === "json") {
+          const jsonObj = JSON.parse(doc.getText());
+          edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
+        } else {
+          return;
+        }
       } else {
         return;
       }

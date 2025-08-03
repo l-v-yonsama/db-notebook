@@ -31,7 +31,7 @@ import {
 import { NOTEBOOK_TYPE } from "../constant";
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
-import { isJsCell, isJsonCell, isSqlCell } from "../utilities/notebookUtil";
+import { isJsCell, isJsonValueCell, isSqlCell } from "../utilities/notebookUtil";
 import { setCloudwatchQueryCompletionItems } from "./intellisenses/awsCloudwatchQuery";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
@@ -45,6 +45,11 @@ const throttleFunc = throttle(300, async (connectionName: string): Promise<void>
   log(`  ${PREFIX} start throttleFunc`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
     log(`  ${PREFIX} end throttleFunc. No connection setting.`);
+    return;
+  }
+
+  if (storage.getDBTypeByConnectionName(connectionName) === DBType.Mqtt) {
+    log(`  ${PREFIX} end throttleFunc. Mqtt is not supported.`);
     return;
   }
   const { ok, result } = await storage.loadResource(connectionName, false, false);
@@ -220,7 +225,7 @@ function getStoreKeys(): string[] {
       });
   });
   cells
-    .filter((it) => isJsonCell(it))
+    .filter((it) => isJsonValueCell(it))
     .forEach((it) => {
       try {
         Object.keys(JSON.parse(it.document.getText())).forEach((k) => keys.add(k));

@@ -38,6 +38,15 @@ export type LMResult = {
   elapsedTime: number;
 };
 
+export type MqttPublishResult = {
+  ok: boolean;
+  message?: string;
+  elapsedTime: number;
+  payloadLength: number;
+  subscription: string;
+  messageId?: number;
+};
+
 export type RunResultMetadata = {
   tableName?: string;
   type?: string;
@@ -46,6 +55,7 @@ export type RunResultMetadata = {
   analyzedRdh?: ResultSetData;
   axiosEvent?: NodeRunAxiosEvent;
   lmResult?: LMResult;
+  mqttPublishResult?: MqttPublishResult;
   updateJSONCellValues?: JSONCellValues[];
   [key: string]: any;
 };

@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0. Evaluate SQL statements with AI.",
-  "version": "0.8.10",
+  "version": "0.8.11",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -172,6 +172,11 @@
           "id": "database-notebook-view-tools",
           "title": "Tools",
           "icon": "$(symbol-numeric)"
+        },
+        {
+          "id": "database-notebook-view-subscription-payloads",
+          "title": "Subscription payloads",
+          "icon": "$(symbol-numeric)"
         }
       ]
     },
@@ -250,6 +255,15 @@
           "contextualTitle": "Tools",
           "when": "database-notebook.view.bottom.tools.visible"
         }
+      ],
+      "database-notebook-view-subscription-payloads": [
+        {
+          "type": "webview",
+          "id": "database-notebook.view.bottom.subscription-payloads",
+          "name": "Subscription payloads",
+          "contextualTitle": "Payloads",
+          "when": "database-notebook.view.bottom.subscription-payloads.visible"
+        }
       ]
     },
     "menus": {
@@ -266,22 +280,102 @@
       "view/item/context": [
         {
           "command": "database-notebook.retrieve-resources",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false$/",
           "group": "inline"
         },
         {
           "command": "database-notebook.retrieve-resources",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false$/",
           "group": "others@3"
         },
         {
+          "command": "database-notebook.connect",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:false,support:false,false$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.connect",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:false,support:false,false$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.disconnect",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:true,support:false,false$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.disconnect",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:true,support:false,false$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.add-subscription",
+          "when": "view == database-notebook-connections && viewItem =~ /^MqttDatabase.*$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.add-subscription",
+          "when": "view == database-notebook-connections && viewItem =~ /^MqttDatabase.*$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.remove-subscription",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=false.*$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.remove-subscription",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=false.*$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.edit-subscription",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=false.*$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.edit-subscription",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=false.*$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.subscribe",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=false.*$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.subscribe",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=false.*$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.unsubscribe",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=true.*$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.unsubscribe",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*isSubscribed=true.*$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.show-publish-editor-panel",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.show-publish-editor-panel",
+          "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*/",
+          "group": "z-record-rule@8"
+        },
+        {
           "command": "database-notebook.specify-default-connection-for-sql-cell",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:false.+$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:false.*support:true,.+$/",
           "group": "others@4"
         },
         {
           "command": "database-notebook.clear-default-connection-for-sql-cell",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:true.+$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:true.*support:true,.+$/",
           "group": "others@4"
         },
         {
@@ -619,6 +713,11 @@
         "category": "create-script"
       },
       {
+        "command": "database-notebook.show-publish-editor-panel",
+        "title": "Open publish editor",
+        "icon": "$(empty-window)"
+      },
+      {
         "command": "database-notebook.create-connection-setting",
         "title": "Create connection setting",
         "icon": "$(add)",
@@ -650,13 +749,43 @@
       },
       {
         "command": "database-notebook.connect",
-        "title": "Connect to Database",
+        "title": "Connect",
         "icon": "$(pass)",
         "category": "connect-disconnect"
       },
       {
         "command": "database-notebook.disconnect",
-        "title": "Disconnect to Database",
+        "title": "Disconnect",
+        "icon": "$(error)",
+        "category": "connect-disconnect"
+      },
+      {
+        "command": "database-notebook.add-subscription",
+        "title": "New Subscription",
+        "icon": "$(add)",
+        "category": "connect-disconnect"
+      },
+      {
+        "command": "database-notebook.remove-subscription",
+        "title": "Remove Subscription",
+        "icon": "$(trash)",
+        "category": "connect-disconnect"
+      },
+      {
+        "command": "database-notebook.edit-subscription",
+        "title": "Edit Subscription",
+        "icon": "$(edit)",
+        "category": "connect-disconnect"
+      },
+      {
+        "command": "database-notebook.subscribe",
+        "title": "Subscribe",
+        "icon": "$(play-circle)",
+        "category": "connect-disconnect"
+      },
+      {
+        "command": "database-notebook.unsubscribe",
+        "title": "Unsubscribe",
         "icon": "$(error)",
         "category": "connect-disconnect"
       },
@@ -1096,8 +1225,8 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.9.30",
-    "@l-v-yonsama/rdh": "^0.2.6",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.10.24",
+    "@l-v-yonsama/rdh": "^0.2.8",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

@@ -10,6 +10,7 @@ import {
   DbS3Bucket,
   DbSQSQueue,
   DbSchema,
+  DbSubscription,
   GeneralResult,
   IamClient,
   IamGroup,
@@ -207,6 +208,14 @@ export class StateStorage {
               };
             });
         }
+        // for mqtt resource ---------
+        dbRes
+          .findChildren<DbSubscription>({ resourceType: ResourceType.Subscription })
+          .forEach((client) => {
+            client.meta = {
+              conName: conRes.name,
+            };
+          });
       }
       this.resMap.set(connectionName, { isInProgress: false, res: result });
       ret.result = { db: result, dbType };
@@ -217,6 +226,10 @@ export class StateStorage {
       ret.message = message;
     }
     return ret;
+  }
+
+  resetResource(connectionName: string, databases: DbDatabase[]) {
+    this.resMap.set(connectionName, { isInProgress: false, res: databases });
   }
 
   constructor(private context: ExtensionContext, private secretStorage: SecretStorage) {}

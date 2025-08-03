@@ -12,10 +12,19 @@ export const BOTTOM_DIFF_MDH_VIEWID = `${EXTENSION_NAME}.view.bottom.diff-mdh`;
 export const BOTTOM_CHARTS_VIEWID = `${EXTENSION_NAME}.view.bottom.charts`;
 export const BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID = `${EXTENSION_NAME}.view.bottom.count-for-all-tables`;
 export const BOTTOM_TOOLS_VIEWID = `${EXTENSION_NAME}.view.bottom.tools`;
+export const BOTTOM_TOPIC_PAYLOADS_VIEWID = `${EXTENSION_NAME}.view.bottom.subscription-payloads`;
 
 //---------------------------------------------------
 // RESOURCE TREE
 //---------------------------------------------------
+export const CONNECT = `${EXTENSION_NAME}.connect`;
+export const DISCONNECT = `${EXTENSION_NAME}.disconnect`;
+export const SUBSCRIBE = `${EXTENSION_NAME}.subscribe`;
+export const UNSUBSCRIBE = `${EXTENSION_NAME}.unsubscribe`;
+export const ADD_SUBSCRIPTION = `${EXTENSION_NAME}.add-subscription`;
+export const EDIT_SUBSCRIPTION = `${EXTENSION_NAME}.edit-subscription`;
+export const REMOVE_SUBSCRIPTION = `${EXTENSION_NAME}.remove-subscription`;
+
 export const REFRESH_RESOURCES = `${EXTENSION_NAME}.refresh-resources`;
 export const RETRIEVE_RESOURCES = `${EXTENSION_NAME}.retrieve-resources`;
 export const SPECIFY_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.specify-default-connection-for-sql-cell`;
@@ -33,6 +42,7 @@ export const DELETE_CONNECTION_SETTING = `${EXTENSION_NAME}.delete-connection-se
 
 export const SHOW_SCAN_PANEL = `${EXTENSION_NAME}.show-scan-panel`;
 export const SHOW_DYNAMO_QUERY_PANEL = `${EXTENSION_NAME}.show-dynamo-query-panel`;
+export const SHOW_PUBLISH_EDITOR_PANEL = `${EXTENSION_NAME}.show-publish-editor-panel`;
 export const SHOW_METADATA_RDH = `${EXTENSION_NAME}.show-metadata-rdh`;
 export const SHOW_RESOURCE_PROPERTIES = `${EXTENSION_NAME}.show-resource-properties`;
 export const CREATE_ER_DIAGRAM = `${EXTENSION_NAME}.create-er-diagram`;
@@ -62,6 +72,10 @@ export const OPEN_DIFF_MDH_VIEWER = `${EXTENSION_NAME}.open-diff-mdh-viewer`;
 export const OPEN_CHARTS_VIEWER = `${EXTENSION_NAME}.open-diff-charts`;
 export const OPEN_COUNT_FOR_ALL_TABLES_VIEWER = `${EXTENSION_NAME}.open-count-for-all-tables-viewer`;
 export const OPEN_TOOLS_VIEWER = `${EXTENSION_NAME}.open-tools-viewer`;
+export const OPEN_SUBSCRIPTION_PAYLOADS_VIEWER = `${EXTENSION_NAME}.open-subscription-payloads-viewer`;
+export const SET_SUBSCRIPTION_PAYLOADS_VIEWER = `${EXTENSION_NAME}.set-subscription-payloads-viewer`;
+export const CLOSE_SUBSCRIPTION_PAYLOADS_VIEWER = `${EXTENSION_NAME}.close-subscription-payloads-viewer`;
+export const UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER = `${EXTENSION_NAME}.update-subscription-res-at-payloads-viewer`;
 
 //---------------------------------------------------
 // NOTE BOOK
@@ -86,6 +100,12 @@ export const CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE = `${EXTENSION_NAME
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
 export const CELL_OPEN_HTTP_RESPONSE = `${EXTENSION_NAME}.cell.open-http-response`;
 export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;
+
+export const CELL_MARK_CELL_AS_MQTT = `${EXTENSION_NAME}.cell.mark-cell-as-mqtt`;
+export const CELL_SPECIFY_MQTT_QOS_TO_USE = `${EXTENSION_NAME}.cell.specify-mqtt-qos-to-use`;
+export const CELL_SPECIFY_MQTT_TOPIC_TO_USE = `${EXTENSION_NAME}.cell.specify-mqtt-subscription-to-use`;
+export const CELL_SPECIFY_MQTT_RETAIN_TO_USE = `${EXTENSION_NAME}.cell.specify-mqtt-retain-to-use`;
+export const CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN = `${EXTENSION_NAME}.cell.specify-mqtt-expand-json-column`;
 
 // NOTEBOOK CELL EXECUTE
 export const CELL_EXECUTE_QUERY = `${EXTENSION_NAME}.cell-execute-query`;

@@ -6,6 +6,7 @@ import { Auth0ElementSetting } from "./Auth0ElementSetting";
 import { AwsElementSetting } from "./AwsElementSetting";
 import type { BaseElementSetting } from "./BaseElementSetting";
 import { KeycloakElementSetting } from "./KeycloakElementSetting";
+import { MqttElementSetting } from "./MqttElementSetting";
 import {
   MysqlElementSetting,
   PostgresElementSetting,
@@ -27,6 +28,8 @@ export class ElementSettingFactory {
     switch (dbType) {
       case "Aws":
         return new AwsElementSetting({ awsCredentialType });
+      case "Mqtt":
+        return new MqttElementSetting();
       case "Redis":
         return new RedisElementSetting();
       case "Auth0":

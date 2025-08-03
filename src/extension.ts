@@ -12,17 +12,23 @@ import {
   BOTTOM_DIFF_MDH_VIEWID,
   BOTTOM_MDH_VIEWID,
   BOTTOM_TOOLS_VIEWID,
+  BOTTOM_TOPIC_PAYLOADS_VIEWID,
+  CLOSE_SUBSCRIPTION_PAYLOADS_VIEWER,
   EXTENSION_NAME,
   OPEN_CHARTS_VIEWER,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DIFF_MDH_VIEWER,
   OPEN_MDH_VIEWER,
+  OPEN_SUBSCRIPTION_PAYLOADS_VIEWER,
   OPEN_TOOLS_VIEWER,
+  SET_SUBSCRIPTION_PAYLOADS_VIEWER,
   SHOW_CSV,
   SHOW_HAR,
+  UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER,
 } from "./constant";
 import { HelpProvider } from "./help/HelpProvider";
 import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
+import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
@@ -30,17 +36,25 @@ import { DynamoQueryPanel } from "./panels/DynamoQueryPanel";
 import { HarFilePanel } from "./panels/HarFilePanel";
 import { LMPromptCreatePanel } from "./panels/LMPromptCreatePanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
+import { PublishEditorPanel } from "./panels/PublishEditorPanel";
 import { ScanPanel } from "./panels/ScanPanel";
+import { SubscriptionSettingPanel } from "./panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
 import { activateRuleEditor } from "./ruleEditor/activator";
-import { ChartsViewParams, DiffMdhViewTabParam, MdhViewParams } from "./types/views";
+import {
+  ChartsViewParams,
+  DiffMdhViewTabParam,
+  MdhViewParams,
+  SubscriptionPayloadsViewParams,
+} from "./types/views";
 import { initializeStoragePath } from "./utilities/fsUtil";
 import { activateLogger, log, setupDisposeLogger } from "./utilities/logger";
 import { ChartsViewProvider } from "./views/ChartsViewProvider";
 import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
 import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
 import { MdhViewProvider } from "./views/MdhViewProvider";
+import { SubscriptionPayloadsViewProvider } from "./views/SubscriptionPayloadsViewProvider";
 import { ToolsViewParams, ToolsViewProvider } from "./views/ToolsViewProvider";
 
 const PREFIX = "[extension]";
@@ -67,11 +81,14 @@ export async function activate(context: ExtensionContext) {
 
   ScanPanel.setStateStorage(stateStorage);
   DynamoQueryPanel.setStateStorage(stateStorage);
+  MqttDriverManager.setDbResourceTreeProvider(dbResourceTree);
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
   HarFilePanel.setStateStorage(stateStorage);
   LMPromptCreatePanel.setStateStorage(stateStorage);
   Chat2QueryPanel.setStateStorage(stateStorage);
+  PublishEditorPanel.setStateStorage(stateStorage);
+  SubscriptionSettingPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
@@ -175,6 +192,47 @@ export async function activate(context: ExtensionContext) {
     registerDisposableCommand(OPEN_TOOLS_VIEWER, async (params: ToolsViewParams) => {
       toolsViewProvider.render(params);
     });
+
+    // Topic payloads View
+    const subscriptionPayloadsViewProvider = new SubscriptionPayloadsViewProvider(
+      BOTTOM_TOPIC_PAYLOADS_VIEWID,
+      context,
+      stateStorage
+    );
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(
+        subscriptionPayloadsViewProvider.viewId,
+        subscriptionPayloadsViewProvider
+      )
+    );
+
+    registerDisposableCommand(
+      OPEN_SUBSCRIPTION_PAYLOADS_VIEWER,
+      async (params: SubscriptionPayloadsViewParams) => {
+        subscriptionPayloadsViewProvider.render(params);
+      }
+    );
+
+    registerDisposableCommand(
+      CLOSE_SUBSCRIPTION_PAYLOADS_VIEWER,
+      async (params: SubscriptionPayloadsViewParams) => {
+        subscriptionPayloadsViewProvider.hide(params);
+      }
+    );
+
+    registerDisposableCommand(
+      UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER,
+      async (params: SubscriptionPayloadsViewParams) => {
+        subscriptionPayloadsViewProvider.updateSubscriptionRes(params);
+      }
+    );
+
+    registerDisposableCommand(
+      SET_SUBSCRIPTION_PAYLOADS_VIEWER,
+      async (params: SubscriptionPayloadsViewParams) => {
+        subscriptionPayloadsViewProvider.setResult(params);
+      }
+    );
   }
 
   log(`${PREFIX} end activation.`);
@@ -201,6 +259,11 @@ export async function deactivate() {
   log(`⭐️⭐️${PREFIX} deactivate`);
   try {
     await DBDriverResolver.getInstance().closeAll();
+  } catch (e) {
+    console.error(PREFIX, e);
+  }
+  try {
+    await MqttDriverManager.closeAll();
   } catch (e) {
     console.error(PREFIX, e);
   }

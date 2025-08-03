@@ -5,6 +5,7 @@ import type {
   DbResource,
   DbSchema,
   DbTable,
+  MqttQoS,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type {
@@ -45,9 +46,12 @@ export type MessageEventData =
   | HttpEventPanelEventData
   | LMPromptCreatePanelEventData
   | MdhViewEventData
+  | PublishEditorPanelEventData
+  | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | RecordRuleEditorEventData
   | ScanPanelEventData
+  | SubscriptionSettingPanelEventData
   | ToolsViewEventData
   | VariablesPanelEventData
   | ViewConditionPanelEventData
@@ -161,6 +165,25 @@ export type DynamoQueryPanelEventData = BaseMessageEventData<
       sortDesc: boolean;
       filters: DynamoQueryFilter[];
       columnItems: { value: string | number; label: string }[];
+    };
+    setPreviewInput?: {
+      previewInput: string;
+    };
+  }
+>;
+
+export type PublishEditorPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-preview-input" | "change-status",
+  "PublishEditorPanel",
+  {
+    initialize?: {
+      conName: string;
+      subscriptionName: string;
+      langType: "plain" | "json" | "javascript";
+      numOfPayloads: number;
+    };
+    changeStatus?: {
+      connected: boolean;
     };
     setPreviewInput?: {
       previewInput: string;
@@ -292,6 +315,22 @@ export type ScanPanelEventData = BaseMessageEventData<
     addTabItem?: ScanTabItem;
     removeTabItem?: {
       tabId: string;
+    };
+  }
+>;
+
+export type SubscriptionSettingPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "SubscriptionSettingPanel",
+  {
+    initialize?: {
+      name: string;
+      qos: MqttQoS;
+      nl: boolean;
+      rap: boolean;
+      rh: number;
+      isNew: boolean;
+      allTopicNames: string[];
     };
   }
 >;
@@ -472,6 +511,22 @@ export type ChartsViewEventData = BaseMessageEventData<
   }
 >;
 
+export type SubscriptionPayloadsViewEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "initialize",
+  "SubscriptionPayloadsView",
+  {
+    searchResult?: {
+      isSubscribed: boolean;
+      rdh: ResultSetData | null;
+    };
+    initialize?: {
+      subscriptionName: string;
+      isSubscribed: boolean;
+      rdh: ResultSetData | null;
+    };
+  }
+>;
+
 export type RecordRuleEditorEventData = BaseMessageEventData<
   BaseMessageEventDataCommand,
   "RecordRuleEditor",
@@ -510,6 +565,7 @@ export type DBFormEventDataValue = {
     [key: string]: any;
   };
   selectedFilePath?: string;
+  targetAttribute?: string;
 };
 
 export type DBFormEventData = BaseMessageEventData<

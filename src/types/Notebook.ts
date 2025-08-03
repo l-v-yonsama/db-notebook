@@ -1,3 +1,4 @@
+import type { MqttQoS } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { NotebookCellKind, Uri } from "vscode";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
@@ -28,6 +29,16 @@ export type CellMetaChart = {
   data4?: string;
 };
 
+export type PublishParams = {
+  topicName: string;
+  qos: MqttQoS;
+  retain: boolean;
+};
+
+export type SubscribeParams = {
+  expandJsonColumn: boolean;
+};
+
 export type CellMeta = {
   markAsSkip?: boolean;
   markAsRunInOrderAtJsonCell?: boolean;
@@ -41,6 +52,8 @@ export type CellMeta = {
   logGroupStartTimeOffset?: "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "12h" | "1d" | "1w";
   chart?: CellMetaChart;
   lmPromptCreateConditions?: LMPromptCreateConditions;
+  publishParams?: PublishParams;
+  subscribeParams?: SubscribeParams;
   readonly [key: string]: any;
 };
 

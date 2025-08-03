@@ -30,6 +30,7 @@ import { getOutputConfig, getToStringParamByConfig } from "./configUtil";
 import { writeToResourceOnStorage } from "./fsUtil";
 import { createResponseBodyMarkdown } from "./httpUtil";
 import { logError } from "./logger";
+import { isMarkupCell } from "./notebookUtil";
 const PREFIX = "[utilities/htmlGenerator]";
 
 type CreateHtmlOptionsParams = {
@@ -541,12 +542,23 @@ const createHtml = async (
 
       htmlContents.push(`<div class="wrapper cellIdx${idx} compact" >`);
 
-      htmlContents.push(
-        `<h4 class="title is-4" ><a name="cell${idx + 1}">${isCellOrigin ? "CELL" : "No"}${
-          idx + 1
-        }</a></h4>`
-      );
-      if (cell.kind === NotebookCellKind.Markup) {
+      if (cellMeta.publishParams?.topicName) {
+        const subscriptionName = cellMeta.publishParams.topicName ?? "";
+        htmlContents.push(
+          `<h4 class="title is-4" ><a name="cell${idx + 1}">${isCellOrigin ? "CELL" : "No"}${
+            idx + 1
+          }<span style="padding:10px; font-size:medium;">TOPIC: ${escapeHtml(
+            subscriptionName
+          )}</span></a></h4>`
+        );
+      } else {
+        htmlContents.push(
+          `<h4 class="title is-4" ><a name="cell${idx + 1}">${isCellOrigin ? "CELL" : "No"}${
+            idx + 1
+          }</a></h4>`
+        );
+      }
+      if (isMarkupCell(cell)) {
         htmlContents.push(`<div id="${id}" class="block">`);
         htmlContents.push("</div>");
         markdownValues[id] = { lang: "Markup", s: escapeHtml(cell.document.getText()) };
@@ -747,6 +759,19 @@ const createHtml = async (
                   ),
                 };
               }
+              if (metadata.mqttPublishResult) {
+                const { subscription, payloadLength, elapsedTime } = metadata.mqttPublishResult;
+                htmlContents.push(
+                  `<div class="notification is-primary is-light" style="padding:10px; margin-bottom:10px;font-size:small;">`
+                );
+                const result = `[Elapsed Time]:${prettyTime(
+                  elapsedTime
+                )} [Payload Length]:${payloadLength}`;
+                htmlContents.push(
+                  `<span class="tag is-primary is-light">Result</span> ${escapeHtml(result)}`
+                );
+                htmlContents.push(`</div>`);
+              }
               if (metadata.lmResult) {
                 htmlContents.push(
                   `<div class="notification is-primary is-light" style="padding:10px; margin-bottom:10px;font-size:small;">`
@@ -805,7 +830,7 @@ const createHtml = async (
 };
 
 const getTocInfoHtml = (cell: NotebookCell): string => {
-  if (cell.kind === NotebookCellKind.Markup) {
+  if (isMarkupCell(cell)) {
     return '<span class="tag is-info is-light">Markdown</span>';
   }
   let s = `<span class="tag is-info is-light">${cell.document.languageId}</span>`;
@@ -814,6 +839,7 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
     s += '<span class="tag is-info is-light">Not executed</span>';
     return s;
   }
+  // SKIPPED CELL ------
   if (
     cell.outputs.some(
       (it) =>
@@ -824,6 +850,8 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
     s += '<span class="tag is-warning is-light">Skipped</span>';
     return s;
   }
+
+  // LM RESULET CELL -------
   if (cell.outputs.some((it) => (it.metadata as RunResultMetadata)?.lmResult !== undefined)) {
     s += '<span class="tag is-warning is-light">Evaluated</span>';
     return s;
@@ -839,7 +867,7 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
   cell.outputs.forEach((output, idx3) => {
     if (output.metadata) {
       const metadata: RunResultMetadata = output.metadata;
-      const { rdh, axiosEvent } = metadata;
+      const { rdh, axiosEvent, mqttPublishResult } = metadata;
       if (rdh) {
         if (rdh.meta.type) {
           s += `<span class="tag is-info is-light">${escapeHtml(rdh.meta.type)}</span>`;
@@ -858,6 +886,10 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
         const { response, request } = axiosEvent.entry;
         s += createAxiosTocInfoHtml(response, request.method, request.url, axiosEvent.entry.time);
       }
+      if (mqttPublishResult) {
+        const { subscription } = mqttPublishResult;
+        s += `<span class="tag is-info is-light">${subscription}</span>`;
+      }
     }
     if (hasError) {
       const item = output.items.find((it) =>
@@ -873,6 +905,13 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
         s += `<span class="tag is-primary is-light">Query Result</span> ${escapeHtml(
           output.metadata.rdh.summary?.info ?? ""
         )}`;
+      }
+      if (output.metadata?.mqttPublishResult) {
+        const { payloadLength, elapsedTime } = output.metadata.mqttPublishResult;
+        const result = `[Elapsed Time]:${prettyTime(
+          elapsedTime
+        )} [Payload Length]:${payloadLength}`;
+        s += `<span class="tag is-primary is-light">Result</span> ${escapeHtml(result)}`;
       }
     }
   });

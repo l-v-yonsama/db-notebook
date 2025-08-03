@@ -18,9 +18,12 @@ import ToolsView from "./components/views/ToolsView.vue";
 
 import DynamoQueryPanel from "./components/DynamoQueryPanel.vue";
 import NotebookCellMetadataPanel from "./components/NotebookCellMetadataPanel.vue";
+import PublishEditorPanel from "./components/PublishEditorPanel.vue";
 import ScanPanel from "./components/ScanPanel.vue";
+import SubscriptionSettingPanel from "./components/SubscriptionSettingPanel.vue";
 import VariablesPanel from "./components/VariablesPanel.vue";
 import ViewConditionPanel from "./components/ViewConditionPanel.vue";
+import SubscriptionPayloadsView from "./components/views/SubscriptionPayloadsView.vue";
 import WriteHttpEventToClipboardParamsPanel from "./components/WriteHttpEventToClipboardParamsPanel.vue";
 
 import CodeResolverEditor from "./components/CodeResolverEditor.vue";
@@ -52,6 +55,10 @@ const notebookCellMetadataPanelRef = ref<InstanceType<typeof NotebookCellMetadat
 const eRDiagramSettingsPanelRef = ref<InstanceType<typeof ERDiagramSettingsVue>>();
 const recordRuleEditorRef = ref<InstanceType<typeof RecordRuleEditor>>();
 const codeResolverEditorRef = ref<InstanceType<typeof CodeResolverEditor>>();
+const publishEditorPanelRef = ref<InstanceType<typeof PublishEditorPanel>>();
+const subscriptionPayloadsViewRef = ref<InstanceType<typeof SubscriptionPayloadsView>>();
+const subscriptionSettingPanelRef = ref<InstanceType<typeof SubscriptionSettingPanel>>();
+
 
 const currentComponentName = window.document.title as ComponentName;
 
@@ -87,6 +94,15 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
       break;
     case "HttpEventPanel":
       httpEventPanelRef.value?.recieveMessage(data);
+      break;
+    case "PublishEditorPanel":
+      publishEditorPanelRef.value?.recieveMessage(data);
+      break;
+    case "SubscriptionPayloadsView":
+      subscriptionPayloadsViewRef.value?.recieveMessage(data);
+      break;
+    case "SubscriptionSettingPanel":
+      subscriptionSettingPanelRef.value?.recieveMessage(data);
       break;
     case "LMPromptCreatePanel":
       lMPromptCreatePanelRef.value?.recieveMessage(data);
@@ -157,6 +173,14 @@ onMounted(() => {
     <ScanPanel v-if="currentComponentName === 'ScanPanel'" ref="scanPanelRef" />
 
     <DynamoQueryPanel v-if="currentComponentName === 'DynamoQueryPanel'" ref="dynamoQueryPanelRef" />
+
+    <PublishEditorPanel v-if="currentComponentName === 'PublishEditorPanel'" ref="publishEditorPanelRef" />
+
+    <SubscriptionPayloadsView v-if="currentComponentName === 'SubscriptionPayloadsView'"
+      ref="subscriptionPayloadsViewRef" />
+
+    <SubscriptionSettingPanel v-if="currentComponentName === 'SubscriptionSettingPanel'"
+      ref="subscriptionSettingPanelRef" />
 
     <ViewConditionPanel v-if="currentComponentName === 'ViewConditionPanel'" ref="viewConditionPanelRef" />
 

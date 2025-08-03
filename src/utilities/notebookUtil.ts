@@ -8,6 +8,10 @@ import { stringConditionToJsonCondition } from "@l-v-yonsama/multi-platform-data
 import { ResultSetData } from "@l-v-yonsama/rdh";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 
+export const isMarkupCell = (cell: NotebookCell): boolean => {
+  return cell.kind === NotebookCellKind.Markup;
+};
+
 export const isSqlCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "sql";
 };
@@ -18,6 +22,22 @@ export const isCwqlCell = (cell: NotebookCell): boolean => {
 
 export const isJsCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "javascript";
+};
+
+export const isJsonValueCell = (cell: NotebookCell): boolean => {
+  const meta = cell.metadata as CellMeta;
+  if (meta.publishParams) {
+    return false;
+  }
+  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "json";
+};
+
+export const isMqttCell = (cell: NotebookCell): boolean => {
+  if (isJsCell(cell)) {
+    return false;
+  }
+  const meta = cell.metadata as CellMeta;
+  return cell.kind === NotebookCellKind.Code && !!meta.publishParams;
 };
 
 export const hasAnyRdhOutputCell = (cell: NotebookCell): boolean => {
@@ -34,12 +54,8 @@ export const hasAnyRdhOutputCell = (cell: NotebookCell): boolean => {
   return true;
 };
 
-export const isJsonCell = (cell: NotebookCell): boolean => {
-  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "json";
-};
-
 export const isPreExecution = (cell: NotebookCell): boolean => {
-  if (!isJsonCell(cell)) {
+  if (!isJsonValueCell(cell)) {
     return false;
   }
   const meta = cell.metadata as CellMeta;

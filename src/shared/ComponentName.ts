@@ -14,10 +14,13 @@ export type ComponentName =
   | "HttpEventPanel"
   | "LMPromptCreatePanel"
   | "ViewConditionPanel"
+  | "PublishEditorPanel"
   | "WriteHttpEventToClipboardParamsPanel"
   | "DBFormView"
   | "ERDiagramSettingsPanel"
   | "RecordRuleEditor"
   | "NotebookCellMetadataPanel"
+  | "SubscriptionSettingPanel"
   | "CodeResolverEditor"
-  | "ToolsView";
+  | "ToolsView"
+  | "SubscriptionPayloadsView";

@@ -52,7 +52,7 @@ const recieveMessage = (data: DBFormEventData) => {
         connectionSettingRef.value?.stopProgress();
       }
       if (command === "selectedFile") {
-        connectionSettingRef.value?.selectedFile(value.selectedFilePath ?? "");
+        connectionSettingRef.value?.selectedFile(value.selectedFilePath ?? "", value.targetAttribute ?? '');
       }
       break;
     case "ResourceProperties":
@@ -73,17 +73,9 @@ defineExpose({
 </script>
 
 <template>
-  <ConnectionSettingVue
-    v-if="visible.connectionSetting"
-    :ref="setConnectionSettingRef"
-    :mode="mode"
-    :item="settingItem"
-    :prohibitedNames="prohibitedNames"
-  ></ConnectionSettingVue>
-  <ResourceProperties
-    v-if="visible.resourceProperties"
-    :values="resourcePropertiesValues"
-  ></ResourceProperties>
+  <ConnectionSettingVue v-if="visible.connectionSetting" :ref="setConnectionSettingRef" :mode="mode" :item="settingItem"
+    :prohibitedNames="prohibitedNames"></ConnectionSettingVue>
+  <ResourceProperties v-if="visible.resourceProperties" :values="resourcePropertiesValues"></ResourceProperties>
 </template>
 
 <style scoped></style>

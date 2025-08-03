@@ -11,6 +11,7 @@ export * from "../../../src/shared/ExtChartJs";
 export * from "../../../src/shared/LMPromptCreateConditionParams";
 export * from "../../../src/shared/MessageEventData";
 export * from "../../../src/shared/ModeType";
+export * from "../../../src/shared/PublishEditorParams";
 export * from "../../../src/shared/RecordRule";
 export * from "../../../src/shared/RunResultMetadata";
 export * from "../../../src/shared/SaveValuesInRdhParams";
