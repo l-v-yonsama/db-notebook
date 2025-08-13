@@ -1,8 +1,8 @@
 {
   "name": "database-notebook",
   "displayName": "Database notebook",
-  "description": "Javascript, SQL creation and execution, Markdown, etc. can be centrally managed in a file format called a notebook. Database manager for MySQL, PostgreSQL, SQLServer, SQLite, Redis, AWS, Keycloak and Auth0. Evaluate SQL statements with AI.",
-  "version": "0.8.11",
+  "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
+  "version": "0.8.12",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -39,7 +39,9 @@
     "Har",
     "HarViewer",
     "CSV",
-    "CsvViewer"
+    "CsvViewer",
+    "MQTT",
+    "mqtt-client"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -1225,7 +1227,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.10.24",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.10.25",
     "@l-v-yonsama/rdh": "^0.2.8",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
