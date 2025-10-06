@@ -10,13 +10,31 @@ import {
   toViewDataQuery,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData } from "@l-v-yonsama/rdh";
-import { commands, ProgressLocation, Uri, ViewColumn, WebviewPanel, window } from "vscode";
-import { OPEN_MDH_VIEWER, REFRESH_SQL_HISTORIES } from "../constant";
+import {
+  commands,
+  NotebookCellData,
+  NotebookCellKind,
+  NotebookEdit,
+  ProgressLocation,
+  Uri,
+  ViewColumn,
+  WebviewPanel,
+  window,
+  workspace,
+  WorkspaceEdit,
+} from "vscode";
+import {
+  CREATE_NEW_NOTEBOOK,
+  NOTEBOOK_TYPE,
+  OPEN_MDH_VIEWER,
+  REFRESH_SQL_HISTORIES,
+} from "../constant";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { ViewConditionPanelEventData } from "../shared/MessageEventData";
 import { SaveValuesInRdhParams } from "../shared/SaveValuesInRdhParams";
 import { ViewConditionParams } from "../shared/ViewConditionParams";
+import { CellMeta } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
@@ -162,108 +180,147 @@ export class ViewConditionPanel extends BasePanel {
         this.dispose();
         return;
       case "ok":
-        {
-          const { conditions, specfyCondition, limit, editable, preview } =
-            params as ViewConditionParams;
+        this.okProcess(params);
+        break;
+      default:
+        break;
+    }
+  }
 
-          if (preview) {
-            this.limit = limit;
-            const previewSql = await this.getPreviewSql(conditions, specfyCondition);
-            // send to webview
-            const msg: ViewConditionPanelEventData = {
-              command: "set-preview-sql",
-              componentName: "ViewConditionPanel",
-              value: {
-                setPreviewSql: {
-                  previewSql,
-                },
-              },
-            };
-            this.panel.webview.postMessage(msg);
+  private async okProcess(params: ViewConditionParams) {
+    const { conditions, specfyCondition, limit, editable, preview } = params;
 
-            return;
-          }
+    if (preview) {
+      this.limit = limit;
+      const previewSql = await this.getPreviewSql(conditions, specfyCondition);
 
-          const { tableRes } = this;
-          if (!tableRes || !ViewConditionPanel.stateStorage) {
-            return;
-          }
-          const { conName, schemaName } = tableRes.meta;
-          const setting = await ViewConditionPanel.stateStorage.getConnectionSettingByName(conName);
-          if (!setting) {
-            return;
-          }
-
-          const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
-            BaseSQLSupportDriver,
-            ResultSetData
-          >(setting, async (driver) => {
-            const { query, binds } = toViewDataNormalizedQuery({
-              tableRes,
-              schemaName: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
-              toPositionedParameter: driver.isPositionedParameterAvailable(),
-              toPositionalCharacter: driver.getPositionalCharacter(),
-              conditions: specfyCondition ? conditions : undefined,
-              limit: this.limit,
-              limitAsTop: driver.isLimitAsTop(),
-              sqlLang: driver.getSqlLang(),
-            });
-
-            log(`${PREFIX} query:[${query}]`);
-            log(`${PREFIX} binds:[${binds}]`);
-            return await driver.requestSql({
-              sql: query,
-              conditions: {
-                binds,
-              },
-              meta: {
-                tableName: tableRes.name,
-                compareKeys: tableRes.getCompareKeys(),
-                comment: tableRes.comment,
-                editable,
-              },
-            });
-          });
-
-          if (ok && result) {
-            const driver = DBDriverResolver.getInstance().createSQLSupportDriver(setting);
-
-            const { query, binds } = toViewDataQuery({
-              tableRes,
-              schemaName,
-              conditions: specfyCondition ? conditions : undefined,
-              limit: this.limit,
-              limitAsTop: driver.isLimitAsTop(),
-            });
-            await ViewConditionPanel.stateStorage.addSQLHistory({
-              connectionName: conName,
-              sqlDoc: query,
-              variables: binds,
-              meta: result.meta,
-              summary: result.summary,
-            });
-            commands.executeCommand(REFRESH_SQL_HISTORIES);
-            if (editable) {
-              this.rdhForUpdate = result;
-              const msg: ViewConditionPanelEventData = {
-                command: "set-rdh-for-update",
-                componentName: "ViewConditionPanel",
-                value: {
-                  rdhForUpdate: result,
-                },
-              };
-              this.panel.webview.postMessage(msg);
-            } else {
-              const commandParam: MdhViewParams = { title: tableRes.name, list: [result] };
-              commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
-              this.dispose();
-            }
-          } else {
-            showWindowErrorMessage(message);
-            this.dispose();
-          }
+      if (params.openInNotebook) {
+        const { tableRes } = this;
+        if (!tableRes || !ViewConditionPanel.stateStorage) {
+          return "";
         }
-        return;
+        const { conName, schemaName } = tableRes.meta;
+        const cell = new NotebookCellData(NotebookCellKind.Code, previewSql, "sql");
+        const metadata: CellMeta = {
+          connectionName: conName,
+        };
+        cell.metadata = metadata;
+
+        if (params.inActiveNotebook) {
+          this.dispose();
+
+          setTimeout(async () => {
+            const activeEditor = window.activeNotebookEditor;
+
+            if (activeEditor && activeEditor.notebook.notebookType === NOTEBOOK_TYPE) {
+              const edit = new WorkspaceEdit();
+              const notebookEdit = NotebookEdit.insertCells(activeEditor.selection.end, [cell]);
+              edit.set(activeEditor.notebook.uri, [notebookEdit]);
+              await workspace.applyEdit(edit);
+            } else {
+              showWindowErrorMessage("No active notebook editor found.");
+              return;
+            }
+          }, 100);
+        } else {
+          // Create a new notebook with the cell
+          commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+        }
+        this.dispose();
+      }
+
+      // send to webview
+      const msg: ViewConditionPanelEventData = {
+        command: "set-preview-sql",
+        componentName: "ViewConditionPanel",
+        value: {
+          setPreviewSql: {
+            previewSql,
+          },
+        },
+      };
+      this.panel.webview.postMessage(msg);
+
+      return;
+    }
+
+    const { tableRes } = this;
+    if (!tableRes || !ViewConditionPanel.stateStorage) {
+      return;
+    }
+    const { conName, schemaName } = tableRes.meta;
+    const setting = await ViewConditionPanel.stateStorage.getConnectionSettingByName(conName);
+    if (!setting) {
+      return;
+    }
+
+    const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+      BaseSQLSupportDriver,
+      ResultSetData
+    >(setting, async (driver) => {
+      const { query, binds } = toViewDataNormalizedQuery({
+        tableRes,
+        schemaName: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
+        toPositionedParameter: driver.isPositionedParameterAvailable(),
+        toPositionalCharacter: driver.getPositionalCharacter(),
+        conditions: specfyCondition ? conditions : undefined,
+        limit: this.limit,
+        limitAsTop: driver.isLimitAsTop(),
+        sqlLang: driver.getSqlLang(),
+      });
+
+      log(`${PREFIX} query:[${query}]`);
+      log(`${PREFIX} binds:[${binds}]`);
+      return await driver.requestSql({
+        sql: query,
+        conditions: {
+          binds,
+        },
+        meta: {
+          tableName: tableRes.name,
+          compareKeys: tableRes.getCompareKeys(),
+          comment: tableRes.comment,
+          editable,
+        },
+      });
+    });
+
+    if (ok && result) {
+      const driver = DBDriverResolver.getInstance().createSQLSupportDriver(setting);
+
+      const { query, binds } = toViewDataQuery({
+        tableRes,
+        schemaName,
+        conditions: specfyCondition ? conditions : undefined,
+        limit: this.limit,
+        limitAsTop: driver.isLimitAsTop(),
+      });
+      await ViewConditionPanel.stateStorage.addSQLHistory({
+        connectionName: conName,
+        sqlDoc: query,
+        variables: binds,
+        meta: result.meta,
+        summary: result.summary,
+      });
+      commands.executeCommand(REFRESH_SQL_HISTORIES);
+      if (editable) {
+        this.rdhForUpdate = result;
+        const msg: ViewConditionPanelEventData = {
+          command: "set-rdh-for-update",
+          componentName: "ViewConditionPanel",
+          value: {
+            rdhForUpdate: result,
+          },
+        };
+        this.panel.webview.postMessage(msg);
+      } else {
+        const commandParam: MdhViewParams = { title: tableRes.name, list: [result] };
+        commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+        this.dispose();
+      }
+    } else {
+      showWindowErrorMessage(message);
+      this.dispose();
     }
   }
 

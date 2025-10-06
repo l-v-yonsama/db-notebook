@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DropdownItem } from "@/types/Components";
+import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import type {
   UpdateTextDocumentActionCommand,
   ViewConditionPanelEventData,
@@ -7,6 +7,7 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { nextTick, onMounted, ref } from "vue";
+import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import RDHViewer from "./RDHViewer.vue";
@@ -23,6 +24,21 @@ const rdhForUpdate = ref(null as any);
 const visibleSettingsMode = ref(true);
 const supportEditMode = ref(false);
 const numOfRowsLabel = ref('Current rows');
+
+type MoreOption = "new" | "active";
+
+const moreDetailItems = [
+  {
+    kind: "selection",
+    label: "Display in new notebook",
+    value: "new",
+  },
+  {
+    kind: "selection",
+    label: "Display in active notebook",
+    value: "active",
+  },
+] as SecondaryItem<MoreOption>[];
 
 window.addEventListener("resize", () => resetSectionHeight());
 
@@ -189,6 +205,28 @@ const ok = (editable: boolean, preview: boolean) => {
     limit: limit.value === "" ? 100 : Number(limit.value),
     editable,
     preview,
+    openInNotebook: false,
+    inActiveNotebook: false,
+  };
+  vscode.postCommand({
+    command: "ok",
+    params,
+  });
+};
+
+const selectedMoreOptions = (v: MoreOption): void => {
+  openInNotebook(true, v === "active");
+};
+
+const openInNotebook = (openInNotebook: boolean, inActiveNotebook?: boolean) => {
+  const params: ViewConditionParams = {
+    conditions: JSON.parse(JSON.stringify(editorItem.value.conditions)),
+    specfyCondition: specifyCondition.value,
+    limit: limit.value === "" ? 100 : Number(limit.value),
+    editable: false,
+    preview: true,
+    openInNotebook,
+    inActiveNotebook,
   };
   vscode.postCommand({
     command: "ok",
@@ -264,16 +302,26 @@ defineExpose({
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
           <fa icon="times" />Cancel
         </VsCodeButton>
-        <VsCodeButton v-if="visibleSettingsMode && supportEditMode" @click="ok(true, false)" appearance="secondary"
-          title="Retlieve in editable mode" style="margin-right: 5px">
-          <fa icon="pencil" />Retlieve in editable mode
-        </VsCodeButton>
-        <VsCodeButton v-if="visibleSettingsMode" @click="ok(false, false)" title="Retlieve">
-          <fa icon="check" />Retlieve
-        </VsCodeButton>
-        <VsCodeButton v-if="!visibleSettingsMode" @click="saveValues()" title="Save changes to table">
-          <fa icon="save" />Save changes to table
-        </VsCodeButton>
+        <template v-if="visibleSettingsMode">
+          <VsCodeButton @click="openInNotebook(true)" appearance="secondary" title="Open in notebook"
+            style="margin-right: 5px">
+            <fa icon="book" />Open in notebook
+          </VsCodeButton>
+          <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
+
+          <VsCodeButton v-if="supportEditMode" @click="ok(true, false)" appearance="secondary"
+            title="Retlieve in editable mode" style="margin-right: 5px">
+            <fa icon="pencil" />Retlieve in editable
+          </VsCodeButton>
+          <VsCodeButton @click="ok(false, false)" title="Retlieve">
+            <fa icon="check" />Retlieve
+          </VsCodeButton>
+        </template>
+        <template v-else>
+          <VsCodeButton @click="saveValues()" title="Save changes to table">
+            <fa icon="save" />Save changes
+          </VsCodeButton>
+        </template>
       </div>
     </div>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">

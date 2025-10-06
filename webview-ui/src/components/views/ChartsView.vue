@@ -32,8 +32,8 @@ import { nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
 import PairPlotChart from "./charts/PairPlotChart.vue";
-import { getBase64Image } from "./charts/utils";
 
+import { export2image } from "@/utilities/imageUtil";
 import { Bar, Doughnut, Line, Pie, Radar, Scatter } from "vue-chartjs";
 
 ChartJS.register(
@@ -60,6 +60,7 @@ const activeChartTabItem = ref(null as any);
 const inProgress = ref(false);
 const sectionWidth = ref(300);
 const sectionHeight = ref(300);
+const isCapturing = ref(false);
 
 window.addEventListener("resize", () => resetSectionHeight());
 
@@ -188,25 +189,32 @@ const replaceSafeFileName = (name: string): string => {
   return name.replace(/[<>#%\{\}\|\\\^~\[\]`;\?:@=& 　]/gi, "_").trim();
 };
 
-const export2image = async () => {
+const saveAsPng = async () => {
   if (!activeChartTabItem.value) {
     return;
   }
-  let link = document.createElement("a");
 
   const { tabId, title, type } = activeChartTabItem.value;
   const id = "chart-" + tabId;
   const fileName = replaceSafeFileName(`chart_${type}_${title}.png`);
-  link.download = fileName;
+
   if (type === "pairPlot") {
     if (!chartRef.value) {
       return;
     }
-    link.href = await chartRef.value.getBase64Image(id);
+    await chartRef.value.saveAsPng(`#${id}`, fileName);
   } else {
-    link.href = getBase64Image(id);
+    await export2image({
+      fileName,
+      selectors: `#${id}`,
+      pre: async () => {
+        isCapturing.value = true;
+      },
+      post: async () => {
+        isCapturing.value = false;
+      },
+    });
   }
-  link.click();
 };
 
 defineExpose({
@@ -219,7 +227,7 @@ defineExpose({
     <div class="toolbar top">
       <div class="tool-left"></div>
       <div class="tool-right">
-        <VsCodeButton @click="export2image" title="Save">
+        <VsCodeButton @click="saveAsPng" title="Save">
           <fa icon="save" />Download
         </VsCodeButton>
       </div>
@@ -232,7 +240,9 @@ defineExpose({
       <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
         <section :style="{ width: `${sectionWidth}px` }">
           <div :id="'chart-' + tabItem.tabId" v-if="activeChartTabItem && isActiveTabId(tabItem.tabId)"
-            class="spPaneWrapper">
+            class="spPaneWrapper" :style="{
+              backgroundColor: isCapturing ? 'white' : '',
+            }">
             <PairPlotChart v-if="activeChartTabItem.type === 'pairPlot'"
               :showDataLabels="activeChartTabItem.showDataLabels"
               :showTitle="activeChartTabItem.pairPlotChartParams.showTitle" :title="activeChartTabItem.title"

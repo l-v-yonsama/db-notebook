@@ -6,4 +6,6 @@ export type ViewConditionParams = {
   limit: number;
   editable: boolean;
   preview: boolean;
+  openInNotebook: boolean;
+  inActiveNotebook?: boolean; // Optional, used for active notebook display
 };

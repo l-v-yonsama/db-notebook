@@ -10,6 +10,7 @@ import {
   faDatabase,
   faEye,
   faFileExcel,
+  faFileImage,
   faFileLines,
   faFloppyDisk,
   faLeaf,
@@ -41,6 +42,7 @@ library.add(faCodeCompare);
 library.add(faDatabase);
 library.add(faEye);
 library.add(faFileExcel);
+library.add(faFileImage);
 library.add(faFileLines);
 library.add(faFloppyDisk);
 library.add(faLeaf);
