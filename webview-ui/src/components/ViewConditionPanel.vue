@@ -310,11 +310,11 @@ defineExpose({
           <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
 
           <VsCodeButton v-if="supportEditMode" @click="ok(true, false)" appearance="secondary"
-            title="Retlieve in editable mode" style="margin-right: 5px">
-            <fa icon="pencil" />Retlieve in editable
+            title="Search for records to edit" style="margin-right: 5px">
+            <fa icon="pencil" />Search &amp; Edit
           </VsCodeButton>
-          <VsCodeButton @click="ok(false, false)" title="Retlieve">
-            <fa icon="check" />Retlieve
+          <VsCodeButton @click="ok(false, false)" title="Search">
+            <fa icon="check" />Search
           </VsCodeButton>
         </template>
         <template v-else>
