@@ -311,6 +311,7 @@ export class Chat2QueryPanel extends BasePanel {
               conditions: undefined,
               limit: this.limit,
               sqlLang,
+              idQuoteCharacter: driver.getIdQuoteCharacter(),
             });
             const sampleData = await driver.requestSql({
               sql: query,

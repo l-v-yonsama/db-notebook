@@ -162,6 +162,7 @@ export class ViewConditionPanel extends BasePanel {
         conditions: specfyCondition ? conditions : undefined,
         limit: this.limit,
         sqlLang,
+        idQuoteCharacter: driver.getIdQuoteCharacter(),
       });
 
       return query + "";
@@ -267,6 +268,7 @@ export class ViewConditionPanel extends BasePanel {
         limit: this.limit,
         limitAsTop: driver.isLimitAsTop(),
         sqlLang: driver.getSqlLang(),
+        idQuoteCharacter: driver.getIdQuoteCharacter(),
       });
 
       log(`${PREFIX} query:[${query}]`);
@@ -294,6 +296,7 @@ export class ViewConditionPanel extends BasePanel {
         conditions: specfyCondition ? conditions : undefined,
         limit: this.limit,
         limitAsTop: driver.isLimitAsTop(),
+        idQuoteCharacter: driver.getIdQuoteCharacter(),
       });
       await ViewConditionPanel.stateStorage.addSQLHistory({
         connectionName: conName,
@@ -329,7 +332,7 @@ export class ViewConditionPanel extends BasePanel {
     if (rdh === undefined) {
       return;
     }
-    const { connectionName, tableName } = rdh.meta;
+    const { connectionName, tableName, schemaName } = rdh.meta;
     if (connectionName === undefined || tableName === undefined) {
       return;
     }
@@ -364,6 +367,7 @@ export class ViewConditionPanel extends BasePanel {
               try {
                 const { query, binds } = toInsertStatement({
                   tableName,
+                  schemaName,
                   columns: rdh.keys,
                   values,
                   bindOption: {
@@ -372,6 +376,7 @@ export class ViewConditionPanel extends BasePanel {
                     toPositionalCharacter,
                   },
                   sqlLang,
+                  idQuoteCharacter: driver.getIdQuoteCharacter(),
                 });
                 log(`${prefix} sql:[${query}]`);
                 log(`${prefix} binds:${JSON.stringify(binds)}`);
@@ -404,6 +409,7 @@ export class ViewConditionPanel extends BasePanel {
               try {
                 const { query, binds } = toUpdateStatement({
                   tableName,
+                  schemaName,
                   columns: rdh.keys,
                   values,
                   conditions,
@@ -413,6 +419,7 @@ export class ViewConditionPanel extends BasePanel {
                     toPositionalCharacter,
                   },
                   sqlLang,
+                  idQuoteCharacter: driver.getIdQuoteCharacter(),
                 });
 
                 log(`${prefix} sql:[${query}]`);
@@ -446,6 +453,7 @@ export class ViewConditionPanel extends BasePanel {
               try {
                 const { query, binds } = toDeleteStatement({
                   tableName,
+                  schemaName,
                   columns: rdh.keys,
                   conditions,
                   bindOption: {
@@ -454,6 +462,7 @@ export class ViewConditionPanel extends BasePanel {
                     toPositionalCharacter,
                   },
                   sqlLang,
+                  idQuoteCharacter: driver.getIdQuoteCharacter(),
                 });
                 log(`${prefix} sql:[${query}]`);
                 log(`${prefix} binds:${JSON.stringify(binds)}`);
