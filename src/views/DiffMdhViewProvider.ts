@@ -296,6 +296,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       }
       item.list = tmpItem.list;
       item.subTitle = tmpItem.subTitle;
+      item.hasUndoChangeSql = tmpItem.hasUndoChangeSql;
 
       const msg: DiffMdhViewEventData = {
         command: "set-search-result",
