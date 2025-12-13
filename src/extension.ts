@@ -1,4 +1,9 @@
-import { DBDriverResolver, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  DbConnection,
+  DBDriverResolver,
+  DbResource,
+  DbSchema,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { commands, ExtensionContext, Uri, window } from "vscode";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
@@ -22,8 +27,10 @@ import {
   OPEN_SUBSCRIPTION_PAYLOADS_VIEWER,
   OPEN_TOOLS_VIEWER,
   SET_SUBSCRIPTION_PAYLOADS_VIEWER,
+  SHOW_CONNECTION_SETTING,
   SHOW_CSV,
   SHOW_HAR,
+  SHOW_RESOURCE_PROPERTIES,
   UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER,
 } from "./constant";
 import { HelpProvider } from "./help/HelpProvider";
@@ -94,6 +101,32 @@ export async function activate(context: ExtensionContext) {
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
 
   // VIEWS
+  // ★ 追加：選択監視用 TreeView
+  const dbResourceTreeView = window.createTreeView("database-notebook-connections", {
+    treeDataProvider: dbResourceTree,
+  });
+  dbResourceTreeView.onDidChangeSelection((e) => {
+    const item = e.selection[0];
+    if (!item) {
+      return;
+    }
+
+    let isDbResource = false;
+    if (item instanceof DbResource) {
+      isDbResource = true;
+    }
+    const dbRes = item as DbResource;
+
+    if (dbRes instanceof DbConnection) {
+      commands.executeCommand(SHOW_CONNECTION_SETTING, dbRes);
+    } else {
+      commands.executeCommand(SHOW_RESOURCE_PROPERTIES, dbRes);
+    }
+
+    commands.executeCommand("setContext", "databaseNotebook.selectedDbResource", isDbResource);
+  });
+  context.subscriptions.push(dbResourceTreeView);
+
   const helpTreeView = window.createTreeView("database-notebook-helpfeedback", {
     treeDataProvider: new HelpProvider(),
   });
@@ -110,6 +143,7 @@ export async function activate(context: ExtensionContext) {
     context,
     stateStorage,
     dbResourceTree,
+    dbResourceTreeView,
     connectionSettingViewProvider,
   });
 

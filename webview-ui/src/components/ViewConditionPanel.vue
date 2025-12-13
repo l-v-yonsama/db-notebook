@@ -288,15 +288,6 @@ defineExpose({
   <section class="view-conditional-root">
     <div class="toolbar">
       <div class="tool-left">
-        <label for="tableName">Table:</label>
-        <span id="tableName">{{ tableNameWithComment }}</span>
-        <label for="numOfRows">{{ numOfRowsLabel }}:</label>
-        <span id="numOfRows">{{ numOfRows }}</span>
-        <label v-if="visibleSettingsMode" for="limit">Limit:</label>
-        <VsCodeTextField id="limit" v-if="visibleSettingsMode" v-model="limit" :min="0" :max="limitMax"
-          style="width: 100px" type="number" title="number of rows returned" placeholder="number of rows returned"
-          @change="updateTextDocument()">
-        </VsCodeTextField>
       </div>
       <div class="tool-right">
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
@@ -326,6 +317,24 @@ defineExpose({
     </div>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div v-if="visibleSettingsMode" class="settings">
+        <div class="db-resource">
+          <fieldset class="conditions">
+            <legend>
+              <span style="margin-right: 30px">DB Resource</span>
+            </legend>
+            <div class="tool-left">
+              <label for="tableName">Table:</label>
+              <span id="tableName">{{ tableNameWithComment }}</span>
+              <label for="numOfRows">{{ numOfRowsLabel }}:</label>
+              <span id="numOfRows">{{ numOfRows }}</span>
+              <label v-if="visibleSettingsMode" for="limit">Limit:</label>
+              <VsCodeTextField id="limit" v-if="visibleSettingsMode" v-model="limit" :min="0" :max="limitMax"
+                style="width: 100px" type="number" title="number of rows returned" placeholder="number of rows returned"
+                @change="updateTextDocument()">
+              </VsCodeTextField>
+            </div>
+          </fieldset>
+        </div>
         <div class="editor">
           <fieldset class="conditions">
             <legend>
@@ -364,7 +373,10 @@ section.view-conditional-root {
     &.toolbar {
       margin-bottom: 7px !important;
 
-      .tool-left {
+      
+    }
+
+    .tool-left {
         label {
           margin-right: 5px;
         }
@@ -379,7 +391,6 @@ section.view-conditional-root {
           white-space: nowrap;
           max-width: 180px;
         }
-      }
     }
 
     &.scroll-wrapper {

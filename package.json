@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.8.16",
+  "version": "0.8.17",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -282,32 +282,32 @@
       "view/item/context": [
         {
           "command": "database-notebook.retrieve-resources",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
           "group": "inline"
         },
         {
           "command": "database-notebook.retrieve-resources",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
           "group": "others@3"
         },
         {
           "command": "database-notebook.connect",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:false,support:false,false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:false,support:false,false.*$/",
           "group": "inline"
         },
         {
           "command": "database-notebook.connect",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:false,support:false,false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:false,support:false,false.*$/",
           "group": "others@3"
         },
         {
           "command": "database-notebook.disconnect",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:true,support:false,false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:true,support:false,false.*$/",
           "group": "inline"
         },
         {
           "command": "database-notebook.disconnect",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:true,support:false,false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:true,support:false,false.*$/",
           "group": "others@3"
         },
         {
@@ -387,7 +387,7 @@
         },
         {
           "command": "database-notebook.edit-connection-setting",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false.*$/",
           "group": "connection-setting@1"
         },
         {
@@ -397,7 +397,7 @@
         },
         {
           "command": "database-notebook.delete-connection-setting",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+false.*$/",
           "group": "connection-setting@1"
         },
         {
@@ -524,6 +524,11 @@
           "command": "database-notebook.open-chat-2-query",
           "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
           "group": "db-resourc@10"
+        },
+        {
+          "command": "database-notebook.copy-resource-name",
+          "when": "view == database-notebook-connections && viewItem =~ /,tag:dbResource$/",
+          "group": "clipboard"
         }
       ],
       "view/title": [
@@ -859,6 +864,10 @@
         "icon": "$(filter)"
       },
       {
+        "command": "database-notebook.copy-resource-name",
+        "title": "Copy Resource Name"
+      },
+      {
         "command": "database-notebook.cell.open-mdh",
         "title": "Open Resultset Data Holder",
         "icon": "$(table)"
@@ -1015,6 +1024,14 @@
         "command": "database-notebook.cell.mark-cell-as-skip",
         "key": "ctrl+alt+s",
         "when": "notebookType == 'database-notebook-type' && notebookCellListFocused && notebookCellType == 'code'"
+      },
+      {
+        "command": "database-notebook.copy-resource-name",
+        "key": "cmd+c",
+        "mac": "cmd+c",
+        "win": "ctrl+c",
+        "linux": "ctrl+c",
+        "when": "focusedView == 'database-notebook-connections' && databaseNotebook.selectedDbResource && !editorTextFocus"
       }
     ],
     "configuration": {

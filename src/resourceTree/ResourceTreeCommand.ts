@@ -17,6 +17,8 @@ import {
   ExtensionContext,
   NotebookCellData,
   NotebookCellKind,
+  TreeItem,
+  TreeView,
   commands,
   env,
   window,
@@ -25,6 +27,7 @@ import {
   ADD_SUBSCRIPTION,
   CLEAR_DEFAULT_CON_FOR_SQL_CELL,
   CONNECT,
+  COPY_RESOURCE_NAME,
   COUNT_FOR_ALL_TABLES,
   CREATE_CONNECTION_SETTING,
   CREATE_ER_DIAGRAM,
@@ -77,6 +80,7 @@ type ResourceTreeParams = {
   context: ExtensionContext;
   stateStorage: StateStorage;
   dbResourceTree: ResourceTreeProvider;
+  dbResourceTreeView: TreeView<TreeItem>;
   connectionSettingViewProvider: SQLConfigurationViewProvider;
 };
 
@@ -126,7 +130,30 @@ const registerConnectionSettingCommand = (params: ResourceTreeParams) => {
 };
 
 const registerDbResourceCommand = (params: ResourceTreeParams) => {
-  const { context, stateStorage, dbResourceTree, connectionSettingViewProvider } = params;
+  const { context, stateStorage, dbResourceTree, dbResourceTreeView } = params;
+
+  commands.registerCommand(COPY_RESOURCE_NAME, async (res: DbResource | DbConnection) => {
+    try {
+      let target = res;
+      if (!target) {
+        const selection = dbResourceTreeView.selection;
+        if (!selection || selection.length === 0) {
+          return;
+        }
+        target = selection[0] as DbResource | DbConnection;
+      }
+      if (!target) {
+        return;
+      }
+
+      const text = target.name;
+      await env.clipboard.writeText(text);
+
+      window.setStatusBarMessage(`Copied: ${text}`, 2000);
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
 
   commands.registerCommand(REFRESH_RESOURCES, () => {
     dbResourceTree.refresh(true);

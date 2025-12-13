@@ -25,7 +25,6 @@ import {
   isTextLike,
 } from "@l-v-yonsama/rdh";
 import * as vscode from "vscode";
-import { SHOW_CONNECTION_SETTING, SHOW_RESOURCE_PROPERTIES } from "../constant";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 
@@ -99,7 +98,6 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
 
   changeDbResourceTreeData(dbRes: DbResource): void {
     this._onDidChangeTreeData.fire(dbRes);
-    this._onDidChangeTreeData.fire();
   }
 
   getTreeItem(element: DbResource): vscode.TreeItem {
@@ -163,12 +161,7 @@ export class ConnectionListItem extends vscode.TreeItem {
     }
     const support = DBType.Mqtt !== conRes.dbType;
     this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},CD:${clearableDefault},connected:${conRes.isConnected},support:${support},${conRes.isInProgress}`;
-
-    this.command = {
-      title: "Show resource property",
-      command: SHOW_CONNECTION_SETTING,
-      arguments: [conRes],
-    };
+    this.contextValue += ",tag:dbResource";
   }
 }
 
@@ -355,17 +348,13 @@ export class DBDatabaseItem extends vscode.TreeItem {
     if (scannable) {
       contextValue += ",scannable";
     }
+    contextValue += ",tag:dbResource";
 
     if (tooltip) {
       this.tooltip = tooltip;
     }
 
     this.contextValue = contextValue;
-    this.command = {
-      title: "Show resource property",
-      command: SHOW_RESOURCE_PROPERTIES,
-      arguments: [resource],
-    };
   }
 }
 

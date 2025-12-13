@@ -57,7 +57,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
     this.webviewView = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
-      enableForms: true,
+      enableForms: true,      
       localResourceRoots: [this.context.extensionUri],
     };
 
@@ -184,6 +184,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
   }
 
   show() {
-    this.webviewView?.show();
+    // preserveFocus = true
+    this.webviewView?.show(true);
   }
 }
