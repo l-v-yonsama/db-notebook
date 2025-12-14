@@ -302,7 +302,15 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.DynamoColumn:
         {
           const c = resource as DbDynamoTableColumn;
-          iconPath = new vscode.ThemeIcon(toIconFileName(parseDynamoAttrType(c.attrType)));
+          // icon color by column attribute
+          let color: vscode.ThemeColor | undefined = undefined;
+          if (c.pk) {
+            color = new vscode.ThemeColor("charts.blue");
+          } else if (c.sk) {
+            // NOT NULL
+            color = new vscode.ThemeColor("charts.orange");
+          }
+          iconPath = new vscode.ThemeIcon(toIconFileName(parseDynamoAttrType(c.attrType)), color);
           tooltip = new vscode.MarkdownString(encodeHtmlWeak(c.name), true);
           tooltip.supportHtml = true;
           tooltip.isTrusted = true;
@@ -320,7 +328,15 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.Column:
         {
           const c = resource as DbColumn;
-          iconPath = new vscode.ThemeIcon(toIconFileName(c.colType));
+          // icon color by column attribute
+          let color: vscode.ThemeColor | undefined = undefined;
+          if (c.primaryKey) {
+            color = new vscode.ThemeColor("charts.blue");
+          } else if (!c.nullable) {
+            // NOT NULL
+            color = new vscode.ThemeColor("charts.orange");
+          }
+          iconPath = new vscode.ThemeIcon(toIconFileName(c.colType), color);
           tooltip = new vscode.MarkdownString(encodeHtmlWeak(c.name), true);
           tooltip.supportHtml = true;
           tooltip.isTrusted = true;
