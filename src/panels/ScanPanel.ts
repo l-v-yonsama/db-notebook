@@ -358,7 +358,7 @@ export class ScanPanel extends BasePanel {
     if (message) {
       showWindowErrorMessage(message);
     } else {
-      vscode.window.showInformationMessage(uri.fsPath);
+      window.setStatusBarMessage(uri.fsPath, 3000);
     }
   }
 

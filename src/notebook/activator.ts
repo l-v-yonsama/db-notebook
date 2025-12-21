@@ -72,6 +72,7 @@ import {
   hasAnyRdhOutputCell,
   isCwqlCell,
   isJsonValueCell,
+  isMemcachedCell,
   isMqttCell,
   isSqlCell,
 } from "../utilities/notebookUtil";
@@ -263,7 +264,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
             continue;
           }
           const dbType = stateStorage.getDBTypeByConnectionName(connectionName);
-          if (dbType === undefined || !(dbType === DBType.MySQL || dbType === DBType.SQLServer)) {
+          if (dbType === undefined) {
             continue;
           }
 
@@ -329,6 +330,8 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         .filter((it) => {
           if (isMqttCell(targetCells[0])) {
             return it.dbType === DBType.Mqtt;
+          } else if (isMemcachedCell(targetCells[0])) {
+            return it.dbType === DBType.Memcache;
           } else {
             return (
               it.dbType === DBType.Mqtt ||

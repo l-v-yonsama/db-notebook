@@ -1,0 +1,6 @@
+{
+  "id": "memcached",
+  "aliases": ["Memcached Command"],
+  "extensions": [".memcached"],
+  "configuration": "./languages/cwqmemcachedl/language-configuration.json"
+}

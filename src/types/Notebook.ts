@@ -1,5 +1,5 @@
 import type { MqttQoS } from "@l-v-yonsama/multi-platform-database-drivers";
-import type { NotebookCellKind, Uri } from "vscode";
+import type { NotebookCellKind, NotebookCellOutput, Uri } from "vscode";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export type SQLMode = "None" | "Query" | "Explain" | "ExplainAnalyze";
@@ -72,6 +72,7 @@ export type RawNotebookCell = {
   kind: NotebookCellKind;
   editable?: boolean;
   metadata?: CellMeta;
+  outputs?: NotebookCellOutput[];
 };
 
 export type NotebookExecutionVariables = {

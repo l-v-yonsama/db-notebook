@@ -21,9 +21,10 @@ export class DBNotebookSerializer implements NotebookSerializer {
 
     // Create array of Notebook cells for the VS Code API from file contents
     const cells = raw.cells.map((item) => {
-      const data = new NotebookCellData(item.kind, item.value, item.language);
-      data.metadata = item.metadata ?? {};
-      return data;
+      const cell = new NotebookCellData(item.kind, item.value, item.language);
+      cell.metadata = item.metadata ?? {};
+      cell.outputs = item.outputs ?? [];
+      return cell;
     });
 
     // Pass read and formatted Notebook Data to VS Code to display Notebook with saved cells
@@ -52,6 +53,7 @@ export class DBNotebookSerializer implements NotebookSerializer {
         language: cell.languageId,
         value: cell.value,
         metadata: cell.metadata ?? {},
+        outputs: cell.outputs ?? [],
       });
     }
 

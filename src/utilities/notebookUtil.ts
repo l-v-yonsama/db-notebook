@@ -20,6 +20,10 @@ export const isCwqlCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "cwql";
 };
 
+export const isMemcachedCell = (cell: NotebookCell): boolean => {
+  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "memcached";
+};
+
 export const isJsCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "javascript";
 };
@@ -38,6 +42,10 @@ export const isMqttCell = (cell: NotebookCell): boolean => {
   }
   const meta = cell.metadata as CellMeta;
   return cell.kind === NotebookCellKind.Code && !!meta.publishParams;
+};
+
+export const hasConnectionCell = (cell: NotebookCell): boolean => {
+  return isSqlCell(cell) || isCwqlCell(cell) || isMemcachedCell(cell) || isMqttCell(cell);
 };
 
 export const hasAnyRdhOutputCell = (cell: NotebookCell): boolean => {

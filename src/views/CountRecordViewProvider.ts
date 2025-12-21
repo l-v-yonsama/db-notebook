@@ -142,7 +142,7 @@ export class CountRecordViewProvider extends BaseViewProvider {
     if (message) {
       showWindowErrorMessage(message);
     } else {
-      window.showInformationMessage(uri.fsPath);
+      window.setStatusBarMessage(uri.fsPath, 3000);
     }
   }
 

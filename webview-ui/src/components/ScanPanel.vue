@@ -346,13 +346,11 @@ const comparable = computed((): boolean => {
     return false;
   }
 
-  if (tabItem.dbType != "Keycloak" && tabItem.dbType != "Auth0") {
-    return false;
-  }
-
-  let currentResourceType = tabItem.resourceType.value;
-  if (tabItem.resourceType.visible && tabItem.prevResourceTypeValue != currentResourceType) {
-    return false;
+  if (tabItem.dbType==='Auth0' || tabItem.dbType==='Keycloak') {
+    let currentResourceType = tabItem.resourceType.value;
+    if (tabItem.resourceType.visible && tabItem.prevResourceTypeValue != currentResourceType) {
+      return false;
+    }
   }
 
   return true;

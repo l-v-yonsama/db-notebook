@@ -30,7 +30,7 @@ import { getOutputConfig, getToStringParamByConfig } from "./configUtil";
 import { writeToResourceOnStorage } from "./fsUtil";
 import { createResponseBodyMarkdown } from "./httpUtil";
 import { logError } from "./logger";
-import { isMarkupCell } from "./notebookUtil";
+import { isMarkupCell, isMemcachedCell } from "./notebookUtil";
 const PREFIX = "[utilities/htmlGenerator]";
 
 type CreateHtmlOptionsParams = {
@@ -462,11 +462,12 @@ export const createHtmlFromRdhList = async (
     };
 
     const outputs: NotebookCellOutput[] = [];
+    const title = rdh.meta.command ? 'Command Result' : 'Query Result';
     outputs.push(
       new NotebookCellOutput(
         [
           NotebookCellOutputItem.text(
-            `\`[Query Result]\` ${rdh.summary?.info}\n` +
+            `\`[${title}]\` ${rdh.summary?.info}\n` +
               ResultSetDataBuilder.from(rdh).toMarkdown(toMarkdownConfig),
             "text/markdown"
           ),
@@ -480,7 +481,7 @@ export const createHtmlFromRdhList = async (
       kind: NotebookCellKind.Code,
       notebook: null as unknown as NotebookDocument,
       document: {
-        languageId: "sql",
+        languageId: rdh.meta.languageId,
         getText: () => rdh.sqlStatement ?? "",
       } as TextDocument,
       metadata: {} as CellMeta,
@@ -490,6 +491,9 @@ export const createHtmlFromRdhList = async (
     if (rdh.sqlStatement === "" && rdh.meta.queryInput) {
       cell.document.languageId = "json";
       cell.document.getText = () => rdh.meta.queryInput ?? "";
+    }
+    if (isMemcachedCell(cell)){
+      cell.document.getText = () => rdh.meta.command ?? "";
     }
 
     cells.push(cell);
@@ -617,11 +621,12 @@ const createHtml = async (
               const metadata: RunResultMetadata = output.metadata;
               if (metadata.rdh) {
                 const { rdh } = metadata;
+                const title = rdh.meta.command ? 'Command Result' : 'Query Result';
                 htmlContents.push(
                   `<div class="notification is-primary is-light" style="padding:10px; margin-bottom:10px;font-size:small;">`
                 );
                 htmlContents.push(
-                  `<span class="tag is-primary is-light">Query Result</span> ${escapeHtml(
+                  `<span class="tag is-primary is-light">${title}</span> ${escapeHtml(
                     rdh.summary?.info ?? ""
                   )}`
                 );
@@ -902,7 +907,8 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
       }
     } else {
       if (output.metadata?.rdh) {
-        s += `<span class="tag is-primary is-light">Query Result</span> ${escapeHtml(
+        const title = output.metadata?.rdh.meta.command ? 'Command Result' : 'Query Result';
+        s += `<span class="tag is-primary is-light">${title}</span> ${escapeHtml(
           output.metadata.rdh.summary?.info ?? ""
         )}`;
       }

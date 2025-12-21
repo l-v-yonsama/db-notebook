@@ -33,6 +33,7 @@ import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
 import { isJsCell, isJsonValueCell, isSqlCell } from "../utilities/notebookUtil";
 import { setCloudwatchQueryCompletionItems } from "./intellisenses/awsCloudwatchQuery";
+import { setMemcachedCompletionItems } from "./intellisenses/memcachedCommand";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
 import { setNodeExecaCompletionItems } from "./intellisenses/nodeExeca";
@@ -82,6 +83,7 @@ export function activateIntellisense(context: ExtensionContext, stateStorage: St
   context.subscriptions.push(createJsIntellisense());
   context.subscriptions.push(createSQLIntellisense());
   context.subscriptions.push(createCloudwatchQueryIntellisense());
+  context.subscriptions.push(registerMemcachedCompletionProvider());
   setActivateDecorator(context);
   log(`${PREFIX} end activateIntellisense`);
 }
@@ -416,3 +418,21 @@ function createCloudwatchQueryIntellisense() {
     }
   );
 }
+
+function registerMemcachedCompletionProvider() {
+  return languages.registerCompletionItemProvider(
+    [{ language: "memcached", notebookType: NOTEBOOK_TYPE }],
+    {
+      provideCompletionItems(
+        document: TextDocument,
+        position: Position,
+        token: CancellationToken,
+        context: CompletionContext
+      ) {
+        const list: CompletionItem[] = [];
+        setMemcachedCompletionItems(list);
+        return list;
+      },
+    }
+  );
+};

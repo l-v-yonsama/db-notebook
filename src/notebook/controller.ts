@@ -56,10 +56,12 @@ import { runLm } from "../utilities/lmUtil";
 import { log, logError } from "../utilities/logger";
 import {
   hasAnyRdhOutputCell,
+  hasConnectionCell,
   isCwqlCell,
   isJsCell,
   isJsonValueCell,
   isMarkupCell,
+  isMemcachedCell,
   isMqttCell,
   isPreExecution,
   isSqlCell,
@@ -70,6 +72,7 @@ import { StateStorage } from "../utilities/StateStorage";
 import { AwsKernel } from "./awsKernel";
 import { setupDbResource } from "./intellisense";
 import { jsonKernelRun } from "./JsonKernel";
+import { MemcachedKernel } from "./MemcachedKernel";
 import { MqttKernel } from "./MqttKernel";
 import { NodeKernel } from "./NodeKernel";
 import { SqlKernel } from "./sqlKernel";
@@ -81,6 +84,7 @@ type NoteSession = {
   kernel: NodeKernel | undefined;
   sqlKernel: SqlKernel | undefined;
   awsKernel: AwsKernel | undefined;
+  memcachedKernel: MemcachedKernel | undefined;
   mqttKernel: MqttKernel | undefined;
   cancellationTokenSourceList: CancellationTokenSource[] | undefined;
   interrupted: boolean;
@@ -90,7 +94,7 @@ export class MainController {
   readonly controllerId = `${NOTEBOOK_TYPE}-controller`;
   readonly notebookType = NOTEBOOK_TYPE;
   readonly label = "Database Notebook";
-  readonly supportedLanguages = ["sql", "javascript", "json", "cwql", "plaintext"];
+  readonly supportedLanguages = ["sql", "javascript", "json", "cwql", "memcached", "plaintext"];
 
   private readonly _controller: NotebookController;
   private readonly noteSessions = new Map<string, NoteSession>();
@@ -147,8 +151,8 @@ export class MainController {
                 const nbEdit = NotebookEdit.updateCellMetadata(cell.index, metadata);
                 edit.set(cell.notebook.uri, [nbEdit]);
                 await workspace.applyEdit(edit);
+                resetCellContext(cell);
               }
-              resetCellContext(cell);
             }
           });
         });
@@ -276,7 +280,14 @@ export class MainController {
     // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
     if (noteSession) {
-      const { kernel, sqlKernel, awsKernel, mqttKernel, cancellationTokenSourceList } = noteSession;
+      const {
+        kernel,
+        sqlKernel,
+        awsKernel,
+        memcachedKernel,
+        mqttKernel,
+        cancellationTokenSourceList,
+      } = noteSession;
       try {
         noteSession.interrupted = true;
         if (kernel) {
@@ -291,6 +302,9 @@ export class MainController {
         }
         if (awsKernel) {
           awsKernel.interrupt();
+        }
+        if (memcachedKernel) {
+          memcachedKernel.interrupt();
         }
         if (mqttKernel) {
           mqttKernel.interrupt();
@@ -331,6 +345,7 @@ export class MainController {
       kernel,
       sqlKernel: undefined,
       awsKernel: undefined,
+      memcachedKernel: undefined,
       mqttKernel: undefined,
       cancellationTokenSourceList: [],
       interrupted: false,
@@ -423,17 +438,19 @@ export class MainController {
         } = metadata;
 
         if (rdh) {
+          rdh.meta['languageId'] = cell.document.languageId;
           const toMarkdownConfig = getToStringParamByConfig({
             maxPrintLines: getResultsetConfig().maxRowsInPreview,
             maxCellValueLength: getResultsetConfig().maxCharactersInCell,
             withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
             withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
           });
+          const title = rdh.meta.command ? 'Command Result' : 'Query Result';
           outputs.push(
             new NotebookCellOutput(
               [
                 NotebookCellOutputItem.text(
-                  `\`[Query Result]\` ${rdh.summary?.info}\n` +
+                  `\`[${title}]\` ${rdh.summary?.info}\n` +
                     ResultSetDataBuilder.from(rdh).toMarkdown(toMarkdownConfig),
                   "text/markdown"
                 ),
@@ -674,6 +691,14 @@ export class MainController {
       const r = await noteSession.awsKernel.run(cell, noteSession.kernel.getStoredVariables());
       noteSession.awsKernel = undefined;
       return r;
+    } else if (isMemcachedCell(cell)) {
+      noteSession.memcachedKernel = new MemcachedKernel(this.stateStorage);
+      const r = await noteSession.memcachedKernel.run(
+        cell,
+        noteSession.kernel.getStoredVariables()
+      );
+      noteSession.memcachedKernel = undefined;
+      return r;
     } else if (isMqttCell(cell)) {
       noteSession.mqttKernel = new MqttKernel(this.stateStorage);
       const r = await noteSession.mqttKernel.run(cell, noteSession.kernel.getStoredVariables());
@@ -802,7 +827,7 @@ class ConnectionSettingProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
 
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    if (!isSqlCell(cell) && !isCwqlCell(cell) && !isMqttCell(cell)) {
+    if (!hasConnectionCell(cell)) {
       return undefined;
     }
 
@@ -829,7 +854,13 @@ class MarkCellAsMqttProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
 
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    if (isCwqlCell(cell) || isSqlCell(cell) || isMarkupCell(cell) || isJsCell(cell)) {
+    if (
+      isCwqlCell(cell) ||
+      isMemcachedCell(cell) ||
+      isSqlCell(cell) ||
+      isMarkupCell(cell) ||
+      isJsCell(cell)
+    ) {
       return undefined;
     }
 

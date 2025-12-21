@@ -1,0 +1,17 @@
+{
+  "scopeName": "source.memcached",
+  "patterns": [
+    {
+      "name": "keyword.control.memcached",
+      "match": "\\b(get|cachedump|set|delete|flush_all)\\b"
+    },
+    {
+      "name": "constant.numeric.memcached",
+      "match": "\\b\\d+\\b"
+    },
+    {
+      "name": "string.unquoted.memcached",
+      "match": "[^\\s]+"
+    }
+  ]
+}

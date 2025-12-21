@@ -1,8 +1,8 @@
 {
   "name": "database-notebook",
   "displayName": "Database notebook",
-  "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.8.18",
+  "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
+  "version": "0.9.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -28,6 +28,7 @@
     "SQLServer",
     "SQLite",
     "Redis",
+    "Memcached",
     "AWS",
     "DynamoDB",
     "Keycloak",
@@ -73,6 +74,19 @@
           "dark": "media/dark/checklist.svg",
           "light": "media/light/checklist.svg"
         }
+      },
+      {
+        "id": "memcached",
+        "filenames": [
+          "*.memcached"
+        ],
+        "extensions": [
+          ".memcached"
+        ],
+        "aliases": [
+          "Memcached Command"
+        ],
+        "configuration": "./languages/memcached/memcached.json"
       },
       {
         "id": "rrule",
@@ -128,6 +142,11 @@
         "language": "cwql",
         "scopeName": "source.cloudwatch",
         "path": "./languages/cwql/syntaxe.json"
+      },
+      {
+        "language": "memcached",
+        "scopeName": "source.memcached",
+        "path": "./languages/memcached/syntaxe.json"
       }
     ],
     "notebooks": [
@@ -477,12 +496,12 @@
         },
         {
           "command": "database-notebook.show-scan-panel",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+scannable$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+,scannable.*/",
           "group": "inline"
         },
         {
           "command": "database-notebook.show-scan-panel",
-          "when": "view == database-notebook-connections && viewItem =~ /^.+scannable$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^.+,scannable.*/",
           "group": "db-resourc@2"
         },
         {
@@ -1244,7 +1263,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.10.31",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.10",
     "@l-v-yonsama/rdh": "^0.2.8",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

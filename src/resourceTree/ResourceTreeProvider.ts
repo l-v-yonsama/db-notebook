@@ -7,6 +7,7 @@ import {
   DbSubscription,
   DBType,
   IamClient,
+  MemcacheDatabase,
   MqttDatabase,
   parseDynamoAttrType,
   RdsDatabase,
@@ -212,12 +213,22 @@ export class DBDatabaseItem extends vscode.TreeItem {
           scannable = true;
         }
         break;
+      case ResourceType.MemcacheDatabase:
+        {
+          const res = resource as MemcacheDatabase;
+          iconPath = new vscode.ThemeIcon("server");
+          scannable = true;
+        }
+        break;
       case ResourceType.MqttDatabase:
         {
           const res = resource as MqttDatabase;
           iconPath = new vscode.ThemeIcon("database");
           scannable = false;
         }
+        break;
+      case ResourceType.Key:
+        iconPath = new vscode.ThemeIcon("key");
         break;
       case ResourceType.Schema:
       case ResourceType.Owner:
