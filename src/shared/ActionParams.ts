@@ -63,6 +63,7 @@ export type ActionCommand =
   | UpdateCodeResolverTextDocumentActionCommand
   | CountAllTablesActionCommand
   | OkActionCommand
+  | ReadyActionCommand
   | SubscribeActionCommand
   | UnsubscribeActionCommand
   | ExecuteActionCommand
@@ -141,6 +142,8 @@ export type SaveConnectionSettingActionCommand = {
 export type CancelActionCommand = BaseActionCommand<"cancel">;
 
 export type OkActionCommand = BaseActionCommand<"ok">;
+
+export type ReadyActionCommand = BaseActionCommand<"ready">;
 
 export type ExecuteActionCommand = BaseActionCommand<"execute">;
 

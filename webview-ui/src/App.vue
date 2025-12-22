@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import "./assets/scss/main.scss";
 import type { ComponentName, MessageEventData } from "./utilities/vscode";
+import { vscode } from "./utilities/vscode";
 
 import Chat2QueryPanel from "./components/Chat2QueryPanel.vue";
 import CreateInsertScriptSettingsPanel from "./components/CreateInsertScriptSettingsPanel.vue";
@@ -60,7 +61,8 @@ const subscriptionPayloadsViewRef = ref<InstanceType<typeof SubscriptionPayloads
 const subscriptionSettingPanelRef = ref<InstanceType<typeof SubscriptionSettingPanel>>();
 
 
-const currentComponentName = window.document.title as ComponentName;
+const currentComponentName = ref<ComponentName | null>(null);
+currentComponentName.value = window.document.title as ComponentName;
 
 function messageListener(evt: MessageEvent<MessageEventData>) {
   const { data } = evt;
@@ -146,6 +148,10 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
 onMounted(() => {
   window.removeEventListener("message", messageListener);
   window.addEventListener("message", messageListener);
+  vscode.postCommand({
+    command: "ready",
+    params: {},
+  });
 });
 </script>
 

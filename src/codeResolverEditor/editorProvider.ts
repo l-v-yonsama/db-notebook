@@ -21,6 +21,7 @@ import {
 import { CodeResolverParams } from "../shared/CodeResolverParams";
 import { ComponentName } from "../shared/ComponentName";
 import { CodeResolverEditorEventData } from "../shared/MessageEventData";
+import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { createWebviewContent } from "../utilities/webviewUtil";
 
@@ -76,7 +77,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
           },
         },
       };
-      await webviewPanel.webview.postMessage(msg);
+      webviewPanel.webview.postMessage(msg);
     };
 
     const changeDocumentSubscription = workspace.onDidChangeTextDocument(async (e) => {
@@ -101,15 +102,17 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
     // Receive message from the webview.
     webviewPanel.webview.onDidReceiveMessage(async (message: ActionCommand) => {
       const { command, params } = message;
-      // log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
+      log(`${PREFIX} ⭐️received message from webview command:[${command}]`);
       switch (command) {
+        case "ready":
+          await updateWebview();
+          break;
         case "updateCodeResolverTextDocument":
           await this.updateTextDocument(document, params);
           break;
       }
     });
 
-    await updateWebview();
   }
 
   private async updateTextDocument(
