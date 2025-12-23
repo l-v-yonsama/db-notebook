@@ -550,6 +550,7 @@ export type CodeResolverEditorEventData = BaseMessageEventData<
       columnNameList: NameWithComment[];
       resolver: CodeResolverParams;
       scrollPos: number;
+      isDirty: boolean;
     };
   }
 >;

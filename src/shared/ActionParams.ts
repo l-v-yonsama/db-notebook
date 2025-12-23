@@ -189,6 +189,8 @@ export type UpdateCodeResolverTextDocumentActionCommand = BaseActionCommand<
       detail?: any;
     };
     scrollPos: number;
+    save?: boolean;
+    openAsJson?: boolean;
   }
 >;
 

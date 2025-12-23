@@ -51,12 +51,14 @@ const editorItem = ref({
 const tableItems = [] as DropdownItem[];
 const columnItems = [] as DropdownItem[];
 const items = ref([] as (CodeItem & { originalIndex: number })[]);
+const isDirty = ref(false);
 
 const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void => {
   if (v === undefined) {
     return;
   }
   resolver = v.resolver;
+  isDirty.value = v.isDirty;
   keyword.value = v.resolver.editor.keyword ?? "";
   connectionName.value = v.resolver.editor.connectionName;
   connectionItems.splice(0, connectionItems.length);
@@ -171,9 +173,15 @@ const createEditorParams = (): CodeResolverParams["editor"] => {
   };
 };
 
-const updateTextDocument = (
+type UpdateParams = {
   values?: UpdateCodeResolverTextDocumentActionCommand["params"]["values"]
-) => {
+  save?: boolean;
+  openAsJson?: boolean;
+};
+const updateTextDocument = (params?: UpdateParams) => {
+  const values = params?.values;
+  const save = params?.save;
+
   const obj: CodeResolverParams = {
     editor: createEditorParams(),
     items: items.value,
@@ -186,6 +194,8 @@ const updateTextDocument = (
       newText,
       values,
       scrollPos: lastKnownScrollPosition,
+      save,
+      openAsJson: params?.openAsJson
     },
   });
 };
@@ -220,17 +230,20 @@ const addDetail = () => {
 };
 
 const changeDetail = (detail: CodeItemDetail) => {
-  if (
-    (detail.code.length > 0 && detail.label.length > 0) ||
-    (detail.code.length === 0 && detail.label.length === 0)
-  ) {
-    updateTextDocument();
-  }
+  updateTextDocument();
 };
 
 const deleteDetail = (index: number) => {
   editorItem.value.details.splice(index, 1);
   updateTextDocument();
+};
+
+const save = async () => {
+  updateTextDocument({ save: true });
+};
+
+const openAsJson = async () => {
+  updateTextDocument({ openAsJson: true });
 };
 
 const recieveMessage = (data: CodeResolverEditorEventData) => {
@@ -256,71 +269,51 @@ defineExpose({
     <div v-if="visibleEditor" class="toolbar">
       <div class="tool-left">
         <label for="connectionName">Connection setting</label>
-        <VsCodeDropdown
-          id="connectionName"
-          v-model="connectionName"
-          :items="connectionItems"
-          @change="updateTextDocument({ name: 'change', detail: 'connectionName' })"
-        />
+        <VsCodeDropdown id="connectionName" v-model="connectionName" :items="connectionItems"
+          @change="updateTextDocument({ values: { name: 'change', detail: 'connectionName' } })" />
       </div>
       <div class="tool-right">
-        <VsCodeButton
-          @click="updateTextDocument({ name: 'cancel' })"
-          appearance="secondary"
-          title="Cancel"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton @click="updateTextDocument({ name: 'save-code-item' })" title="Save"
-          ><fa icon="check" />Ok</VsCodeButton
-        >
+        <VsCodeButton @click="updateTextDocument({ values: { name: 'cancel' } })" appearance="secondary" title="Cancel">
+          <fa icon="times" />Cancel
+        </VsCodeButton>
+        <VsCodeButton @click="updateTextDocument({ values: { name: 'save-code-item' } })" title="Save">
+          <fa icon="check" />Ok
+        </VsCodeButton>
       </div>
     </div>
     <div v-else class="toolbar">
       <div class="tool-left">
-        <label for="keyword"> <fa icon="search" style="margin-right: 3px" />Search </label>
-        <VsCodeTextField
-          id="keyword"
-          v-model="keyword"
-          :maxlength="128"
-          :change-on-mouseout="true"
-          title="keyword"
-          placeholder="Enter a keyword"
-          @change="updateTextDocument()"
-        >
+        <label for="keyword">
+          <fa icon="search" style="margin-right: 3px" />Search
+        </label>
+        <VsCodeTextField id="keyword" v-model="keyword" :maxlength="128" :change-on-mouseout="true" title="keyword"
+          placeholder="Enter a keyword" @change="updateTextDocument()">
         </VsCodeTextField>
       </div>
       <div class="tool-right">
-        <VsCodeButton @click="updateTextDocument({ name: 'add-code-item' })" title="Add code item"
-          ><fa icon="plus" />Add code item</VsCodeButton
-        >
+        <VsCodeButton @click="openAsJson" appearance="secondary" title="Open as JSON">
+          <fa icon="file" />Open as JSON
+        </VsCodeButton>
+        <VsCodeButton @click="updateTextDocument({ values: { name: 'add-code-item' } })" appearance="secondary"
+          title="Add code item">
+          <fa icon="plus" />Add code item
+        </VsCodeButton>
+        <VsCodeButton @click="save" title="Save" :disabled="!isDirty">
+          <fa icon="save" />Save
+        </VsCodeButton>
       </div>
     </div>
     <div class="cr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div v-if="visibleEditor" class="editor">
         <div class="code-name">
           <label :for="`codeName`">Code name</label>
-          <VsCodeTextField
-            :id="`codeName`"
-            v-model="editorItem.title"
-            :maxlength="128"
-            :transparent="true"
-            :required="true"
-            :change-on-mouseout="true"
-            style="flex-grow: 1"
-            @change="updateTextDocument()"
-          />
+          <VsCodeTextField :id="`codeName`" v-model="editorItem.title" :maxlength="128" :transparent="true"
+            :required="true" :change-on-mouseout="true" style="flex-grow: 1" @change="updateTextDocument()" />
         </div>
         <div class="description">
           <label :for="`description`">Description</label>
-          <VsCodeTextField
-            :id="`description`"
-            v-model="editorItem.description"
-            :maxlength="256"
-            :transparent="true"
-            :change-on-mouseout="true"
-            style="flex-grow: 1"
-            @change="updateTextDocument()"
-          />
+          <VsCodeTextField :id="`description`" v-model="editorItem.description" :maxlength="256" :transparent="true"
+            :change-on-mouseout="true" style="flex-grow: 1" @change="updateTextDocument()" />
         </div>
         <fieldset class="resource">
           <legend>Applicable Resources</legend>
@@ -328,45 +321,26 @@ defineExpose({
             <tbody>
               <tr>
                 <td style="width: 130px">
-                  <vscode-checkbox
-                    :checked="editorItem.resource.table !== undefined"
-                    @change="($e:any) => handleChangeSpecifyResourceTable($e.target.checked)"
-                    style="margin-right: auto"
-                    >Specify table</vscode-checkbox
-                  >
+                  <vscode-checkbox :checked="editorItem.resource.table !== undefined"
+                    @change="($e: any) => handleChangeSpecifyResourceTable($e.target.checked)"
+                    style="margin-right: auto">Specify table</vscode-checkbox>
                 </td>
                 <td style="width: 170px">
                   <template v-if="editorItem.resource.table !== undefined">
-                    <vscode-checkbox
-                      :checked="editorItem.resource.table.regex"
-                      @change="($e:any) => handleChangeRegexResource('table', $e.target.checked)"
-                      >Regular expression</vscode-checkbox
-                    >
+                    <vscode-checkbox :checked="editorItem.resource.table.regex"
+                      @change="($e: any) => handleChangeRegexResource('table', $e.target.checked)">Regular
+                      expression</vscode-checkbox>
                   </template>
                 </td>
                 <td>
                   <template v-if="editorItem.resource.table !== undefined">
-                    <VsCodeDropdown
-                      v-if="!editorItem.resource.table.regex"
-                      :id="`resourceTable`"
-                      v-model="editorItem.resource.table.pattern"
-                      :items="tableItems"
-                      :transparent="true"
-                      :required="true"
-                      style="z-index: 11"
-                      @change="updateTextDocument()"
-                    ></VsCodeDropdown>
+                    <VsCodeDropdown v-if="!editorItem.resource.table.regex" :id="`resourceTable`"
+                      v-model="editorItem.resource.table.pattern" :items="tableItems" :transparent="true"
+                      :required="true" style="z-index: 11" @change="updateTextDocument()"></VsCodeDropdown>
 
-                    <VsCodeTextField
-                      v-if="editorItem.resource.table.regex"
-                      :id="`resourceTable`"
-                      v-model="editorItem.resource.table.pattern"
-                      :maxlength="256"
-                      :transparent="true"
-                      :required="true"
-                      :change-on-mouseout="true"
-                      @change="updateTextDocument()"
-                    ></VsCodeTextField>
+                    <VsCodeTextField v-if="editorItem.resource.table.regex" :id="`resourceTable`"
+                      v-model="editorItem.resource.table.pattern" :maxlength="256" :transparent="true" :required="true"
+                      :change-on-mouseout="true" @change="updateTextDocument()"></VsCodeTextField>
                   </template>
                 </td>
               </tr>
@@ -375,33 +349,18 @@ defineExpose({
                   <label :for="`resourceColumn`">Column</label>
                 </td>
                 <td>
-                  <vscode-checkbox
-                    :checked="editorItem.resource.column.regex"
-                    @change="($e:any) => handleChangeRegexResource(  'column', $e.target.checked)"
-                    >Regular expression</vscode-checkbox
-                  >
+                  <vscode-checkbox :checked="editorItem.resource.column.regex"
+                    @change="($e: any) => handleChangeRegexResource('column', $e.target.checked)">Regular
+                    expression</vscode-checkbox>
                 </td>
                 <td>
-                  <VsCodeDropdown
-                    v-if="!editorItem.resource.column.regex"
-                    :id="`resourceColumn`"
-                    v-model="editorItem.resource.column.pattern"
-                    :items="columnItems"
-                    :transparent="true"
-                    :required="true"
-                    @change="updateTextDocument()"
-                  ></VsCodeDropdown>
+                  <VsCodeDropdown v-if="!editorItem.resource.column.regex" :id="`resourceColumn`"
+                    v-model="editorItem.resource.column.pattern" :items="columnItems" :transparent="true"
+                    :required="true" @change="updateTextDocument()"></VsCodeDropdown>
 
-                  <VsCodeTextField
-                    v-if="editorItem.resource.column.regex"
-                    :id="`resourceColumn`"
-                    v-model="editorItem.resource.column.pattern"
-                    :maxlength="256"
-                    :transparent="true"
-                    :required="true"
-                    :change-on-mouseout="true"
-                    @change="updateTextDocument()"
-                  ></VsCodeTextField>
+                  <VsCodeTextField v-if="editorItem.resource.column.regex" :id="`resourceColumn`"
+                    v-model="editorItem.resource.column.pattern" :maxlength="256" :transparent="true" :required="true"
+                    :change-on-mouseout="true" @change="updateTextDocument()"></VsCodeTextField>
                 </td>
               </tr>
             </tbody>
@@ -411,13 +370,9 @@ defineExpose({
           <legend>
             <span>Details</span>
 
-            <VsCodeButton
-              @click="addDetail"
-              title="Add detail"
-              appearance="secondary"
-              style="margin-left: 2px"
-              ><fa icon="plus" />Add detail</VsCodeButton
-            >
+            <VsCodeButton @click="addDetail" title="Add detail" appearance="secondary" style="margin-left: 2px">
+              <fa icon="plus" />Add detail
+            </VsCodeButton>
           </legend>
           <table v-if="editorItem.details.length > 0">
             <thead>
@@ -431,34 +386,19 @@ defineExpose({
               <tr v-for="(detail, idx2) of editorItem.details">
                 <td class="no" style="text-align: right">{{ idx2 + 1 }}</td>
                 <td class="code">
-                  <VsCodeTextField
-                    v-model="editorItem.details[idx2].code"
-                    :maxlength="256"
-                    :transparent="true"
-                    :required="true"
-                    :change-on-mouseout="true"
-                    @change="changeDetail(detail)"
-                  ></VsCodeTextField>
+                  <VsCodeTextField v-model="editorItem.details[idx2].code" :maxlength="256" :transparent="true"
+                    :required="true" :change-on-mouseout="true" @change="changeDetail(detail)"></VsCodeTextField>
                 </td>
                 <td class="label">
-                  <VsCodeTextField
-                    v-model="editorItem.details[idx2].label"
-                    :maxlength="256"
-                    :transparent="true"
-                    :required="true"
-                    :change-on-mouseout="true"
-                    style="flex-grow: 1"
-                    @change="changeDetail(detail)"
-                  ></VsCodeTextField>
+                  <VsCodeTextField v-model="editorItem.details[idx2].label" :maxlength="256" :transparent="true"
+                    :required="true" :change-on-mouseout="true" style="flex-grow: 1" @change="changeDetail(detail)">
+                  </VsCodeTextField>
                 </td>
                 <td style="width: 85px">
-                  <VsCodeButton
-                    @click="deleteDetail(idx2)"
-                    title="Delete detail"
-                    appearance="secondary"
-                    style="margin-left: 2px"
-                    ><fa icon="trash" />Delete</VsCodeButton
-                  >
+                  <VsCodeButton @click="deleteDetail(idx2)" title="Delete detail" appearance="secondary"
+                    style="margin-left: 2px">
+                    <fa icon="trash" />Delete
+                  </VsCodeButton>
                 </td>
               </tr>
             </tbody>
@@ -486,61 +426,52 @@ defineExpose({
                   <td class="code-name">
                     <Paragraph :text="item.title" :highlight-text="keyword" />
                     <div class="controller">
-                      <VsCodeButton
-                        @click="
-                          updateTextDocument({ name: 'edit-code-item', detail: item.originalIndex })
-                        "
-                        title="Edit code"
-                        appearance="secondary"
-                        ><fa icon="pencil" />Edit</VsCodeButton
-                      >
-                      <VsCodeButton
-                        @click="
-                          updateTextDocument({
+                      <VsCodeButton @click="
+                        updateTextDocument({ values: { name: 'edit-code-item', detail: item.originalIndex } })
+                        " title="Edit code" appearance="secondary">
+                        <fa icon="pencil" />Edit
+                      </VsCodeButton>
+                      <VsCodeButton @click="
+                        updateTextDocument({
+                          values: {
                             name: 'duplicate-code-item',
                             detail: item.originalIndex,
-                          })
-                        "
-                        title="Duplicate code"
-                        appearance="secondary"
-                        ><fa icon="plus" />Duplicate</VsCodeButton
-                      >
-                      <VsCodeButton
-                        @click="
-                          updateTextDocument({
+                          }
+                        })
+                        " title="Duplicate code" appearance="secondary">
+                        <fa icon="plus" />Duplicate
+                      </VsCodeButton>
+                      <VsCodeButton @click="
+                        updateTextDocument({
+                          values: {
                             name: 'delete-code-item',
                             detail: item.originalIndex,
-                          })
-                        "
-                        title="Delete code"
-                        appearance="secondary"
-                        ><fa icon="trash" />Delete</VsCodeButton
-                      >
+                          }
+                        })
+                        " title="Delete code" appearance="secondary">
+                        <fa icon="trash" />Delete
+                      </VsCodeButton>
                     </div>
                   </td>
                   <td class="w150">
                     <div v-if="item.resource.table">
                       <span>TABLE:</span>
-                      <Paragraph
-                        :text="item.resource.table.pattern"
-                        :highlight-text="keyword"
-                        style="display: inline-block"
-                      />
+                      <Paragraph :text="item.resource.table.pattern" :highlight-text="keyword"
+                        style="display: inline-block" />
                       <span v-if="item.resource.table.regex">(REGEX)</span>
                     </div>
                     <div>
                       <span>COLMUN:</span>
-                      <Paragraph
-                        :text="item.resource.column.pattern"
-                        :highlight-text="keyword"
-                        style="display: inline-block"
-                      />
+                      <Paragraph :text="item.resource.column.pattern" :highlight-text="keyword"
+                        style="display: inline-block" />
                       <span v-if="item.resource.column.regex">(REGEX)</span>
                     </div>
                   </td>
                   <td class="w100">-</td>
                   <td class="w150">-</td>
-                  <td><Paragraph :text="item.description" :highlight-text="keyword" /></td>
+                  <td>
+                    <Paragraph :text="item.description" :highlight-text="keyword" />
+                  </td>
                 </tr>
               </template>
               <template v-else>
@@ -548,60 +479,53 @@ defineExpose({
                   <td v-if="idx2 === 0" :rowspan="item.details.length" class="code-name">
                     <Paragraph :text="item.title" :highlight-text="keyword" />
                     <div class="controller">
-                      <VsCodeButton
-                        @click="
-                          updateTextDocument({ name: 'edit-code-item', detail: item.originalIndex })
-                        "
-                        title="Edit code"
-                        appearance="secondary"
-                        ><fa icon="pencil" />Edit</VsCodeButton
-                      >
-                      <VsCodeButton
-                        @click="
-                          updateTextDocument({
+                      <VsCodeButton @click="
+                        updateTextDocument({ values: { name: 'edit-code-item', detail: item.originalIndex } })
+                        " title="Edit code" appearance="secondary">
+                        <fa icon="pencil" />Edit
+                      </VsCodeButton>
+                      <VsCodeButton @click="
+                        updateTextDocument({
+                          values: {
                             name: 'duplicate-code-item',
                             detail: item.originalIndex,
-                          })
-                        "
-                        title="Duplicate code"
-                        appearance="secondary"
-                        ><fa icon="plus" />Duplicate</VsCodeButton
-                      >
-                      <VsCodeButton
-                        @click="
-                          updateTextDocument({
+                          }
+                        })
+                        " title="Duplicate code" appearance="secondary">
+                        <fa icon="plus" />Duplicate
+                      </VsCodeButton>
+                      <VsCodeButton @click="
+                        updateTextDocument({
+                          values: {
                             name: 'delete-code-item',
                             detail: item.originalIndex,
-                          })
-                        "
-                        title="Delete code"
-                        appearance="secondary"
-                        ><fa icon="trash" />Delete</VsCodeButton
-                      >
+                          }
+                        })
+                        " title="Delete code" appearance="secondary">
+                        <fa icon="trash" />Delete
+                      </VsCodeButton>
                     </div>
                   </td>
                   <td v-if="idx2 === 0" :rowspan="item.details.length" class="w150">
                     <div v-if="item.resource.table">
                       <span>TABLE:</span>
-                      <Paragraph
-                        :text="item.resource.table.pattern"
-                        :highlight-text="keyword"
-                        style="display: inline-block"
-                      />
+                      <Paragraph :text="item.resource.table.pattern" :highlight-text="keyword"
+                        style="display: inline-block" />
                       <span v-if="item.resource.table.regex">(REGEX)</span>
                     </div>
                     <div>
                       <span>COLMUN:</span>
-                      <Paragraph
-                        :text="item.resource.column.pattern"
-                        :highlight-text="keyword"
-                        style="display: inline-block"
-                      />
+                      <Paragraph :text="item.resource.column.pattern" :highlight-text="keyword"
+                        style="display: inline-block" />
                       <span v-if="item.resource.column.regex">(REGEX)</span>
                     </div>
                   </td>
-                  <td class="w100"><Paragraph :text="detail.code" :highlight-text="keyword" /></td>
-                  <td class="w150"><Paragraph :text="detail.label" :highlight-text="keyword" /></td>
+                  <td class="w100">
+                    <Paragraph :text="detail.code" :highlight-text="keyword" />
+                  </td>
+                  <td class="w150">
+                    <Paragraph :text="detail.label" :highlight-text="keyword" />
+                  </td>
                   <td v-if="idx2 === 0" :rowspan="item.details.length">
                     <Paragraph :text="item.description" :highlight-text="keyword" />
                   </td>
@@ -630,6 +554,7 @@ div.editor {
     z-index: 5;
   }
 }
+
 div.description {
   display: flex;
   flex-direction: row;
@@ -641,6 +566,7 @@ div.code-name {
   align-items: center;
   column-gap: 5px;
 }
+
 fieldset {
   display: flex;
   align-items: center;
@@ -648,6 +574,7 @@ fieldset {
   margin-left: 20px;
   column-gap: 5px;
 }
+
 legend {
   width: -webkit-fill-available;
 }
@@ -657,7 +584,7 @@ fieldset.resource {
   margin-top: 3px;
   margin-bottom: 3px;
 
-  & > table {
+  &>table {
     width: 100%;
 
     vscode-dropdown,
@@ -676,6 +603,7 @@ fieldset.details {
     }
   }
 }
+
 label {
   margin-right: 4px;
 }
@@ -684,6 +612,7 @@ label {
   overflow: auto;
   flex-grow: 1;
 }
+
 section.items {
   padding: 5px;
   flex-grow: 1;
@@ -724,12 +653,13 @@ section.items {
         width: 255px;
         background-color: var(--vscode-editorPane-background);
 
-        & > .controller {
+        &>.controller {
           display: flex;
           justify-content: space-between;
           visibility: hidden;
         }
-        &:hover > .controller {
+
+        &:hover>.controller {
           visibility: visible;
         }
       }
@@ -750,6 +680,7 @@ section.items {
   width: 100px;
   max-width: 100px;
 }
+
 .w150 {
   width: 150px;
   max-width: 150px;

@@ -1,14 +1,17 @@
 import {
   CancellationToken,
+  commands,
   CustomTextEditorProvider,
   Disposable,
   ExtensionContext,
+  languages,
   Range,
   TextDocument,
+  ViewColumn,
   WebviewPanel,
-  WorkspaceEdit,
   window,
   workspace,
+  WorkspaceEdit,
 } from "vscode";
 
 import { RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -74,6 +77,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
             columnNameList: this.columnNameList,
             resolver,
             scrollPos: this.scrollPos,
+            isDirty: document.isDirty,
           },
         },
       };
@@ -112,14 +116,13 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
           break;
       }
     });
-
   }
 
   private async updateTextDocument(
     document: TextDocument,
     params: UpdateCodeResolverTextDocumentActionCommand["params"]
   ) {
-    const { newText, values, scrollPos } = params;
+    const { newText, values, scrollPos, save, openAsJson } = params;
     this.scrollPos = scrollPos;
     const edit = new WorkspaceEdit();
 
@@ -227,7 +230,28 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
       JSON.stringify(codeResolver, null, 1)
     );
 
-    return workspace.applyEdit(edit);
+    await workspace.applyEdit(edit);
+    if (save) {
+      workspace.save(document.uri);
+    }
+    if (openAsJson) {
+      await commands.executeCommand(
+        "vscode.openWith",
+        document.uri,
+        "default", // ← 標準 Text Editor
+        {
+          viewColumn: ViewColumn.Active,
+          preserveFocus: false,
+        }
+      );
+      const openedDoc = window.activeTextEditor?.document;
+      if (!openedDoc) {
+        return;
+      }
+      if (openedDoc.languageId !== "json") {
+        await languages.setTextDocumentLanguage(openedDoc, "json");
+      }
+    }
   }
 
   private async initDbResourceParams(connectionName?: string) {
