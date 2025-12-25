@@ -20,7 +20,6 @@ import {
 import * as dayjs from "dayjs";
 import { EnumValues } from "enum-values";
 import * as Excel from "exceljs";
-import { Fill } from "exceljs";
 import * as os from "os";
 import { getOutputConfig, getResultsetConfig } from "./configUtil";
 
@@ -1142,39 +1141,33 @@ function setTableHeaderCell(cell: Excel.Cell) {
 }
 
 function fillCell(cell: Excel.Cell, type: AnnotationType) {
-  let fill: Fill | undefined = undefined;
+  let fgColor: string | undefined;
+
   switch (type) {
     case "Add":
-      fill = {
-        type: "pattern",
-        pattern: "lightGrid",
-        fgColor: { argb: "40c3e88d" },
-      };
+      // GitHub diff: green
+      fgColor = "FFDFF0D8";
       break;
     case "Upd":
-      fill = {
-        type: "pattern",
-        pattern: "gray125",
-        fgColor: { argb: "407053ff" },
-      };
+      // GitHub diff: blue
+      fgColor = "FFD9EDF7";
       break;
     case "Del":
-      fill = {
-        type: "pattern",
-        pattern: "lightHorizontal",
-        fgColor: { argb: "e0ff5370" },
-      };
+      // GitHub diff: red
+      fgColor = "FFF2DEDE";
       break;
     case "Rul":
-      fill = {
-        type: "pattern",
-        pattern: "lightTrellis",
-        fgColor: { argb: "30e8e853" },
-      };
+      // warning / rule
+      fgColor = "FFFCF8E3";
       break;
   }
-  if (fill) {
-    cell.fill = fill;
+
+  if (fgColor) {
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: fgColor },
+    };
   }
 }
 
