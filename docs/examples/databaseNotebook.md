@@ -6,6 +6,7 @@ This page shows an example of the use of the VS code extension "Database Noteboo
 
 - 1. [Query examples](#1-query-examples)
   - 1.1. [Bind parameters in query](#11-bind-parameters-in-query)
+  - 1.2. [Variable sharing advanced examples (LIKE / IN)](./databaseNotebookVariableSharing.md)
 - 2. [Controlling the Database with Javascript](#2-controlling-the-database-with-javascript)
   - 2.1. [Inserting parent and child records in the same transaction](#21-inserting-parent-and-child-records-in-the-same-transaction)
 
@@ -29,6 +30,14 @@ SELECT customer_no, age FROM customer WHERE age IN (10, 20, 30) ORDER BY custome
 | 3 | 7782 | 20 |
 
 ### 1.1. Bind parameters in query
+
+> **More examples**
+>
+> For more practical examples of bind parameters — including
+> exact match, partial match (`LIKE`), and `IN (:list)` patterns —
+> see the following document:
+>
+> - [Variable sharing between notebook cells – LIKE and IN examples](./databaseNotebookVariableSharing.md)
 
 #### Define cells.
 

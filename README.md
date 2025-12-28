@@ -17,6 +17,8 @@ It also provides a CSV and Har file preview feature.
   - Execute explain analyze (Displays actual execution time and statistics)
 - SQL history management
 - Variable sharing between notebook cells
+  - See practical SQL examples using shared variables (LIKE, IN, exact match):
+    [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
 - Count all tables in the schema
 - Provide IntelliSense with database resource names and comments
@@ -173,6 +175,7 @@ It also provides a CSV and Har file preview feature.
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
+- [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 
 ## Keyboard shortcuts
 
