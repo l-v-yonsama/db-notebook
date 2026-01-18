@@ -277,6 +277,8 @@ export class MainController {
   }
 
   private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
+    window.setStatusBarMessage("Interrupted", 3000);
+
     // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
     if (noteSession) {
@@ -335,6 +337,7 @@ export class MainController {
     notebook: NotebookDocument,
     _controller: NotebookController
   ): Promise<void> {
+    const startTime = Date.now();
     log(`${PREFIX} _executeAll START`);
     const config = getNodeConfig();
     await initializeStorageTmpPath(config.tmpDirPath);
@@ -358,7 +361,13 @@ export class MainController {
     const targetCells = preExecCells;
     targetCells.push(...iCells.filter((it) => !isPreExecution(it)));
 
-    for (let cell of targetCells) {
+    for (let cellIndex = 0; cellIndex < targetCells.length; cellIndex++) {
+      const cell = targetCells[cellIndex];
+      // リアルタイム表示
+      window.setStatusBarMessage(
+        `Executing (${cellIndex + 1}/${targetCells.length})`,
+        0 // 消えない
+      );
       if (noteSession.interrupted) {
         break;
       }
@@ -373,6 +382,15 @@ export class MainController {
     noteSession.kernel = undefined;
     this.noteSessions.delete(notebook.uri.path);
 
+    if (targetCells.length > 1) {
+      let message = "Interrupted";
+      if (!noteSession.interrupted) {
+        message = `Executed ${targetCells.length} cells in ${
+          (Date.now() - startTime) / 1000
+        } seconds.`;
+      }
+      window.setStatusBarMessage(message, 2000);
+    }
     // log(`${PREFIX} _executeAll END`);
   }
 
@@ -438,14 +456,14 @@ export class MainController {
         } = metadata;
 
         if (rdh) {
-          rdh.meta['languageId'] = cell.document.languageId;
+          rdh.meta["languageId"] = cell.document.languageId;
           const toMarkdownConfig = getToStringParamByConfig({
             maxPrintLines: getResultsetConfig().maxRowsInPreview,
             maxCellValueLength: getResultsetConfig().maxCharactersInCell,
             withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
             withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
           });
-          const title = rdh.meta.command ? 'Command Result' : 'Query Result';
+          const title = rdh.meta.command ? "Command Result" : "Query Result";
           outputs.push(
             new NotebookCellOutput(
               [

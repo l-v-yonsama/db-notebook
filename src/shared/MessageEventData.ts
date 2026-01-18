@@ -551,6 +551,7 @@ export type CodeResolverEditorEventData = BaseMessageEventData<
       resolver: CodeResolverParams;
       scrollPos: number;
       isDirty: boolean;
+      keyword: string;
     };
   }
 >;

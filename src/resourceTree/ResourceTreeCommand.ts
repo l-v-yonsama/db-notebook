@@ -42,12 +42,13 @@ import {
   FLUSH_DB,
   GET_LOCKS,
   GET_SESSIONS,
+  LOAD_DB_SCHEMA,
   OPEN_CHAT_2_QUERY,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
+  OPEN_DB_NOTEBOOK,
   OPEN_TOOLS_VIEWER,
   REFRESH_RESOURCES,
   REMOVE_SUBSCRIPTION,
-  RETRIEVE_RESOURCES,
   RETRIEVE_TABLE_RECORDS,
   SHOW_CONNECTION_SETTING,
   SHOW_DYNAMO_QUERY_PANEL,
@@ -69,6 +70,7 @@ import { PublishEditorPanel } from "../panels/PublishEditorPanel";
 import { ScanPanel } from "../panels/ScanPanel";
 import { SubscriptionSettingPanel } from "../panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "../panels/ViewConditionPanel";
+import { CellMeta } from "../types/Notebook";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { log } from "../utilities/logger";
@@ -159,7 +161,16 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     dbResourceTree.refresh(true);
   });
 
-  commands.registerCommand(RETRIEVE_RESOURCES, async (conRes: DbConnection) => {
+  commands.registerCommand(OPEN_DB_NOTEBOOK, async (conRes: DbConnection) => {
+    const cell = new NotebookCellData(NotebookCellKind.Code, '', 'sql');
+    const metadata: CellMeta = {
+      connectionName: conRes.name
+    };
+    cell.metadata = metadata;
+    commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+  });
+
+  commands.registerCommand(LOAD_DB_SCHEMA, async (conRes: DbConnection) => {
     try {
       conRes.isInProgress = true;
       dbResourceTree.changeConnectionTreeData(conRes);
@@ -401,7 +412,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
           return;
         }
         await driver.flushDb();
-        commands.executeCommand(RETRIEVE_RESOURCES, conRes);
+        commands.executeCommand(LOAD_DB_SCHEMA, conRes);
       });
     })
   );

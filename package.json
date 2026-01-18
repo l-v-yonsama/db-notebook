@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -300,12 +300,22 @@
       ],
       "view/item/context": [
         {
-          "command": "database-notebook.retrieve-resources",
+          "command": "database-notebook.open-db-notebook",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
           "group": "inline"
         },
         {
-          "command": "database-notebook.retrieve-resources",
+          "command": "database-notebook.open-db-notebook",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
+          "group": "others@3"
+        },
+        {
+          "command": "database-notebook.load-database-schema",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.load-database-schema",
           "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
           "group": "others@3"
         },
@@ -629,7 +639,7 @@
         },
         {
           "command": "database-notebook.toolbar.specify-using-database-all",
-          "group": "navigation/execute@1",
+          "group": "more",
           "when": "notebookType == 'database-notebook-type' && hasSql"
         },
         {
@@ -669,6 +679,16 @@
         {
           "command": "database-notebook.cell-toolbar-format",
           "group": "inline",
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
+        },
+        {
+          "command": "database-notebook.cell-toolbar-duplicate-with-metadata",
+          "group": "inline",
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
+        },
+        {
+          "command": "database-notebook.cell-toolbar-duplicate-with-metadata",
+          "group": "1_modification",
           "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
         }
       ]
@@ -827,10 +847,16 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "database-notebook.retrieve-resources",
-        "title": "Retrieve DB Resources",
-        "shortTitle": "Retrieve",
+        "command": "database-notebook.load-database-schema",
+        "title": "Load Database Schema",
+        "shortTitle": "Load DB Schema",
         "icon": "$(list-tree)"
+      },
+      {
+        "command": "database-notebook.open-db-notebook",
+        "title": "Open Database Notebook",
+        "shortTitle": "Open DB Notebook",
+        "icon": "$(database)"
       },
       {
         "command": "database-notebook.specify-default-connection-for-sql-cell",
@@ -969,6 +995,12 @@
         "title": "Format this document",
         "shortTitle": "Format",
         "icon": "$(word-wrap)"
+      },
+      {
+        "command": "database-notebook.cell-toolbar-duplicate-with-metadata",
+        "title": "Duplicate Cell with metadata",
+        "shortTitle": "Duplicate Cell",
+        "icon": "$(files)"
       },
       {
         "command": "database-notebook.show-csv-file",
@@ -1191,23 +1223,29 @@
           "default": 100,
           "description": "Specify the number of records to return"
         },
-        "output.Excel: display TOC": {
+        "output.Excel: Create Table of Contents": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Display TOC in Excel"
+          "description": "Creates a table of contents sheet with links to each ResultSet in Excel"
         },
-        "output.Excel: display table-name, sql-statement": {
+        "output.Excel: Show Query and Table Info": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Display table names and SQL statements for each data in Excel"
+          "description": "Shows the SELECT statement and target table before each ResultSet table"
         },
-        "output.Html: display TOC": {
+        "output.Excel: enable cross-pair links": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Display TOC in HTML"
+          "description": "Adds clickable links to jump between the before and after ResultSet sheets"
+        },
+        "output.Html: Create Table of Contents": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": true,
+          "description": "Creates a table of contents sheet with links to each ResultSet in HTML"
         },
         "output.Html: display graphs": {
           "scope": "resource",
@@ -1263,8 +1301,8 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.10",
-    "@l-v-yonsama/rdh": "^0.2.8",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.11",
+    "@l-v-yonsama/rdh": "^0.2.10",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",

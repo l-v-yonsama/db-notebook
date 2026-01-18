@@ -32,6 +32,7 @@ export type OutputParams = TabIdParam & {
 
 export type ActionCommand =
   | CancelActionCommand
+  | ShowMessageActionCommand
   | CompareActionCommand
   | ConnectActionCommand
   | CreateERDiagramActionCommand
@@ -57,9 +58,9 @@ export type ActionCommand =
   | TestConnectionSettingActionCommand
   | SaveConnectionSettingActionCommand
   | SaveValuesActionCommand
-  | ShowErrorActionCommand
   | DeleteKeyActionCommand
   | UpdateTextDocumentActionCommand
+  | UpdateKeywordActionCommand
   | UpdateCodeResolverTextDocumentActionCommand
   | CountAllTablesActionCommand
   | OkActionCommand
@@ -79,7 +80,11 @@ export type BaseActionCommand<T extends string, U = any> = {
   params: U;
 };
 
-export type ShowErrorActionCommand = BaseActionCommand<"showError", { message: string }>;
+export type ShowMessageActionCommand = BaseActionCommand<"showMessage", {
+  type?: "info" | "warn" | "error";
+  
+  message: string 
+}>;
 
 export type KillActionCommand = BaseActionCommand<"kill", { sessionOrPid: number | undefined }>;
 
@@ -90,6 +95,7 @@ export type UnsubscribeActionCommand = BaseActionCommand<
   "unsubscribe",
   { subscriptionName: string }
 >;
+export type UpdateKeywordActionCommand = BaseActionCommand<"updateKeyword", { keyword: string }>;
 
 export type SelectFileActionCommand = BaseActionCommand<
   "selectFileActionCommand",
@@ -191,6 +197,7 @@ export type UpdateCodeResolverTextDocumentActionCommand = BaseActionCommand<
     scrollPos: number;
     save?: boolean;
     openAsJson?: boolean;
+    keyword: string;
   }
 >;
 

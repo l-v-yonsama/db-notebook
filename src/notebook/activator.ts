@@ -1,57 +1,60 @@
 import {
-  DBType,
-  isPartiQLType,
-  isRDSType,
-  MqttQoS,
-  ResourceType,
-  separateMultipleQueries,
+    DBType,
+    isPartiQLType,
+    isRDSType,
+    MqttQoS,
+    ResourceType,
+    separateMultipleQueries,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as dayjs from "dayjs";
 import * as path from "path";
 import sqlFormatter from "sql-formatter-plus";
 import {
-  commands,
-  ExtensionContext,
-  NotebookCell,
-  NotebookCellData,
-  NotebookCellKind,
-  NotebookData,
-  NotebookEdit,
-  Range,
-  TextEdit,
-  Uri,
-  window,
-  workspace,
-  WorkspaceEdit,
+    commands,
+    ExtensionContext,
+    NotebookCell,
+    NotebookCellData,
+    NotebookCellKind,
+    NotebookCellOutput,
+    NotebookCellOutputItem,
+    NotebookData,
+    NotebookEdit,
+    Range,
+    TextEdit,
+    Uri,
+    window,
+    workspace,
+    WorkspaceEdit,
 } from "vscode";
 import {
-  CELL_EXECUTE_EXPLAIN,
-  CELL_EXECUTE_EXPLAIN_ANALYZE,
-  CELL_EXECUTE_QUERY,
-  CELL_MARK_CELL_AS_MQTT,
-  CELL_MARK_CELL_AS_PRE_EXECUTION,
-  CELL_MARK_CELL_AS_SKIP,
-  CELL_OPEN_HTTP_RESPONSE,
-  CELL_OPEN_MDH,
-  CELL_SHOW_METADATA_SETTINGS,
-  CELL_SPECIFY_CONNECTION_TO_USE,
-  CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
-  CELL_SPECIFY_LOG_GROUP_TO_USE,
-  CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN,
-  CELL_SPECIFY_MQTT_QOS_TO_USE,
-  CELL_SPECIFY_MQTT_RETAIN_TO_USE,
-  CELL_SPECIFY_MQTT_TOPIC_TO_USE,
-  CELL_TOOLBAR_FORMAT,
-  CELL_TOOLBAR_LM,
-  CREATE_NEW_NOTEBOOK,
-  CREATE_NOTEBOOK_FROM_SQL,
-  EXPORT_IN_HTML,
-  NOTEBOOK_TYPE,
-  OPEN_MDH_VIEWER,
-  SHOW_NOTEBOOK_ALL_RDH,
-  SHOW_NOTEBOOK_ALL_VARIABLES,
-  SPECIFY_CONNECTION_TO_ALL_CELLS,
-  SPECIFY_USING_DB_TO_ALL_CELLS,
+    CELL_EXECUTE_EXPLAIN,
+    CELL_EXECUTE_EXPLAIN_ANALYZE,
+    CELL_EXECUTE_QUERY,
+    CELL_MARK_CELL_AS_MQTT,
+    CELL_MARK_CELL_AS_PRE_EXECUTION,
+    CELL_MARK_CELL_AS_SKIP,
+    CELL_OPEN_HTTP_RESPONSE,
+    CELL_OPEN_MDH,
+    CELL_SHOW_METADATA_SETTINGS,
+    CELL_SPECIFY_CONNECTION_TO_USE,
+    CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
+    CELL_SPECIFY_LOG_GROUP_TO_USE,
+    CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN,
+    CELL_SPECIFY_MQTT_QOS_TO_USE,
+    CELL_SPECIFY_MQTT_RETAIN_TO_USE,
+    CELL_SPECIFY_MQTT_TOPIC_TO_USE,
+    CELL_TOOLBAR_DUPLICATE_WITH_METADATA,
+    CELL_TOOLBAR_FORMAT,
+    CELL_TOOLBAR_LM,
+    CREATE_NEW_NOTEBOOK,
+    CREATE_NOTEBOOK_FROM_SQL,
+    EXPORT_IN_HTML,
+    NOTEBOOK_TYPE,
+    OPEN_MDH_VIEWER,
+    SHOW_NOTEBOOK_ALL_RDH,
+    SHOW_NOTEBOOK_ALL_VARIABLES,
+    SPECIFY_CONNECTION_TO_ALL_CELLS,
+    SPECIFY_USING_DB_TO_ALL_CELLS,
 } from "../constant";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
 import { LMPromptCreatePanel } from "../panels/LMPromptCreatePanel";
@@ -67,14 +70,14 @@ import { readResource } from "../utilities/fsUtil";
 import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
 import { log } from "../utilities/logger";
 import {
-  getSelectedCells,
-  getToolbarButtonClickedNotebookEditor,
-  hasAnyRdhOutputCell,
-  isCwqlCell,
-  isJsonValueCell,
-  isMemcachedCell,
-  isMqttCell,
-  isSqlCell,
+    getSelectedCells,
+    getToolbarButtonClickedNotebookEditor,
+    hasAnyRdhOutputCell,
+    isCwqlCell,
+    isJsonValueCell,
+    isMemcachedCell,
+    isMqttCell,
+    isSqlCell,
 } from "../utilities/notebookUtil";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
 import { StateStorage } from "../utilities/StateStorage";
@@ -713,6 +716,44 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       var formatEdit = new WorkspaceEdit();
       formatEdit.set(doc.uri, [edit]);
       await workspace.applyEdit(formatEdit);
+    });
+  }
+  {
+    registerDisposableCommand(CELL_TOOLBAR_DUPLICATE_WITH_METADATA, async (cell: NotebookCell) => {
+      const notebook = cell.notebook;
+      const insertIndex = cell.index + 1;
+
+      // ---- セル本文 ----
+      const text = cell.document.getText();
+
+      // ---- 新しいセル定義 ----
+      const newCell = new NotebookCellData(
+        cell.kind,
+        text,
+        cell.document.languageId
+      );
+
+      // ---- メタデータ完全コピー ----
+      newCell.metadata = structuredClone(cell.metadata);
+
+      // ---- outputs もコピー（Code Cellのみ意味あり）----
+      if (cell.kind === NotebookCellKind.Code) {
+        newCell.outputs = cell.outputs.map(
+          (output) =>
+            new NotebookCellOutput(
+              output.items.map((item) => new NotebookCellOutputItem(item.data, item.mime)),
+              structuredClone(output.metadata)
+            )
+        );
+      }
+
+      // ---- NotebookEdit ----
+      const edit = new WorkspaceEdit();
+      edit.set(notebook.uri, [NotebookEdit.insertCells(insertIndex, [newCell])]);
+
+      await workspace.applyEdit(edit);
+
+      window.setStatusBarMessage("Cell duplicated with metadata", 2000);
     });
   }
 

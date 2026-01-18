@@ -8,7 +8,7 @@ import {
 } from "@/utilities/vscode";
 import { abbr, type ResultSetData } from "@l-v-yonsama/rdh";
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
-import { defineExpose, nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import RDHViewer from "../RDHViewer.vue";
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());

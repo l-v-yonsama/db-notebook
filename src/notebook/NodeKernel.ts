@@ -106,12 +106,39 @@ export class NodeKernel {
         variables.set('_ResultSetData', rdh);
       };
 
+      const _buildAxiosFullUrl = (config) => {
+        const base = config.baseURL
+          ? new URL(config.url, config.baseURL)
+          : new URL(config.url);
+
+        if (config.params) {
+          const params = new URLSearchParams(config.params);
+          base.search = params.toString();
+        }
+
+        return base.toString();
+      };
+
+      const _normalizeUrl = (url) => {
+        const u = new URL(url);
+        u.searchParams.sort();
+        return u.toString();
+      };
+
       const writeResponseData = (res) => {
         try {
           const har = _axiosTracker.getGeneratedHar();
           _axiosTracker.resetHar();
           const rc = res.config;
-          const entry = har.log.entries.find(it => it.request.url===rc.url && it.request.method === rc.method && it.response.status === res.status);
+          const axiosUrl = _normalizeUrl(_buildAxiosFullUrl(rc));
+          const entry = har.log.entries.find(it => {
+            const harUrl = _normalizeUrl(it.request.url);
+            return (
+              harUrl === axiosUrl &&
+              it.request.method.toLowerCase() === rc.method &&
+              it.response.status === res.status
+            );
+          });
     
           if(entry){
             if(res.config.baseURL) {

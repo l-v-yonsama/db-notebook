@@ -17,7 +17,7 @@ import {
   vsCodePanelTab,
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
-import { defineExpose, nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import CompareKeySettings from "../CompareKeySettings.vue";
 import RDHViewer from "../RDHViewer.vue";
 import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
@@ -377,7 +377,7 @@ defineExpose({
 
       <div v-if="contentMode == 'tab'" class="tab-container-actions">
         <VsCodeDropdown v-if="innerTabItems.length > 1" v-model="innerTabIndex" :items="innerTabItems"
-          style="z-index: 15" @change="resetActiveInnerRdh" />
+          style="z-index: 15; width: 170px;" @change="resetActiveInnerRdh" />
 
         <button v-if="!editable && refreshable" @click="actionToolbar('compare', {})"
           :disabled="inProgress || noCompareKeys"

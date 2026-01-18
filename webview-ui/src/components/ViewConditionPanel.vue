@@ -245,7 +245,7 @@ const saveValues = () => {
     });
   } else {
     vscode.postCommand({
-      command: "showError",
+      command: "showMessage",
       params: {
         message: result.message,
       },

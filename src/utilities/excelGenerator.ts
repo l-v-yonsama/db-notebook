@@ -83,6 +83,14 @@ function stripSheetName(s: string): string {
   return s.replace(/['*\/:\?\[\\\]’＇*／：？［＼］￥]+/g, "");
 }
 
+function rowCellStringLabel(row: number, col?: number): string {
+  let s = `${row} row${row === 1 ? "" : "s"}`;
+  if(col !== undefined){
+    s += ` (${col} col${col === 1 ? "" : "s"})`;
+  }
+  return s;
+};
+
 function createQueryResultListSheet(
   workbook: Excel.Workbook,
   list: ResultSetData[],
@@ -551,6 +559,7 @@ async function createBookFromDiffList(
       tocSheet.getColumn("C").width = 4;
       tocSheet.getColumn("D").width = 20;
       tocSheet.getColumn("E").width = 16;
+      tocSheet.getColumn("H").width = 16;
     }
 
     let tocRowNo = 3;
@@ -633,9 +642,9 @@ async function createBookFromDiffList(
         tocSheet!.getCell(`C${tocRowNo}`).value = no;
         tocSheet!.getCell(`D${tocRowNo}`).value = title;
         tocSheet!.getCell(`E${tocRowNo}`).value = rdh1.meta.comment ?? "";
-        tocSheet!.getCell(`F${tocRowNo}`).value = diffResult.inserted;
-        tocSheet!.getCell(`G${tocRowNo}`).value = diffResult.deleted;
-        tocSheet!.getCell(`H${tocRowNo}`).value = diffResult.updated;
+        tocSheet!.getCell(`F${tocRowNo}`).value = rowCellStringLabel(diffResult.inserted);
+        tocSheet!.getCell(`G${tocRowNo}`).value = rowCellStringLabel(diffResult.deleted);
+        tocSheet!.getCell(`H${tocRowNo}`).value = rowCellStringLabel(diffResult.updated, diffResult.updatedColumns);
 
         tocSheet!.getCell(`I${tocRowNo}`).value = {
           text: "Before" + no,
@@ -866,21 +875,23 @@ async function createBookFromDiffList(
       }
     });
 
-    // 相手テーブルへのリンク作成
-    pairList[0].tableRowNoList.forEach((beforeRowNo, idx) => {
-      const afterRowNo = pairList[1].tableRowNoList[idx];
-      beforeSheet.getCell(`H${beforeRowNo}`).value = {
-        text: "Link to after sheet",
-        hyperlink: `#after!A${afterRowNo}`,
-      };
-    });
-    pairList[1].tableRowNoList.forEach((afterRowNo, idx) => {
-      const beforeRowNo = pairList[0].tableRowNoList[idx];
-      afterSheet.getCell(`H${afterRowNo}`).value = {
-        text: "Link to before sheet",
-        hyperlink: `#before!A${beforeRowNo}`,
-      };
-    });
+    if(outputCondig.excel.enableCrossPairLinks) {
+      // 相手テーブルへのリンク作成
+      pairList[0].tableRowNoList.forEach((beforeRowNo, idx) => {
+        const afterRowNo = pairList[1].tableRowNoList[idx];
+        beforeSheet.getCell(`H${beforeRowNo}`).value = {
+          text: "Link to after sheet",
+          hyperlink: `#after!A${afterRowNo}`,
+        };
+      });
+      pairList[1].tableRowNoList.forEach((afterRowNo, idx) => {
+        const beforeRowNo = pairList[0].tableRowNoList[idx];
+        afterSheet.getCell(`H${afterRowNo}`).value = {
+          text: "Link to before sheet",
+          hyperlink: `#before!A${beforeRowNo}`,
+        };
+      });
+    }
 
     // Undo Changes
     const undoList = diffList

@@ -102,8 +102,10 @@ export class MdhViewProvider extends BaseViewProvider {
           this.currentTabId = tabId;
           this.currentInnerIndex = innerIndex;
 
-          const info = tabItem.list[innerIndex].summary?.info ?? "";
-          showStatusMessage(info);
+          const rdh = tabItem.list[innerIndex];
+          const info = rdh.summary?.info ?? "";
+          let refreshableInfo = `refreshable: ${tabItem.refreshable === true ? "yes" : "no"}`;
+          showStatusMessage(`${info} | ${refreshableInfo}`);
         }
         break;
       case "refresh":
@@ -146,7 +148,7 @@ export class MdhViewProvider extends BaseViewProvider {
       case "output":
         this.output(params);
         return;
-      case "showError":
+      case "showMessage":
         await showWindowErrorMessage(params.message);
         return;
       case "writeToClipboard":

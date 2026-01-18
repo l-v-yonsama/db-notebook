@@ -61,11 +61,12 @@ export const getOutputConfig = (): OutputConfigType => {
     maxRows: settings.get("Max rows in output file", 10000),
     maxCharactersInCell: settings.get("Max characters in cell in output file", 10000),
     excel: {
-      displayToc: settings.get("Excel: display TOC", true),
-      displayTableNameAndStatement: settings.get("Excel: display table-name, sql-statement", true),
+      displayToc: settings.get("Excel: Create Table of Contents", true),
+      displayTableNameAndStatement: settings.get("Excel: Show Query and Table Info", true),
+      enableCrossPairLinks: settings.get("Excel: enable cross-pair links", true),
     },
     html: {
-      displayToc: settings.get("Html: display TOC", true),
+      displayToc: settings.get("Html: Create Table of Contents", true),
       displayGraphs: settings.get("Html: display graphs", true),
     },
   };

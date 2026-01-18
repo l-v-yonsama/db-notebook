@@ -52,6 +52,7 @@ export type OutputConfigType = {
   excel: {
     displayToc: boolean;
     displayTableNameAndStatement: boolean;
+    enableCrossPairLinks: boolean;
   };
   html: {
     displayToc: boolean;

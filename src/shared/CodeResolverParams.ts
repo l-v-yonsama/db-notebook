@@ -10,5 +10,4 @@ export type CodeEditorPart = {
   connectionName: string;
   item?: CodeItem;
   editingItemIndex?: number;
-  keyword?: string;
 };

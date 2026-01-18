@@ -26,7 +26,8 @@ export const EDIT_SUBSCRIPTION = `${EXTENSION_NAME}.edit-subscription`;
 export const REMOVE_SUBSCRIPTION = `${EXTENSION_NAME}.remove-subscription`;
 
 export const REFRESH_RESOURCES = `${EXTENSION_NAME}.refresh-resources`;
-export const RETRIEVE_RESOURCES = `${EXTENSION_NAME}.retrieve-resources`;
+export const LOAD_DB_SCHEMA = `${EXTENSION_NAME}.load-database-schema`;
+export const OPEN_DB_NOTEBOOK = `${EXTENSION_NAME}.open-db-notebook`;
 export const SPECIFY_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.specify-default-connection-for-sql-cell`;
 export const CLEAR_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.clear-default-connection-for-sql-cell`;
 export const GET_LOCKS = `${EXTENSION_NAME}.get-locks`;
@@ -117,6 +118,7 @@ export const CELL_EXECUTE_EXPLAIN_ANALYZE = `${EXTENSION_NAME}.cell-execute-expl
 // NOTEBOOK CELL TITLE (CELL TOOLBAR-ACTION)
 export const CELL_TOOLBAR_LM = `${EXTENSION_NAME}.cell-toolbar-lm`;
 export const CELL_TOOLBAR_FORMAT = `${EXTENSION_NAME}.cell-toolbar-format`;
+export const CELL_TOOLBAR_DUPLICATE_WITH_METADATA = `${EXTENSION_NAME}.cell-toolbar-duplicate-with-metadata`;
 
 //---------------------------------------------------
 // RECORD RULE EDITOR

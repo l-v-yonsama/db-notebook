@@ -16,7 +16,7 @@ import {
   vsCodePanelTab,
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
-import { defineExpose, nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
 import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";

@@ -52,6 +52,7 @@ const tableItems = [] as DropdownItem[];
 const columnItems = [] as DropdownItem[];
 const items = ref([] as (CodeItem & { originalIndex: number })[]);
 const isDirty = ref(false);
+const noResources = ref(false);
 
 const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void => {
   if (v === undefined) {
@@ -59,7 +60,7 @@ const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void
   }
   resolver = v.resolver;
   isDirty.value = v.isDirty;
-  keyword.value = v.resolver.editor.keyword ?? "";
+  keyword.value = v.keyword ?? "";
   connectionName.value = v.resolver.editor.connectionName;
   connectionItems.splice(0, connectionItems.length);
   connectionItems.push({
@@ -89,6 +90,8 @@ const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void
       value: it.name,
     })
   );
+
+  noResources.value = columnItems.length === 0;
 
   const wrapper = document.querySelector(".cr-scroll-wrapper");
   if (wrapper) {
@@ -168,7 +171,6 @@ const createEditorParams = (): CodeResolverParams["editor"] => {
     ...resolver.editor,
     visible: visibleEditor.value,
     connectionName: connectionName.value,
-    keyword: keyword.value,
     item: editorItem.value,
   };
 };
@@ -177,6 +179,15 @@ type UpdateParams = {
   values?: UpdateCodeResolverTextDocumentActionCommand["params"]["values"]
   save?: boolean;
   openAsJson?: boolean;
+};
+const updateKeyword = () => {
+  vscode.postCommand({
+    command: "updateKeyword",
+    params: {
+      keyword: keyword.value,
+    },
+  });
+
 };
 const updateTextDocument = (params?: UpdateParams) => {
   const values = params?.values;
@@ -195,7 +206,8 @@ const updateTextDocument = (params?: UpdateParams) => {
       values,
       scrollPos: lastKnownScrollPosition,
       save,
-      openAsJson: params?.openAsJson
+      openAsJson: params?.openAsJson,
+      keyword: keyword.value,
     },
   });
 };
@@ -270,7 +282,9 @@ defineExpose({
       <div class="tool-left">
         <label for="connectionName">Connection setting</label>
         <VsCodeDropdown id="connectionName" v-model="connectionName" :items="connectionItems"
-          @change="updateTextDocument({ values: { name: 'change', detail: 'connectionName' } })" />
+          @change="updateTextDocument({ values: { name: 'change', detail: 'connectionName' } })"
+          style="z-index: 15; width:200px"
+          />
       </div>
       <div class="tool-right">
         <VsCodeButton @click="updateTextDocument({ values: { name: 'cancel' } })" appearance="secondary" title="Cancel">
@@ -287,7 +301,7 @@ defineExpose({
           <fa icon="search" style="margin-right: 3px" />Search
         </label>
         <VsCodeTextField id="keyword" v-model="keyword" :maxlength="128" :change-on-mouseout="true" title="keyword"
-          placeholder="Enter a keyword" @change="updateTextDocument()">
+          placeholder="Enter a keyword" @change="updateKeyword()">
         </VsCodeTextField>
       </div>
       <div class="tool-right">
@@ -319,6 +333,12 @@ defineExpose({
           <legend>Applicable Resources</legend>
           <table>
             <tbody>
+              <tr v-if="noResources">
+                <td colspan="3">
+                  <p class="warning">⚠️ Database connection unavailable. Table / Column list could not be loaded.</p>
+                  <p class="warning">🔧 Please enter the column name manually (⏳ retry after recovery).</p>
+                </td>
+              </tr>
               <tr>
                 <td style="width: 130px">
                   <vscode-checkbox :checked="editorItem.resource.table !== undefined"
@@ -354,13 +374,23 @@ defineExpose({
                     expression</vscode-checkbox>
                 </td>
                 <td>
-                  <VsCodeDropdown v-if="!editorItem.resource.column.regex" :id="`resourceColumn`"
-                    v-model="editorItem.resource.column.pattern" :items="columnItems" :transparent="true"
-                    :required="true" @change="updateTextDocument()"></VsCodeDropdown>
-
-                  <VsCodeTextField v-if="editorItem.resource.column.regex" :id="`resourceColumn`"
-                    v-model="editorItem.resource.column.pattern" :maxlength="256" :transparent="true" :required="true"
-                    :change-on-mouseout="true" @change="updateTextDocument()"></VsCodeTextField>
+                  <template v-if="editorItem.resource.column.regex">
+                    <VsCodeTextField :id="`resourceColumn`"
+                      v-model="editorItem.resource.column.pattern" :maxlength="256" :transparent="true" :required="true"
+                      :change-on-mouseout="true" @change="updateTextDocument()"></VsCodeTextField>
+                  </template>
+                  <template v-else>
+                    <template v-if="noResources">
+                      <VsCodeTextField :id="`resourceColumn`"
+                        v-model="editorItem.resource.column.pattern" :maxlength="256" :transparent="true" :required="true"
+                        :change-on-mouseout="true" @change="updateTextDocument()"></VsCodeTextField>
+                    </template>
+                    <template v-else>
+                      <VsCodeDropdown :id="`resourceColumn`"
+                        v-model="editorItem.resource.column.pattern" :items="columnItems" :transparent="true"
+                        :required="true" @change="updateTextDocument()"></VsCodeDropdown>
+                    </template>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -410,13 +440,13 @@ defineExpose({
           <thead>
             <tr>
               <th rowspan="2" class="code-name">Code name</th>
-              <th rowspan="2" class="w150">Applicable Resources</th>
+              <th rowspan="2" class="col-resource">Applicable Resources</th>
               <th colspan="2">Code detail</th>
-              <th rowspan="2">Description</th>
+              <th rowspan="2" class="col-desc">Description</th>
             </tr>
             <tr>
-              <th class="w100">Value</th>
-              <th class="w150">Label</th>
+              <th class="col-value">Value</th>
+              <th class="col-label">Label</th>
             </tr>
           </thead>
           <tbody>
@@ -453,7 +483,7 @@ defineExpose({
                       </VsCodeButton>
                     </div>
                   </td>
-                  <td class="w150">
+                  <td class="col-resource">
                     <div v-if="item.resource.table">
                       <span>TABLE:</span>
                       <Paragraph :text="item.resource.table.pattern" :highlight-text="keyword"
@@ -467,9 +497,9 @@ defineExpose({
                       <span v-if="item.resource.column.regex">(REGEX)</span>
                     </div>
                   </td>
-                  <td class="w100">-</td>
-                  <td class="w150">-</td>
-                  <td>
+                  <td class="col-value">-</td>
+                  <td class="col-label">-</td>
+                  <td class="col-desc">
                     <Paragraph :text="item.description" :highlight-text="keyword" />
                   </td>
                 </tr>
@@ -506,7 +536,7 @@ defineExpose({
                       </VsCodeButton>
                     </div>
                   </td>
-                  <td v-if="idx2 === 0" :rowspan="item.details.length" class="w150">
+                  <td v-if="idx2 === 0" :rowspan="item.details.length" class="col-resource">
                     <div v-if="item.resource.table">
                       <span>TABLE:</span>
                       <Paragraph :text="item.resource.table.pattern" :highlight-text="keyword"
@@ -520,13 +550,13 @@ defineExpose({
                       <span v-if="item.resource.column.regex">(REGEX)</span>
                     </div>
                   </td>
-                  <td class="w100">
+                  <td class="col-value">
                     <Paragraph :text="detail.code" :highlight-text="keyword" />
                   </td>
-                  <td class="w150">
+                  <td class="col-label">
                     <Paragraph :text="detail.label" :highlight-text="keyword" />
                   </td>
-                  <td v-if="idx2 === 0" :rowspan="item.details.length">
+                  <td v-if="idx2 === 0" :rowspan="item.details.length" class="col-desc">
                     <Paragraph :text="item.description" :highlight-text="keyword" />
                   </td>
                 </tr>
@@ -565,6 +595,7 @@ div.code-name {
   display: flex;
   align-items: center;
   column-gap: 5px;
+  margin-bottom: 4px;
 }
 
 fieldset {
@@ -649,8 +680,6 @@ section.items {
         position: sticky;
         left: 0;
         z-index: 1;
-        min-width: 255px;
-        width: 255px;
         background-color: var(--vscode-editorPane-background);
 
         &>.controller {
@@ -666,6 +695,36 @@ section.items {
     }
   }
 
+  /* 1. Code name */
+  td.code-name,th.code-name {
+    min-width: 180px;
+    width: 255px;
+  }
+
+  /* 3.1 Value */
+  .col-value {
+    width: 140px;
+    white-space: nowrap;
+  }
+
+  /* 3.2 Label（最重要・広め） */
+  .col-label {
+    width: 280px;
+    white-space: nowrap;
+  }
+
+  /* 2. Applicable Resources */
+  .col-resource {
+    width: 150px;
+    white-space: nowrap;
+  }
+
+  /* 4. Description（ほぼ使われない） */
+  .col-desc {
+    width: 80px;
+    white-space: nowrap;
+  }
+
   span.label {
     display: inline-block;
     vertical-align: middle;
@@ -674,6 +733,12 @@ section.items {
     overflow: hidden;
     white-space: nowrap;
   }
+}
+
+p.warning {
+  color: var(--vscode-warnForeground);
+  padding: 2px 5px;
+  margin: 0;
 }
 
 .w100 {
