@@ -166,6 +166,9 @@ It also provides a CSV and Har file preview feature.
 
 ## Tips
 
+1. Instead of using VS Code’s built-in `Copy Cell` or `+ Code` / `Add Code Cell`, I recommend using `Duplicate Cell with Metadata`.
+This action copies not only the cell content, but also all associated metadata—such as database connection settings and ResultSet decoration options—so you can add a new cell without reconfiguring these settings.
+   - ![](./docs/images/tips/00_duplicate_cell.png)
 1. You can specify a default connection definition each time you add a new SQL cell to the notebook
    - ![](./docs/images/tips/01_default_connection.png)
 

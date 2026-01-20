@@ -1121,6 +1121,12 @@ function createUndoChangeSheet(
     cell = sheet.getCell(`B${rowNo}`);
     setTableHeaderCell(cell);
     cell.value = `-- ${idx + 1}:${tableName}`;
+    // only setting cell style.
+    cell = sheet.getCell(`C${rowNo}`);
+    setTableHeaderCell(cell);
+    cell = sheet.getCell(`D${rowNo}`);
+    setTableHeaderCell(cell);
+
     rowNo++;
 
     undoChangeStatements.forEach((statement) => {

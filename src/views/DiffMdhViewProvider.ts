@@ -267,6 +267,24 @@ export class DiffMdhViewProvider extends BaseViewProvider {
         });
       }
     );
+    if (item && item.list.length) {
+      let inserted = 0;
+      let updated = 0;
+      let deleted = 0;
+      item.list
+        .filter((it) => it.diffResult?.ok)
+        .forEach((it) => {
+          inserted += it.diffResult.inserted;
+          updated += it.diffResult.updated;
+          deleted += it.diffResult.deleted;
+        });
+      if (inserted + updated + deleted > 0) {
+        const message = ` (Inserted: ${inserted}, Updated: ${updated}, Deleted: ${deleted})`;
+        window.showWarningMessage(`Differences found.` + message);
+      } else {
+        window.showInformationMessage(`No differences found.`);
+      }
+    }
 
     return item;
   }
