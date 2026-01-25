@@ -42,15 +42,15 @@ import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
 
 const PREFIX = "[notebook/intellisense]";
 
-const throttleFunc = throttle(300, async (connectionName: string): Promise<void> => {
-  log(`  ${PREFIX} start throttleFunc`);
+const throttleFunc = throttle(400, async (connectionName: string): Promise<void> => {
+  log(`  ${PREFIX} throttleFunc(setupDbResource(${connectionName}))`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
-    log(`  ${PREFIX} end throttleFunc. No connection setting.`);
+    // log(`  ${PREFIX} end throttleFunc. No connection setting.`);
     return;
   }
 
   if (storage.getDBTypeByConnectionName(connectionName) === DBType.Mqtt) {
-    log(`  ${PREFIX} end throttleFunc. Mqtt is not supported.`);
+    // log(`  ${PREFIX} end throttleFunc. Mqtt is not supported.`);
     return;
   }
   const { ok, result } = await storage.loadResource(connectionName, false, false);
@@ -64,11 +64,11 @@ const throttleFunc = throttle(300, async (connectionName: string): Promise<void>
     }
     dbType = result.dbType;
   }
-  log(`  ${PREFIX} end throttleFunc with sqlDatabase`);
+  // log(`  ${PREFIX} end throttleFunc with sqlDatabase`);
 });
 
 export async function setupDbResource(connectionName: string) {
-  log(`${PREFIX} setupDbResource`);
+  // log(`${PREFIX} setupDbResource`);
   throttleFunc(connectionName);
 }
 

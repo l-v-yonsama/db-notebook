@@ -24,6 +24,7 @@ import {
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DIFF_MDH_VIEWER,
   OPEN_MDH_VIEWER,
+  OPEN_OUTPUT_CHANNEL,
   OPEN_SUBSCRIPTION_PAYLOADS_VIEWER,
   OPEN_TOOLS_VIEWER,
   SET_SUBSCRIPTION_PAYLOADS_VIEWER,
@@ -56,7 +57,7 @@ import {
   SubscriptionPayloadsViewParams,
 } from "./types/views";
 import { initializeStoragePath } from "./utilities/fsUtil";
-import { activateLogger, log, setupDisposeLogger } from "./utilities/logger";
+import { activateLogger, log, setupDisposeLogger, show } from "./utilities/logger";
 import { ChartsViewProvider } from "./views/ChartsViewProvider";
 import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
 import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
@@ -85,6 +86,11 @@ export async function activate(context: ExtensionContext) {
 
   activateLogger(context, EXTENSION_NAME);
   log(`${PREFIX} start activation.`);
+  {
+    registerDisposableCommand(OPEN_OUTPUT_CHANNEL, async () => {
+      show();
+    });
+  }
 
   ScanPanel.setStateStorage(stateStorage);
   DynamoQueryPanel.setStateStorage(stateStorage);

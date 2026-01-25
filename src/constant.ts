@@ -81,6 +81,11 @@ export const CLOSE_SUBSCRIPTION_PAYLOADS_VIEWER = `${EXTENSION_NAME}.close-subsc
 export const UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER = `${EXTENSION_NAME}.update-subscription-res-at-payloads-viewer`;
 
 //---------------------------------------------------
+// LOG
+//---------------------------------------------------
+export const OPEN_OUTPUT_CHANNEL= `${EXTENSION_NAME}.open-output-channel`;
+
+//---------------------------------------------------
 // NOTE BOOK
 //---------------------------------------------------
 export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;

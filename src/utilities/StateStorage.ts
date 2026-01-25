@@ -23,6 +23,7 @@ import { sleep } from "@l-v-yonsama/rdh";
 import ShortUniqueId from "short-unique-id";
 import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
+import { showStatusMessage } from "../statusBar";
 import { SQLHistory } from "../types/SQLHistory";
 import { log } from "./logger";
 
@@ -71,9 +72,9 @@ export class StateStorage {
     connectionName: string,
     reload: boolean,
     wait = false
-  ): Promise<GeneralResult<{ db: DbDatabase[]; dbType: DBType }>> {
+  ): Promise<GeneralResult<{ db: DbDatabase[]; dbType: DBType; }>> {
     // log(`${PREFIX} loadResource(${connectionName}, reload:${reload}, wait:${wait})`);
-    const ret: GeneralResult<{ db: DbDatabase[]; dbType: DBType }> = {
+    const ret: GeneralResult<{ db: DbDatabase[]; dbType: DBType; }> = {
       ok: false,
       message: "",
     };
@@ -224,6 +225,7 @@ export class StateStorage {
       log(`${PREFIX} loadResource Error:${message}`);
       this.resMap.set(connectionName, { isInProgress: false, res: undefined });
       ret.message = message;
+      showStatusMessage(message, 'warning');
     }
     return ret;
   }

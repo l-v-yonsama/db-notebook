@@ -23,6 +23,12 @@ export function setupDisposeLogger(context: ExtensionContext) {
   context.subscriptions.push(channel);
 }
 
+export function show() {
+  if (channel) {
+    channel.show();
+  }
+}
+
 export function log(...args: unknown[]) {
   if (channel) {
     try {
