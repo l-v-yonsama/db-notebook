@@ -55,6 +55,7 @@ export const CREATE_INSERT_SCRIPT_WITH_SETTINGS = `${EXTENSION_NAME}.create-inse
 export const OPEN_CHAT_2_QUERY = `${EXTENSION_NAME}.open-chat-2-query`;
 
 export const COPY_RESOURCE_NAME = `${EXTENSION_NAME}.copy-resource-name`;
+export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 
 //---------------------------------------------------
 // SQL HISTORIES TREE

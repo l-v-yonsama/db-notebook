@@ -12,6 +12,7 @@ import {
   RdsDatabase,
   RedisDriver,
   ResourceType,
+  createColumnNames,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   ExtensionContext,
@@ -27,6 +28,7 @@ import {
   ADD_SUBSCRIPTION,
   CLEAR_DEFAULT_CON_FOR_SQL_CELL,
   CONNECT,
+  COPY_COLUMN_NAMES,
   COPY_RESOURCE_NAME,
   COUNT_FOR_ALL_TABLES,
   CREATE_CONNECTION_SETTING,
@@ -157,14 +159,37 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     }
   });
 
+  commands.registerCommand(COPY_COLUMN_NAMES, async (tableRes: DbTable) => {
+    try {
+      let target = tableRes;
+      if (!target) {
+        const selection = dbResourceTreeView.selection;
+        if (!selection || selection.length === 0) {
+          return;
+        }
+        target = selection[0] as DbTable;
+      }
+      if (!target) {
+        return;
+      }
+
+      const text = createColumnNames(target);
+      await env.clipboard.writeText(text);
+
+      window.setStatusBarMessage(`Copied: ${text}`, 2000);
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
+
   commands.registerCommand(REFRESH_RESOURCES, () => {
     dbResourceTree.refresh(true);
   });
 
   commands.registerCommand(OPEN_DB_NOTEBOOK, async (conRes: DbConnection) => {
-    const cell = new NotebookCellData(NotebookCellKind.Code, '', 'sql');
+    const cell = new NotebookCellData(NotebookCellKind.Code, "", "sql");
     const metadata: CellMeta = {
-      connectionName: conRes.name
+      connectionName: conRes.name,
     };
     cell.metadata = metadata;
     commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);

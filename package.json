@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -558,6 +558,11 @@
           "command": "database-notebook.copy-resource-name",
           "when": "view == database-notebook-connections && viewItem =~ /,tag:dbResource$/",
           "group": "clipboard"
+        },
+        {
+          "command": "database-notebook.copy-column-names",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "clipboard"
         }
       ],
       "view/title": [
@@ -911,6 +916,10 @@
       {
         "command": "database-notebook.copy-resource-name",
         "title": "Copy Resource Name"
+      },
+      {
+        "command": "database-notebook.copy-column-names",
+        "title": "Copy Column Names"
       },
       {
         "command": "database-notebook.cell.open-mdh",
@@ -1301,7 +1310,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.11",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.13",
     "@l-v-yonsama/rdh": "^0.2.10",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

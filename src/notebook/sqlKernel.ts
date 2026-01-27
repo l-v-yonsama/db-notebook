@@ -134,6 +134,14 @@ export class SqlKernel {
             result.meta.tableName = `CELL${cell.index + 1}`;
           }
           metadata!.rdh = result;
+          log(`${PREFIX} resultset.summary`, result?.summary);
+          log(`${PREFIX} resultset.sqlStatement`, result?.sqlStatement);
+          log(
+            `${PREFIX} resultset.meta.compareKeys`,
+            result?.meta?.compareKeys,
+            "type",
+            result?.meta?.type
+          );
           metadata!.tableName = result.meta.tableName;
           metadata!.type = result.meta.type;
         } else {
