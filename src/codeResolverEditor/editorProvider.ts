@@ -35,7 +35,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
   private scrollPos: number = 0;
   private tableNameList: NameWithComment[] = [];
   private columnNameList: NameWithComment[] = [];
-  private keyword='';
+  private keyword = "";
 
   public static register(context: ExtensionContext, stateStorage: StateStorage): Disposable {
     const provider = new CodeResolverEditorProvider(context, stateStorage);
@@ -59,7 +59,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
       this.context.extensionUri,
       componentName
     );
-    this.keyword='';
+    this.keyword = "";
 
     const updateWebview = async () => {
       // log(`${PREFIX} updateWebview`);
@@ -130,7 +130,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
   ) {
     const { newText, values, scrollPos, save, openAsJson } = params;
     this.scrollPos = scrollPos;
-    this.keyword = params.keyword ?? '';
+    this.keyword = params.keyword ?? "";
     const edit = new WorkspaceEdit();
 
     const codeResolver = JSON.parse(newText) as CodeResolverParams;
@@ -227,6 +227,32 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
             }
           }
           break;
+        case "move-code-item":
+          {
+            const { index, direction } = values.detail as {
+              index: number;
+              direction: "up" | "down";
+            };
+
+            const items = codeResolver.items;
+
+            if (
+              index < 0 ||
+              index >= items.length ||
+              (direction === "up" && index === 0) ||
+              (direction === "down" && index === items.length - 1)
+            ) {
+              break;
+            }
+
+            const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+            // 要素入れ替え
+            const tmp = items[targetIndex];
+            items[targetIndex] = items[index];
+            items[index] = tmp;
+          }
+          break;
       }
     }
 
@@ -235,11 +261,7 @@ export class CodeResolverEditorProvider implements CustomTextEditorProvider {
     if (newContent !== oldContent) {
       // Just replace the entire document every time for this example extension.
       // A more complete extension should compute minimal edits instead.
-      edit.replace(
-        document.uri,
-        new Range(0, 0, document.lineCount, 0),
-        newContent
-      );      
+      edit.replace(document.uri, new Range(0, 0, document.lineCount, 0), newContent);
     }
 
     await workspace.applyEdit(edit);

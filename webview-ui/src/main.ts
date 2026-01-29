@@ -1,5 +1,6 @@
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
+  faArrowDown,
   faArrowUp,
   faBook,
   faCheck,
@@ -33,6 +34,7 @@ import vueClickOutsideElement from "vue-click-outside-element";
 import App from "./App.vue";
 
 library.add(faArrowUp);
+library.add(faArrowDown);
 library.add(faBook);
 library.add(faCheck);
 library.add(faClipboard);

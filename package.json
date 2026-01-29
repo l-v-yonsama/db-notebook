@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.9.8",
+  "version": "0.9.10",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -1310,7 +1310,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.13",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.14",
     "@l-v-yonsama/rdh": "^0.2.10",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

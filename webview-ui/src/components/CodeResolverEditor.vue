@@ -534,6 +534,37 @@ defineExpose({
                         " title="Delete code" appearance="secondary">
                         <fa icon="trash" />Delete
                       </VsCodeButton>
+                      <VsCodeButton
+                        @click="
+                          updateTextDocument({
+                            values: {
+                              name: 'move-code-item',
+                              detail: { index: item.originalIndex, direction: 'up' },
+                            },
+                          })
+                        "
+                        title="Move up"
+                        appearance="secondary"
+                        :disabled="item.originalIndex === 0"
+                      >
+                        <fa icon="arrow-up" />
+                      </VsCodeButton>
+
+                      <VsCodeButton
+                        @click="
+                          updateTextDocument({
+                            values: {
+                              name: 'move-code-item',
+                              detail: { index: item.originalIndex, direction: 'down' },
+                            },
+                          })
+                        "
+                        title="Move down"
+                        appearance="secondary"
+                        :disabled="item.originalIndex === items.length - 1"
+                      >
+                        <fa icon="arrow-down" />
+                      </VsCodeButton>
                     </div>
                   </td>
                   <td v-if="idx2 === 0" :rowspan="item.details.length" class="col-resource">

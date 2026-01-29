@@ -381,12 +381,12 @@ function createSQLIntellisense() {
 
           if (sqlDatabase) {
             getProposals({ db: sqlDatabase, sql, keyword, lastChar, parentWord }).forEach((s) => {
-              const item = new CompletionItem({ label: s.label, description: "DB resources" });
+              const item = new CompletionItem({ label: s.label, description: s.detail ?? '' });
               item.kind =
                 s.kind === ProposalKind.ReservedWord
                   ? CompletionItemKind.Keyword
                   : CompletionItemKind.Variable;
-              item.detail = s.detail;
+              item.detail = s.desc ?? '';
               list.push(item);
             });
           }

@@ -26,7 +26,7 @@
     "vue-click-outside-element": "^3.1.2"
   },
   "devDependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.13",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.14",
     "@types/chart.js": "^2.9.41",
     "@types/node": "^16.11.27",
     "@types/splitpanes": "^2.2.1",

@@ -189,6 +189,7 @@ export type UpdateCodeResolverTextDocumentActionCommand = BaseActionCommand<
         | "change"
         | "add-code-item"
         | "edit-code-item"
+        | "move-code-item"
         | "save-code-item"
         | "delete-code-item"
         | "duplicate-code-item";

@@ -59,6 +59,8 @@ const output = (fileType: 'excel' | 'html'): void => {
 };
 
 const searchAgain = (): void => {
+  rdh.value = undefined;
+  clickedCellParams.value = undefined;
   vscode.postCommand({
     command: "refresh",
     params: {
