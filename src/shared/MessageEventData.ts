@@ -26,6 +26,7 @@ import type {
 } from "./ActionParams";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ComponentName } from "./ComponentName";
+import type { DBExportSettingsInputParams, DBExportSettingsUIParams } from "./DBDumpParams";
 import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
 import type { ModeType } from "./ModeType";
 import type { RecordRule } from "./RecordRule";
@@ -39,6 +40,7 @@ export type MessageEventData =
   | CreateInsertScriptSettingsPanelEventData
   | CsvParseSettingPanelEventData
   | DBFormEventData
+  | DBExportSettingsPanelEventData
   | DiffMdhViewEventData
   | DynamoQueryPanelEventData
   | ERDiagramSettingsPanelEventData
@@ -69,6 +71,8 @@ export type RdhViewConfig = {
   dateFormat: ToStringParam["dateFormat"];
   timestampFormat: ToStringParam["timestampFormat"];
   binaryToHex: ToStringParam["binaryToHex"];
+  displayComment: boolean;
+  displayType: boolean;
 };
 
 export type RdhTabItem = {
@@ -76,7 +80,6 @@ export type RdhTabItem = {
   title: string;
   refreshable: boolean;
   list: ResultSetData[];
-  config: RdhViewConfig;
 };
 
 export type HttpResponseTabItem = {
@@ -106,6 +109,7 @@ export type MdhViewEventData = BaseMessageEventData<
       currentTabId?: string;
       currentInnerIndex?: number;
     };
+    config?: RdhViewConfig;
   }
 >;
 
@@ -216,6 +220,7 @@ export type HarFilePanelEventData = BaseMessageEventData<
       };
     };
     addTabItem?: HarFileTabItem;
+    config: RdhViewConfig;
   }
 >;
 
@@ -252,6 +257,7 @@ export type DiffMdhViewEventData = BaseMessageEventData<
       currentTabId?: string;
       currentInnerIndex?: number;
     };
+    config?: RdhViewConfig;
   }
 >;
 
@@ -361,6 +367,7 @@ export type CsvParseSettingPanelEventData = BaseMessageEventData<
     initialize?: SaveCsvOptionParams;
     rdh: ResultSetData | null;
     message?: string;
+    config: RdhViewConfig;
   }
 >;
 
@@ -467,6 +474,17 @@ export type ERDiagramSettingsPanelEventData = BaseMessageEventData<
   {
     initialize?: {
       params: ERDiagramSettingsInputParams;
+    };
+  }
+>;
+
+export type DBExportSettingsPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "DBExportSettingsPanel",
+  {
+    initialize?: {
+      params: DBExportSettingsInputParams;
+      uiParams: DBExportSettingsUIParams;
     };
   }
 >;

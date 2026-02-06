@@ -1,7 +1,7 @@
 import { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr } from "@l-v-yonsama/rdh";
 import * as cp from "child_process";
-import * as dayjs from "dayjs";
+import dayjs from "dayjs";
 import { Entry } from "har-format";
 import * as iconv from "iconv-lite";
 import * as os from "os";

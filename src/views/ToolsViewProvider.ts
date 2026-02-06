@@ -5,8 +5,8 @@ import {
   RDSBaseDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData } from "@l-v-yonsama/rdh";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import * as path from "path";
 import { commands, ExtensionContext, Uri, window } from "vscode";
 import { BOTTOM_TOOLS_VIEWID } from "../constant";

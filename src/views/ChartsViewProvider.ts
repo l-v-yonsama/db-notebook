@@ -1,8 +1,8 @@
 import { commands, ExtensionContext } from "vscode";
 
 import { createHash } from "crypto";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import { BOTTOM_CHARTS_VIEWID } from "../constant";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";

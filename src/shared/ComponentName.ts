@@ -3,6 +3,7 @@ export type ComponentName =
   | "ChartsView"
   | "Chat2QueryPanel"
   | "MdhView"
+  | "DBExportSettingsPanel"
   | "DiffMdhView"
   | "DynamoQueryPanel"
   | "ExportHtmlParamsPanel"

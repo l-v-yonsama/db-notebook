@@ -17,7 +17,7 @@ import {
   isDateTimeOrDate,
   toDate,
 } from "@l-v-yonsama/rdh";
-import * as dayjs from "dayjs";
+import dayjs from "dayjs";
 import { EnumValues } from "enum-values";
 import * as Excel from "exceljs";
 import * as os from "os";

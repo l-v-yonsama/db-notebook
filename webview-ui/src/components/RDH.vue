@@ -37,11 +37,9 @@ import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 type Props = {
   rdh: ResultSetData;
-  config?: RdhViewConfig;
+  config: RdhViewConfig | null;
   width: number;
   height: number;
-  withComment: boolean;
-  withType?: boolean;
   showOnlyChanged?: boolean;
 };
 
@@ -89,6 +87,9 @@ type ColKey = {
 
 const selectedRowIndex = ref(-1);
 const editable = props.rdh.meta?.editable === true;
+const hasComment = props.rdh.keys.some((it) => it.comment?.length);
+const withComment = props.config?.displayComment;
+const withType = props.config?.displayType;
 
 const emit = defineEmits<{
   (event: "onClickCell", value: CellFocusParams): void;
@@ -552,7 +553,7 @@ defineExpose({
                 <a class="widen" @click="key.width += 100"><span class="codicon codicon-arrow-both"></span></a>
               </th>
             </tr>
-            <tr v-if="withComment || editable">
+            <tr v-if="(hasComment && withComment) || editable">
               <th v-if="editable" class="ctrl">
                 <div style="display: flex !important">
                   <VsCodeButton v-if="editable" @click="addRow" title="Add row" appearance="secondary">

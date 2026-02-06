@@ -1,6 +1,6 @@
 import { DbSubscription, MqttQoS } from "@l-v-yonsama/multi-platform-database-drivers";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import {
   commands,
   NotebookCellData,

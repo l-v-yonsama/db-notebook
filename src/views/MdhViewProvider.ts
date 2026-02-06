@@ -5,8 +5,8 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { resolveCodeLabel, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import * as path from "path";
 import { commands, env, ExtensionContext, ProgressLocation, Uri, window } from "vscode";
 import { BOTTOM_MDH_VIEWID, OPEN_DIFF_MDH_VIEWER, OPEN_MDH_VIEWER } from "../constant";
@@ -21,7 +21,7 @@ import { MdhViewEventData, RdhTabItem } from "../shared/MessageEventData";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { DiffMdhViewTabParam, MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
-import { getResultsetConfig } from "../utilities/configUtil";
+import { getRdhViewConfig } from "../utilities/configUtil";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
 import { log } from "../utilities/logger";
@@ -141,6 +141,7 @@ export class MdhViewProvider extends BaseViewProvider {
                 tabId,
                 value: tabItem.list,
               },
+              config: getRdhViewConfig(),
             },
           });
         }
@@ -189,6 +190,7 @@ export class MdhViewProvider extends BaseViewProvider {
             currentTabId: this.currentTabId,
             currentInnerIndex: this.currentInnerIndex,
           },
+          config: getRdhViewConfig(),
         },
       });
     }
@@ -218,6 +220,7 @@ export class MdhViewProvider extends BaseViewProvider {
             tabId: item.tabId,
             value: item.list,
           },
+          config: getRdhViewConfig(),
         },
       });
       this.currentTabId = item.tabId;
@@ -233,12 +236,12 @@ export class MdhViewProvider extends BaseViewProvider {
       componentName: "MdhView",
       value: {
         addTabItem: item,
+        config: getRdhViewConfig(),
       },
     });
   }
 
   private createTabItem(title: string, list: ResultSetData[]): RdhTabItem {
-    const rdhConfig = getResultsetConfig();
     const tabId = createHash("md5").update(title).digest("hex");
     const refreshable = list.every(
       (it) => (it.meta.type === "select" || it.meta.type === "show") && it.sqlStatement
@@ -248,11 +251,6 @@ export class MdhViewProvider extends BaseViewProvider {
       title,
       list,
       refreshable,
-      config: {
-        dateFormat: rdhConfig.dateFormat,
-        timestampFormat: rdhConfig.timestampFormat,
-        binaryToHex: rdhConfig.binaryToHex,
-      },
     };
     return item;
   }
@@ -442,6 +440,7 @@ export class MdhViewProvider extends BaseViewProvider {
           tabId,
           value: tabItem.list,
         },
+        config: getRdhViewConfig(),
       },
     });
   }

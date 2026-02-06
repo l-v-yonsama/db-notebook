@@ -2,8 +2,8 @@ import { commands, ExtensionContext, Uri, window } from "vscode";
 
 import { DbSubscription } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData } from "@l-v-yonsama/rdh";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import * as path from "path";
 import { BOTTOM_TOPIC_PAYLOADS_VIEWID } from "../constant";
 import { MqttDriverManager } from "../mqtt/MqttDriverManager";

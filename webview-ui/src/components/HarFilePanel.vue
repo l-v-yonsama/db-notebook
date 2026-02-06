@@ -5,6 +5,7 @@ import type {
   CloseTabActionCommand,
   HarFilePanelEventData,
   HarFileTabItem,
+  RdhViewConfig,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
@@ -14,7 +15,7 @@ import {
   vsCodePanelTab,
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
-import { defineExpose, nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
@@ -29,6 +30,7 @@ const splitterWidth = ref(300);
 const splitterHeight = ref(300);
 const keyword = ref("");
 const eventRdh = ref(null as ResultSetData | null);
+const viewConfig = ref(null as RdhViewConfig | null);
 const statusType = ref("");
 const statusTypeItems = ref([] as DropdownItem[]);
 const contentType = ref("");
@@ -230,11 +232,13 @@ const recieveMessage = (data: HarFilePanelEventData) => {
 
   switch (command) {
     case "add-tab-item":
+      viewConfig.value = value.config;
       if (value.addTabItem) {
         addTabItem(value.addTabItem);
       }
       break;
     case "set-response":
+      viewConfig.value = value.config;
       if (value.searchResponse === undefined) {
         return;
       }
@@ -311,7 +315,7 @@ defineExpose({
         </div>
         <section :style="{ width: `${splitterWidth}px` }">
           <div v-if="eventRdh" class="spPaneWrapper">
-            <RDHViewer :rdh="eventRdh" :width="splitterWidth" :height="splitterHeight" @onClickCell="onClickCell" />
+            <RDHViewer :rdh="eventRdh" :width="splitterWidth" :height="splitterHeight" :config="viewConfig" @onClickCell="onClickCell" />
           </div>
         </section>
       </vscode-panel-view>

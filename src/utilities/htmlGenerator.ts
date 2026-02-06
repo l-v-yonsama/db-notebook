@@ -7,7 +7,7 @@ import {
   ResultSetData,
   ResultSetDataBuilder,
 } from "@l-v-yonsama/rdh";
-import * as dayjs from "dayjs";
+import dayjs from "dayjs";
 import { promises as fs } from "fs";
 import { Cookie, Header, Response } from "har-format";
 import * as path from "path";

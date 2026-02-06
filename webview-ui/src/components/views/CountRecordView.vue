@@ -120,32 +120,20 @@ defineExpose({
     <div class="toolbar">
       <div class="tool-left"></div>
       <div class="tool-right">
-        <VsCodeButton
-          :disabled="mode === 'running'"
-          @click="cancel"
-          appearance="secondary"
-          title="Cancel"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton
-          v-if="rdh && mode !== 'setting'"
-          :disabled="mode === 'running'"
-          @click="output"
-          appearance="secondary"
-          title="Output as Excel"
-          ><fa icon="file-excel" />Output as Excel</VsCodeButton
-        >
-        <VsCodeButton :disabled="mode === 'running'" title="Count selected tables" @click="doCount"
-          ><fa icon="circle-play" />Count selected tables</VsCodeButton
-        >
+        <VsCodeButton :disabled="mode === 'running'" @click="cancel" appearance="secondary" title="Cancel">
+          <fa icon="times" />Cancel
+        </VsCodeButton>
+        <VsCodeButton v-if="rdh && mode !== 'setting'" :disabled="mode === 'running'" @click="output"
+          appearance="secondary" title="Output as Excel">
+          <fa icon="file-excel" />Output as Excel
+        </VsCodeButton>
+        <VsCodeButton :disabled="mode === 'running'" title="Count selected tables" @click="doCount">
+          <fa icon="circle-play" />Count selected tables
+        </VsCodeButton>
       </div>
     </div>
     <section class="content">
-      <div
-        v-if="mode === 'setting'"
-        class="scroll-wrapper"
-        :style="{ height: `${sectionHeight}px` }"
-      >
+      <div v-if="mode === 'setting'" class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
         <table>
           <thead>
             <tr>
@@ -160,11 +148,7 @@ defineExpose({
                 <td>{{ item.name }}</td>
                 <td>{{ item.comment }}</td>
                 <td>
-                  <VsCodeRadioGroupVue
-                    class="switch"
-                    v-model="item.selectedString"
-                    :items="countingTargetItems"
-                  />
+                  <VsCodeRadioGroupVue class="switch" v-model="item.selectedString" :items="countingTargetItems" />
                 </td>
               </tr>
             </template>
@@ -172,12 +156,8 @@ defineExpose({
         </table>
       </div>
 
-      <RDHViewer
-        v-if="rdh && mode !== 'setting'"
-        :rdh="rdh"
-        :width="sectionWidth"
-        :height="sectionHeight"
-      />
+      <RDHViewer v-if="rdh && mode !== 'setting'" :rdh="rdh" :width="sectionWidth" :height="sectionHeight"
+        :config="null" />
     </section>
   </section>
 </template>
@@ -198,6 +178,7 @@ table {
     height: 20px;
     padding: 2px;
   }
+
   th,
   td {
     text-overflow: ellipsis;
@@ -218,6 +199,7 @@ table {
   width: 110px;
   max-width: 110px;
 }
+
 div.scroll-wrapper {
   overflow: auto;
 }

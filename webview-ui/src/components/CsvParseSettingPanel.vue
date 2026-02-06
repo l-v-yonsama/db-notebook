@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownItem } from "@/types/Components";
-import type { CsvParseSettingPanelEventData, SaveCsvOptionParams } from "@/utilities/vscode";
+import type { CsvParseSettingPanelEventData, RdhViewConfig, SaveCsvOptionParams } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
@@ -40,6 +40,7 @@ const castDate = ref(false);
 const initilizing = ref(true);
 
 const rdh = ref(null as ResultSetData | null);
+const viewConfig = ref(null as RdhViewConfig | null);
 
 window.addEventListener("resize", () => resetSectionHeight());
 
@@ -74,6 +75,7 @@ const initialize = async (v: CsvParseSettingPanelEventData["value"]) => {
   cast.value = v.initialize?.cast === true;
   castDate.value = v.initialize?.castDate === true;
   message.value = v.message ?? "";
+  viewConfig.value = v.config;
 
   await nextTick();
 
@@ -247,7 +249,7 @@ defineExpose({
               :rdh="rdh"
               :width="sectionWidth"
               :height="sectionRdhHeight"
-              :with-type="true"
+              :config="viewConfig"
             />
           </div>
           <p v-else>{{ message }}</p>

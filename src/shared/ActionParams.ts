@@ -32,6 +32,7 @@ export type OutputParams = TabIdParam & {
 
 export type ActionCommand =
   | CancelActionCommand
+  | InputChangeActionCommand
   | ShowMessageActionCommand
   | CompareActionCommand
   | ConnectActionCommand
@@ -146,6 +147,8 @@ export type SaveConnectionSettingActionCommand = {
 };
 
 export type CancelActionCommand = BaseActionCommand<"cancel">;
+
+export type InputChangeActionCommand<U = any> = BaseActionCommand<"inputChange", U>;
 
 export type OkActionCommand = BaseActionCommand<"ok">;
 

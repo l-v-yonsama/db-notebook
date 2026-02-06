@@ -9,6 +9,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { CsvParseSettingPanelEventData } from "../shared/MessageEventData";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getRdhViewConfig } from "../utilities/configUtil";
 import { getIconPath } from "../utilities/fsUtil";
 import { log } from "../utilities/logger";
 import { BasePanel } from "./BasePanel";
@@ -77,6 +78,7 @@ export class CsvParseSettingPanel extends BasePanel {
             preview: true,
           },
           rdh: rdb.build(),
+          config: getRdhViewConfig()
         },
       };
       this.panel.webview.postMessage(msg);
@@ -90,6 +92,7 @@ export class CsvParseSettingPanel extends BasePanel {
             preview: true,
           },
           rdh: null,
+          config: getRdhViewConfig(),
           message: (e as Error).message,
         },
       };

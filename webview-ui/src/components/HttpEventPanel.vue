@@ -13,7 +13,7 @@ import {
   vsCodePanelTab,
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
-import { defineExpose, nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import HttpRequestViewer from "./HttpRequestViewer.vue";
@@ -320,12 +320,12 @@ defineExpose({
         <div v-if="displayReqSwitch === 'cookies'">
           <div>Request Cookies</div>
           <RDHViewer v-if="codeBlocks.req.cookies != undefined" :rdh="codeBlocks.req.cookies" :width="splitterWidth"
-            :height="Math.max(splitterHeight / 2 - 15, 15)" />
+            :height="Math.max(splitterHeight / 2 - 15, 15)" :config="null" />
           <div v-else>No data</div>
           <hr style="border-width: 0.5px" />
           <div>Response Cookies</div>
           <RDHViewer v-if="codeBlocks.res.cookies != undefined" :rdh="codeBlocks.res.cookies" :width="splitterWidth"
-            :height="Math.max(splitterHeight / 2 - 15, 15)" />
+            :height="Math.max(splitterHeight / 2 - 15, 15)" :config="null" />
           <div v-else>No data</div>
         </div>
       </div>

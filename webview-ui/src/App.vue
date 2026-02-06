@@ -28,6 +28,7 @@ import SubscriptionPayloadsView from "./components/views/SubscriptionPayloadsVie
 import WriteHttpEventToClipboardParamsPanel from "./components/WriteHttpEventToClipboardParamsPanel.vue";
 
 import CodeResolverEditor from "./components/CodeResolverEditor.vue";
+import DBExportSettingsPanel from "./components/DBExportSettingsPanel.vue";
 import type ERDiagramSettingsVue from "./components/ERDiagramSettings.vue";
 import ERDiagramSettings from "./components/ERDiagramSettings.vue";
 import RecordRuleEditor from "./components/RecordRuleEditor.vue";
@@ -59,7 +60,7 @@ const codeResolverEditorRef = ref<InstanceType<typeof CodeResolverEditor>>();
 const publishEditorPanelRef = ref<InstanceType<typeof PublishEditorPanel>>();
 const subscriptionPayloadsViewRef = ref<InstanceType<typeof SubscriptionPayloadsView>>();
 const subscriptionSettingPanelRef = ref<InstanceType<typeof SubscriptionSettingPanel>>();
-
+const dBExportSettingsPanelRef = ref<InstanceType<typeof DBExportSettingsPanel>>();
 
 const currentComponentName = ref<ComponentName | null>(null);
 currentComponentName.value = window.document.title as ComponentName;
@@ -70,6 +71,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
   console.log("[App.vue] at messageListener ", command, value);
 
   switch (componentName) {
+    case "DBExportSettingsPanel":
+      dBExportSettingsPanelRef.value?.recieveMessage(data);
+      break;
     case "DBFormView":
       dBFormViewRef.value?.recieveMessage(data);
       break;
@@ -157,6 +161,8 @@ onMounted(() => {
 
 <template>
   <main>
+    <DBExportSettingsPanel v-if="currentComponentName === 'DBExportSettingsPanel'" ref="dBExportSettingsPanelRef" />
+
     <DBFormView v-if="currentComponentName === 'DBFormView'" ref="dBFormViewRef" />
 
     <MdhView v-if="currentComponentName === 'MdhView'" ref="MdhViewRef" />

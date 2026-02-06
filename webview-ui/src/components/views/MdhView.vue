@@ -7,6 +7,7 @@ import type {
   MdhViewEventData,
   OutputParams,
   RdhTabItem,
+  RdhViewConfig,
   WriteToClipboardParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
@@ -39,6 +40,7 @@ const contentMode = ref("tab" as "tab" | "keys");
 const noCompareKeys = ref(false);
 const activeTabRdhList = ref([] as ResultSetData[]);
 const initialized = ref(false);
+const viewConfig = ref(null as RdhViewConfig | null);
 
 // secondarySelections
 const writeToClipboardDetailItems = WRITE_TO_CLIP_BOARD_DETAIL_ITEMS;
@@ -346,6 +348,9 @@ const saveCompareKeys = (
 
 const recieveMessage = (data: MdhViewEventData) => {
   const { command, value } = data;
+  if(value.config){
+    viewConfig.value = value.config;
+  }
 
   switch (command) {
     case "add-tab-item":
@@ -420,7 +425,7 @@ defineExpose({
         <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
           <section :style="{ width: `${splitterWidth}px` }">
             <div v-if="activeInnerRdh && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
-              <RDHViewer :rdh="activeInnerRdh" :config="tabItem.config" :width="splitterWidth" :height="splitterHeight"
+              <RDHViewer :rdh="activeInnerRdh" :config="viewConfig" :width="splitterWidth" :height="splitterHeight"
                 :ref="setRdhViewerRef" />
             </div>
             <div v-else class="centered-content">Drawing {{ numOfRows.toLocaleString() }} rows now. Just a moment,

@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.9.10",
+  "version": "0.10.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -449,6 +449,11 @@
           "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showSessions.*/",
           "group": "db-resourc@2"
         },
+         {
+          "command": "database-notebook.export-database",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,exportable.*/",
+          "group": "io@6"
+        },
         {
           "command": "database-notebook.count-for-all-tables",
           "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
@@ -750,6 +755,12 @@
         "title": "Create ER diagram with settings",
         "icon": "$(git-pull-request)",
         "category": "er-diagram"
+      },
+      {
+        "command": "database-notebook.export-database",
+        "title": "Export database",
+        "icon": "$(git-pull-request)",
+        "category": "io"
       },
       {
         "command": "database-notebook.write-er-diagram-to-clipboard",
@@ -1102,21 +1113,21 @@
           "scope": "resource",
           "type": "boolean",
           "default": false,
-          "description": "Converts reserved keywords to uppercase"
+          "description": "Convert SQL reserved keywords to uppercase when formatting."
         },
         "sql-formatter.linesBetweenQueries": {
           "scope": "resource",
           "type": "number",
           "minimum": 1,
           "default": 2,
-          "description": "How many newlines to insert between queries"
+          "description": "Number of blank lines inserted between SQL statements."
         },
         "sql-formatter.tabWidth": {
           "scope": "resource",
           "type": "number",
           "minimum": 1,
           "default": 2,
-          "description": "Amount of indentation to use"
+          "description": "Indentation width used by the SQL formatter."
         },
         "node.Node path": {
           "scope": "resource",
@@ -1143,31 +1154,31 @@
             "Windows949",
             "EUC-KR"
           ],
-          "description": "STDOUT/STDERR encoding of the Javascript execution process"
+          "description": "Character encoding for STDOUT / STDERR of the Node.js process"
         },
         "node.Tmp dir path": {
           "scope": "resource",
           "type": "string",
           "default": "",
-          "description": "temporary directory."
+          "description": "Directory used for temporary files during Node.js execution."
         },
         "resultset.Header display comment": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Display column comments in Resultset header"
+          "description": "Show column comments in the ResultSet table header displayed inside VS Code (preview only)."
         },
         "resultset.Header display type": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Display column type in Resultset header"
+          "description": "Show column data types in the ResultSet table header displayed inside VS Code (preview only)."
         },
         "resultset.Display rowno": {
           "scope": "resource",
           "type": "boolean",
           "default": false,
-          "description": "Display row number in Resultset"
+          "description": "Display row numbers in the ResultSet preview inside VS Code."
         },
         "resultset.Max characters in cell": {
           "scope": "resource",
@@ -1175,7 +1186,7 @@
           "minimum": 1,
           "maximum": 1000000,
           "default": 100,
-          "description": "Maximum number of characters to be displayed in a cell"
+          "description": "Maximum number of characters shown per cell in the ResultSet preview inside VS Code."
         },
         "resultset.Max rows in preview": {
           "scope": "resource",
@@ -1183,7 +1194,7 @@
           "minimum": 1,
           "maximum": 1000000,
           "default": 10,
-          "description": "Maximum number of rows displayed in preview"
+          "description": "Maximum number of rows shown in the ResultSet preview inside VS Code."
         },
         "resultset.Date format": {
           "scope": "resource",
@@ -1193,7 +1204,7 @@
             "YYYY-MM-DD HH:mm:ss"
           ],
           "default": "YYYY-MM-DD",
-          "description": "Get the formatted date"
+          "description": "Date formatting rule applied to ResultSet values (preview and output)."
         },
         "resultset.Timestamp format": {
           "scope": "resource",
@@ -1205,7 +1216,7 @@
             "YYYY-MM-DDTHH:mm:ss.SSSZ"
           ],
           "default": "YYYY-MM-DD HH:mm:ss",
-          "description": "Get the formatted timestamp"
+          "description": "Timestamp formatting rule applied to ResultSet values (preview and output)."
         },
         "resultset.End of Line": {
           "scope": "resource",
@@ -1216,13 +1227,13 @@
             "\r"
           ],
           "default": "\n",
-          "description": "End of Line"
+          "description": "End-of-line character used when generating output files."
         },
         "resultset.Binary to Hex": {
           "scope": "resource",
           "type": "boolean",
           "default": false,
-          "description": "Binary to Hex"
+          "description": "Convert binary data to hexadecimal representation in ResultSets."
         },
         "database.Default limit rows": {
           "scope": "resource",
@@ -1230,37 +1241,37 @@
           "minimum": 1,
           "maximum": 1000000,
           "default": 100,
-          "description": "Specify the number of records to return"
+          "description": "Default LIMIT applied to SQL queries when no explicit limit is specified."
         },
         "output.Excel: Create Table of Contents": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Creates a table of contents sheet with links to each ResultSet in Excel"
+          "description": "Create a table of contents sheet in Excel output files."
         },
         "output.Excel: Show Query and Table Info": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Shows the SELECT statement and target table before each ResultSet table"
+          "description": "Include the executed SQL statement and target table information before each ResultSet in Excel output."
         },
         "output.Excel: enable cross-pair links": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Adds clickable links to jump between the before and after ResultSet sheets"
+          "description": "Enable clickable links between paired ResultSets (before / after) in Excel output."
         },
         "output.Html: Create Table of Contents": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Creates a table of contents sheet with links to each ResultSet in HTML"
+          "description": "Create a table of contents section in HTML output files."
         },
         "output.Html: display graphs": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "description": "Display graphs in HTML"
+          "description": "Display charts and graphs in HTML output files when available."
         },
         "output.Max rows in output file": {
           "scope": "resource",
@@ -1268,7 +1279,7 @@
           "minimum": 1,
           "maximum": 1000000,
           "default": 10000,
-          "description": "Maximum number of rows displayed in output file"
+          "description": "Maximum number of rows written to output files (HTML / Excel)."
         },
         "output.Max characters in cell in output file": {
           "scope": "resource",
@@ -1276,7 +1287,7 @@
           "minimum": 1,
           "maximum": 1000000,
           "default": 10000,
-          "description": "Maximum number of characters to be displayed in a cell in output file"
+          "description": "Maximum number of characters written per cell in output files (HTML / Excel)."
         }
       }
     }

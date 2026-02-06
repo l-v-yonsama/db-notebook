@@ -137,7 +137,7 @@ defineExpose({
       </div>
     </div>
     <section class="content">
-      <RDHViewer v-if="rdh" :rdh="rdh" :width="sectionWidth" :height="sectionHeight" @onClickCell="onClickCell" />
+      <RDHViewer v-if="rdh" :rdh="rdh" :width="sectionWidth" :height="sectionHeight" :config="null" @onClickCell="onClickCell" />
     </section>
   </section>
 </template>

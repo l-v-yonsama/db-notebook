@@ -6,8 +6,8 @@ import {
   QueryItemsAtClientInputParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData } from "@l-v-yonsama/rdh";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import { commands, Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { OPEN_MDH_VIEWER } from "../constant";
 import { ActionCommand } from "../shared/ActionParams";

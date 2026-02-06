@@ -16,8 +16,8 @@ import {
   sleep,
 } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import * as path from "path";
 import {
   commands,
@@ -40,6 +40,7 @@ import { DiffMdhViewEventData, DiffTabItem } from "../shared/MessageEventData";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { DiffMdhViewTabParam } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getRdhViewConfig } from "../utilities/configUtil";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { createHtmlFromDiffList } from "../utilities/htmlGenerator";
 import { StateStorage } from "../utilities/StateStorage";
@@ -144,6 +145,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             currentTabId: this.currentTabId,
             currentInnerIndex: this.currentInnerIndex,
           },
+          config: getRdhViewConfig(),
         },
       });
     }
@@ -324,6 +326,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             tabId: item.tabId,
             value: item,
           },
+          config: getRdhViewConfig(),
         },
       };
       this.postMessage<DiffMdhViewEventData>(msg);
@@ -349,6 +352,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       componentName: "DiffMdhView",
       value: {
         addTabItem: item,
+        config: getRdhViewConfig(),
       },
     };
     this.postMessage<DiffMdhViewEventData>(msg2);

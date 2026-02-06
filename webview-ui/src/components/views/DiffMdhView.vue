@@ -7,6 +7,7 @@ import type {
   DiffTabInnerItem,
   DiffTabItem,
   OutputParams,
+  RdhViewConfig,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { sleep } from "@l-v-yonsama/rdh";
@@ -38,6 +39,7 @@ const displayOnlyChanged = ref(false);
 const hasUndoChangeSql = ref(false);
 const comparable = ref(false);
 const initialized = ref(false);
+const viewConfig = ref(null as RdhViewConfig | null);
 
 const compareDetailItems = [
   {
@@ -259,6 +261,9 @@ const selectedMoreOptions = (v: MoreOption): void => {
 
 const recieveMessage = (data: DiffMdhViewEventData) => {
   const { command, value } = data;
+  if(value.config){
+    viewConfig.value = value.config;
+  }
 
   switch (command) {
     case "add-tab-item":
@@ -321,14 +326,14 @@ defineExpose({
               <pane min-size="5">
                 <div v-if="activeInnerRdh1 && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
                   <RDHViewer :rdh="activeInnerRdh1" :width="splitterWidth" :height="splitterHeight"
-                    :showOnlyChanged="displayOnlyChanged">
+                    :showOnlyChanged="displayOnlyChanged" :config="viewConfig">
                   </RDHViewer>
                 </div>
               </pane>
               <pane min-size="5">
                 <div v-if="activeInnerRdh2 && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
                   <RDHViewer :rdh="activeInnerRdh2" :width="splitterWidth" :height="splitterHeight"
-                    :showOnlyChanged="displayOnlyChanged">
+                    :showOnlyChanged="displayOnlyChanged" :config="viewConfig">
                   </RDHViewer>
                 </div>
               </pane>

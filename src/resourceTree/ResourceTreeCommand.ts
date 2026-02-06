@@ -41,6 +41,7 @@ import {
   DUPLICATE_CONNECTION_SETTING,
   EDIT_CONNECTION_SETTING,
   EDIT_SUBSCRIPTION,
+  EXPORT_DATABASE,
   FLUSH_DB,
   GET_LOCKS,
   GET_SESSIONS,
@@ -66,6 +67,7 @@ import { SQLConfigurationViewProvider } from "../form";
 import { MqttDriverManager } from "../mqtt/MqttDriverManager";
 import { Chat2QueryPanel } from "../panels/Chat2QueryPanel";
 import { CreateInsertScriptSettingsPanel } from "../panels/CreateInsertScriptSettingsPanel";
+import { DBExportSettingsPanel } from "../panels/DBExportSettingsPanel";
 import { DynamoQueryPanel } from "../panels/DynamoQueryPanel";
 import { ERDiagramSettingsPanel } from "../panels/ERDiagramSettingsPanel";
 import { PublishEditorPanel } from "../panels/PublishEditorPanel";
@@ -441,6 +443,17 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       });
     })
   );
+
+  commands.registerCommand(EXPORT_DATABASE, async (dbRes: DbDatabase) => {
+    try {
+      const { conName, schemaName } = dbRes.meta;
+      const rdb = stateStorage.getFirstRdsDatabaseByName(conName);
+      const schema = rdb?.getSchema({ isDefault: true });
+      DBExportSettingsPanel.render(context.extensionUri, dbRes);
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
 
   // Show scan panel
   context.subscriptions.push(

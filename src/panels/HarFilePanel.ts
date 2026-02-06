@@ -1,7 +1,7 @@
 import { prettyFileSize, prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
 import { createRdhKey, GeneralColumnType, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
-import * as dayjs from "dayjs";
+import dayjs from "dayjs";
 import type { Har } from "har-format";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -11,6 +11,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { HarFilePanelEventData, HarFileTabItem } from "../shared/MessageEventData";
 import { hideStatusMessage } from "../statusBar";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { getRdhViewConfig } from "../utilities/configUtil";
 import { getIconPath, readResource } from "../utilities/fsUtil";
 import { createHtmlFromHarItem } from "../utilities/htmlGenerator";
 import { toNodeRunAxiosEvent } from "../utilities/httpUtil";
@@ -121,6 +122,7 @@ export class HarFilePanel extends BasePanel {
               rdh: tmp.rdh,
             },
           },
+          config: getRdhViewConfig(),
         },
       };
       this.panel.webview.postMessage(msg);
@@ -135,6 +137,7 @@ export class HarFilePanel extends BasePanel {
       componentName: "HarFilePanel",
       value: {
         addTabItem: item,
+        config: getRdhViewConfig(),
       },
     };
     this.panel.webview.postMessage(msg2);

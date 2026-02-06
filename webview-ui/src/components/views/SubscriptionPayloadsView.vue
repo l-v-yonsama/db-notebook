@@ -179,7 +179,7 @@ defineExpose({
 
     <section class="panel-view" :style="{ width: `${splitterWidth}px` }">
       <div v-if="rdh" class="spPaneWrapper">
-        <RDHViewer :rdh="rdh" :width="splitterWidth" :height="splitterHeight" @onClickCell="onClickCell" />
+        <RDHViewer :rdh="rdh" :width="splitterWidth" :height="splitterHeight" :config="null" @onClickCell="onClickCell" />
       </div>
       <div v-else class="centered-content">No payloads.</div>
     </section>

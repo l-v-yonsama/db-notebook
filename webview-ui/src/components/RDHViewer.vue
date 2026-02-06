@@ -10,13 +10,14 @@ type Props = {
   width: number;
   height: number;
   rdh: ResultSetData;
-  config?: RdhViewConfig;
+  config: RdhViewConfig | null;
   showOnlyChanged?: boolean;
   showDetailPane?: boolean;
-  withType?: boolean;
 };
 
 const props = defineProps<Props>();
+
+const TR_HEIGHT = 25;
 
 const rdhRef = ref<InstanceType<typeof RDH>>();
 const setRdhRef = (el: any) => {
@@ -26,7 +27,22 @@ const showDetailPane = ref(props.showDetailPane ?? false);
 const detailText = ref("");
 const detailFileAnnotationValue = ref(undefined as FileAnnotation["values"] | undefined);
 
-const contentHeight = computed(() => Math.max(props.height - 44, 50));
+const contentHeight = computed(() => {
+  const hasComment = props.rdh.keys.some((it) => it.comment?.length);
+  const withComment = props.config?.displayComment;
+  const withType = props.config?.displayType;
+  const editable = props.rdh.meta?.editable === true;
+  let div = 19;
+  if (editable || (withComment && hasComment) && withType) {
+    div += TR_HEIGHT * 3;
+  } else if ((withComment && hasComment) || withType) {
+    div += TR_HEIGHT * 2;
+  } else {
+    div += TR_HEIGHT;
+  }
+
+  return Math.max(props.height - div, 50)
+});
 
 const emit = defineEmits<{
   (event: "onClickCell", value: CellFocusParams): void;
@@ -83,8 +99,8 @@ defineExpose({
     <splitpanes class="default-theme" :style="{ 'max-width': `${width}px`, 'height': `${height}px` }">
       <pane min-size="5" size="70">
         <RDH :rdh="rdh" :config="config" :width="width" :height="height" :showOnlyChanged="showOnlyChanged"
-          :withComment="rdh.keys.some((it) => it.comment?.length)" :withType="withType" @onClickCell="onClickCell"
-          @onShowDetailPane="onShowDetailPane" @onShowRecordAtDetailPane="onShowRecordAtDetailPane" :ref="setRdhRef">
+          @onClickCell="onClickCell" @onShowDetailPane="onShowDetailPane"
+          @onShowRecordAtDetailPane="onShowRecordAtDetailPane" :ref="setRdhRef">
         </RDH>
       </pane>
       <pane v-if="showDetailPane" size="30">

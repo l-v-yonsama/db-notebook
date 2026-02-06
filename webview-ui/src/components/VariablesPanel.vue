@@ -53,7 +53,7 @@ defineExpose({
 
 <template>
   <section class="VariablesPanel">
-    <RDHViewer v-if="rdh" :rdh="rdh" :width="splitterWidth" :height="splitterHeight" />
+    <RDHViewer v-if="rdh" :rdh="rdh" :width="splitterWidth" :height="splitterHeight" :config="null" />
   </section>
 </template>
 

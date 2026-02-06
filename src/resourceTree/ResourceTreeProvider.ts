@@ -178,6 +178,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
     let description = resource.comment || "";
     let scannable = false;
     let showSessions = false;
+    let exportable = false;
     let tooltip: string | vscode.MarkdownString | undefined;
 
     switch (resource.resourceType) {
@@ -193,6 +194,8 @@ export class DBDatabaseItem extends vscode.TreeItem {
           ) {
             showSessions = true;
           }
+          exportable =
+            dbType === DBType.MySQL || dbType === DBType.Postgres || dbType === DBType.SQLite;
         }
         break;
       case ResourceType.AwsDatabase:
@@ -371,6 +374,9 @@ export class DBDatabaseItem extends vscode.TreeItem {
     contextValue += ",properties";
     if (showSessions) {
       contextValue += ",showSessions";
+    }
+    if (exportable) {
+      contextValue += ",exportable";
     }
     if (scannable) {
       contextValue += ",scannable";

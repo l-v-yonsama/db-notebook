@@ -354,7 +354,7 @@ defineExpose({
         </fieldset>
       </div>
       <div v-else class="spread">
-        <RDHViewer :rdh="rdhForUpdate" :width="sectionWidth" :height="sectionHeight" :ref="setRdhViewerRef" />
+        <RDHViewer :rdh="rdhForUpdate" :width="sectionWidth" :height="sectionHeight" :config="null" :ref="setRdhViewerRef" />
       </div>
     </div>
   </section>

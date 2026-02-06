@@ -1,5 +1,6 @@
 import { ToStringParam } from "@l-v-yonsama/rdh";
 import { workspace } from "vscode";
+import { RdhViewConfig } from "../shared/MessageEventData";
 import {
   DatabaseConfigType,
   NodeConfigType,
@@ -43,6 +44,17 @@ export const getResultsetConfig = (): ResultsetConfigType => {
     timestampFormat: settings.get("Timestamp format", "YYYY-MM-DD HH:mm:ss"),
     eol: settings.get("End of Line", "\n"),
     binaryToHex: settings.get("Binary to Hex", false),
+  };
+};
+
+export const getRdhViewConfig = (): RdhViewConfig => {
+  const rdhConfig = getResultsetConfig();
+  return {
+    dateFormat: rdhConfig.dateFormat,
+    timestampFormat: rdhConfig.timestampFormat,
+    binaryToHex: rdhConfig.binaryToHex,
+    displayComment: rdhConfig.header.displayComment,
+    displayType: rdhConfig.header.displayType,
   };
 };
 

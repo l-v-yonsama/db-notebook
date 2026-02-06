@@ -6,6 +6,7 @@ export * from "../../../src/shared/Chat2QueryConditionParams";
 export * from "../../../src/shared/CodeResolverParams";
 export * from "../../../src/shared/ComponentName";
 export * from "../../../src/shared/CreateScriptConditionParams";
+export * from "../../../src/shared/DBDumpParams";
 export * from "../../../src/shared/DynamoDBConditionParams";
 export * from "../../../src/shared/ExtChartJs";
 export * from "../../../src/shared/LMPromptCreateConditionParams";

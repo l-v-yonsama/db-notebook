@@ -487,7 +487,7 @@ defineExpose({
           </div>
           <div class="spPaneWrapper">
             <RDHViewer v-if="tabItem.rdh != undefined" :rdh="tabItem.rdh" :width="splitterWidth"
-              :height="splitterHeight" @onClickCell="onClickCell" />
+              :height="splitterHeight" :config="null" @onClickCell="onClickCell" />
           </div>
         </section>
       </vscode-panel-view>

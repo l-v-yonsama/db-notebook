@@ -35,6 +35,7 @@ onMounted(() => {
 let resolver: CodeResolverParams;
 const keyword = ref("");
 const visibleEditor = ref(false);
+const initialized = ref(false);
 const connectionName = ref("");
 const connectionItems: DropdownItem[] = [];
 const editorItem = ref({
@@ -54,8 +55,11 @@ const items = ref([] as (CodeItem & { originalIndex: number })[]);
 const isDirty = ref(false);
 const noResources = ref(false);
 
-const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void => {
+
+const initialize = async (v: CodeResolverEditorEventData["value"]["initialize"]) => {
+  initialized.value = false;
   if (v === undefined) {
+    initialized.value = true;
     return;
   }
   resolver = v.resolver;
@@ -93,10 +97,6 @@ const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void
 
   noResources.value = columnItems.length === 0;
 
-  const wrapper = document.querySelector(".cr-scroll-wrapper");
-  if (wrapper) {
-    wrapper.scrollTop = v.scrollPos ?? 0;
-  }
   items.value.splice(0, items.value.length);
   v.resolver.items.forEach((it, originalIndex) =>
     items.value.push({
@@ -107,6 +107,13 @@ const initialize = (v: CodeResolverEditorEventData["value"]["initialize"]): void
 
   Object.assign(editorItem.value, v.resolver.editor.item);
   visibleEditor.value = v.resolver.editor.visible;
+  initialized.value = true;
+
+  await nextTick();
+  const wrapper = document.querySelector(".cr-scroll-wrapper");
+  if (wrapper) {
+    wrapper.scrollTop = v.scrollPos ?? 0;
+  }
 };
 
 type ComputedItem = {
@@ -146,8 +153,8 @@ const computedItems = computed((): ComputedItem[] => {
         (it.description && it.description.toLocaleLowerCase().indexOf(k) >= 0) ||
         it.details.some(
           (detail) =>
-            detail.code.toLocaleLowerCase().indexOf(k) >= 0 ||
-            detail.label.toLocaleLowerCase().indexOf(k) >= 0
+            detail.code?.toLocaleLowerCase().indexOf(k) >= 0 ||
+            detail.label?.toLocaleLowerCase().indexOf(k) >= 0
         )
       ) {
         return true;
@@ -317,7 +324,8 @@ defineExpose({
         </VsCodeButton>
       </div>
     </div>
-    <div class="cr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+    <section v-if="!initialized" class="centered-content">Just a moment, please.</section>
+    <div v-else class="cr-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div v-if="visibleEditor" class="editor">
         <div class="code-name">
           <label :for="`codeName`">Code name</label>

@@ -10,8 +10,8 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
-import * as dayjs from "dayjs";
-import * as utc from "dayjs/plugin/utc";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import * as path from "path";
 import * as vscode from "vscode";
 import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
