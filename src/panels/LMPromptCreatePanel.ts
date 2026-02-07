@@ -21,6 +21,7 @@ import {
 import { MainController } from "../notebook/controller";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
+import { LabelValueItem } from "../shared/LabelValueItem";
 import { LMPromptCreateConditionParams } from "../shared/LMPromptCreateConditionParams";
 import { LMPromptCreatePanelEventData } from "../shared/MessageEventData";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -242,7 +243,7 @@ export class LMPromptCreatePanel extends BasePanel {
     const models = await lm.selectChatModels({
       vendor: "copilot",
     });
-    let languageModels: { label: string; value: string }[] = [];
+    let languageModels: LabelValueItem[] = [];
     if (models.length === 0) {
       errorMessage =
         "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.";

@@ -40,7 +40,8 @@ import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
-import { DBExportSettingsPanel } from "./panels/DBExportSettingsPanel";
+import { DBDumpSettingsPanel } from "./panels/DBDumpSettingsPanel";
+import { DBRestoreSettingsPanel } from "./panels/DBRestoreSettingsPanel";
 import { DynamoQueryPanel } from "./panels/DynamoQueryPanel";
 import { HarFilePanel } from "./panels/HarFilePanel";
 import { LMPromptCreatePanel } from "./panels/LMPromptCreatePanel";
@@ -103,7 +104,8 @@ export async function activate(context: ExtensionContext) {
   Chat2QueryPanel.setStateStorage(stateStorage);
   PublishEditorPanel.setStateStorage(stateStorage);
   SubscriptionSettingPanel.setStateStorage(stateStorage);
-  DBExportSettingsPanel.setStateStorage(stateStorage);
+  DBDumpSettingsPanel.setStateStorage(stateStorage);
+  DBRestoreSettingsPanel.setStateStorage(stateStorage);
 
   window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);

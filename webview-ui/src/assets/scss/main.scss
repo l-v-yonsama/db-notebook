@@ -162,3 +162,12 @@ div.tool-right {
   height: 100vh;          /* 親要素の高さを全画面に設定 */
   text-align: center;     /* テキストの中央揃え */
 }
+
+.disabled-reason {
+  margin-top: 3px;
+  padding: 3px 6px;
+  color: var(--vscode-descriptionForeground);
+  background-color: var(--vscode-editorWarning-background, rgba(255, 200, 0, 0.08));
+  border-left: 3px solid var(--vscode-editorWarning-foreground, #cca700);
+  border-radius: 2px;
+}

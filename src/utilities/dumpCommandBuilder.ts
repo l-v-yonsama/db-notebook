@@ -1,127 +1,232 @@
-import { DBExportSettingsInputParams } from "../shared/DBDumpParams";
+import { DBDumpInputParams } from "../shared/DBDumpParams";
 
-
+/**
+ * Build DB Dump command
+ */
 export function buildDumpCommand(
-  params: DBExportSettingsInputParams,
+  params: DBDumpInputParams,
+  maskSensitive: boolean
+): string {
+  switch (params.dbType) {
+    case "MySQL":
+      return buildMySqlDumpCommand(params, maskSensitive);
+    case "Postgres":
+      return buildPostgresDumpCommand(params, maskSensitive);
+    case "SQLite":
+      return buildSqliteDumpCommand(params);
+    default:
+      return "";
+  }
+}
+
+/* =========================
+ * MySQL
+ * ========================= */
+function buildMySqlDumpCommand(
+  params: DBDumpInputParams,
   maskSensitive: boolean
 ): string {
   const {
-    dbType,
+    dbName,
+    userName,
+    password,
+    selectedTables,
+    targetScope,
+    options,
+    executeDumpInDockerContainer,
+    dockerContainerName,
+    outputTarget,
+    outputFilePrefix,
+    outputCompression = "none",
+  } = params;
+
+  const args: string[] = ["mysqldump"];
+  const dockerEnvArgs: string[] = [];
+
+  if (userName) args.push(`-u ${quote(userName)}`);
+
+  if (password) {
+    const value = maskSensitive ? "****" : password;
+    if (executeDumpInDockerContainer) {
+      dockerEnvArgs.push(`-e MYSQL_PWD=${quote(value)}`);
+    } else {
+      args.push(`-p${quote(value)}`);
+    }
+  }
+
+  args.push(quote(dbName));
+
+  if (targetScope === "tables" && selectedTables.length) {
+    selectedTables.forEach((t) => args.push(quote(t)));
+  }
+
+  appendDumpOptions(args, options);
+
+  return buildFinalDumpCommand({
+    baseArgs: args,
+    dockerEnvArgs,
+    executeDumpInDockerContainer,
+    dockerContainerName,
+    outputTarget,
+    outputFilePrefix,
+    outputCompression,
+    dbType: "MySQL",
+  });
+}
+
+/* =========================
+ * PostgreSQL
+ * ========================= */
+function buildPostgresDumpCommand(
+  params: DBDumpInputParams,
+  maskSensitive: boolean
+): string {
+  const {
     dbName,
     userName,
     password,
     targetScope,
+    selectedSchemas,
     selectedTables,
     options,
     executeDumpInDockerContainer,
     dockerContainerName,
     outputTarget,
     outputFilePrefix,
-    outputFormat,
     outputCompression = "none",
   } = params;
 
-  let baseCommand = "";
-  const args: string[] = [];
+  const args: string[] = ["pg_dump"];
   const dockerEnvArgs: string[] = [];
 
-  /* ===============================
-   * DB ごとのベースコマンド
-   * =============================== */
-  switch (dbType) {
-    case "MySQL":
-      baseCommand = "mysqldump";
-      if (userName) args.push(`-u ${quote(userName)}`);
-      break;
+  if (userName) args.push(`-U ${quote(userName)}`);
 
-    case "Postgres":
-      baseCommand = "pg_dump";
-      if (userName) args.push(`-U ${quote(userName)}`);
-      break;
-
-    case "SQLite":
-      baseCommand = "sqlite3";
-      break;
-
-    default:
-      return "";
-  }
-
-  /* ===============================
-   * パスワード
-   * =============================== */
   if (password) {
     const value = maskSensitive ? "****" : password;
     if (executeDumpInDockerContainer) {
-      if (dbType === "MySQL") dockerEnvArgs.push(`-e MYSQL_PWD=${quote(value)}`);
-      if (dbType === "Postgres") dockerEnvArgs.push(`-e PGPASSWORD=${quote(value)}`);
+      dockerEnvArgs.push(`-e PGPASSWORD=${quote(value)}`);
     } else {
-      if (dbType === "MySQL") args.push(`-p${quote(value)}`);
-      if (dbType === "Postgres") dockerEnvArgs.push(`PGPASSWORD=${quote(value)}`);
+      dockerEnvArgs.push(`PGPASSWORD=${quote(value)}`);
     }
   }
 
-  /* ===============================
-   * 対象スコープ
-   * =============================== */
-  if (targetScope === "database") {
-    if (dbType === "SQLite") {
-      args.push(quote(dbName), quote(".dump"));
-    } else {
-      args.push(quote(dbName));
-    }
-  } else if (selectedTables?.length) {
-    switch (dbType) {
-      case "MySQL":
-        args.push(quote(dbName));
-        selectedTables.forEach((t) => args.push(quote(t)));
-        break;
-      case "Postgres":
-        args.push(quote(dbName));
-        selectedTables.forEach((t) => args.push(`--table=${quote(t)}`));
-        break;
-      case "SQLite":
-        args.push(quote(dbName), quote(`.dump ${selectedTables.join(" ")}`));
-        break;
-    }
+  args.push(quote(dbName));
+
+  if (targetScope === "schemas" && selectedSchemas.length) {
+    selectedSchemas.forEach((s) => {
+      args.push(`--schema=${quote(s)}`);
+    });
   }
 
-  /* ===============================
-   * dump オプション
-   * =============================== */
+  if (targetScope === "tables" && selectedTables.length) {
+    // 完全修飾名前提（schema.table）
+    selectedTables.forEach((t) => {
+      args.push(`--table=${quote(t)}`);
+    });
+  }
+
+  appendDumpOptions(args, options);
+
+  return buildFinalDumpCommand({
+    baseArgs: args,
+    dockerEnvArgs,
+    executeDumpInDockerContainer,
+    dockerContainerName,
+    outputTarget,
+    outputFilePrefix,
+    outputCompression,
+    dbType: "Postgres",
+  });
+}
+
+/* =========================
+ * SQLite
+ * ========================= */
+function buildSqliteDumpCommand(params: DBDumpInputParams): string {
+  const {
+    dbName,
+    selectedTables,
+    targetScope,
+    outputTarget,
+    outputFilePrefix,
+    outputCompression = "none",
+  } = params;
+
+  const args: string[] = ["sqlite3", quote(dbName)];
+
+  if (targetScope === "tables" && selectedTables.length) {
+    args.push(quote(`.dump ${selectedTables.join(" ")}`));
+  } else {
+    args.push(quote(".dump"));
+  }
+
+  return buildFinalDumpCommand({
+    baseArgs: args,
+    dockerEnvArgs: [],
+    executeDumpInDockerContainer: false,
+    dockerContainerName: "",
+    outputTarget,
+    outputFilePrefix,
+    outputCompression,
+    dbType: "SQLite",
+  });
+}
+
+/* ===============================
+ * 共通ユーティリティ
+ * =============================== */
+
+function appendDumpOptions(
+  args: string[],
+  options: DBDumpInputParams["options"]
+) {
   for (const opt of options) {
     if (!opt.enabled) continue;
+
     if (!opt.argType) {
       args.push(opt.option);
       continue;
     }
+
     const value = opt.param ?? opt.defaultValue;
     if (value !== undefined) {
       args.push(`${opt.option}=${quote(String(value))}`);
     }
   }
+}
 
-  /* ===============================
-   * コマンド本体
-   * =============================== */
+function buildFinalDumpCommand({
+  baseArgs,
+  dockerEnvArgs,
+  executeDumpInDockerContainer,
+  dockerContainerName,
+  outputTarget,
+  outputFilePrefix,
+  outputCompression,
+  dbType,
+}: {
+  baseArgs: string[];
+  dockerEnvArgs: string[];
+  executeDumpInDockerContainer: boolean;
+  dockerContainerName: string;
+  outputTarget: DBDumpInputParams["outputTarget"];
+  outputFilePrefix: string;
+  outputCompression: DBDumpInputParams["outputCompression"];
+  dbType: DBDumpInputParams["dbType"];
+}): string {
   const parts: string[] = [
     ...(executeDumpInDockerContainer && dockerContainerName
       ? ["docker exec", ...dockerEnvArgs, quote(dockerContainerName)]
       : dockerEnvArgs),
-    baseCommand,
-    ...args,
+    ...baseArgs,
   ];
 
-  /* ===============================
-   * 出力 + 圧縮制御
-   * =============================== */
   if (outputTarget === "file") {
     if (!outputFilePrefix) {
       throw new Error("outputFilePrefix is required when outputTarget === 'file'");
     }
 
-    const baseSuffix = resolveOutputSuffix(dbType, outputFormat) ?? "";
-    let outputPath = `${outputFilePrefix}${baseSuffix}`;
+    let outputPath = `${outputFilePrefix}.sql`;
 
     if (outputCompression === "gzip") {
       parts.push("|", "gzip");
@@ -137,33 +242,6 @@ export function buildDumpCommand(
   return joinCommandLines(parts);
 }
 
-/* ===============================
- * 共通ユーティリティ
- * =============================== */
-function resolveOutputSuffix(
-  dbType: DBExportSettingsInputParams["dbType"],
-  format?: DBExportSettingsInputParams["outputFormat"]
-): string | undefined {
-  switch (dbType) {
-    case "Postgres":
-      switch (format) {
-        case "binary":
-          return ".dump";
-        case "directory":
-          return ""; // ディレクトリ
-        case "sql":
-        default:
-          return ".sql";
-      }
-
-    case "MySQL":
-    case "SQLite":
-      return ".sql";
-
-    default:
-      return undefined;
-  }
-}
 function quote(value: string): string {
   if (/[\s"'\\]/.test(value)) {
     return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -172,5 +250,5 @@ function quote(value: string): string {
 }
 
 function joinCommandLines(parts: string[], indent = "  "): string {
-  return parts.map((p, i) => (i === 0 ? p : `${indent}${p}`)).join(` \\\n`);
+  return parts.map((p, i) => (i === 0 ? p : `${indent}${p}`)).join(" \\\n");
 }

@@ -449,8 +449,13 @@
           "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showSessions.*/",
           "group": "db-resourc@2"
         },
-         {
-          "command": "database-notebook.export-database",
+        {
+          "command": "database-notebook.dump-database",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,exportable.*/",
+          "group": "io@6"
+        },
+        {
+          "command": "database-notebook.restore-database",
           "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,exportable.*/",
           "group": "io@6"
         },
@@ -757,8 +762,14 @@
         "category": "er-diagram"
       },
       {
-        "command": "database-notebook.export-database",
-        "title": "Export database",
+        "command": "database-notebook.dump-database",
+        "title": "Dump database",
+        "icon": "$(cloud-download)",
+        "category": "io"
+      },
+      {
+        "command": "database-notebook.restore-database",
+        "title": "Restore database",
         "icon": "$(git-pull-request)",
         "category": "io"
       },

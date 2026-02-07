@@ -48,7 +48,8 @@ export const SHOW_METADATA_RDH = `${EXTENSION_NAME}.show-metadata-rdh`;
 export const SHOW_RESOURCE_PROPERTIES = `${EXTENSION_NAME}.show-resource-properties`;
 export const CREATE_ER_DIAGRAM = `${EXTENSION_NAME}.create-er-diagram`;
 export const CREATE_ER_DIAGRAM_WITH_SETTINGS = `${EXTENSION_NAME}.create-er-diagram-with-settings`;
-export const EXPORT_DATABASE = `${EXTENSION_NAME}.export-database`;
+export const DUMP_DATABASE = `${EXTENSION_NAME}.dump-database`;
+export const RESTORE_DATABASE = `${EXTENSION_NAME}.restore-database`;
 export const WRITE_ER_DIAGRAM_TO_CLIPBOARD = `${EXTENSION_NAME}.write-er-diagram-to-clipboard`;
 
 export const CREATE_INSERT_SCRIPT_WITH_SETTINGS = `${EXTENSION_NAME}.create-insert-script-with-settings`;

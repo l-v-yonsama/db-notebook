@@ -26,8 +26,16 @@ import type {
 } from "./ActionParams";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ComponentName } from "./ComponentName";
-import type { DBExportSettingsInputParams, DBExportSettingsUIParams } from "./DBDumpParams";
+import type {
+  DBDumpInputParams,
+  DBDumpSettingsUIParams,
+} from "./DBDumpParams";
+import type {
+  DBRestoreInputParams,
+  DBRestoreSettingsUIParams,
+} from "./DBRestoreParams";
 import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
+import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
 import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
@@ -40,7 +48,8 @@ export type MessageEventData =
   | CreateInsertScriptSettingsPanelEventData
   | CsvParseSettingPanelEventData
   | DBFormEventData
-  | DBExportSettingsPanelEventData
+  | DBDumpSettingsPanelEventData
+  | DBRestoreSettingsPanelEventData
   | DiffMdhViewEventData
   | DynamoQueryPanelEventData
   | ERDiagramSettingsPanelEventData
@@ -400,8 +409,8 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
       metadata: CellMeta;
       preparationVisible: boolean;
       connectionSettingNames: string[];
-      codeFileItems: { label: string; value: string }[];
-      ruleFileItems: { label: string; value: string }[];
+      codeFileItems: LabelValueItem[];
+      ruleFileItems: LabelValueItem[];
       columnItems: RdhKey[];
     };
   }
@@ -416,7 +425,7 @@ export type LMPromptCreatePanelEventData = BaseMessageEventData<
       hasExplainPlan: boolean;
       assistantPromptText: string;
       userPromptText: string;
-      languageModels: { label: string; value: string }[];
+      languageModels: LabelValueItem[];
       languageModelId: string;
       translateResponse: boolean;
       withTableDefinition: boolean;
@@ -438,7 +447,7 @@ export type Chat2QueryPanelEventData = BaseMessageEventData<
       selectedTableNames: string[];
       assistantPromptText: string;
       userPromptText: string;
-      languageModels: { label: string; value: string }[];
+      languageModels: LabelValueItem[];
       languageModelId: string;
       queryContent: string;
       translateResponse: boolean;
@@ -478,13 +487,32 @@ export type ERDiagramSettingsPanelEventData = BaseMessageEventData<
   }
 >;
 
-export type DBExportSettingsPanelEventData = BaseMessageEventData<
+/* =========================
+ * Dump
+ * ========================= */
+
+export type DBDumpSettingsPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand,
-  "DBExportSettingsPanel",
+  "DBDumpSettingsPanel",
   {
     initialize?: {
-      params: DBExportSettingsInputParams;
-      uiParams: DBExportSettingsUIParams;
+      params: DBDumpInputParams;
+      uiParams: DBDumpSettingsUIParams;
+    };
+  }
+>;
+
+/* =========================
+ * Restore
+ * ========================= */
+
+export type DBRestoreSettingsPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "DBRestoreSettingsPanel",
+  {
+    initialize?: {
+      params: DBRestoreInputParams;
+      uiParams: DBRestoreSettingsUIParams;
     };
   }
 >;

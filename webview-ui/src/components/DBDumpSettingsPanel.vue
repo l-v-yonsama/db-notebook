@@ -1,17 +1,13 @@
 <script setup lang="ts">
 import type { DropdownItem } from "@/types/Components";
 import type {
+  DBDumpInputParams,
   DBDumpOptionParams,
-  DBExportSettingsInputParams,
-  DBExportSettingsPanelEventData,
+  DBDumpSettingsPanelEventData,
+  LabelValueItem,
   OutputCompressionType
 } from "@/utilities/vscode";
-import {
-  vscode,
-} from "@/utilities/vscode";
-import type {
-  DbTable
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import { vscode } from "@/utilities/vscode";
 import { computed, nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
@@ -20,9 +16,7 @@ import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 const sectionHeight = ref(300);
 
-type TableItem = {
-  name: string;
-  comment: string;
+type SelectableItem = LabelValueItem & {
   selected: boolean;
 };
 
@@ -31,7 +25,7 @@ window.addEventListener("resize", () => resetSectionHeight());
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector("section.root");
   if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 76, 100);
+    sectionHeight.value = Math.max(sectionWrapper.clientHeight - 76, 100);
   }
 };
 
@@ -40,7 +34,6 @@ onMounted(() => {
 });
 
 const groupLabels: Record<string, string> = {
-  target: "Target",
   content: "Content",
   filter: "Filter",
   performance: "Performance",
@@ -48,117 +41,129 @@ const groupLabels: Record<string, string> = {
   advanced: "Advanced (Danger)",
 };
 
-const optionGroups = computed(() => {
-  const map: Record<string, DBDumpOptionParams[]> = {};
+const initialized = ref(false);
 
-  for (const opt of dumpOptions.value) {
-    if (!map[opt.group]) {
-      map[opt.group] = [];
-    }
-    map[opt.group].push(opt);
+const disabledReasonMessage = computed<string | null>(() => {
+  if (!initialized.value) return "Initializing...";
+
+  if (outputTarget.value === "file" && !fileNamePrefix.value.trim()) {
+    return "Output file name prefix is required";
   }
 
+  if (targetScope.value === "schemas" && schemaItems.value.every(it => !it.selected)) {
+    return "Select at least one schema";
+  }
+
+  if (targetScope.value === "tables" && tableItems.value.every(it => !it.selected)) {
+    return "Select at least one table";
+  }
+
+  if (executeDumpInDockerContainer.value && !dockerContainerName.value) {
+    return "Docker container is not selected";
+  }
+
+  return null;
+});
+
+const optionGroups = computed(() => {
+  const map: Record<string, DBDumpOptionParams[]> = {};
+  for (const opt of dumpOptions.value) {
+    (map[opt.group] ??= []).push(opt);
+  }
   return map;
 });
 
-const dbType = ref('MySQL' as DBExportSettingsInputParams['dbType']);
-const initialized = ref(false);
+const dbType = ref("MySQL" as DBDumpInputParams["dbType"]);
 const executeDumpInDockerContainer = ref(false);
 const userName = ref("");
 const password = ref("");
 const fileNamePrefix = ref("");
 const previewCommand = ref("");
-const targetScope = ref("database" as "database" | 'tables');
-const targetScopeItems: DropdownItem[] = [
-  { label: 'Database', value: 'database' },
-  { label: 'Tables', value: 'tables' },
-];
-const dockerContainerName = ref('');
+const selectableSchema = ref(false);
+
+const targetScope = ref<"database" | "schemas" | "tables">("database");
+const targetScopeItems: DropdownItem[] = [];
+
+const dockerContainerName = ref("");
 const dockerContainerItems: DropdownItem[] = [];
 
 const outputTarget = ref<"stdout" | "file">("file");
-const outputFormat = ref<"sql" | "csv" | "binary" | "directory">("sql");
-const outputCompression = ref<OutputCompressionType>('none');
+const outputCompression = ref<OutputCompressionType>("none");
+
 const outputTargetItems: DropdownItem[] = [
   { label: "Standard output", value: "stdout" },
   { label: "File", value: "file" },
 ];
 
-const outputFormatItems: DropdownItem[] = [
-  { label: "SQL (plain)", value: "sql" },
-  { label: "Binary", value: "binary" },
-  { label: "Directory", value: "directory" },
-];
-
 const outputCompressionItems: DropdownItem[] = [
-  { label: "None", value: "none" },
-  { label: "Gzip", value: "gzip" },
-  { label: "Zstd", value: "zstd" },
+  { label: "None (plain SQL file)", value: "none" },
+  { label: "gzip (.gz)", value: "gzip" },
+  { label: "zstd (.zst)", value: "zstd" },
 ];
 
-
-const allTableItems = ref([] as TableItem[]);
+const schemaItems = ref<SelectableItem[]>([]);
+const tableItems = ref<SelectableItem[]>([]);
 const dumpOptions = ref<DBDumpOptionParams[]>([]);
-let tables: DbTable[] = [];
 
-const initialize = async (v: DBExportSettingsPanelEventData["value"]["initialize"]) => {
+const initialize = async (
+  v: DBDumpSettingsPanelEventData["value"]["initialize"]
+) => {
   initialized.value = false;
   await nextTick();
-  if (v === undefined) {
+  if (!v) {
     initialized.value = true;
     return;
   }
 
   dbType.value = v.params.dbType;
+  selectableSchema.value = v.params.dbType === "Postgres";
+
   outputTarget.value = v.params.outputTarget ?? "file";
-  outputFormat.value = v.params.outputFormat ?? "sql";
-  outputCompression.value = v.params.outputCompression ?? 'none';
+  outputCompression.value = v.params.outputCompression ?? "none";
   fileNamePrefix.value = v.params.outputFilePrefix ?? "";
 
+  targetScopeItems.splice(0);
+  targetScopeItems.push({ label: "Database", value: "database" });
+  if (selectableSchema.value) {
+    targetScopeItems.push({ label: "Schema", value: "schemas" });
+  }
+  targetScopeItems.push({ label: "Table", value: "tables" });
+
+  targetScope.value = v.params.targetScope;
+
   executeDumpInDockerContainer.value = v.params.executeDumpInDockerContainer;
-  dockerContainerItems.splice(0, dockerContainerItems.length);
-  dockerContainerItems.push({
-    label: '', value: ''
-  });
-  v.uiParams.dockerContainerItems.forEach(it => {
-    dockerContainerItems.push(it);
-  });
+  dockerContainerItems.splice(0, dockerContainerItems.length, { label: "", value: "" });
+  v.uiParams.dockerContainerItems.forEach(it => dockerContainerItems.push(it));
   dockerContainerName.value = v.params.dockerContainerName;
 
-  tables = v.uiParams.tables as DbTable[];
   userName.value = v.params.userName;
   password.value = v.params.password;
   dumpOptions.value = v.params.options;
   previewCommand.value = v.uiParams.previewCommand;
 
-  allTableItems.value.splice(0, allTableItems.value.length);
-  v.uiParams.tables.forEach((table) => {
-    allTableItems.value.push({
-      name: table.name,
-      comment: table.comment ?? "",
-      selected: v.params.selectedTables.includes(table.name),
-    });
-  });
+  schemaItems.value = v.uiParams.schemas.map(it => ({
+    ...it,
+    selected: v.params.selectedSchemas.includes(it.value),
+  }));
+
+  tableItems.value = v.uiParams.tables.map(it => ({
+    ...it,
+    selected: v.params.selectedTables.includes(it.value),
+  }));
+
   initialized.value = true;
 
   await nextTick();
-  const wrapper = document.querySelector("section.scroll-wrapper");
-  if (wrapper) {
-    wrapper.scrollTop = v.uiParams.scrollPos ?? 0;
-  }
+  const wrapper = document.querySelector("section.top-scroll-wrapper");
+  if (wrapper) wrapper.scrollTop = v.uiParams.scrollPos ?? 0;
 };
 
-function selectTable(tableItem: TableItem) {
-  tableItem.selected = true;
-  // resetAll(tableItem, true);
-}
 
 const handleChange = () => {
-  const lastKnownScrollPosition = document.querySelector(".scroll-wrapper")?.scrollTop ?? 0;
+  const lastKnownScrollPosition = document.querySelector(".top-scroll-wrapper")?.scrollTop ?? 0;
 
-  const params: Partial<DBExportSettingsInputParams> = {
+  const params: Partial<DBDumpInputParams> = {
     outputTarget: outputTarget.value,
-    outputFormat: outputFormat.value,
     outputFilePrefix: fileNamePrefix.value,
     outputCompression: outputCompression.value,
     userName: userName.value,
@@ -166,12 +171,13 @@ const handleChange = () => {
     targetScope: targetScope.value,
     executeDumpInDockerContainer: executeDumpInDockerContainer.value,
     dockerContainerName: dockerContainerName.value,
-    selectedTables: allTableItems.value.filter(it => it.selected).map(it => it.name),
+    selectedSchemas: schemaItems.value.filter(it => it.selected).map(it => it.value),
+    selectedTables: tableItems.value.filter(it => it.selected).map(it => it.value),
     options: JSON.parse(JSON.stringify(dumpOptions.value)),
   };
   vscode.postCommand({
     command: "inputChange",
-    params:{
+    params: {
       ...params,
       scrollPos: lastKnownScrollPosition,
     },
@@ -202,7 +208,7 @@ const writeToClipboard = () => {
   });
 };
 
-const recieveMessage = (data: DBExportSettingsPanelEventData) => {
+const recieveMessage = (data: DBDumpSettingsPanelEventData) => {
   const { command, value } = data;
   switch (command) {
     case "initialize":
@@ -223,22 +229,25 @@ defineExpose({
   <section class="root">
     <div class="toolbar">
       <div class="tool-left">
-        <h3>DB export settings</h3>
+        <div v-if="disabledReasonMessage" class="disabled-reason">
+          ⚠ {{ disabledReasonMessage }}
+        </div>
       </div>
       <div class="tool-right">
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
           <fa icon="times" />Cancel
         </VsCodeButton>
-        <VsCodeButton @click="writeToClipboard" appearance="secondary" title="Write to clipboard">
+        <VsCodeButton @click="writeToClipboard" appearance="secondary" title="Write to clipboard"
+          :disabled="!!disabledReasonMessage">
           <fa icon="clipboard" />Copy to clipboard
         </VsCodeButton>
-        <VsCodeButton @click="ok" title="Execute in a terminal">
-          <fa icon="check" />Execute
+        <VsCodeButton @click="ok" title="Run Dump command" :disabled="!!disabledReasonMessage">
+          <fa icon="check" />Run Dump
         </VsCodeButton>
       </div>
     </div>
     <section v-if="!initialized" class="centered-content">Just a moment, please.</section>
-    <section v-else class="content scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
+    <section v-else class="content top-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="params content-child">
         <fieldset class="conditions">
           <legend>
@@ -261,7 +270,7 @@ defineExpose({
               <div v-if="executeDumpInDockerContainer">
                 <label for="dockerContainerName"> Container name:</label>
                 <VsCodeDropdown id="dockerContainerName" v-model="dockerContainerName" :items="dockerContainerItems"
-                  style="z-index: 25; width: 320px;" @change="handleChange()" />
+                  style="z-index: 25; width: 320px;" :required="true" @change="handleChange()" />
               </div>
               <div>
                 <label for="targetScope">Target scope:</label>
@@ -300,11 +309,6 @@ defineExpose({
                 <div>
                   <label>Compression:</label>
                   <VsCodeDropdown v-model="outputCompression" :items="outputCompressionItems" style="width: 200px;"
-                    @change="handleChange()" />
-                </div>
-                <div v-if="dbType === 'Postgres'">
-                  <label>Output format:</label>
-                  <VsCodeDropdown v-model="outputFormat" :items="outputFormatItems" style="width: 200px;"
                     @change="handleChange()" />
                 </div>
               </template>
@@ -352,14 +356,27 @@ defineExpose({
           </div>
         </fieldset>
       </div>
-      <div v-if="targetScope === 'tables'" class="tables content-child">
-        <fieldset class="conditions">
+      <div v-if="targetScope !== 'database'" class="schemas content-child">
+        <fieldset v-if="selectableSchema" class="conditions">
+          <legend>Schemas</legend>
+          <div class="scroll-wrapper">
+            <div v-for="opt in schemaItems" :key="opt.value" class="schema-item">
+              <label>
+                <input type="checkbox" v-model="opt.selected" @change="($e: any) => handleChange()" />
+                {{ opt.label }}
+              </label>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset v-if="targetScope === 'tables'" class="conditions">
           <legend>Tables</legend>
-          <div v-for="opt in allTableItems" :key="opt.name" class="table-item">
-            <label>
-              <input type="checkbox" v-model="opt.selected" @change="($e: any) => handleChange()" />
-              {{ opt.name }}&nbsp;<small v-if="opt.comment">({{ opt.comment }})</small>
-            </label>
+          <div class="scroll-wrapper" style="max-height: 350px;">
+            <div v-for="opt in tableItems" :key="opt.value" class="table-item">
+              <label>
+                <input type="checkbox" v-model="opt.selected" @change="($e: any) => handleChange()" />
+                {{ opt.label }}
+              </label>
+            </div>
           </div>
         </fieldset>
       </div>
@@ -436,7 +453,14 @@ p.preview {
   white-space: pre-wrap;
 }
 
-section.scroll-wrapper {
+section.top-scroll-wrapper {
   overflow: auto;
+}
+
+div.content-child {
+  .scroll-wrapper {
+    overflow-y: auto;
+    max-height: 180px;
+  }
 }
 </style>
