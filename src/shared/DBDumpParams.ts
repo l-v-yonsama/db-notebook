@@ -74,6 +74,8 @@ export type DBDumpInputParams = {
   /** 認証 */
   userName: string;
   password: string;
+  port?: number;
+  host?: string;
 
   /** 対象範囲 */
   targetScope: "database" | "schemas" | "tables";

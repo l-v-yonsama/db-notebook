@@ -201,7 +201,9 @@ export class DBDumpSettingsPanel extends BasePanel {
 
     const terminalName = "DB Dump";
     let terminal = window.terminals.find((t) => t.name === terminalName);
-    if (!terminal) terminal = createPreferredTerminal(terminalName);
+    if (!terminal) {
+      terminal = createPreferredTerminal(terminalName);
+    }
 
     terminal.show(true);
     terminal.sendText(`echo "===== DB Dump Started: ${outputFilePrefix} ====="`, true);
@@ -209,9 +211,11 @@ export class DBDumpSettingsPanel extends BasePanel {
   }
 
   private async handleChange(params: Partial<DBDumpInputParams>) {
-    if (!this.variables) return;
+    if (!this.variables) {
+      return;
+    }
 
-    Object.assign(this.variables, params);
+    assignDefined(this.variables, params);
     this.uiParams.scrollPos = (params as any).scrollPos;
 
     await this.resetUiParams();
@@ -284,6 +288,14 @@ export class DBDumpSettingsPanel extends BasePanel {
       this.dockerContainers,
       this.variables.dbType
     );
+  }
+}
+
+function assignDefined<T extends object>(target: T, src: Partial<T>) {
+  for (const [key, value] of Object.entries(src)) {
+    if (value !== undefined) {
+      (target as any)[key] = value;
+    }
   }
 }
 
@@ -455,13 +467,4 @@ const sqliteDumpPresets: DBDumpOptionParams[] = [
     description: "Output schema definitions only",
   },
 
-  /* ========= advanced ========= */
-  {
-    id: "sqlite-foreign-keys-off",
-    group: "advanced",
-    riskLevel: "danger",
-    enabled: false,
-    option: "PRAGMA foreign_keys=OFF;",
-    description: "Disable foreign key constraints",
-  },
 ];

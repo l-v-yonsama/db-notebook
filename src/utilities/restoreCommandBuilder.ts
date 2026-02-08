@@ -15,21 +15,6 @@ export function buildRestoreCommand(params: DBRestoreInputParams, maskSensitive:
   }
 }
 
-function buildDecompressionCommand(
-  inputFilePath: string,
-  fileCompression: RestoreFileCompressionType
-): string {
-  switch (fileCompression) {
-    case "gzip":
-      return `gzip -dc "${inputFilePath}"`;
-    case "zstd":
-      return `zstd -dc "${inputFilePath}"`;
-    case "none":
-    default:
-      throw new Error("No decompression needed");
-  }
-}
-
 function buildInputSourceCommand(
   inputFilePath: string,
   fileCompression: RestoreFileCompressionType
@@ -56,11 +41,16 @@ function withPreviewComments(command: string, comments: string[], enabled: boole
 /* =========================
  * MySQL
  * ========================= */
-function buildMysqlRestoreCommand(params: DBRestoreInputParams, maskSensitive: boolean): string {
+function buildMysqlRestoreCommand(
+  params: DBRestoreInputParams,
+  maskSensitive: boolean
+): string {
   const {
     dbName,
     userName,
     password,
+    host,
+    port,
     inputFilePath,
     fileCompression,
     executeRestoreInDockerContainer,
@@ -74,6 +64,8 @@ function buildMysqlRestoreCommand(params: DBRestoreInputParams, maskSensitive: b
     "mysql",
     advanced.verbose ? "--verbose" : "",
     userName ? `-u ${userName}` : "",
+    host ? `-h ${host}` : "",
+    port !== undefined ? `-P ${port}` : "",
     dbName,
   ]
     .filter(Boolean)
@@ -86,12 +78,17 @@ function buildMysqlRestoreCommand(params: DBRestoreInputParams, maskSensitive: b
   const left = advanced.showProgress ? `${inputSource} | pv` : inputSource;
 
   const baseCmd = executeRestoreInDockerContainer
-    ? pipe(left, [`docker exec -i ${dockerEnv} ${dockerContainerName} \\`, `  ${mysqlCmd}`])
+    ? pipe(left, [
+        `docker exec -i ${dockerEnv} ${dockerContainerName} \\`,
+        `  ${mysqlCmd}`,
+      ])
     : pipe(left, [[localEnv, mysqlCmd].filter(Boolean).join(" ")]);
 
   return withPreviewComments(
     baseCmd,
-    advanced.showProgress ? ["requires pv (Pipe Viewer)", "install: brew install pv"] : [],
+    advanced.showProgress
+      ? ["requires pv (Pipe Viewer)", "install: brew install pv"]
+      : [],
     maskSensitive
   );
 }
@@ -99,11 +96,16 @@ function buildMysqlRestoreCommand(params: DBRestoreInputParams, maskSensitive: b
 /* =========================
  * PostgreSQL
  * ========================= */
-function buildPostgresRestoreCommand(params: DBRestoreInputParams, maskSensitive: boolean): string {
+function buildPostgresRestoreCommand(
+  params: DBRestoreInputParams,
+  maskSensitive: boolean
+): string {
   const {
     dbName,
     userName,
     password,
+    host,
+    port,
     inputFilePath,
     fileCompression,
     executeRestoreInDockerContainer,
@@ -117,6 +119,8 @@ function buildPostgresRestoreCommand(params: DBRestoreInputParams, maskSensitive
     "psql",
     advanced.verbose ? "--echo-all" : "",
     userName ? `-U ${userName}` : "",
+    host ? `-h ${host}` : "",
+    port !== undefined ? `-p ${port}` : "",
     `-d ${dbName}`,
   ]
     .filter(Boolean)
@@ -129,12 +133,17 @@ function buildPostgresRestoreCommand(params: DBRestoreInputParams, maskSensitive
   const left = advanced.showProgress ? `${inputSource} | pv` : inputSource;
 
   const baseCmd = executeRestoreInDockerContainer
-    ? pipe(left, [`docker exec -i ${dockerEnv} ${dockerContainerName} \\`, `  ${psqlCmd}`])
+    ? pipe(left, [
+        `docker exec -i ${dockerEnv} ${dockerContainerName} \\`,
+        `  ${psqlCmd}`,
+      ])
     : pipe(left, [[localEnv, psqlCmd].filter(Boolean).join(" ")]);
 
   return withPreviewComments(
     baseCmd,
-    advanced.showProgress ? ["requires pv (Pipe Viewer)", "install: brew install pv"] : [],
+    advanced.showProgress
+      ? ["requires pv (Pipe Viewer)", "install: brew install pv"]
+      : [],
     maskSensitive
   );
 }

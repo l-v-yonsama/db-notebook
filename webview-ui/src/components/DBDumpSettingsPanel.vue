@@ -8,6 +8,7 @@ import type {
   OutputCompressionType
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
+import { toNum } from "@l-v-yonsama/rdh";
 import { computed, nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
@@ -77,6 +78,8 @@ const dbType = ref("MySQL" as DBDumpInputParams["dbType"]);
 const executeDumpInDockerContainer = ref(false);
 const userName = ref("");
 const password = ref("");
+const host = ref("");
+const port = ref<number | undefined>(undefined);
 const fileNamePrefix = ref("");
 const previewCommand = ref("");
 const selectableSchema = ref(false);
@@ -138,6 +141,8 @@ const initialize = async (
 
   userName.value = v.params.userName;
   password.value = v.params.password;
+  host.value = v.params.host ?? '';
+  port.value = v.params.port;
   dumpOptions.value = v.params.options;
   previewCommand.value = v.uiParams.previewCommand;
 
@@ -168,6 +173,8 @@ const handleChange = () => {
     outputCompression: outputCompression.value,
     userName: userName.value,
     password: password.value,
+    host: host.value,
+    port: toNum(port.value),
     targetScope: targetScope.value,
     executeDumpInDockerContainer: executeDumpInDockerContainer.value,
     dockerContainerName: dockerContainerName.value,
@@ -254,7 +261,7 @@ defineExpose({
             <span style="margin-right: 30px">Options</span>
           </legend>
           <div>
-            <fieldset class="conditions">
+            <fieldset class="conditions" v-if="dbType !== 'SQLite'">
               <legend>
                 <span style="margin-right: 30px">Base</span>
               </legend>
@@ -288,6 +295,16 @@ defineExpose({
                 <VsCodeTextField id="password" v-model="password" :maxlength="128" :transparent="true"
                   :change-on-mouseout="true" title="Output file name prefix" @change="($e: any) => handleChange()">
                 </VsCodeTextField>
+              </div>
+              <div>
+                <label for="host">Host:</label>
+                <VsCodeTextField id="host" v-model="host" :transparent="true" :change-on-mouseout="true"
+                  @change="handleChange()" />
+              </div>
+              <div>
+                <label for="port">Port:</label>
+                <VsCodeTextField id="port" type="number" v-model.number="port" :transparent="true"
+                  :change-on-mouseout="true" @change="handleChange()" />
               </div>
             </fieldset>
             <fieldset class="conditions">

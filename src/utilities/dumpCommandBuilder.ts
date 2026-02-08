@@ -3,10 +3,7 @@ import { DBDumpInputParams } from "../shared/DBDumpParams";
 /**
  * Build DB Dump command
  */
-export function buildDumpCommand(
-  params: DBDumpInputParams,
-  maskSensitive: boolean
-): string {
+export function buildDumpCommand(params: DBDumpInputParams, maskSensitive: boolean): string {
   switch (params.dbType) {
     case "MySQL":
       return buildMySqlDumpCommand(params, maskSensitive);
@@ -22,14 +19,13 @@ export function buildDumpCommand(
 /* =========================
  * MySQL
  * ========================= */
-function buildMySqlDumpCommand(
-  params: DBDumpInputParams,
-  maskSensitive: boolean
-): string {
+function buildMySqlDumpCommand(params: DBDumpInputParams, maskSensitive: boolean): string {
   const {
     dbName,
     userName,
     password,
+    host,
+    port,
     selectedTables,
     targetScope,
     options,
@@ -42,6 +38,9 @@ function buildMySqlDumpCommand(
 
   const args: string[] = ["mysqldump"];
   const dockerEnvArgs: string[] = [];
+
+  if (host) args.push(`-h ${quote(host)}`);
+  if (port) args.push(`-P ${port}`);
 
   if (userName) args.push(`-u ${quote(userName)}`);
 
@@ -77,14 +76,13 @@ function buildMySqlDumpCommand(
 /* =========================
  * PostgreSQL
  * ========================= */
-function buildPostgresDumpCommand(
-  params: DBDumpInputParams,
-  maskSensitive: boolean
-): string {
+function buildPostgresDumpCommand(params: DBDumpInputParams, maskSensitive: boolean): string {
   const {
     dbName,
     userName,
     password,
+    host,
+    port,
     targetScope,
     selectedSchemas,
     selectedTables,
@@ -98,6 +96,9 @@ function buildPostgresDumpCommand(
 
   const args: string[] = ["pg_dump"];
   const dockerEnvArgs: string[] = [];
+
+  if (host) args.push(`-h ${quote(host)}`);
+  if (port) args.push(`-p ${port}`);
 
   if (userName) args.push(`-U ${quote(userName)}`);
 
@@ -119,7 +120,6 @@ function buildPostgresDumpCommand(
   }
 
   if (targetScope === "tables" && selectedTables.length) {
-    // 完全修飾名前提（schema.table）
     selectedTables.forEach((t) => {
       args.push(`--table=${quote(t)}`);
     });
@@ -138,7 +138,6 @@ function buildPostgresDumpCommand(
     dbType: "Postgres",
   });
 }
-
 /* =========================
  * SQLite
  * ========================= */
@@ -147,39 +146,67 @@ function buildSqliteDumpCommand(params: DBDumpInputParams): string {
     dbName,
     selectedTables,
     targetScope,
+    options,
     outputTarget,
     outputFilePrefix,
     outputCompression = "none",
   } = params;
 
-  const args: string[] = ["sqlite3", quote(dbName)];
+  /* =========================
+  * SQLite internal commands
+   * ========================= */
+  const sqliteCommands: string[] = [];
 
-  if (targetScope === "tables" && selectedTables.length) {
-    args.push(quote(`.dump ${selectedTables.join(" ")}`));
+  const schemaOnly = options.some((o) => o.enabled && o.option === ".schema");
+
+  if (schemaOnly) {
+    sqliteCommands.push(".schema");
+  } else if (targetScope === "tables" && selectedTables.length > 0) {
+    sqliteCommands.push(`.dump ${selectedTables.join(" ")}`);
   } else {
-    args.push(quote(".dump"));
+    sqliteCommands.push(".dump");
   }
 
-  return buildFinalDumpCommand({
-    baseArgs: args,
-    dockerEnvArgs: [],
-    executeDumpInDockerContainer: false,
-    dockerContainerName: "",
-    outputTarget,
-    outputFilePrefix,
-    outputCompression,
-    dbType: "SQLite",
-  });
+  /* =========================
+   * here-doc (must be self-contained)
+   * ========================= */
+  const hereDocBody = [
+    `sqlite3 ${quote(dbName)} <<'SQL'`,
+    ...sqliteCommands,
+    "SQL",
+  ].join("\n");
+
+  /* stdout のみ */
+  if (outputTarget !== "file") {
+    return hereDocBody;
+  }
+
+  if (!outputFilePrefix) {
+    throw new Error("outputFilePrefix is required when outputTarget === 'file'");
+  }
+
+  let outputPath = `${outputFilePrefix}.sql`;
+  let pipeCmd = "";
+
+  if (outputCompression === "gzip") {
+    outputPath += ".gz";
+    pipeCmd = " | gzip";
+  } else if (outputCompression === "zstd") {
+    outputPath += ".zst";
+    pipeCmd = " | zstd";
+  }
+
+  return [
+    "(",
+    hereDocBody,
+    `)${pipeCmd} > ${quote(outputPath)}`,
+  ].join("\n");
 }
 
 /* ===============================
- * 共通ユーティリティ
+ * Common utilities
  * =============================== */
-
-function appendDumpOptions(
-  args: string[],
-  options: DBDumpInputParams["options"]
-) {
+function appendDumpOptions(args: string[], options: DBDumpInputParams["options"]) {
   for (const opt of options) {
     if (!opt.enabled) continue;
 

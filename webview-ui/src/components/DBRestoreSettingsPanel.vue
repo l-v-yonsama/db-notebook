@@ -8,6 +8,7 @@ import type {
 import {
   vscode,
 } from "@/utilities/vscode";
+import { toNum } from "@l-v-yonsama/rdh";
 import { computed, nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
@@ -57,6 +58,8 @@ const initialized = ref(false);
 const executeRestoreInDockerContainer = ref(false);
 const userName = ref("");
 const password = ref("");
+const host = ref("");
+const port = ref<number | undefined>(undefined);
 const inputFilePath = ref("");
 const previewCommand = ref("");
 const dockerContainerName = ref('');
@@ -101,6 +104,8 @@ const initialize = async (v: DBRestoreSettingsPanelEventData["value"]["initializ
 
   userName.value = v.params.userName ?? '';
   password.value = v.params.password ?? '';
+  host.value = v.params.host ?? '';
+  port.value = v.params.port;
   previewCommand.value = v.uiParams.previewCommand;
 
   initialized.value = true;
@@ -134,6 +139,8 @@ const handleChange = () => {
     fileCompression: fileCompression.value,
     userName: userName.value,
     password: password.value,
+    host: host.value,
+    port: toNum(port.value),
     executeRestoreInDockerContainer: executeRestoreInDockerContainer.value,
     dockerContainerName: dockerContainerName.value,
     advanced: {
@@ -208,7 +215,8 @@ defineExpose({
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
           <fa icon="times" />Cancel
         </VsCodeButton>
-        <VsCodeButton @click="writeToClipboard" appearance="secondary" title="Write to clipboard" :disabled="!!disabledReasonMessage">
+        <VsCodeButton @click="writeToClipboard" appearance="secondary" title="Write to clipboard"
+          :disabled="!!disabledReasonMessage">
           <fa icon="clipboard" />Copy to clipboard
         </VsCodeButton>
         <VsCodeButton @click="ok" title="Run restore command" :disabled="!!disabledReasonMessage">
@@ -254,6 +262,16 @@ defineExpose({
                 <VsCodeTextField id="password" v-model="password" :maxlength="128" :transparent="true"
                   :change-on-mouseout="true" title="Input password" @change="($e: any) => handleChange()">
                 </VsCodeTextField>
+              </div>
+              <div>
+                <label for="host">Host:</label>
+                <VsCodeTextField id="host" v-model="host" :transparent="true" :change-on-mouseout="true"
+                  @change="handleChange()" />
+              </div>
+              <div>
+                <label for="port">Port:</label>
+                <VsCodeTextField id="port" type="number" v-model.number="port" :transparent="true"
+                  :change-on-mouseout="true" @change="handleChange()" />
               </div>
             </fieldset>
             <fieldset class="conditions">

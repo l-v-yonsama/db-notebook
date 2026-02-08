@@ -232,6 +232,8 @@ export class DBRestoreSettingsPanel extends BasePanel {
     this.variables.fileCompression = params.fileCompression!;
     this.variables.userName = params.userName!;
     this.variables.password = params.password!;
+    this.variables.host = params.host;
+    this.variables.port = params.port;
     this.variables.advanced = params.advanced!;
     this.variables.sqliteOption = {
       ...params.sqliteOption!,

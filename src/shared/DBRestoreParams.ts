@@ -29,6 +29,8 @@ export type DBRestoreInputParams = {
   /** 認証（SQLite では未使用） */
   userName?: string;
   password?: string;
+  port?: number;
+  host?: string;
 
   /** dump ファイル */
   inputFilePath: string;
