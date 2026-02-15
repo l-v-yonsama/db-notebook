@@ -5,13 +5,16 @@ import {
   DbDynamoTableColumn,
   DbResource,
   DbSubscription,
+  DbTable,
   DBType,
   IamClient,
+  isRDSType,
   MemcacheDatabase,
   MqttDatabase,
   parseDynamoAttrType,
   RdsDatabase,
   RedisDatabase,
+  resolveLastOrderByColumn,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
@@ -179,14 +182,18 @@ export class DBDatabaseItem extends vscode.TreeItem {
     let scannable = false;
     let showSessions = false;
     let exportable = false;
+    let canViewLastRows = false;
     let tooltip: string | vscode.MarkdownString | undefined;
+    let dbType: DBType | undefined = undefined;
+    if (resource.meta) {
+      dbType = resource.meta.dbType;
+    }
 
     switch (resource.resourceType) {
       case ResourceType.RdsDatabase:
         {
           const res = resource as RdsDatabase;
           iconPath = new vscode.ThemeIcon("database");
-          const { dbType } = res.meta;
           if (
             dbType === DBType.MySQL ||
             dbType === DBType.Postgres ||
@@ -246,7 +253,16 @@ export class DBDatabaseItem extends vscode.TreeItem {
         scannable = true;
         break;
       case ResourceType.Table:
-        iconPath = new vscode.ThemeIcon("table");
+        {
+          iconPath = new vscode.ThemeIcon("table");
+          if (dbType && isRDSType(dbType)) {
+            if (resource instanceof DbTable) {
+              const res = resource as DbTable;
+              const lastColumn = resolveLastOrderByColumn(res);
+              canViewLastRows = lastColumn !== undefined;
+            }
+          }
+        }
         break;
       case ResourceType.DynamoTable:
         iconPath = new vscode.ThemeIcon("table");
@@ -380,6 +396,9 @@ export class DBDatabaseItem extends vscode.TreeItem {
     }
     if (scannable) {
       contextValue += ",scannable";
+    }
+    if (canViewLastRows) {
+      contextValue += ",canViewLastRows";
     }
     contextValue += ",tag:dbResource";
 

@@ -1,6 +1,4 @@
-import * as path from "path";
 import * as vscode from "vscode";
-import { mediaDir } from "../constant";
 
 const HELP_ITEMS = [
   {
@@ -16,7 +14,7 @@ const HELP_ITEMS = [
 ];
 
 export class HelpProvider implements vscode.TreeDataProvider<HelpItem> {
-  constructor() {}
+  constructor(private readonly extensionUri: vscode.Uri) {}
 
   getTreeItem(element: HelpItem): vscode.TreeItem {
     return element;
@@ -27,7 +25,12 @@ export class HelpProvider implements vscode.TreeDataProvider<HelpItem> {
       return [];
     } else {
       return HELP_ITEMS.map((item) => {
-        return new HelpItem(item.name, item.uri, item.iconFile);
+        return new HelpItem(
+          this.extensionUri,
+          item.name,
+          item.uri,
+          item.iconFile
+        );
       });
     }
   }
@@ -35,20 +38,32 @@ export class HelpProvider implements vscode.TreeDataProvider<HelpItem> {
 
 export class HelpItem extends vscode.TreeItem {
   constructor(
+    private readonly extensionUri: vscode.Uri,
     public readonly label: string,
     public readonly uri: string,
-    private iconFile: string
+    private readonly iconFile: string
   ) {
     super(label, vscode.TreeItemCollapsibleState.None);
+
     this.tooltip = `${this.label}`;
+
+    this.iconPath = {
+      dark: vscode.Uri.joinPath(
+        this.extensionUri,
+        "media",
+        "dark",
+        this.iconFile
+      ),
+      light: vscode.Uri.joinPath(
+        this.extensionUri,
+        "media",
+        "light",
+        this.iconFile
+      ),
+    };
   }
 
   handleClick() {
     vscode.env.openExternal(vscode.Uri.parse(this.uri));
   }
-
-  iconPath = {
-    dark: path.join(mediaDir, "dark", this.iconFile),
-    light: path.join(mediaDir, "light", this.iconFile),
-  };
 }

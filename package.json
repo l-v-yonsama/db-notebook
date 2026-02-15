@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -12,7 +12,7 @@
   },
   "preview": false,
   "engines": {
-    "vscode": "^1.46.0",
+    "vscode": "^1.74.0",
     "node": ">= 18"
   },
   "categories": [
@@ -55,6 +55,12 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "submenus": [
+      {
+        "id": "database-notebook.viewRowsSubmenu",
+        "label": "View Rows"
+      }
+    ],
     "languages": [
       {
         "id": "cwql",
@@ -490,8 +496,8 @@
           "group": "er-diagram@5"
         },
         {
-          "command": "database-notebook.retrieve-table-records",
-          "when": "view == database-notebook-connections && viewItem =~ /^(Dynamo)?Table.*/",
+          "command": "database-notebook.view-data",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "inline"
         },
         {
@@ -500,9 +506,14 @@
           "group": "script@6"
         },
         {
-          "command": "database-notebook.retrieve-table-records",
+          "command": "database-notebook.view-data",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "db-resourc@2"
+        },
+        {
+          "submenu": "database-notebook.viewRowsSubmenu",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "db-resourc@3"
         },
         {
           "command": "database-notebook.create-blank-record-rule",
@@ -573,6 +584,17 @@
           "command": "database-notebook.copy-column-names",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "clipboard"
+        }
+      ],
+      "database-notebook.viewRowsSubmenu": [
+        {
+          "command": "database-notebook.view-top-rows",
+          "group": "1_top"
+        },
+        {
+          "command": "database-notebook.view-last-rows",
+          "when": "view == database-notebook-connections && viewItem =~ /^(Dynamo)?Table.*,canViewLastRows.*/",
+          "group": "2_last"
         }
       ],
       "view/title": [
@@ -914,9 +936,19 @@
         "icon": "$(list-ordered)"
       },
       {
-        "command": "database-notebook.retrieve-table-records",
-        "title": "Retrieve Table Records",
-        "shortTitle": "Retrieve",
+        "command": "database-notebook.view-data",
+        "title": "View Data...",
+        "shortTitle": "View Data",
+        "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.view-top-rows",
+        "title": "View Top 100 Rows",
+        "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.view-last-rows",
+        "title": "View Last 100 Rows",
         "icon": "$(table)"
       },
       {
@@ -1322,7 +1354,7 @@
     "@types/node": "14.14.0",
     "@types/qs": "^6.9.9",
     "@types/throttle-debounce": "^5.0.0",
-    "@types/vscode": "^1.46.0",
+    "@types/vscode": "^1.109.0",
     "@typescript-eslint/eslint-plugin": "^4.14.1",
     "@typescript-eslint/parser": "^4.14.1",
     "eslint": "^7.19.0",
@@ -1332,7 +1364,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.14",
+    "@l-v-yonsama/multi-platform-database-drivers": "^0.11.15",
     "@l-v-yonsama/rdh": "^0.2.10",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

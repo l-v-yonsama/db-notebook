@@ -136,6 +136,7 @@ export class StateStorage {
             tableRes.meta = {
               conName: conRes.name,
               schemaName: schemaRes.name,
+              dbType: conRes.dbType,
             };
           });
         });

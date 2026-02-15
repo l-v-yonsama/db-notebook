@@ -138,7 +138,7 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(dbResourceTreeView);
 
   const helpTreeView = window.createTreeView("database-notebook-helpfeedback", {
-    treeDataProvider: new HelpProvider(),
+    treeDataProvider: new HelpProvider(context.extensionUri),
   });
   helpTreeView.onDidChangeSelection((e) => {
     e.selection.forEach((item) => {

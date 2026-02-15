@@ -9,10 +9,13 @@ import {
   DbSubscription,
   DbTable,
   MqttDatabase,
+  RDSBaseDriver,
   RdsDatabase,
   RedisDriver,
   ResourceType,
+  SchemaAndTableName,
   createColumnNames,
+  resolveLastOrderByColumn,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   ExtensionContext,
@@ -49,11 +52,11 @@ import {
   OPEN_CHAT_2_QUERY,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DB_NOTEBOOK,
+  OPEN_MDH_VIEWER,
   OPEN_TOOLS_VIEWER,
   REFRESH_RESOURCES,
   REMOVE_SUBSCRIPTION,
   RESTORE_DATABASE,
-  RETRIEVE_TABLE_RECORDS,
   SHOW_CONNECTION_SETTING,
   SHOW_DYNAMO_QUERY_PANEL,
   SHOW_PUBLISH_EDITOR_PANEL,
@@ -62,6 +65,9 @@ import {
   SPECIFY_DEFAULT_CON_FOR_SQL_CELL,
   SUBSCRIBE,
   UNSUBSCRIBE,
+  VIEW_DATA,
+  VIEW_LAST_ROWS,
+  VIEW_TOP_ROWS,
   WRITE_ER_DIAGRAM_TO_CLIPBOARD,
 } from "../constant";
 import { SQLConfigurationViewProvider } from "../form";
@@ -77,6 +83,7 @@ import { ScanPanel } from "../panels/ScanPanel";
 import { SubscriptionSettingPanel } from "../panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "../panels/ViewConditionPanel";
 import { CellMeta } from "../types/Notebook";
+import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { log } from "../utilities/logger";
@@ -392,7 +399,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   );
 
   context.subscriptions.push(
-    commands.registerCommand(RETRIEVE_TABLE_RECORDS, async (tableRes: DbTable | DbDynamoTable) => {
+    commands.registerCommand(VIEW_DATA, async (tableRes: DbTable | DbDynamoTable) => {
       const { conName, schemaName } = tableRes.meta;
       const setting = await stateStorage.getConnectionSettingByName(conName);
       if (!setting) {
@@ -414,6 +421,18 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       } else {
         showWindowErrorMessage(message);
       }
+    })
+  );
+
+  context.subscriptions.push(
+    commands.registerCommand(VIEW_TOP_ROWS, async (tableRes: DbTable) => {
+      viewRows(stateStorage, tableRes, "top");
+    })
+  );
+
+  context.subscriptions.push(
+    commands.registerCommand(VIEW_LAST_ROWS, async (tableRes: DbTable) => {
+      viewRows(stateStorage, tableRes, "last");
     })
   );
 
@@ -549,3 +568,41 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     }
   });
 };
+
+async function viewRows(stateStorage: StateStorage, tableRes: DbTable, limitMode: "top" | "last") {
+  const { conName, schemaName } = tableRes.meta;
+  const setting = await stateStorage.getConnectionSettingByName(conName);
+  if (!setting) {
+    return;
+  }
+  const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+    setting,
+    async (driver) => {
+      const schemaAndName: SchemaAndTableName = {
+        schema: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
+        table: tableRes.name,
+      };
+
+      let limitLastColumn: string | undefined = undefined;
+      if (limitMode === "last") {
+        limitLastColumn = resolveLastOrderByColumn(tableRes);
+      }
+      return await driver.viewRows({
+        schemaAndName,
+        limitMode,
+        limit: 100,
+        limitLastColumn,
+      });
+    }
+  );
+
+  if (ok && result !== undefined) {
+    const commandParam: MdhViewParams = {
+      title: tableRes.name,
+      list: [result],
+    };
+    commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+  } else {
+    showWindowErrorMessage(message);
+  }
+}
