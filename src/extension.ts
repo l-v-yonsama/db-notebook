@@ -68,6 +68,7 @@ import { SubscriptionPayloadsViewProvider } from "./views/SubscriptionPayloadsVi
 import { ToolsViewParams, ToolsViewProvider } from "./views/ToolsViewProvider";
 
 const PREFIX = "[extension]";
+const CONNECTION_VIEW_ID = "database-notebook-connections";
 
 let connectionSettingViewProvider: SQLConfigurationViewProvider;
 
@@ -107,13 +108,13 @@ export async function activate(context: ExtensionContext) {
   DBDumpSettingsPanel.setStateStorage(stateStorage);
   DBRestoreSettingsPanel.setStateStorage(stateStorage);
 
-  window.registerTreeDataProvider("database-notebook-connections", dbResourceTree);
+  window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
 
   // VIEWS
-  // ★ 追加：選択監視用 TreeView
-  const dbResourceTreeView = window.createTreeView("database-notebook-connections", {
+  const dbResourceTreeView = window.createTreeView(CONNECTION_VIEW_ID, {
     treeDataProvider: dbResourceTree,
+    showCollapseAll: true,
   });
   dbResourceTreeView.onDidChangeSelection((e) => {
     const item = e.selection[0];
@@ -161,6 +162,11 @@ export async function activate(context: ExtensionContext) {
     context,
     stateStorage,
     historyTreeProvider,
+  });
+
+  registerDisposableCommand("database-notebook.focus-filter", async () => {
+    await commands.executeCommand(`${CONNECTION_VIEW_ID}.focus`);
+    await commands.executeCommand("list.find");
   });
 
   // Notebook
