@@ -462,7 +462,7 @@ export const createHtmlFromRdhList = async (
     };
 
     const outputs: NotebookCellOutput[] = [];
-    const title = rdh.meta.command ? 'Command Result' : 'Query Result';
+    const title = rdh.meta.command ? "Command Result" : "Query Result";
     outputs.push(
       new NotebookCellOutput(
         [
@@ -492,7 +492,7 @@ export const createHtmlFromRdhList = async (
       cell.document.languageId = "json";
       cell.document.getText = () => rdh.meta.queryInput ?? "";
     }
-    if (isMemcachedCell(cell)){
+    if (isMemcachedCell(cell)) {
       cell.document.getText = () => rdh.meta.command ?? "";
     }
 
@@ -621,7 +621,7 @@ const createHtml = async (
               const metadata: RunResultMetadata = output.metadata;
               if (metadata.rdh) {
                 const { rdh } = metadata;
-                const title = rdh.meta.command ? 'Command Result' : 'Query Result';
+                const title = rdh.meta.command ? "Command Result" : "Query Result";
                 htmlContents.push(
                   `<div class="notification is-primary is-light" style="padding:10px; margin-bottom:10px;font-size:small;">`
                 );
@@ -838,7 +838,11 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
   if (isMarkupCell(cell)) {
     return '<span class="tag is-info is-light">Markdown</span>';
   }
-  let s = `<span class="tag is-info is-light">${cell.document.languageId}</span>`;
+  let s = "";
+
+  if (cell.document.languageId) {
+    s = `<span class="tag is-info is-light">${cell.document.languageId}</span>`;
+  }
 
   if (cell.outputs.length === 0) {
     s += '<span class="tag is-info is-light">Not executed</span>';
@@ -907,7 +911,7 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
       }
     } else {
       if (output.metadata?.rdh) {
-        const title = output.metadata?.rdh.meta.command ? 'Command Result' : 'Query Result';
+        const title = output.metadata?.rdh.meta.command ? "Command Result" : "Query Result";
         s += `<span class="tag is-primary is-light">${title}</span> ${escapeHtml(
           output.metadata.rdh.summary?.info ?? ""
         )}`;

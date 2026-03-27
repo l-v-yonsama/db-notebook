@@ -24,8 +24,7 @@ import {
   TreeItem,
   TreeView,
   commands,
-  env,
-  window,
+  window
 } from "vscode";
 import {
   ADD_SUBSCRIPTION,
@@ -85,6 +84,7 @@ import { ViewConditionPanel } from "../panels/ViewConditionPanel";
 import { CellMeta } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
@@ -162,9 +162,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       }
 
       const text = target.name;
-      await env.clipboard.writeText(text);
-
-      window.setStatusBarMessage(`Copied: ${text}`, 2000);
+      await copyToClipboard(text);
     } catch (e) {
       showWindowErrorMessage(e);
     }
@@ -185,9 +183,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       }
 
       const text = createColumnNames(target);
-      await env.clipboard.writeText(text);
-
-      window.setStatusBarMessage(`Copied: ${text}`, 2000);
+      await copyToClipboard(text);
     } catch (e) {
       showWindowErrorMessage(e);
     }
@@ -543,7 +539,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       const schema = rdb?.getSchema({ name: schemaName });
       const params = createSimpleERDiagramParams(schema, tableRes);
       const content = createErDiagram(params);
-      env.clipboard.writeText(content);
+      copyToClipboard(content);
     } catch (e) {
       showWindowErrorMessage(e);
     }

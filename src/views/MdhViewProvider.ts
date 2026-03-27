@@ -8,7 +8,7 @@ import { createHash } from "crypto";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import * as path from "path";
-import { commands, env, ExtensionContext, ProgressLocation, Uri, window } from "vscode";
+import { commands, ExtensionContext, ProgressLocation, Uri, window } from "vscode";
 import { BOTTOM_MDH_VIEWID, OPEN_DIFF_MDH_VIEWER, OPEN_MDH_VIEWER } from "../constant";
 import {
   ActionCommand,
@@ -21,6 +21,7 @@ import { MdhViewEventData, RdhTabItem } from "../shared/MessageEventData";
 import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { DiffMdhViewTabParam, MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import { getRdhViewConfig } from "../utilities/configUtil";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
@@ -299,7 +300,7 @@ export class MdhViewProvider extends BaseViewProvider {
       return;
     }
 
-    await env.clipboard.writeText(rdhListToText(tabItem.list, params));
+    await copyToClipboard(rdhListToText(tabItem.list, params));
   }
 
   private async compare(params: CompareParams) {

@@ -31,6 +31,7 @@ import {
 } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
 import { computed, nextTick, ref } from "vue";
+import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import FileAnnotationView from "./base/FileAnnotationView.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
@@ -85,11 +86,14 @@ type ColKey = {
   align?: "left" | "center" | "right";
 };
 
-const selectedRowIndex = ref(-1);
+const selectedRow = ref<RowValues | null>(null);
 const editable = props.rdh.meta?.editable === true;
 const hasComment = props.rdh.keys.some((it) => it.comment?.length);
 const withComment = props.config?.displayComment;
 const withType = props.config?.displayType;
+const showCommentRow = (hasComment && withComment) || editable;
+const showTypeRow = withType;
+const showRowColumn = props.config?.hideRowColumn === undefined ? true : !props.config.hideRowColumn;
 
 const emit = defineEmits<{
   (event: "onClickCell", value: CellFocusParams): void;
@@ -334,7 +338,7 @@ const onClickCell = ({
     rowValues,
     value,
   };
-  selectedRowIndex.value = rowPos;
+  selectedRow.value = rowValues;
   emit("onClickCell", params);
 };
 
@@ -382,6 +386,9 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
   if (hasAnnotationsOf(meta, "Rul", keyInfo.name)) {
     styles["background-color"] = "rgba(232, 232, 83, 0.21) !important";
   }
+  if (hasAnnotationsOf(meta, "Err", keyInfo.name)) {
+    styles["background-color"] = "rgba(200, 33, 33, 0.32) !important";
+  }
   return styles;
 };
 
@@ -396,7 +403,7 @@ const rowStyle = (p: any, rowIndex: number): any => {
     // } else if (hasAnnotationsOf(meta, "Rul")) {
     // return { "background-color": "rgba(232, 232, 83, 0.09) !important" };
   }
-  if (rowIndex === selectedRowIndex.value) {
+  if (p === selectedRow.value) {
     return { "background-color": "rgba(232, 232, 232, 0.09) !important" };
   }
   return null;
@@ -546,14 +553,14 @@ defineExpose({
           <thead>
             <tr>
               <th v-if="editable" class="ctrl">CONTROL</th>
-              <th class="row">ROW</th>
+              <th v-if="showRowColumn" class="row">ROW</th>
               <th v-for="(key, idx) of columns" :key="idx" :title="key.name" :style="{ width: `${key.width}px` }">
                 <span class="codicon" :class="key.typeClass"></span><span class="label"
                   :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }">{{ key.name }}</span>
                 <a class="widen" @click="key.width += 100"><span class="codicon codicon-arrow-both"></span></a>
               </th>
             </tr>
-            <tr v-if="(hasComment && withComment) || editable">
+            <tr v-if="showCommentRow">
               <th v-if="editable" class="ctrl">
                 <div style="display: flex !important">
                   <VsCodeButton v-if="editable" @click="addRow" title="Add row" appearance="secondary">
@@ -561,17 +568,17 @@ defineExpose({
                   </VsCodeButton>
                 </div>
               </th>
-              <th class="row"></th>
+              <th v-if="showRowColumn" class="row"></th>
               <th v-for="(key, idx) of columns" :key="idx"
                 :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }" :title="key.comment">
                 {{ key.comment }}
               </th>
             </tr>
-            <tr v-if="withType || editable">
+            <tr v-if="showTypeRow">
               <th v-if="editable" class="ctrl">
                 <div style="display: flex !important"></div>
               </th>
-              <th class="row">[TYPE]</th>
+              <th v-if="showRowColumn" class="row">TYPE</th>
               <th v-for="(key, idx) of columns" :key="idx"
                 :style="{ 'width': `${key.width}px`, 'max-width': `${key.width}px` }" :title="key.gtype">
                 {{ key.gtype }}
@@ -580,7 +587,7 @@ defineExpose({
           </thead>
         </template>
         <template #default="{ item, index }">
-          <tr :style="rowStyle(item, index)" :class="{ selectedRow: index === selectedRowIndex }">
+          <tr :style="rowStyle(item, index)" :class="{ selectedRow: item === selectedRow }">
             <td v-if="editable" class="ctrl">
               <div>
                 <VsCodeButton v-if="editable" :disabled="item.editType === 'ins'" @click="editRow(index)"
@@ -592,7 +599,7 @@ defineExpose({
                 </VsCodeButton>
               </div>
             </td>
-            <td class="row" @click="onClickCell({ rowPos: index, colPos: -1, key: '', rowValues: item })">
+            <td v-if="showRowColumn" class="row" @click="onClickCell({ rowPos: index, colPos: -1, key: '', rowValues: item })">
               {{ toEditTypeMark(item.editType) }}
               {{ index + 1 }}
               <div class="cell-actions" v-if="!editable">
@@ -639,10 +646,7 @@ defineExpose({
                       appearance="secondary" class="show-detail" title="View details">
                       <fa icon="eye" />
                     </VsCodeButton>
-                    <VsCodeButton @click.stop="copyToClipboard(item[key.name])" appearance="secondary"
-                      class="copy-to-clipboard" title="Copy to clipboard">
-                      <fa icon="clipboard" />
-                    </VsCodeButton>
+                    <CopyToClipboardButton :content="item[key.name]" appearance="secondary" title="Copy to clipboard" />
                   </div>
                 </template>
               </template>
@@ -663,167 +667,168 @@ defineExpose({
 </style>
 
 <style lang="scss" scoped>
+/* =========================
+   Sticky header
+========================= */
+
 thead {
   position: sticky;
   top: 0;
-  z-index: 2;
-  background-color: var(--vscode-editorPane-background);
+  z-index: 10;
+  background: var(--vscode-editorPane-background);
 }
 
-tr {
-  &.selectedRow {
-
-    td.ctrl,
-    td.row {
-      background-color: var(--vscode-editorGroupHeader-tabsBackground);
-    }
-  }
-}
+/* =========================
+   Base table cell
+========================= */
 
 td,
 th {
   border-right: calc(var(--border-width) * 1px) groove var(--dropdown-border);
   border-bottom: calc(var(--border-width) * 1px) groove var(--dropdown-border);
+}
 
-  &.row {
-    min-width: 55px;
-    width: 55px;
-    max-width: 55px;
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background-color: var(--vscode-editorPane-background);
+/* =========================
+   Column types
+========================= */
+
+/* CONTROL COLUMN */
+
+th.ctrl,
+td.ctrl {
+
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+
+  position: sticky;
+  left: 0;
+  z-index: 3;
+
+  background: var(--vscode-editorPane-background);
+  text-align: right;
+  padding-right: 5px;
+
+  >div {
+    display: none;
+
+    >vscode-button {
+      flex: 1;
+    }
   }
 
-  &.ctrl {
-    min-width: 80px;
-    width: 80px;
-    max-width: 80px;
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    background-color: var(--vscode-editorPane-background);
-
-    &>div {
-      display: none;
-
-      &>vscode-button {
-        flex: 1;
-      }
-    }
-
-    &:hover>div {
-      display: flex;
-      flex-direction: row;
-      column-gap: 3px;
-    }
+  &:hover>div {
+    display: flex;
+    column-gap: 3px;
   }
 }
 
-td {
-  text-align: center;
+/* ROW NUMBER COLUMN */
 
-  &.row,
-  &.ctrl {
-    text-align: right;
-    padding-right: 5px;
+th.row,
+td.row {
+
+  width: 55px;
+  min-width: 55px;
+  max-width: 55px;
+
+  position: sticky;
+  left: 0;
+  z-index: 2;
+
+  background: var(--vscode-editorPane-background);
+  text-align: right;
+  padding-right: 5px;
+
+  .cell-actions {
+    display: none;
+    position: absolute;
+    right: 2px;
+    top: 4px;
   }
 
-  &.row {
-    position: relative;
-
-    &>.cell-actions {
-      display: none;
-      position: absolute;
-      right: 2px;
-      top: 4px;
-    }
-
-    &:hover>.cell-actions {
-      display: inline-block;
-    }
-  }
-
-  &.vcell {
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
-    position: relative;
-    padding-right: 2px;
-
-    &>a.download-link {
-      display: inline-block;
-      position: absolute;
-      left: 4px;
-      top: 4px;
-      border-radius: 3px;
-      padding: 1px;
-    }
-
-    &>.code-label {
-      display: inline-block;
-      position: absolute;
-      right: 4px;
-      top: 4px;
-      border-radius: 3px;
-      padding: 1px;
-    }
-
-    &:hover>.code-label {
-      display: none;
-    }
-
-    &>.cell-actions {
-      display: none;
-      position: absolute;
-      right: 1px;
-      top: 2px;
-    }
-
-    &:hover>.cell-actions {
-      display: inline-block;
-    }
-
-    &>p {
-      display: inline-block;
-      margin: 5px 0px 5px 2px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      width: 100%;
-
-      &>span.val {
-        margin-right: 2px;
-      }
-
-      &.is-null::after {
-        position: absolute;
-        content: "(NULL)";
-        color: gray;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-      }
-    }
-
-    span.violation-mark {
-      font-size: x-small;
-      font-weight: bold;
-      margin-right: 4px;
-    }
+  &:hover .cell-actions {
+    display: inline-block;
   }
 }
 
-th {
-  height: 20px;
-  padding: 2px;
+/* DATA COLUMN */
+
+td.vcell {
+
+  position: relative;
+  padding-right: 2px;
+
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+
+  >a.download-link {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+  }
+
+  >.code-label {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+  }
+
+  &:hover>.code-label {
+    display: none;
+  }
+
+  .cell-actions {
+    display: none;
+    position: absolute;
+    right: 1px;
+    top: 2px;
+  }
+
+  &:hover .cell-actions {
+    display: inline-block;
+  }
+
+  >p {
+    margin: 5px 0 5px 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  span.violation-mark {
+    font-size: x-small;
+    font-weight: bold;
+    margin-right: 4px;
+  }
+}
+
+/* =========================
+   Row states
+========================= */
+
+tr.selectedRow td.ctrl,
+tr.selectedRow td.row {
+  background: var(--vscode-editorGroupHeader-tabsBackground);
+}
+
+/* =========================
+   Header cells
+========================= */
+
+th {
+
+  height: 20px;
+  padding: 2px;
   position: relative;
 
-  &>a.widen {
-    cursor: pointer;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+
+  >a.widen {
     display: none;
     position: absolute;
     right: 2px;
@@ -835,6 +840,10 @@ th {
   }
 }
 
+/* =========================
+   Icons / misc
+========================= */
+
 span.codicon {
   margin-right: 2px;
   vertical-align: middle;
@@ -843,9 +852,8 @@ span.codicon {
 span.label {
   display: inline-block;
   vertical-align: middle;
-  height: 100%;
-  text-overflow: ellipsis;
   overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -856,11 +864,4 @@ p.rule-violation-legend {
 p.code-value {
   text-align: left;
 }
-
-/* tr.inserted {
-  background-color: var(--vscode-diffEditor-insertedTextBackground) !important;
-}
-tr.removed {
-  background-color: var(--vscode-diffEditor-removedTextBackground) !important;
-} */
 </style>

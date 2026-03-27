@@ -4,6 +4,7 @@ import { ActionCommand, WriteHttpEventToClipboardParams } from "../shared/Action
 import { ComponentName } from "../shared/ComponentName";
 import { WriteHttpEventToClipboardParamsPanelEventData } from "../shared/MessageEventData";
 import { NodeRunAxiosEvent } from "../shared/RunResultMetadata";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import { httpEventToText } from "../utilities/httpUtil";
 import { BasePanel } from "./BasePanel";
 
@@ -53,7 +54,7 @@ export class WriteHttpEventToClipboardParamsPanel extends BasePanel {
       return;
     }
 
-    await vscode.env.clipboard.writeText(httpEventToText(this.item?.entry, params));
+    await copyToClipboard(httpEventToText(this.item?.entry, params));
   }
 
   protected preDispose(): void {

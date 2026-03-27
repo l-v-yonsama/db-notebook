@@ -7,8 +7,7 @@ import {
   ViewColumn,
   WebviewPanel,
   commands,
-  env,
-  window,
+  window
 } from "vscode";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
@@ -18,6 +17,7 @@ import {
   ERDiagramSettingsInputParams,
   ERDiagramSettingsPanelEventData,
 } from "../shared/MessageEventData";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import { createERDiagramParams, createErDiagram } from "../utilities/erDiagramGenerator";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
@@ -117,7 +117,7 @@ export class ERDiagramSettingsPanel extends BasePanel {
     }
     const erParams = createERDiagramParams(this.variables.tables, options);
     const content = createErDiagram(erParams);
-    env.clipboard.writeText(content);
+    copyToClipboard(content);
   }
 
   private async createERDiagram(options: ERDiagramSettingParams) {

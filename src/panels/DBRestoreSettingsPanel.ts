@@ -1,5 +1,5 @@
 import { AllSubDbResource, DbResource } from "@l-v-yonsama/multi-platform-database-drivers";
-import { Uri, ViewColumn, WebviewPanel, env, window } from "vscode";
+import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { DBRestoreInputParams, DBRestoreSettingsUIParams } from "../shared/DBRestoreParams";
@@ -7,6 +7,7 @@ import { ERDiagramSettingParams } from "../shared/ERDiagram";
 import { DBRestoreSettingsPanelEventData } from "../shared/MessageEventData";
 import { DockerContainerSummary } from "../types/Docker";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import {
   buildDockerContainerItems,
   listRunningDockerContainers,
@@ -273,7 +274,7 @@ export class DBRestoreSettingsPanel extends BasePanel {
       showWindowErrorMessage("Restore command is empty.");
       return;
     }
-    env.clipboard.writeText(command);
+    copyToClipboard(command);
   }
 
   private async resetDockerParams(): Promise<void> {

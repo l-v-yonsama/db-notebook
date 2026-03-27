@@ -13,9 +13,11 @@ export const getFormatterConfig = (): SQLFormatterConfigType => {
   const settings = workspace.getConfiguration("sql-formatter", null);
 
   return {
-    uppercase: settings.get("uppercase", false),
+    keywordCase: settings.get("keywordCase", 'upper'),
+    tabWidth: settings.get("tabWidth", 2),
+    useTabs: settings.get("useTabs", false),
+    expressionWidth: settings.get("expressionWidth", 120),
     linesBetweenQueries: settings.get("linesBetweenQueries", 2),
-    indent: " ".repeat(settings.get("tabWidth", 2)),
   };
 };
 

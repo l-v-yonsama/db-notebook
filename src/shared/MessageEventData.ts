@@ -5,6 +5,8 @@ import type {
   DbResource,
   DbSchema,
   DbTable,
+  ExtractedSqlResult,
+  LogParseParams,
   MqttQoS,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -26,14 +28,8 @@ import type {
 } from "./ActionParams";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ComponentName } from "./ComponentName";
-import type {
-  DBDumpInputParams,
-  DBDumpSettingsUIParams,
-} from "./DBDumpParams";
-import type {
-  DBRestoreInputParams,
-  DBRestoreSettingsUIParams,
-} from "./DBRestoreParams";
+import type { DBDumpInputParams, DBDumpSettingsUIParams } from "./DBDumpParams";
+import type { DBRestoreInputParams, DBRestoreSettingsUIParams } from "./DBRestoreParams";
 import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
@@ -56,6 +52,8 @@ export type MessageEventData =
   | HarFilePanelEventData
   | HttpEventPanelEventData
   | LMPromptCreatePanelEventData
+  | LogParseSettingPanelEventData
+  | LogParseResultViewEventData
   | MdhViewEventData
   | PublishEditorPanelEventData
   | SubscriptionPayloadsViewEventData
@@ -82,6 +80,19 @@ export type RdhViewConfig = {
   binaryToHex: ToStringParam["binaryToHex"];
   displayComment: boolean;
   displayType: boolean;
+  hideRowColumn?: boolean;
+};
+
+export type LogParsedTabItem = {
+  tabId: string;
+  title: string;
+  totalLogLines: number;
+  linesToParse: number;
+  rawLogs: ResultSetData;
+  logEvents?: ResultSetData;
+  sqlEvents?: ResultSetData;
+  list: ResultSetData[];
+  extractedSqlResult?: ExtractedSqlResult;
 };
 
 export type RdhTabItem = {
@@ -115,6 +126,25 @@ export type MdhViewEventData = BaseMessageEventData<
     addTabItem?: RdhTabItem;
     initialize?: {
       tabItems: RdhTabItem[];
+      currentTabId?: string;
+      currentInnerIndex?: number;
+    };
+    config?: RdhViewConfig;
+  }
+>;
+
+export type LogParseResultViewEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "set-search-result" | "add-tab-item" | "initialize",
+  "LogParseResultView",
+  {
+    searchResult?: {
+      tabId: string;
+      value: ResultSetData[];
+      extractedSqlResult?: LogParsedTabItem["extractedSqlResult"];
+    };
+    addTabItem?: Omit<LogParsedTabItem, "rawLogs" | "logEvents" | "sqlEvents">;
+    initialize?: {
+      tabItems: Omit<LogParsedTabItem, "rawLogs" | "logEvents" | "sqlEvents">[];
       currentTabId?: string;
       currentInnerIndex?: number;
     };
@@ -377,6 +407,60 @@ export type CsvParseSettingPanelEventData = BaseMessageEventData<
     rdh: ResultSetData | null;
     message?: string;
     config: RdhViewConfig;
+  }
+>;
+
+export type LogParseSettingPanelEventDataConfigSummary = {
+  logEventSplitPattern: string;
+  classificationSummary: string;
+  extractionSummary: string;
+};
+
+export type LogParseSettingPanelEventDataPreset = {
+  logSplitDetectionMessage: string;
+  logEventSplitPresets: {
+    name: string;
+    label: string;
+    logExample: string;
+    logFieldsPattern: string;
+  }[];
+  sqlParseDetectionMessage: string;
+  sqlParsePresets: LabelValueItem[];
+};
+
+export type LogParseSettingPanelEventData = BaseMessageEventData<
+  | BaseMessageEventDataCommand
+  | "reset-raw-log"
+  | "reset-config"
+  | "set-parsed-result"
+  | "set-config-editor-visibility"
+  | "set-sql-parse-preset-visibility"
+  | "reset-config-file-and-items",
+  "LogParseSettingPanel",
+  {
+    "initialize"?: {
+      logParserConfigFile: string;
+      logParserConfigItems: LabelValueItem[];
+      formatterSqlLanguage: LogParseParams["language"];
+      formatterSqlLanguageItems: LabelValueItem[];
+      linesToParse: number;
+      totalLogLines: number;
+      errorMessage: string;
+      configSummary: LogParseSettingPanelEventDataConfigSummary;
+      preset: LogParseSettingPanelEventDataPreset;
+    };
+    "reset-config-file-and-items"?: {
+      logParserConfigFile: string;
+      logParserConfigItems: LabelValueItem[];
+    };
+    "reset-config"?: {
+      configSummary: LogParseSettingPanelEventDataConfigSummary;
+      canSplitLog: boolean;
+      errorMessage: string;
+      preset: LogParseSettingPanelEventDataPreset;
+    };
+    "set-config-editor-visibility"?: boolean;
+    "set-sql-parse-preset-visibility"?: boolean;
   }
 >;
 

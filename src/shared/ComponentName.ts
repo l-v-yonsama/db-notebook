@@ -14,6 +14,8 @@ export type ComponentName =
   | "CreateInsertScriptSettingsPanel"
   | "HarFilePanel"
   | "HttpEventPanel"
+  | "LogParseSettingPanel"
+  | "LogParseResultView"
   | "LMPromptCreatePanel"
   | "ViewConditionPanel"
   | "PublishEditorPanel"

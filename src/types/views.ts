@@ -1,10 +1,21 @@
-import type { DbSubscription } from "@l-v-yonsama/multi-platform-database-drivers";
+import type {
+  DbSubscription,
+  ExtractedSqlResult,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
 import type { CellMetaChart } from "./Notebook";
 
 export type MdhViewParams = {
   title: string;
   list: ResultSetData[];
+};
+
+export type LogParseResultViewParams = {
+  title: string;
+  rawLogs: ResultSetData;
+  totalLogLines: number;
+  linesToParse: number;
+  extractedSqlResult?: ExtractedSqlResult;
 };
 
 export type DiffMdhViewTabParam = {

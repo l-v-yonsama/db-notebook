@@ -2,13 +2,12 @@ import { DbTable, toInsertStatement } from "@l-v-yonsama/multi-platform-database
 import { createRdhKey, isNumericLike, isTextLike, RdhKey } from "@l-v-yonsama/rdh";
 import {
   commands,
-  env,
   NotebookCellData,
   NotebookCellKind,
   Uri,
   ViewColumn,
   WebviewPanel,
-  window,
+  window
 } from "vscode";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
 import { ActionCommand } from "../shared/ActionParams";
@@ -16,6 +15,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { CreateScriptConditionParams } from "../shared/CreateScriptConditionParams";
 import { CreateInsertScriptSettingsPanelEventData } from "../shared/MessageEventData";
 import { CellMeta } from "../types/Notebook";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import { getIconPath } from "../utilities/fsUtil";
 import { BasePanel } from "./BasePanel";
 
@@ -87,7 +87,7 @@ export class CreateInsertScriptSettingsPanel extends BasePanel {
             };
             this.panel.webview.postMessage(msg);
           } else {
-            env.clipboard.writeText(previewSql);
+            await copyToClipboard(previewSql);
             this.dispose();
           }
         }

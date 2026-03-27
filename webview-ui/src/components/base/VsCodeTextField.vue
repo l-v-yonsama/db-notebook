@@ -30,7 +30,7 @@ const props = defineProps<{
 }>();
 
 const isError = ref(false);
-const initialValue = props.modelValue ?? "";
+let focusValue = "";
 const placeholderText = ref(props.placeholder ?? "");
 
 watch(
@@ -75,10 +75,11 @@ function handleOnInput(event: any) {
   emit("update:modelValue", event.target.value);
 }
 function handleOnFocus(event: any) {
+  focusValue = event.target.value;
   emit("onFocusCell", event.target.value);
 }
 function handleOnMouseOut(event: any) {
-  if (props.changeOnMouseout === true && initialValue != event.target.value) {
+  if (props.changeOnMouseout === true && focusValue != event.target.value) {
     nextTick(() => event.target.blur());
   }
 }

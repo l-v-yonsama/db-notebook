@@ -11,9 +11,11 @@ import DBFormView from "./components/DBFormView.vue";
 import HarFilePanel from "./components/HarFilePanel.vue";
 import HttpEventPanel from "./components/HttpEventPanel.vue";
 import LMPromptCreatePanel from "./components/LMPromptCreatePanel.vue";
+import LogParseSettingPanel from "./components/LogParseSettingPanel/LogParseSettingPanel.vue";
 import ChartsView from "./components/views/ChartsView.vue";
 import CountRecordView from "./components/views/CountRecordView.vue";
 import DiffMdhView from "./components/views/DiffMdhView.vue";
+import LogParseResultView from "./components/views/LogParseResultView/LogParseResultView.vue";
 import MdhView from "./components/views/MdhView.vue";
 import ToolsView from "./components/views/ToolsView.vue";
 
@@ -39,8 +41,10 @@ const MdhViewRef = ref<InstanceType<typeof MdhView>>();
 const countRecordViewRef = ref<InstanceType<typeof CountRecordView>>();
 const chartsViewRef = ref<InstanceType<typeof ChartsView>>();
 const toolsViewRef = ref<InstanceType<typeof ToolsView>>();
+const logParseResultViewRef = ref<InstanceType<typeof LogParseResultView>>();
 
 const csvParseSettingPanelRef = ref<InstanceType<typeof CsvParseSettingPanel>>();
+const logParseSettingPanelRef = ref<InstanceType<typeof LogParseSettingPanel>>();
 const createInsertScriptSettingsPanelRef =
   ref<InstanceType<typeof CreateInsertScriptSettingsPanel>>();
 const httpEventPanelRef = ref<InstanceType<typeof HttpEventPanel>>();
@@ -100,6 +104,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     case "CsvParseSettingPanel":
       csvParseSettingPanelRef.value?.recieveMessage(data);
       break;
+    case "LogParseSettingPanel":
+      logParseSettingPanelRef.value?.recieveMessage(data);
+      break;
     case "HarFilePanel":
       harFilePanelRef.value?.recieveMessage(data);
       break;
@@ -151,6 +158,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     case "ToolsView":
       toolsViewRef.value?.recieveMessage(data);
       break;
+    case "LogParseResultView":
+      logParseResultViewRef.value?.recieveMessage(data);
+      break;
   }
 }
 
@@ -184,6 +194,8 @@ onMounted(() => {
       ref="createInsertScriptSettingsPanelRef" />
 
     <CsvParseSettingPanel v-if="currentComponentName === 'CsvParseSettingPanel'" ref="csvParseSettingPanelRef" />
+
+    <LogParseSettingPanel v-if="currentComponentName === 'LogParseSettingPanel'" ref="logParseSettingPanelRef" />
 
     <HarFilePanel v-if="currentComponentName === 'HarFilePanel'" ref="harFilePanelRef" />
 
@@ -222,6 +234,8 @@ onMounted(() => {
     <CodeResolverEditor v-if="currentComponentName === 'CodeResolverEditor'" ref="codeResolverEditorRef" />
 
     <ToolsView v-if="currentComponentName === 'ToolsView'" ref="toolsViewRef" />
+
+    <LogParseResultView v-if="currentComponentName === 'LogParseResultView'" ref="logParseResultViewRef" />
 
   </main>
 </template>

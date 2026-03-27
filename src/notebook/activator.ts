@@ -1,5 +1,6 @@
 import {
   DBType,
+  formatQuery,
   isPartiQLType,
   isRDSType,
   MqttQoS,
@@ -8,7 +9,6 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import dayjs from "dayjs";
 import * as path from "path";
-import sqlFormatter from "sql-formatter-plus";
 import {
   commands,
   ExtensionContext,
@@ -699,7 +699,13 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       let edit: TextEdit;
 
       if (isSqlCell(cell)) {
-        edit = new TextEdit(range, sqlFormatter.format(doc.getText(), getFormatterConfig()));
+        const { connectionName }: CellMeta = cell.metadata;
+        const dbType = connectionName
+          ? stateStorage.getDBTypeByConnectionName(connectionName)
+          : DBType.MySQL;
+        const options = { ...getFormatterConfig(), dbType };
+        log(`${PREFIX} formatQuery options:${JSON.stringify(options)}`);
+        edit = new TextEdit(range, formatQuery(doc.getText(), options));
       } else if (isJsonValueCell(cell)) {
         const jsonObj = JSON.parse(doc.getText());
         edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
@@ -727,11 +733,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       const text = cell.document.getText();
 
       // ---- 新しいセル定義 ----
-      const newCell = new NotebookCellData(
-        cell.kind,
-        text,
-        cell.document.languageId
-      );
+      const newCell = new NotebookCellData(cell.kind, text, cell.document.languageId);
 
       // ---- メタデータ完全コピー ----
       newCell.metadata = structuredClone(cell.metadata);

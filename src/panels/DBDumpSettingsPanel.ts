@@ -6,7 +6,7 @@ import {
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import dayjs from "dayjs";
-import { env, Uri, ViewColumn, WebviewPanel, window } from "vscode";
+import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import {
@@ -18,6 +18,7 @@ import { ERDiagramSettingParams } from "../shared/ERDiagram";
 import { DBDumpSettingsPanelEventData } from "../shared/MessageEventData";
 import { DockerContainerSummary } from "../types/Docker";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import {
   buildDockerContainerItems,
   listRunningDockerContainers,
@@ -189,7 +190,9 @@ export class DBDumpSettingsPanel extends BasePanel {
   }
 
   private async dumpOnTerminal(): Promise<void> {
-    if (!this.variables) return;
+    if (!this.variables) {
+      return;
+    }
 
     const command = buildDumpCommand(this.variables, false);
     const { outputFilePrefix } = this.variables;
@@ -243,7 +246,7 @@ export class DBDumpSettingsPanel extends BasePanel {
       showWindowErrorMessage("Dump command is empty.");
       return;
     }
-    env.clipboard.writeText(command);
+    copyToClipboard(command);
   }
 
   private async resetUiParams() {
@@ -466,5 +469,4 @@ const sqliteDumpPresets: DBDumpOptionParams[] = [
     option: ".schema",
     description: "Output schema definitions only",
   },
-
 ];

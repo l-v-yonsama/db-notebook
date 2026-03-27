@@ -3,14 +3,20 @@
  * Corresponds to: sql-formatter.*
  * ========================================================= */
 export type SQLFormatterConfigType = {
-  /** Convert SQL reserved keywords to uppercase */
-  uppercase?: boolean;
+  /** Keyword case */
+  keywordCase?: 'upper' | 'lower' | 'preserve';
 
-  /** Number of blank lines inserted between SQL statements */
+  /** Indentation width (spaces) */
+  tabWidth?: number;
+
+  /** Use tabs instead of spaces */
+  useTabs?: boolean;
+
+  /** Max line width before wrapping */
+  expressionWidth?: number;
+
+  /** Blank lines between queries */
   linesBetweenQueries?: number;
-
-  /** Indentation string used by the SQL formatter */
-  indent?: string;
 };
 
 /* =========================================================

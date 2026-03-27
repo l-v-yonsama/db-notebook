@@ -15,6 +15,7 @@ import {
   BOTTOM_CHARTS_VIEWID,
   BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
   BOTTOM_DIFF_MDH_VIEWID,
+  BOTTOM_LOG_PARSE_RESULT_VIEWID,
   BOTTOM_MDH_VIEWID,
   BOTTOM_TOOLS_VIEWID,
   BOTTOM_TOPIC_PAYLOADS_VIEWID,
@@ -23,6 +24,7 @@ import {
   OPEN_CHARTS_VIEWER,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DIFF_MDH_VIEWER,
+  OPEN_LOG_PARSE_RESULT_VIEWER,
   OPEN_MDH_VIEWER,
   OPEN_OUTPUT_CHANNEL,
   OPEN_SUBSCRIPTION_PAYLOADS_VIEWER,
@@ -31,6 +33,7 @@ import {
   SHOW_CONNECTION_SETTING,
   SHOW_CSV,
   SHOW_HAR,
+  SHOW_LOG,
   SHOW_RESOURCE_PROPERTIES,
   UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER,
 } from "./constant";
@@ -45,6 +48,7 @@ import { DBRestoreSettingsPanel } from "./panels/DBRestoreSettingsPanel";
 import { DynamoQueryPanel } from "./panels/DynamoQueryPanel";
 import { HarFilePanel } from "./panels/HarFilePanel";
 import { LMPromptCreatePanel } from "./panels/LMPromptCreatePanel";
+import { LogParseSettingPanel } from "./panels/LogParseSettingPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 import { PublishEditorPanel } from "./panels/PublishEditorPanel";
 import { ScanPanel } from "./panels/ScanPanel";
@@ -55,6 +59,7 @@ import { activateRuleEditor } from "./ruleEditor/activator";
 import {
   ChartsViewParams,
   DiffMdhViewTabParam,
+  LogParseResultViewParams,
   MdhViewParams,
   SubscriptionPayloadsViewParams,
 } from "./types/views";
@@ -63,6 +68,7 @@ import { activateLogger, log, setupDisposeLogger, show } from "./utilities/logge
 import { ChartsViewProvider } from "./views/ChartsViewProvider";
 import { CountRecordViewProvider } from "./views/CountRecordViewProvider";
 import { DiffMdhViewProvider } from "./views/DiffMdhViewProvider";
+import { LogParseResultViewProvider } from "./views/LogParseResultViewProvider";
 import { MdhViewProvider } from "./views/MdhViewProvider";
 import { SubscriptionPayloadsViewProvider } from "./views/SubscriptionPayloadsViewProvider";
 import { ToolsViewParams, ToolsViewProvider } from "./views/ToolsViewProvider";
@@ -182,7 +188,9 @@ export async function activate(context: ExtensionContext) {
     registerDisposableCommand(SHOW_CSV, async (csvUri: Uri) => {
       CsvParseSettingPanel.render(context.extensionUri, csvUri);
     });
-
+    registerDisposableCommand(SHOW_LOG, async (logUri: Uri) => {
+      LogParseSettingPanel.render(context.extensionUri, logUri);
+    });
     registerDisposableCommand(SHOW_HAR, async (harUri: Uri) => {
       HarFilePanel.render(context.extensionUri, harUri);
     });
@@ -283,6 +291,23 @@ export async function activate(context: ExtensionContext) {
         subscriptionPayloadsViewProvider.setResult(params);
       }
     );
+
+    // LogParseResultViewProvider
+    const logParseResultViewProvider = new LogParseResultViewProvider(
+      BOTTOM_LOG_PARSE_RESULT_VIEWID,
+      context,
+      stateStorage
+    );
+    context.subscriptions.push(
+      window.registerWebviewViewProvider(
+        logParseResultViewProvider.viewId,
+        logParseResultViewProvider
+      )
+    );
+
+    registerDisposableCommand(OPEN_LOG_PARSE_RESULT_VIEWER, async (params: LogParseResultViewParams) => {
+      logParseResultViewProvider.render(params);
+    });
   }
 
   log(`${PREFIX} end activation.`);

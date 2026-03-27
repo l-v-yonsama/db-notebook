@@ -8,15 +8,15 @@ import {
   ViewColumn,
   WebviewPanel,
   commands,
-  env,
   window,
-  workspace,
+  workspace
 } from "vscode";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
 import { ActionCommand, WriteHttpEventToClipboardParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { HttpEventPanelEventCodeBlocks, HttpEventPanelEventData } from "../shared/MessageEventData";
 import { NodeRunAxiosEvent } from "../shared/RunResultMetadata";
+import { copyToClipboard } from "../utilities/clipboardUtil";
 import { getIconPath } from "../utilities/fsUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
 import {
@@ -145,7 +145,7 @@ export class HttpEventPanel extends BasePanel {
     if (params.specifyDetail === true) {
       WriteHttpEventToClipboardParamsPanel.render(this.extensionUri, this.item, params);
     } else {
-      await env.clipboard.writeText(httpEventToText(this.item?.entry, params));
+      await copyToClipboard(httpEventToText(this.item?.entry, params));
     }
   }
 

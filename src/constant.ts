@@ -13,6 +13,7 @@ export const BOTTOM_CHARTS_VIEWID = `${EXTENSION_NAME}.view.bottom.charts`;
 export const BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID = `${EXTENSION_NAME}.view.bottom.count-for-all-tables`;
 export const BOTTOM_TOOLS_VIEWID = `${EXTENSION_NAME}.view.bottom.tools`;
 export const BOTTOM_TOPIC_PAYLOADS_VIEWID = `${EXTENSION_NAME}.view.bottom.subscription-payloads`;
+export const BOTTOM_LOG_PARSE_RESULT_VIEWID = `${EXTENSION_NAME}.view.bottom.log-parse-result`;
 
 //---------------------------------------------------
 // RESOURCE TREE
@@ -74,6 +75,7 @@ export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;
 // OPEN VIEWERS
 //---------------------------------------------------
 export const SHOW_CSV = `${EXTENSION_NAME}.show-csv-file`;
+export const SHOW_LOG = `${EXTENSION_NAME}.show-log-file`;
 export const SHOW_HAR = `${EXTENSION_NAME}.show-har-file`;
 export const OPEN_MDH_VIEWER = `${EXTENSION_NAME}.open-mdh-viewer`;
 export const OPEN_DIFF_MDH_VIEWER = `${EXTENSION_NAME}.open-diff-mdh-viewer`;
@@ -84,6 +86,7 @@ export const OPEN_SUBSCRIPTION_PAYLOADS_VIEWER = `${EXTENSION_NAME}.open-subscri
 export const SET_SUBSCRIPTION_PAYLOADS_VIEWER = `${EXTENSION_NAME}.set-subscription-payloads-viewer`;
 export const CLOSE_SUBSCRIPTION_PAYLOADS_VIEWER = `${EXTENSION_NAME}.close-subscription-payloads-viewer`;
 export const UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER = `${EXTENSION_NAME}.update-subscription-res-at-payloads-viewer`;
+export const OPEN_LOG_PARSE_RESULT_VIEWER = `${EXTENSION_NAME}.open-log-parse-result-viewer`;
 
 //---------------------------------------------------
 // LOG

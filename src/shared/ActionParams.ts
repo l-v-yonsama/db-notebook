@@ -1,6 +1,7 @@
 import type {
   ConnectionSetting,
   CsvParseOptions,
+  LogParseParams,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { CellMeta } from "../types/Notebook";
@@ -25,6 +26,23 @@ export type SaveCsvOptionParams = CsvParseOptions & {
   preview: boolean;
 };
 
+export type SaveLogOptionParams = {
+  action:
+    | "create-new-config"
+    | "reset-lines"
+    | "reset-formatter-sql-language"
+    | "apply-log-event-split-preset"
+    | "apply-parser-sql-preset"
+    | "open-as-json"
+    | "parse"
+    | "test-split"
+    | "set-config-file";
+  linesToParse?: number;
+  presetName?: string;
+  logParserConfigFile?: string;
+  sqlLanguage?: LogParseParams["language"];
+};
+
 export type OutputParams = TabIdParam & {
   fileType: "excel" | "csv" | "markdown" | "text" | "html";
   displayOnlyChanged?: boolean;
@@ -47,6 +65,7 @@ export type ActionCommand =
   | WriteToClipboardActionCommand
   | WriteHttpEventToClipboardActionCommand
   | DescribeActionCommand
+  | OpenInNoteBookActionCommand
   | OpenScanPanelActionCommand
   | OpenInEditorActionCommand
   | CloseScanPanelActionCommand
@@ -81,11 +100,14 @@ export type BaseActionCommand<T extends string, U = any> = {
   params: U;
 };
 
-export type ShowMessageActionCommand = BaseActionCommand<"showMessage", {
-  type?: "info" | "warn" | "error";
-  
-  message: string 
-}>;
+export type ShowMessageActionCommand = BaseActionCommand<
+  "showMessage",
+  {
+    type?: "info" | "warn" | "error";
+
+    message: string;
+  }
+>;
 
 export type KillActionCommand = BaseActionCommand<"kill", { sessionOrPid: number | undefined }>;
 
@@ -265,6 +287,7 @@ export type WriteToClipboardActionCommand = {
 
 export type WriteToClipboardParams<T = any> = TabIdParam & {
   fileType: "csv" | "tsv" | "markdown" | "text";
+  textContent?: string;
   options?: T;
 };
 
@@ -348,4 +371,9 @@ export type DescribeActionCommand = {
   params: TabIdParam & {
     innerIndex: number;
   };
+};
+
+export type OpenInNoteBookActionCommand = {
+  command: "openInNoteBook";
+  params: TabIdParam;
 };

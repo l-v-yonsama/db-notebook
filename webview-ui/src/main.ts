@@ -22,6 +22,7 @@ import {
   faRotateLeft,
   faSave,
   faSearch,
+  faSpinner,
   faTimes,
   faTrash,
 } from "@fortawesome/free-solid-svg-icons";
@@ -55,6 +56,7 @@ library.add(faRotate);
 library.add(faRotateLeft);
 library.add(faSave);
 library.add(faSearch);
+library.add(faSpinner);
 library.add(faTrash);
 library.add(faTimes);
 

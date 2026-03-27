@@ -1,9 +1,13 @@
-import { getRecordRuleResults } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  ExtractedSqlResult,
+  getRecordRuleResults,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   AnnotationType,
   ChangeInNumbersAnnotation,
   CodeResolvedAnnotation,
   DiffResult,
+  ErrorAnnotation,
   FileAnnotation,
   GeneralColumnType,
   RdhKey,
@@ -21,19 +25,41 @@ import dayjs from "dayjs";
 import { EnumValues } from "enum-values";
 import * as Excel from "exceljs";
 import * as os from "os";
+import { ResultsetConfigType } from "../types/Config";
 import { getOutputConfig, getResultsetConfig } from "./configUtil";
 
 // const FONT_NAME_Arial ='Arial';
-const FONT_NAME_Comic_Sans_MS = "Comic Sans MS";
+const FONT_NAME_COMIC_SANS_MS = "Comic Sans MS";
 
 const RECORD_RULE_SHEET_NAME = "RECORD_RULES";
 
 const UNDO_CHANGE_SQL_SHEET_NAME = "UNDO_CHANGES";
 
+type HorizontalType =
+  | "fill"
+  | "left"
+  | "center"
+  | "right"
+  | "justify"
+  | "centerContinuous"
+  | "distributed";
+
 interface IHyperLink {
   title: string;
   address: string;
 }
+
+type CellStyleOptionsParams = {
+  annotationMessage?: any;
+  ruleMarker?: string;
+  resolvedLabel?: string;
+  isHyperText?: boolean;
+  hyperLinkAddr?: string;
+  wrap?: boolean;
+  horizontal?: HorizontalType;
+  fontSize?: number;
+  format?: CellFormat;
+};
 
 type UndoChangeSheetParams = {
   title: string;
@@ -51,6 +77,17 @@ type TocRecords = {
   records: { [key: string]: Excel.CellValue }[];
 };
 
+export type LogAnalysisWorkbookParams = {
+  totalLogLines: number;
+  linesToParse: number;
+  rawLogs: ResultSetData;
+  logEvents: ResultSetData;
+  sqlEvents?: ResultSetData;
+  extractedResult: ExtractedSqlResult;
+  targetExcelPath: string;
+  options?: BookCreateOption;
+};
+
 export type BookCreateOption = {
   rdh: {
     outputAllOnOneSheet: boolean;
@@ -66,7 +103,13 @@ export type BookCreateOption = {
   subTitle?: string;
 };
 
-export { columnToLetter, createBookFromDiffList, createBookFromList, createBookFromRdh };
+export {
+  columnToLetter,
+  createBookFromDiffList,
+  createBookFromList,
+  createBookFromRdh,
+  createLogAnalysisWorkbook
+};
 
 function columnToLetter(column: number) {
   var temp,
@@ -85,11 +128,11 @@ function stripSheetName(s: string): string {
 
 function rowCellStringLabel(row: number, col?: number): string {
   let s = `${row} row${row === 1 ? "" : "s"}`;
-  if(col !== undefined){
+  if (col !== undefined) {
     s += ` (${col} col${col === 1 ? "" : "s"})`;
   }
   return s;
-};
+}
 
 function createQueryResultListSheet(
   workbook: Excel.Workbook,
@@ -131,7 +174,13 @@ function createQueryResultListSheet(
         rows: rdh.meta.type === "select" ? rdh.rows.length : "-",
         time,
       });
-      const plusRows = createQueryResultSheet(workbook, sheet, rdh, baseRowNo);
+      const plusRows = createQueryResultSheet(
+        workbook,
+        sheet,
+        rdh,
+        baseRowNo,
+        getResultsetConfig()
+      );
       baseRowNo += plusRows + 2;
     });
   } else {
@@ -154,7 +203,7 @@ function createQueryResultListSheet(
         pageSetup: { paperSize: 9, orientation: "portrait" },
       });
       sheet.getColumn("A").width = 2;
-      createQueryResultSheet(workbook, sheet, rdh, baseRowNo);
+      createQueryResultSheet(workbook, sheet, rdh, baseRowNo, getResultsetConfig());
     });
   }
 
@@ -165,10 +214,17 @@ function createQueryResultSheet(
   book: Excel.Workbook,
   sheet: Excel.Worksheet,
   rdh: ResultSetData,
-  baseRowNo: number
+  baseRowNo: number,
+  rdhConfig: ResultsetConfigType,
+  options?: {
+    sqlStatementLabel?: string;
+    adjustRow?: {
+      maxRowCount: number;
+      calcKeys: string[];
+    };
+  }
 ): number {
   let plusNo = 0;
-  const rdhConfig = getResultsetConfig();
   const outputCondig = getOutputConfig();
 
   const { tableName, comment, ruleViolationSummary } = rdh.meta;
@@ -185,9 +241,12 @@ function createQueryResultSheet(
     // sql statement
     if (rdh.sqlStatement) {
       plusNo++;
-      const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
+      const lines = rdh.sqlStatement
+        .trim()
+        .replace(/\r\n|\r/g, "\n")
+        .split("\n");
       cell = sheet.getCell(baseRowNo + plusNo, 2);
-      cell.value = "SQL";
+      cell.value = options?.sqlStatementLabel ? options.sqlStatementLabel : "SQL";
       setTableHeaderCell(cell);
       sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + lines.length - 1}`);
       lines.forEach((line) => {
@@ -291,6 +350,11 @@ function createQueryResultSheet(
       if (displayRowno) {
         sheet.getCell(baseRowNo + plusNo, 2).value = ri + 1;
       }
+      if (options?.adjustRow) {
+        const { calcKeys, maxRowCount } = options.adjustRow;
+        const rowCount = calcMaxRowCount(values, calcKeys, maxRowCount);
+        sheet.getRow(baseRowNo + plusNo).height = rowCount * 15;
+      }
       rdh.keys.forEach((column: RdhKey, colIdx: number) => {
         let colBasePos = displayRowno ? 3 : 2;
         let ruleMarker: string | undefined = undefined;
@@ -334,6 +398,11 @@ function createQueryResultSheet(
             ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
             fillCell(cell, "Rul");
           }
+          if (
+            RowHelper.filterAnnotationByKeyOf<ErrorAnnotation>(rdhRow, column.name, "Err").length
+          ) {
+            fillCell(cell, "Err");
+          }
           if (rdh.meta.codeItems) {
             resolvedLabel = RowHelper.getFirstAnnotationOf<CodeResolvedAnnotation>(
               rdhRow,
@@ -352,7 +421,16 @@ function createQueryResultSheet(
               (cinAnnotation.values?.value >= 0 ? " +" : " ") + cinAnnotation.values?.value;
           }
 
-          setAnyValueByIndex(cell, v, { isHyperText, format, ruleMarker, resolvedLabel });
+          const styleOptions: CellStyleOptionsParams = {
+            isHyperText,
+            format,
+            ruleMarker,
+            resolvedLabel,
+          };
+          if (options?.adjustRow) {
+            styleOptions.wrap = true;
+          }
+          setAnyValueByIndex(cell, v, styleOptions);
         }
       });
       plusNo++;
@@ -363,6 +441,21 @@ function createQueryResultSheet(
   }
 
   return plusNo;
+}
+
+function calcMaxRowCount(values: Record<string, any>, calcKeys: string[], maxLines: number) {
+  let calcMaxLineCount = 1;
+  if (calcKeys.length > 0) {
+    calcKeys.forEach((calcKey) => {
+      const v = values[calcKey];
+      if (v) {
+        const lines = `${v}`.split(/\r\n|\r|\n/).length;
+        calcMaxLineCount = Math.max(lines, calcMaxLineCount);
+      }
+    });
+  }
+
+  return Math.min(calcMaxLineCount, maxLines);
 }
 
 function createSheetName(o: ResultSetData | string, no?: number): string {
@@ -380,7 +473,7 @@ async function createBookFromRdh(rdh: ResultSetData, targetExcelPath: string): P
   var sheet = workbook.addWorksheet(sheetName, {
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
-  createQueryResultSheet(workbook, sheet, rdh, 1);
+  createQueryResultSheet(workbook, sheet, rdh, 1, getResultsetConfig());
 
   return new Promise<string>((resolve, reject) => {
     try {
@@ -436,7 +529,7 @@ async function createBookFromList(
     if (outputCondig.excel.displayToc) {
       cell = tocSheet!.getCell(`C${tocRowNo}`);
       cell.value = "Table of contents.";
-      cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
+      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 24 };
     }
 
     tocRowNo += 4;
@@ -490,6 +583,289 @@ async function createBookFromList(
       }
     }
   });
+}
+
+async function createLogAnalysisWorkbook(params: LogAnalysisWorkbookParams): Promise<string> {
+  const { targetExcelPath, totalLogLines, linesToParse, extractedResult } = params;
+  let errorMessage = "";
+  var workbook = new Excel.Workbook();
+  const outputCondig = getOutputConfig();
+
+  try {
+    // TOC
+    let tocSheet: Excel.Worksheet | undefined = undefined;
+    if (outputCondig.excel.displayToc) {
+      tocSheet = workbook.addWorksheet("TOC", {
+        pageSetup: {
+          paperSize: 9,
+          orientation: "portrait",
+          margins: {
+            left: 0.5,
+            right: 0.5,
+            top: 0.75,
+            bottom: 0.75,
+            header: 0.3,
+            footer: 0.3,
+          },
+        },
+      });
+      createCommonHeader(tocSheet);
+      tocSheet.getColumn("A").width = 2;
+      tocSheet.getColumn("B").width = 2;
+      tocSheet.getColumn("C").width = 4;
+      tocSheet.getColumn("D").width = 22;
+      tocSheet.getColumn("E").width = 26;
+    }
+
+    let tocRowNo = 3;
+    let cell: Excel.Cell;
+    if (outputCondig.excel.displayToc && tocSheet) {
+      const curSheet = tocSheet;
+      const writeLabelAndValue = (
+        tocRowNo: number,
+        label: string,
+        value: any,
+        hyperlink?: string
+      ) => {
+        let cell: Excel.Cell;
+        cell = curSheet.getCell(`D${tocRowNo}`);
+        cell.value = label;
+        setTableHeaderCell(cell, { horizontal: "left" });
+        cell = curSheet.getCell(`E${tocRowNo}`);
+        if (hyperlink) {
+          setAnyValueByIndex(cell, value, { isHyperText: true, hyperLinkAddr: hyperlink });
+        } else {
+          cell.value = value;
+        }
+      };
+
+      // [Title]
+      cell = tocSheet.getCell(`C${tocRowNo++}`);
+      cell.value = "Log Analysis Report";
+      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 24 };
+
+      tocRowNo += 2;
+
+      // [Summary]
+      const { elapsedTimeMilli, outputSummary } = extractedResult;
+      const { totalSqlExecutions, totalEvents, eventTypeCounts, sqlExecutionTypeCounts } =
+        outputSummary;
+      cell = tocSheet.getCell(`C${tocRowNo++}`);
+      cell.value = "[Summary]";
+      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+      writeLabelAndValue(tocRowNo++, "Total Log Lines", totalLogLines);
+      writeLabelAndValue(tocRowNo++, "Lines to parse", linesToParse < 0 ? "All" : linesToParse);
+      writeLabelAndValue(tocRowNo++, "Parsed Events", totalEvents);
+      writeLabelAndValue(tocRowNo++, "Extracted SQLs", totalSqlExecutions);
+      writeLabelAndValue(tocRowNo++, "Error Rate", extractedResult.errorRate ?? "-");
+      writeLabelAndValue(tocRowNo++, "Elapsed Time", ``);
+      writeLabelAndValue(tocRowNo++, "  Split Log", `${elapsedTimeMilli.split}ms`);
+      if (elapsedTimeMilli.classification !== undefined) {
+        writeLabelAndValue(tocRowNo++, "  Classify", `${elapsedTimeMilli.classification}ms`);
+      }
+      if (elapsedTimeMilli.sqlExecutions !== undefined) {
+        writeLabelAndValue(tocRowNo++, "  Extract SQL", `${elapsedTimeMilli.sqlExecutions}ms`);
+      }
+      writeLabelAndValue(tocRowNo++, "  Total", `${elapsedTimeMilli.total}ms`);
+
+      tocRowNo++;
+
+      if (totalEvents && extractedResult.stage !== "split") {
+        // [Classified Log Events]
+        cell = tocSheet.getCell(`C${tocRowNo++}`);
+        cell.value = "[Classified Log Events]";
+        cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+        for (const [key, value] of Object.entries(eventTypeCounts)) {
+          writeLabelAndValue(tocRowNo++, key, value ?? 0);
+        }
+        tocRowNo++;
+      }
+
+      if (totalSqlExecutions) {
+        // [Extracted SQL Summary]
+        cell = tocSheet.getCell(`C${tocRowNo++}`);
+        cell.value = "[Extracted SQL Summary]";
+        cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+        for (const [key, value] of Object.entries(sqlExecutionTypeCounts)) {
+          writeLabelAndValue(tocRowNo++, key, value ?? 0);
+        }
+        tocRowNo++;
+      }
+
+      tocRowNo += 4;
+
+      // [Navigation]
+      cell = tocSheet.getCell(`C${tocRowNo++}`);
+      cell.value = "[Navigation]";
+      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+      writeLabelAndValue(tocRowNo++, "Raw Logs", "Link to Raw Logs", "#RawLogs!A1");
+      if (elapsedTimeMilli.classification !== undefined) {
+        writeLabelAndValue(
+          tocRowNo++,
+          "Parsed Events",
+          "Link to Parsed Events",
+          "#ParsedEvents!A1"
+        );
+      }
+      if (elapsedTimeMilli.sqlExecutions !== undefined && params.sqlEvents) {
+        writeLabelAndValue(
+          tocRowNo++,
+          "Extracted SQLs",
+          "Link to Extracted SQLs",
+          "#ExtractedSQLs!A1"
+        );
+      }
+    }
+
+    createLogAnalysisWorksheets(workbook, params);
+  } catch (e) {
+    console.error(e);
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    try {
+      workbook.xlsx.writeFile(targetExcelPath).then(function () {
+        resolve(errorMessage);
+      });
+    } catch (e) {
+      if (e instanceof Error) {
+        reject(e.message);
+      } else {
+        reject("Error:" + e);
+      }
+    }
+  });
+}
+
+function createLogAnalysisWorksheets(
+  workbook: Excel.Workbook,
+  params: LogAnalysisWorkbookParams
+): void {
+  const { totalLogLines, linesToParse, rawLogs, logEvents, sqlEvents } = params;
+  const outputCondig = getOutputConfig();
+  const rdhConfig = getResultsetConfig();
+  rdhConfig.header.displayComment = false;
+  rdhConfig.header.displayType = false;
+
+  const rawLogsSheet = workbook.addWorksheet("RawLogs", {
+    views: [{ state: "frozen", ySplit: 4 }],
+    pageSetup: { paperSize: 9, orientation: "portrait" },
+  });
+  if (outputCondig.excel.displayToc) {
+    const cell = rawLogsSheet.getCell(`A1`);
+    setAnyValueByIndex(cell, "Back to TOC", { isHyperText: true, hyperLinkAddr: "#TOC!A1" });
+  }
+  rawLogsSheet.mergeCells("A1:C1");
+  rawLogsSheet.getColumn("A").width = 2;
+  rawLogsSheet.getColumn("B").width = 8;
+  rawLogsSheet.getColumn("C").width = 214;
+
+  rawLogsSheet.getCell(`B2`).value = `  ( Total log lines: ${totalLogLines} / Lines to parse: ${
+    linesToParse < 0 ? "All" : linesToParse
+  } )`;
+  createQueryResultSheet(workbook, rawLogsSheet, rawLogs, 3, rdhConfig, {
+    sqlStatementLabel: "Path",
+  });
+
+  // ParsedEvents
+  const parsedEventsSheet = workbook.addWorksheet("ParsedEvents", {
+    views: [{ state: "frozen", ySplit: 4 }],
+    pageSetup: { paperSize: 9, orientation: "portrait" },
+  });
+  if (outputCondig.excel.displayToc) {
+    const cell = parsedEventsSheet.getCell(`A1`);
+    setAnyValueByIndex(cell, "Back to TOC", { isHyperText: true, hyperLinkAddr: "#TOC!A1" });
+  }
+  parsedEventsSheet.mergeCells("A1:C1");
+  parsedEventsSheet.getColumn("A").width = 2;
+
+  logEvents.keys.forEach((key, idx) => {
+    // 1=>A, 2=>B
+    const colNumber = idx + 2;
+    switch (key.name) {
+      case "lineNo":
+        parsedEventsSheet.getColumn(colNumber).width = 8;
+        break;
+      case "timestamp":
+        parsedEventsSheet.getColumn(colNumber).width = 30;
+        break;
+      case "eventType":
+        parsedEventsSheet.getColumn(colNumber).width = 20;
+        break;
+      case "thread":
+        parsedEventsSheet.getColumn(colNumber).width = 24;
+        break;
+      case "logger":
+        parsedEventsSheet.getColumn(colNumber).width = 32;
+        break;
+      case "message":
+        parsedEventsSheet.getColumn(colNumber).width = 160;
+        break;
+      case "transformed":
+        parsedEventsSheet.getColumn(colNumber).width = 40;
+        break;
+    }
+  });
+  createQueryResultSheet(workbook, parsedEventsSheet, logEvents, 3, rdhConfig, {
+    sqlStatementLabel: "Summary",
+  });
+
+  // ExtractedSQLs
+  if (sqlEvents) {
+    const extractedSQLsSheet = workbook.addWorksheet("ExtractedSQLs", {
+      views: [{ state: "frozen", ySplit: 4 }],
+      pageSetup: { paperSize: 9, orientation: "portrait" },
+    });
+    if (outputCondig.excel.displayToc) {
+      const cell = extractedSQLsSheet.getCell(`A1`);
+      setAnyValueByIndex(cell, "Back to TOC", { isHyperText: true, hyperLinkAddr: "#TOC!A1" });
+    }
+    extractedSQLsSheet.mergeCells("A1:C1");
+    extractedSQLsSheet.getColumn("A").width = 2;
+
+    sqlEvents.keys.forEach((key, idx) => {
+      // 1=>A, 2=>B
+      const colNumber = idx + 2;
+      switch (key.name) {
+        case "startLine":
+        case "endLine":
+          extractedSQLsSheet.getColumn(colNumber).width = 8;
+          break;
+        case "timestamp":
+          extractedSQLsSheet.getColumn(colNumber).width = 29;
+          break;
+        case "thread":
+          extractedSQLsSheet.getColumn(colNumber).width = 18;
+          break;
+        case "daoClass":
+        case "daoMethod":
+          extractedSQLsSheet.getColumn(colNumber).width = 28;
+          break;
+        case "table":
+        case "params":
+        case "result":
+          extractedSQLsSheet.getColumn(colNumber).width = 22;
+          break;
+        case "type":
+          extractedSQLsSheet.getColumn(colNumber).width = 13;
+          break;
+        case "content":
+        case "detail":
+          extractedSQLsSheet.getColumn(colNumber).width = 100;
+          break;
+        case "framework":
+          extractedSQLsSheet.getColumn(colNumber).width = 10;
+          break;
+      }
+    });
+    createQueryResultSheet(workbook, extractedSQLsSheet, sqlEvents, 3, rdhConfig, {
+      sqlStatementLabel: "Summary",
+      adjustRow: {
+        maxRowCount: 20,
+        calcKeys: ["content", "detail"],
+      },
+    });
+  }
 }
 
 function getImageTypeFromContentType(
@@ -567,7 +943,7 @@ async function createBookFromDiffList(
     if (outputCondig.excel.displayToc) {
       cell = tocSheet!.getCell(`C${tocRowNo}`);
       cell.value = "Table of contents.";
-      cell.font = { name: FONT_NAME_Comic_Sans_MS, size: 24 };
+      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 24 };
     }
 
     tocRowNo += 4;
@@ -644,7 +1020,10 @@ async function createBookFromDiffList(
         tocSheet!.getCell(`E${tocRowNo}`).value = rdh1.meta.comment ?? "";
         tocSheet!.getCell(`F${tocRowNo}`).value = rowCellStringLabel(diffResult.inserted);
         tocSheet!.getCell(`G${tocRowNo}`).value = rowCellStringLabel(diffResult.deleted);
-        tocSheet!.getCell(`H${tocRowNo}`).value = rowCellStringLabel(diffResult.updated, diffResult.updatedColumns);
+        tocSheet!.getCell(`H${tocRowNo}`).value = rowCellStringLabel(
+          diffResult.updated,
+          diffResult.updatedColumns
+        );
 
         tocSheet!.getCell(`I${tocRowNo}`).value = {
           text: "Before" + no,
@@ -875,21 +1254,23 @@ async function createBookFromDiffList(
       }
     });
 
-    if(outputCondig.excel.enableCrossPairLinks) {
+    if (outputCondig.excel.enableCrossPairLinks) {
       // 相手テーブルへのリンク作成
       pairList[0].tableRowNoList.forEach((beforeRowNo, idx) => {
         const afterRowNo = pairList[1].tableRowNoList[idx];
-        beforeSheet.getCell(`H${beforeRowNo}`).value = {
-          text: "Link to after sheet",
-          hyperlink: `#after!A${afterRowNo}`,
-        };
+        const cell = beforeSheet.getCell(`H${beforeRowNo}`);
+        setAnyValueByIndex(cell, "Link to after sheet", {
+          isHyperText: true,
+          hyperLinkAddr: `#after!A${afterRowNo}`,
+        });
       });
       pairList[1].tableRowNoList.forEach((afterRowNo, idx) => {
         const beforeRowNo = pairList[0].tableRowNoList[idx];
-        afterSheet.getCell(`H${afterRowNo}`).value = {
-          text: "Link to before sheet",
-          hyperlink: `#before!A${beforeRowNo}`,
-        };
+        const cell = afterSheet.getCell(`H${afterRowNo}`);
+        setAnyValueByIndex(cell, "Link to before sheet", {
+          isHyperText: true,
+          hyperLinkAddr: `#before!A${beforeRowNo}`,
+        });
       });
     }
 
@@ -997,7 +1378,8 @@ function createRecordRulesSheet(
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
   if (outputCondig.excel.displayToc) {
-    sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
+    const cell = sheet.getCell(`A1`);
+    setAnyValueByIndex(cell, "Back to TOC", { isHyperText: true, hyperLinkAddr: "#TOC!A1" });
   }
   sheet.mergeCells("A1:C1");
   sheet.autoFilter = "B3:D3";
@@ -1095,7 +1477,8 @@ function createUndoChangeSheet(
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
   if (outputCondig.excel.displayToc) {
-    sheet.getCell(`A1`).value = { text: "Back to TOC", hyperlink: `#TOC!A1` };
+    const cell = sheet.getCell(`A1`);
+    setAnyValueByIndex(cell, "Back to TOC", { isHyperText: true, hyperLinkAddr: "#TOC!A1" });
   }
   sheet.mergeCells("A1:C1");
   sheet.getColumn("A").width = 2;
@@ -1144,10 +1527,15 @@ function convertNotNaN(v: number) {
   return isNaN(v) ? "-" : v;
 }
 
-function setTableHeaderCell(cell: Excel.Cell) {
+function setTableHeaderCell(
+  cell: Excel.Cell,
+  options?: {
+    horizontal?: HorizontalType;
+  }
+) {
   cell.alignment = {
     vertical: "middle",
-    horizontal: "center",
+    horizontal: options?.horizontal ?? "center",
   };
   cell.font = { color: { argb: "00ffffff" } };
   cell.fill = {
@@ -1177,6 +1565,9 @@ function fillCell(cell: Excel.Cell, type: AnnotationType) {
       // warning / rule
       fgColor = "FFFCF8E3";
       break;
+    case "Err":
+      fgColor = "FFFF8E8E";
+      break;
   }
 
   if (fgColor) {
@@ -1196,33 +1587,13 @@ enum CellFormat {
   floatPercent = "0.00%",
 }
 
-function setAnyValueByIndex(
-  cell: Excel.Cell,
-  text: any,
-  options?: {
-    annotationMessage?: any;
-    ruleMarker?: string;
-    resolvedLabel?: string;
-    isHyperText?: boolean;
-    wrap?: boolean;
-    horizontal?:
-      | "fill"
-      | "left"
-      | "center"
-      | "right"
-      | "justify"
-      | "centerContinuous"
-      | "distributed";
-    fontSize?: number;
-    format?: CellFormat;
-  }
-) {
+function setAnyValueByIndex(cell: Excel.Cell, text: any, options?: CellStyleOptionsParams) {
   let cellValue: Excel.CellValue = text;
   if (options) {
     if (options.isHyperText === true) {
       cellValue = {
         text: text,
-        hyperlink: text,
+        hyperlink: options.hyperLinkAddr ? options.hyperLinkAddr : text,
       };
       cell.font = { color: { argb: "004e47cc" } };
     }
@@ -1315,29 +1686,6 @@ function toDateString(target: any, format: CellFormat): string {
   return dayjs(d)
     .add(dayjs().utcOffset(), "minute")
     .format(format === CellFormat.date ? "YYYY-MM-DD" : "YYYY-MM-DD HH:mm:ss");
-}
-
-function setAnyValue(
-  sheet: Excel.Worksheet,
-  c: string,
-  text: any,
-  options?: {
-    isHyperText?: boolean;
-    wrap?: boolean;
-    horizontal?:
-      | "fill"
-      | "left"
-      | "center"
-      | "right"
-      | "justify"
-      | "centerContinuous"
-      | "distributed";
-    fontSize?: number;
-    format?: CellFormat;
-  }
-) {
-  const cell = sheet.getCell(c);
-  setAnyValueByIndex(cell, text, options);
 }
 
 function setBorders(sheet: Excel.Worksheet, rs: number, re: number, cs: number, ce: number) {
