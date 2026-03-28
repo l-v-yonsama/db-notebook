@@ -19,7 +19,6 @@ provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePa
 /* state */
 
 const sectionHeight = ref(300);
-const sectionRdhHeight = ref(300);
 const sectionWidth = ref(300);
 
 const configEditorVisible = ref(false);
@@ -62,8 +61,7 @@ window.addEventListener("resize", () => resetSectionHeight());
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector(".log-conditional-root");
   if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 68, 100);
-    sectionRdhHeight.value = Math.max(sectionHeight.value - 165, 100);
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 50, 100);
   }
   if (sectionWrapper?.clientWidth) {
     sectionWidth.value = sectionWrapper.clientWidth - 50;
@@ -361,7 +359,7 @@ defineExpose({
               <div class="flex-line">
                 <label for="splitPreset" class="condition-label">Lines to parse:&nbsp;</label>
                 <div>
-                  <VsCodeDropdown id="splitPreset" v-model="linesToParse" :items="lineItems" style="z-index: 30;"
+                  <VsCodeDropdown id="splitPreset" v-model="linesToParse" :items="lineItems"
                     @change="resetLines" />
                   <p class="total-log-lines hint" style="margin-left: 2px;">(Total log lines: {{totalLogLines}} )</p>
                 </div>
@@ -369,13 +367,13 @@ defineExpose({
               <div class="flex-line">
                 <label for="configFile" class="condition-label">Config file:&nbsp;</label>
                 <VsCodeDropdown id="configFile" v-model="configFile" :items="configFileItems"
-                  style="z-index: 100; width: 300px;" @change="postOk({ 'action': 'set-config-file' })" />
+                  style=" width: 300px;" @change="postOk({ 'action': 'set-config-file' })" />
               </div>
               <div class="flex-line">
                 <label for="formatterSqlLanguage" class="condition-label">Formatter SQL language:&nbsp;</label>
                 <div>
                   <VsCodeDropdown id="formatterSqlLanguage" v-model="formatterSqlLanguage"
-                    :items="formatterSqlLanguageItems" style="z-index: 25;" @change="resetSqlLanguage" />
+                    :items="formatterSqlLanguageItems" @change="resetSqlLanguage" />
                   <p class="log-detection-message hint" style="margin-left: 2px;">( optional )</p>
                 </div>
               </div>
@@ -386,7 +384,7 @@ defineExpose({
                   <div class="flex-line">
                     <label for="splitPreset" class="condition-label">Log split preset:&nbsp;</label>
                     <VsCodeDropdown id="splitPreset" v-model="splitPresetName" :items="splitPresetItems"
-                      style="z-index: 15; width: 200px;" />
+                      style="width: 200px;" />
                     <VsCodeButton @click="applyLogEventSplitPreset" :disabled="splitPresetName === ''"
                       title="Apply selected preset" appearance="secondary">
                       <fa icon="check" />Apply
@@ -400,7 +398,7 @@ defineExpose({
                     <label for="sqlParsePreset" class="condition-label">Classify & Extract preset:&nbsp;</label>
                     <template v-if="sqlParsePresetVisible">
                       <VsCodeDropdown id="sqlParsePreset" v-model="sqlParsePresetName" :items="sqlParsePresetItems"
-                        style="z-index: 15; width: 200px;" />
+                        style="width: 200px;" />
                       <VsCodeButton @click="applySqlParsePreset" :disabled="sqlParsePresetName === ''"
                         title="Apply selected preset" appearance="secondary">
                         <fa icon="check" />Apply

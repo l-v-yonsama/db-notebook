@@ -277,7 +277,7 @@ defineExpose({
               <div v-if="executeDumpInDockerContainer">
                 <label for="dockerContainerName"> Container name:</label>
                 <VsCodeDropdown id="dockerContainerName" v-model="dockerContainerName" :items="dockerContainerItems"
-                  style="z-index: 25; width: 320px;" :required="true" @change="handleChange()" />
+                  style="width: 320px;" :required="true" @change="handleChange()" />
               </div>
               <div>
                 <label for="targetScope">Target scope:</label>
@@ -359,7 +359,7 @@ defineExpose({
                     <!-- enum -->
                     <VsCodeDropdown v-else-if="opt.argType === 'enum'" v-model="opt.param as string"
                       :items="(opt.enumValues ?? []).map(it => ({ label: it, value: it }))"
-                      style="z-index: 25; width: 200px;" @change="handleChange()" />
+                      style="width: 200px;" @change="handleChange()" />
                   </div>
 
                   <!-- description detail -->

@@ -140,7 +140,7 @@ defineExpose({
       <div class="tool-left">
         <label for="languageModelId"> Language model</label>
         <VsCodeDropdown id="languageModelId" v-model="languageModelId" :items="languageModelItems"
-          style="z-index: 15; width: 220px;" @change="handleLanguageModelOnChange()" />
+          style="width: 220px;" @change="handleLanguageModelOnChange()" />
       </div>
       <div class="tool-right">
         <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">

@@ -145,7 +145,7 @@ defineExpose({
       </div>
       <div>
         <label for="qos">QoS:</label>
-        <VsCodeDropdown id="qos" v-model="qos" :items="QosItems" style="z-index: 15; width:148px" />
+        <VsCodeDropdown id="qos" v-model="qos" :items="QosItems" style="width:148px" />
         <p style="opacity: 0.7;">Don’t receive your own messages</p>
       </div>
       <div>
@@ -161,7 +161,7 @@ defineExpose({
       </div>
       <div>
         <label for="rh">Retain Handling:</label>
-        <VsCodeDropdown id="rh" v-model="rh" :items="RhItems" style="z-index: 15; width:148px" />
+        <VsCodeDropdown id="rh" v-model="rh" :items="RhItems" style="width:148px" />
       </div>
 
     </section>

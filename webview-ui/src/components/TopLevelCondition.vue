@@ -340,9 +340,7 @@ const toExample = (p: ConditionProperties): string => {
 };
 </script>
 <style lang="scss" scoped>
-vscode-dropdown.open {
-  z-index: 20;
-}
+
 section.condition {
   margin-top: 17px;
 
@@ -364,7 +362,6 @@ section.condition {
       }
       .valType {
         margin-right: 3px;
-        z-index: 4;
       }
       .ctl {
         width: 60px;

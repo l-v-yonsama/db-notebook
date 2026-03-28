@@ -19,7 +19,6 @@ import {
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
-import CompareKeySettings from "../../CompareKeySettings.vue";
 import RDHViewer from "../../RDHViewer.vue";
 import SecondarySelectionAction from "../../base/SecondarySelectionAction.vue";
 import VsCodeDropdown from "../../base/VsCodeDropdown.vue";
@@ -37,7 +36,6 @@ const innerTabIndex = ref(-1);
 const innerTabItems = ref([] as DropdownItem[]);
 const activeInnerRdh = ref(null as any);
 const numOfRows = ref(0);
-const contentMode = ref("tab" as "tab" | "keys");
 const noCompareKeys = ref(false);
 const activeTabRdhList = ref([] as ResultSetData[]);
 const initialized = ref(false);
@@ -341,20 +339,6 @@ const openInNoteBook = (): void => {
   });
 };
 
-const selectedCompareMoreOptions = (v: CompareMoreOption): void => {
-  const { command } = v;
-  switch (command) {
-    case "compare": {
-      compare({});
-      return;
-    }
-    case "editCompareKeys": {
-      contentMode.value = "keys";
-      return;
-    }
-  }
-};
-
 const saveCompareKeys = (
   values: {
     index: number;
@@ -373,7 +357,6 @@ const saveCompareKeys = (
       list: values,
     },
   });
-  contentMode.value = "tab";
 };
 
 const recieveMessage = (data: LogParseResultViewEventData) => {
@@ -411,9 +394,9 @@ defineExpose({
     <section v-if="!initialized" class="centered-content">Just a moment, please.</section>
     <template v-else>
 
-      <div v-if="contentMode == 'tab'" class="tab-container-actions">
-        <VsCodeDropdown v-if="innerTabItems.length > 1" v-model="innerTabIndex" :items="innerTabItems"
-          style="z-index: 15; width: 170px;" @change="resetActiveInnerRdh" />
+      <div class="tab-container-actions">
+        <VsCodeDropdown :disabled="innerTabItems.length <= 1" v-model="innerTabIndex" :items="innerTabItems"
+          style="width: 170px;" @change="resetActiveInnerRdh" />
         <button @click="
           writeToClipboard({
             fileType: 'text',
@@ -433,10 +416,7 @@ defineExpose({
           <fa icon="book" />
         </button>
       </div>
-      <CompareKeySettings v-if="contentMode == 'keys'" :rdhList="activeTabRdhList" @cancel="contentMode = 'tab'"
-        @save="saveCompareKeys" />
-      <vscode-panels v-if="contentMode == 'tab'" class="tab-wrapper" :activeid="activeTabId"
-        aria-label="With Active Tab">
+      <vscode-panels class="tab-wrapper" aria-label="With Active Tab">
         <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
           :title="`${tabItem.title}`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
           @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">

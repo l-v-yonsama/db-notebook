@@ -302,7 +302,7 @@ defineExpose({
       <div class="tool-left">
         <label for="languageModelId"> Language model</label>
         <VsCodeDropdown id="languageModelId" v-model="languageModelId" :items="languageModelItems"
-          :disabled="screenMode !== 'setting'" style="z-index: 25; width: 220px;"
+          :disabled="screenMode !== 'setting'" style="width: 220px;"
           @change="handleLanguageModelOnChange()" />
       </div>
       <div class="tool-right">
@@ -346,7 +346,7 @@ defineExpose({
                       <span style="margin-right: 30px">Examples</span>
                     </legend>
                     <VsCodeDropdown id="queryContentExample" v-model="queryContentExample"
-                      :items="queryContentExampleItems" style="z-index: 15; width:380px"
+                      :items="queryContentExampleItems" style="width:380px"
                       @change="handleQueryContentExampleOnChange()" />
                   </fieldset>
                 </div>

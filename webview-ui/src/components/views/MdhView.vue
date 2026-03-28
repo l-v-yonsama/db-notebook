@@ -382,7 +382,7 @@ defineExpose({
 
       <div v-if="contentMode == 'tab'" class="tab-container-actions">
         <VsCodeDropdown v-if="innerTabItems.length > 1" v-model="innerTabIndex" :items="innerTabItems"
-          style="z-index: 15; width: 170px;" @change="resetActiveInnerRdh" />
+          style="width: 170px;" @change="resetActiveInnerRdh" />
 
         <button v-if="!editable && refreshable" @click="actionToolbar('compare', {})"
           :disabled="inProgress || noCompareKeys"

@@ -290,7 +290,7 @@ defineExpose({
         <label for="connectionName">Connection setting</label>
         <VsCodeDropdown id="connectionName" v-model="connectionName" :items="connectionItems"
           @change="updateTextDocument({ values: { name: 'change', detail: 'connectionName' } })"
-          style="z-index: 15; width:200px"
+          style="width:200px"
           />
       </div>
       <div class="tool-right">
@@ -618,10 +618,6 @@ defineExpose({
 
 div.editor {
   padding: 5px;
-
-  vscode-dropdown {
-    z-index: 5;
-  }
 }
 
 div.description {

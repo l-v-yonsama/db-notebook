@@ -226,7 +226,7 @@ defineExpose({
           title="number of rows returned" placeholder="number of rows returned" @change="updateTextDocument()">
         </VsCodeTextField>
         <label for="target">Table or Index:</label>
-        <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="z-index: 15; width:200px"
+        <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="width:200px"
           @change="updateOptions()" />
       </div>
       <div class="tool-right">
@@ -247,14 +247,14 @@ defineExpose({
             </legend>
             <div>
               <label for="pk">Partial key ({{ pkName }} [{{ pkAttr }}] ):</label>
-              <VsCodeDropdown v-model="pkOpe" :items="ONLY_EQUAL_OPERATORS" style="z-index: 15; width:160px" />
+              <VsCodeDropdown v-model="pkOpe" :items="ONLY_EQUAL_OPERATORS" style="width:160px" />
               <VsCodeTextField id="pk" v-model="pkValue" style="width: 200px" @change="updateTextDocument()"
                 :required="true" :change-on-mouseout="true">
               </VsCodeTextField>
             </div>
             <div v-if="skName">
               <label for="sk">Sort key ({{ skName }} [{{ skAttr }}] ):</label>
-              <VsCodeDropdown v-model="skOpe" :items="OPERATORS" style="z-index: 15; width:160px"
+              <VsCodeDropdown v-model="skOpe" :items="OPERATORS" style="width:160px"
                 @change="updateOptions()" />
               <VsCodeTextField id="sk" v-model="skValue" style="width: 200px" @change="updateTextDocument()"
                 :change-on-mouseout="true">
@@ -290,11 +290,11 @@ defineExpose({
                     </VsCodeButton>
                   </td>
                   <td>
-                    <VsCodeDropdown v-model="filter.name" :items="columnItems" style="z-index: 15; width:160px"
+                    <VsCodeDropdown v-model="filter.name" :items="columnItems" style="width:160px"
                       @change="updateFilter(idx)" />
                   </td>
                   <td>
-                    <VsCodeDropdown v-model="filter.operator" :items="FILTER_OPERATORS" style="z-index: 15; width:160px"
+                    <VsCodeDropdown v-model="filter.operator" :items="FILTER_OPERATORS" style="width:160px"
                       @change="updateFilter(idx)" />
                   </td>
                   <td>

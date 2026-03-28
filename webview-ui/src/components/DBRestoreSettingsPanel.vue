@@ -249,7 +249,7 @@ defineExpose({
               <div v-if="executeRestoreInDockerContainer">
                 <label for="dockerContainerName"> Container name:</label>
                 <VsCodeDropdown id="dockerContainerName" v-model="dockerContainerName" :items="dockerContainerItems"
-                  style="z-index: 25; width: 320px;" :required="true" @change="handleChange()" />
+                  style="width: 320px;" :required="true" @change="handleChange()" />
               </div>
               <div>
                 <label for="userName">User name:</label>

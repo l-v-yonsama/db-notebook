@@ -311,7 +311,7 @@ defineExpose({
             @change="resetActiveInnerRdh" />
           <label for="content-type">Content-type</label>
           <VsCodeDropdown id="content-type" v-model="contentType" :items="contentTypeItems"
-            style="z-index: 15; width: 160px" @change="resetActiveInnerRdh" />
+            style="width: 160px" @change="resetActiveInnerRdh" />
         </div>
         <section :style="{ width: `${splitterWidth}px` }">
           <div v-if="eventRdh" class="spPaneWrapper">

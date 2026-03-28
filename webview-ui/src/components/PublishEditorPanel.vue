@@ -198,10 +198,10 @@ defineExpose({
       <div class="settings">
         <div>
           <label for="langType">Lang:</label>
-          <VsCodeDropdown id="langType" v-model="langType" :items="langItems" style="z-index: 15; width:120px" />
+          <VsCodeDropdown id="langType" v-model="langType" :items="langItems" style="width:120px" />
 
           <label for="qos" style="margin-left: 10px;">QOS:</label>
-          <VsCodeDropdown id="qos" v-model="qos" :items="QosItems" style="z-index: 15; width:148px" />
+          <VsCodeDropdown id="qos" v-model="qos" :items="QosItems" style="width:148px" />
 
           <vscode-checkbox :checked="retain" @change="($e: any) => { retain = $e.target.checked; }"
             style="margin-right: auto;margin-left: 10px;">Retain</vscode-checkbox>
