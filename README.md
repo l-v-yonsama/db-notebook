@@ -39,6 +39,7 @@ It also provides a CSV and Har file preview feature.
 - MQTT Client
   - Intuitive publish/subscribe interface
   - Query subscribed payloads using SQLite directly from the notebook
+- Parse SQL log
 
 ## Screenshots
 
@@ -164,6 +165,12 @@ It also provides a CSV and Har file preview feature.
 
 </details>
 
+### SQL Log Parse Feature
+
+The Log Parse feature analyzes application logs and extracts structured SQL execution data.
+
+- [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
+
 ## Tips
 
 1. Instead of using VS Code’s built-in `Copy Cell` or `+ Code` / `Add Code Cell`, I recommend using `Duplicate Cell with Metadata`.
@@ -179,6 +186,7 @@ This action copies not only the cell content, but also all associated metadata�
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
+- [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
 
 ## Keyboard shortcuts
 

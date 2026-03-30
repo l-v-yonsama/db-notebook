@@ -367,6 +367,7 @@ export function convertExtractedSqlRdhResult(params: ExtractedSqlResult): Extrac
   const logEventRdb = createLogResultBuilder(params.logEvents, params.stage, {
     elapsedTimeMilli: elapsedTimeMilli.split + (elapsedTimeMilli.classification ?? 0),
     logEventSplitPattern: inputSummary.logEventSplitPattern,
+    logEventFieldsPattern: inputSummary.logEventFieldsPattern,
     classificationSummary: inputSummary.classificationSummary,
   });
 

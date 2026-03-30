@@ -408,6 +408,7 @@ export class LogParseSettingPanel extends BasePanel {
     configSummary: LogParseSettingPanelEventDataConfigSummary;
   } {
     let logEventSplitPattern = "";
+    let logEventFieldsPattern = "";
     let classificationSummary = "";
     let extractionSummary = "";
     let errorMessage = "";
@@ -423,6 +424,11 @@ export class LogParseSettingPanel extends BasePanel {
       if (!errorMessage) {
         if (logParseConfig && logParseConfig.split && logParseConfig.split.fields?.length > 0) {
           logEventSplitPattern = createLogEventPatternText({
+            ...logParseConfig.split,
+            targetForHuman: true,
+            onlyStartMarker: true,
+          });
+          logEventFieldsPattern = createLogEventPatternText({
             ...logParseConfig.split,
             targetForHuman: true,
           });
@@ -448,6 +454,7 @@ export class LogParseSettingPanel extends BasePanel {
       canSplitLog,
       configSummary: {
         logEventSplitPattern,
+        logEventFieldsPattern,
         classificationSummary,
         extractionSummary,
       },
@@ -481,6 +488,11 @@ export class LogParseSettingPanel extends BasePanel {
           ...value.split,
           targetForHuman: true,
         }),
+        logEventSplitPattern: createLogEventPatternText({
+          ...value.split,
+          onlyStartMarker: true,
+          targetForHuman: true,
+        }),
       });
     }
     const logDetectionMessage = formatLogDetectionMessage(splitConfidence);
@@ -503,8 +515,10 @@ export class LogParseSettingPanel extends BasePanel {
           sqlParseConfidence.confidence >= 0.3 &&
           sqlParseConfidence.presetNames.includes(key);
         sqlParsePresets.push({
-          value: key,
+          name: key,
           label: `${key}${recommended ? " (Recommended)" : ""}`,
+          classificationSummary: summarizeClassifyRules(value.classify),
+          extractionSummary: summarizeExtractors(value.extractors),
         });
       }
       if (sqlParseConfidence) {

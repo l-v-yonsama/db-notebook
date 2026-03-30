@@ -412,6 +412,7 @@ export type CsvParseSettingPanelEventData = BaseMessageEventData<
 
 export type LogParseSettingPanelEventDataConfigSummary = {
   logEventSplitPattern: string;
+  logEventFieldsPattern: string;
   classificationSummary: string;
   extractionSummary: string;
 };
@@ -423,9 +424,15 @@ export type LogParseSettingPanelEventDataPreset = {
     label: string;
     logExample: string;
     logFieldsPattern: string;
+    logEventSplitPattern: string;
   }[];
   sqlParseDetectionMessage: string;
-  sqlParsePresets: LabelValueItem[];
+  sqlParsePresets: {
+    name: string;
+    label: string;
+    classificationSummary: string;
+    extractionSummary: string;
+  }[];
 };
 
 export type LogParseSettingPanelEventData = BaseMessageEventData<

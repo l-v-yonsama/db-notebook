@@ -41,7 +41,8 @@ const errorMessage = ref('');
 const totalLogLines = ref(0);
 const canSplitLog = ref(false);
 
-const currentLogFieldPattern = ref('');
+const currentLogEventSplitPattern = ref('');
+const currentLogFieldsPattern = ref('');
 const currentEventClassification = ref('');
 const currentSqlExtractionFlow = ref('');
 
@@ -74,7 +75,7 @@ onMounted(() => {
 
 /* computed */
 const isSummaryVisible = computed((): boolean => {
-  return currentLogFieldPattern.value.length > 1 || !!currentEventClassification.value || !!currentSqlExtractionFlow.value;
+  return currentLogFieldsPattern.value.length > 1 || !!currentEventClassification.value || !!currentSqlExtractionFlow.value;
 });
 const isConfigFileSelected = computed((): boolean => {
   return !!configFile.value;
@@ -83,22 +84,34 @@ const isConfigFileSelected = computed((): boolean => {
 const computedPresetInfo = computed((): {
   logExample: string;
   logFieldsPattern: string;
+  logEventSplitPattern: string;
+  classificationSummary: string;
+  extractionSummary: string;
 } => {
-  const presetName = splitPresetName.value;
-  if (presetName) {
-    const item = splitPresetItems.value.find(it => it.value === presetName)
-    if (item) {
-      return {
-        logExample: item.meta?.logExample ?? '',
-        logFieldsPattern: item.meta?.logFieldsPattern ?? '',
-
-      }
-    }
-  }
-  return {
+  const ret = {
     logExample: '',
     logFieldsPattern: '',
+    logEventSplitPattern: '',
+    classificationSummary: '',
+    extractionSummary: ''
   };
+  if (splitPresetName.value) {
+    const item = splitPresetItems.value.find(it => it.value === splitPresetName.value);
+    if (item) {
+      ret.logExample = item.meta?.logExample ?? '';
+      ret.logFieldsPattern = item.meta?.logFieldsPattern ?? '';
+      ret.logEventSplitPattern = item.meta?.logEventSplitPattern ?? '';
+    }
+  }
+  if (sqlParsePresetName.value) {
+    const item = sqlParsePresetItems.value.find(it => it.value === sqlParsePresetName.value);
+    if (item) {
+      ret.classificationSummary = item.meta?.classificationSummary ?? '';
+      ret.extractionSummary = item.meta?.extractionSummary ?? '';
+    }
+  }
+
+  return ret;
 });
 
 const initialize = async (v: InitializePayload) => {
@@ -148,6 +161,7 @@ const initialize = async (v: InitializePayload) => {
       label: it.label, value: it.name, meta: {
         logExample: it.logExample,
         logFieldsPattern: it.logFieldsPattern,
+        logEventSplitPattern: it.logEventSplitPattern,
       }
     });
   });
@@ -155,7 +169,10 @@ const initialize = async (v: InitializePayload) => {
   sqlParsePresetItems.value.push({ label: '-- Select --', value: '' });
   v.preset.sqlParsePresets.forEach(it => {
     sqlParsePresetItems.value.push({
-      label: it.label, value: it.value
+      label: it.label, value: it.name, meta: {
+        classificationSummary: it.classificationSummary,
+        extractionSummary: it.extractionSummary,
+      }
     });
   });
 
@@ -164,7 +181,8 @@ const initialize = async (v: InitializePayload) => {
   v.logParserConfigItems.forEach(it => configFileItems.value.push(it));
   configFile.value = v.logParserConfigFile;
 
-  currentLogFieldPattern.value = v.configSummary.logEventSplitPattern;
+  currentLogEventSplitPattern.value = v.configSummary.logEventSplitPattern;
+  currentLogFieldsPattern.value = v.configSummary.logEventFieldsPattern;
   currentEventClassification.value = v.configSummary.classificationSummary;
   currentSqlExtractionFlow.value = v.configSummary.extractionSummary;
   initilizing.value = false;
@@ -173,7 +191,8 @@ const initialize = async (v: InitializePayload) => {
 /* handlers */
 
 const resetConfig = async (v: ResetConfigPayload) => {
-  currentLogFieldPattern.value = v.configSummary.logEventSplitPattern;
+  currentLogEventSplitPattern.value = v.configSummary.logEventSplitPattern;
+  currentLogFieldsPattern.value = v.configSummary.logEventFieldsPattern;
   currentEventClassification.value = v.configSummary.classificationSummary;
   currentSqlExtractionFlow.value = v.configSummary.extractionSummary;
   canSplitLog.value = v.canSplitLog;
@@ -191,6 +210,7 @@ const resetConfig = async (v: ResetConfigPayload) => {
       label: it.label, value: it.name, meta: {
         logExample: it.logExample,
         logFieldsPattern: it.logFieldsPattern,
+        logEventSplitPattern: it.logEventSplitPattern
       }
     });
   });
@@ -198,7 +218,10 @@ const resetConfig = async (v: ResetConfigPayload) => {
   sqlParsePresetItems.value.push({ label: '-- Select --', value: '' });
   v.preset.sqlParsePresets.forEach(it => {
     sqlParsePresetItems.value.push({
-      label: it.label, value: it.value
+      label: it.label, value: it.name, meta: {
+        classificationSummary: it.classificationSummary,
+        extractionSummary: it.extractionSummary,
+      }
     });
   });
 };
@@ -359,15 +382,14 @@ defineExpose({
               <div class="flex-line">
                 <label for="splitPreset" class="condition-label">Lines to parse:&nbsp;</label>
                 <div>
-                  <VsCodeDropdown id="splitPreset" v-model="linesToParse" :items="lineItems"
-                    @change="resetLines" />
-                  <p class="total-log-lines hint" style="margin-left: 2px;">(Total log lines: {{totalLogLines}} )</p>
+                  <VsCodeDropdown id="splitPreset" v-model="linesToParse" :items="lineItems" @change="resetLines" />
+                  <p class="total-log-lines hint" style="margin-left: 2px;">(Total log lines: {{ totalLogLines }} )</p>
                 </div>
               </div>
               <div class="flex-line">
                 <label for="configFile" class="condition-label">Config file:&nbsp;</label>
-                <VsCodeDropdown id="configFile" v-model="configFile" :items="configFileItems"
-                  style=" width: 300px;" @change="postOk({ 'action': 'set-config-file' })" />
+                <VsCodeDropdown id="configFile" v-model="configFile" :items="configFileItems" style=" width: 300px;"
+                  @change="postOk({ 'action': 'set-config-file' })" />
               </div>
               <div class="flex-line">
                 <label for="formatterSqlLanguage" class="condition-label">Formatter SQL language:&nbsp;</label>
@@ -404,7 +426,8 @@ defineExpose({
                         <fa icon="check" />Apply
                       </VsCodeButton>
                     </template>
-                    <p v-else style="margin:0"><span class="disabled-reason">⚠️ Log must be split before using this feature.</span></p>
+                    <p v-else style="margin:0"><span class="disabled-reason">⚠️ Log must be split before using this
+                        feature.</span></p>
                   </div>
                   <p v-if="sqlParsePresetVisible && sqlParseDetectionMessage" class="log-detection-message hint">( {{
                     sqlParseDetectionMessage }} )</p>
@@ -415,7 +438,7 @@ defineExpose({
 
               <fieldset v-if="splitPresetName" class="preset-details">
                 <legend class="legend-bar">
-                  <span>Preset details <VsCodeButton @click="splitPresetName = ''" appearance="secondary"
+                  <span>Log split preset details <VsCodeButton @click="splitPresetName = ''" appearance="secondary"
                       style="margin-left:10px;">
                       Close</VsCodeButton></span>
                 </legend>
@@ -425,19 +448,48 @@ defineExpose({
                   </legend>
                   <div class="log-examples" v-text="computedPresetInfo.logExample"></div>
                 </fieldset>
+                <fieldset v-if="computedPresetInfo.logEventSplitPattern" class="log-fields-pattern">
+                  <legend>
+                    <span>Log event split pattern</span>
+                  </legend>
+                  <div class="log-fields-pattern" v-text="computedPresetInfo.logEventSplitPattern"></div>
+                </fieldset>
                 <fieldset v-if="computedPresetInfo.logFieldsPattern" class="log-fields-pattern">
                   <legend>
-                    <span>Log fields pattern</span>
+                    <span>Log event fields pattern</span>
                   </legend>
                   <div class="log-fields-pattern" v-text="computedPresetInfo.logFieldsPattern"></div>
+                </fieldset>
+              </fieldset>
+              <fieldset v-if="sqlParsePresetName" class="preset-details">
+                <legend class="legend-bar">
+                  <span>SQL parse preset details <VsCodeButton @click="sqlParsePresetName = ''" appearance="secondary"
+                      style="margin-left:10px;">
+                      Close</VsCodeButton></span>
+                </legend>
+
+                <fieldset v-if="computedPresetInfo.classificationSummary" class="log-fields-pattern summary">
+                  <legend>
+                    <span>Event classification</span>
+                  </legend>
+                  <div class="log-fields-pattern" v-text="computedPresetInfo.classificationSummary"></div>
+                </fieldset>
+                <fieldset v-if="computedPresetInfo.extractionSummary" class="log-fields-pattern summary">
+                  <legend>
+                    <span>SQL extraction flow</span>
+                  </legend>
+                  <div class="log-fields-pattern" v-text="computedPresetInfo.extractionSummary"></div>
                 </fieldset>
               </fieldset>
 
               <fieldset v-if="isSummaryVisible" class="summary">
                 <legend><span>Summary</span></legend>
 
-                <label for="currentLogFieldPattern" class="condition-label">Log fields pattern</label>
-                <div id="currentLogFieldPattern" class="log-fields-pattern" v-text="currentLogFieldPattern"></div>
+                <label for="currentLogFieldPattern" class="condition-label">Log event split pattern</label>
+                <div id="currentLogFieldPattern" class="log-fields-pattern" v-text="currentLogEventSplitPattern"></div>
+
+                <label for="currentLogFieldPattern" class="condition-label">Log event fields pattern</label>
+                <div id="currentLogFieldPattern" class="log-fields-pattern" v-text="currentLogFieldsPattern"></div>
 
                 <template v-if="currentEventClassification">
                   <label for="currentEventClassification" class="condition-label">Event classification</label>
