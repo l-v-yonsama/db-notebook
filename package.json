@@ -1452,6 +1452,11 @@
     "ts-node": "^10.9.1",
     "xregexp": "^5.1.2"
   },
+  "overrides": {
+
+    "@types/readable-stream": "4.0.19"
+
+  },
   "volta": {
     "node": "18.13.0",
     "npm": "9.3.1"
