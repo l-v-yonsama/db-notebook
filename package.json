@@ -1449,13 +1449,10 @@
     "short-unique-id": "^4.4.4",
     "store": "^2.0.12",
     "throttle-debounce": "^5.0.0",
-    "ts-node": "^10.9.1",
     "xregexp": "^5.1.2"
   },
   "overrides": {
-
     "@types/readable-stream": "4.0.19"
-
   },
   "volta": {
     "node": "18.13.0",
