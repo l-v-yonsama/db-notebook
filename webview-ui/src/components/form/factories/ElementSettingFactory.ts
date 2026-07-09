@@ -6,7 +6,7 @@ import { Auth0ElementSetting } from "./Auth0ElementSetting";
 import { AwsElementSetting } from "./AwsElementSetting";
 import type { BaseElementSetting } from "./BaseElementSetting";
 import { KeycloakElementSetting } from "./KeycloakElementSetting";
-import { MemcacheElementSetting } from "./MemcacheElementSetting copy";
+import { MemcacheElementSetting } from "./MemcacheElementSetting";
 import { MqttElementSetting } from "./MqttElementSetting";
 import {
   MysqlElementSetting,
