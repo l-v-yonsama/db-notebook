@@ -420,7 +420,7 @@ export class NodeKernel {
   }
 
   interrupt() {
-    if (this.child) {
+    if (this.child && this.child.pid !== undefined) {
       log(`${PREFIX} [interrupt] kill pid:${this.child.pid}`);
       try {
         const message = process.kill(this.child.pid);

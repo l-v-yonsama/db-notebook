@@ -102,7 +102,7 @@ function setActivateDecorator(context: ExtensionContext) {
   let activeEditor = window.activeTextEditor;
   // let activeNotebook = window.activeNotebookEditor?.notebook;
   let cell: NotebookCell | undefined;
-  let timeout: NodeJS.Timer | undefined = undefined;
+  let timeout: NodeJS.Timeout | undefined = undefined;
 
   const triggerUpdateDecorations = (throttle = false) => {
     // log(`${PREFIX} triggerUpdateDecorations`);

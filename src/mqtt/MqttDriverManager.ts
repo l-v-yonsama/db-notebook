@@ -25,7 +25,7 @@ import { log } from "../utilities/logger";
 
 export class MqttDriverManager {
   private static manageMap = new Map<string, MqttDriverManager>();
-  private subscribeTimer: NodeJS.Timer | undefined = undefined;
+  private subscribeTimer: NodeJS.Timeout | undefined = undefined;
   static dbResourceTree: ResourceTreeProvider;
   private subscriptionResList: DbSubscription[] = [];
   private beforeSummary: Record<
