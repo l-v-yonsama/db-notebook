@@ -11,5 +11,12 @@
     "noImplicitAny": true,
     "esModuleInterop": true
   },
-  "exclude": ["node_modules", ".vscode-test", "webview-ui"]
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "webview-ui",
+    "src/test",
+    "src/**/*.test.ts",
+    "vitest.config.ts"
+  ]
 }

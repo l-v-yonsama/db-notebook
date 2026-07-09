@@ -39,10 +39,15 @@ function buildMySqlDumpCommand(params: DBDumpInputParams, maskSensitive: boolean
   const args: string[] = ["mysqldump"];
   const dockerEnvArgs: string[] = [];
 
-  if (host) args.push(`-h ${quote(host)}`);
-  if (port) args.push(`-P ${port}`);
-
-  if (userName) args.push(`-u ${quote(userName)}`);
+  if (host) {
+    args.push(`-h ${quote(host)}`);
+  }
+  if (port) {
+    args.push(`-P ${port}`);
+  }
+  if (userName) {
+    args.push(`-u ${quote(userName)}`);
+  }
 
   if (password) {
     const value = maskSensitive ? "****" : password;
@@ -97,10 +102,15 @@ function buildPostgresDumpCommand(params: DBDumpInputParams, maskSensitive: bool
   const args: string[] = ["pg_dump"];
   const dockerEnvArgs: string[] = [];
 
-  if (host) args.push(`-h ${quote(host)}`);
-  if (port) args.push(`-p ${port}`);
-
-  if (userName) args.push(`-U ${quote(userName)}`);
+  if (host) {
+    args.push(`-h ${quote(host)}`);
+  }
+  if (port) {
+    args.push(`-p ${port}`);
+  }
+  if (userName) {
+    args.push(`-U ${quote(userName)}`);
+  }
 
   if (password) {
     const value = maskSensitive ? "****" : password;
@@ -208,7 +218,9 @@ function buildSqliteDumpCommand(params: DBDumpInputParams): string {
  * =============================== */
 function appendDumpOptions(args: string[], options: DBDumpInputParams["options"]) {
   for (const opt of options) {
-    if (!opt.enabled) continue;
+    if (!opt.enabled) {
+      continue;
+    }
 
     if (!opt.argType) {
       args.push(opt.option);

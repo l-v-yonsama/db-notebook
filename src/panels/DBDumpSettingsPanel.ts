@@ -281,7 +281,9 @@ export class DBDumpSettingsPanel extends BasePanel {
   }
 
   private async resetDockerParams(): Promise<void> {
-    if (!this.variables?.executeDumpInDockerContainer) return;
+    if (!this.variables?.executeDumpInDockerContainer) {
+      return;
+    }
 
     if (this.dockerContainers.length === 0) {
       this.dockerContainers = await listRunningDockerContainers();
