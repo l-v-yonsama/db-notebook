@@ -1,56 +1,71 @@
-import * as shiki from "shiki";
-import { workspace } from "vscode";
+import Prism from "prismjs";
+import loadLanguages from "prismjs/components/index.js";
+
+// "text"/"plaintext" and other non-highlightable codes are expected inputs,
+// not errors, so silence loadLanguages' console warning for unknown ids.
+loadLanguages.silent = true;
+
+// Maps our short language codes (mostly file extensions / mime-derived hints,
+// see multi-platform-database-drivers' parseContentType) to Prism's component ids.
+// Only entries where the two differ need to be listed; unlisted codes are
+// tried as-is against Prism's own component/alias ids.
+const LANG_ALIASES: Record<string, string> = {
+  js: "javascript",
+  ts: "typescript",
+  cs: "csharp",
+  sh: "bash",
+  zsh: "bash",
+  yml: "yaml",
+  rb: "ruby",
+  rs: "rust",
+  py: "python",
+  md: "markdown",
+  vb: "visual-basic",
+  ps: "powershell",
+  ps1: "powershell",
+  make: "makefile",
+  html: "markup",
+  xml: "markup",
+  gql: "graphql",
+  spl: "splunk-spl",
+  tex: "latex",
+  bat: "batch",
+  coffee: "coffeescript",
+};
 
 export const createCodeHtmlString = async ({
   code,
   lang,
-  themeName,
 }: {
   code: string;
   lang: string;
-  themeName?: string;
 }): Promise<string> => {
   if (typeof code !== "string") {
     throw new Error(`code type(${typeof code}) must be string type. ` + code);
   }
-  const theme = themeName !== undefined && themeName.length > 0 ? themeName : getThemeName();
-  const highlighter = await shiki.getHighlighter({
-    theme,
-  });
 
-  try {
-    return highlighter.codeToHtml(code, { lang: getLanguage(lang) });
-  } catch (e) {
-    console.error(e);
-    return highlighter.codeToHtml(code, { lang: "plaintext" });
+  const langId = resolveLanguageId(lang);
+  if (langId) {
+    try {
+      const html = Prism.highlight(code, Prism.languages[langId], langId);
+      return `<pre class="code-highlight"><code class="language-${langId}">${html}</code></pre>`;
+    } catch (e) {
+      console.error(e);
+    }
   }
+  return `<pre class="code-highlight"><code>${escapeHtml(code)}</code></pre>`;
 };
 
-const getLanguage = (lang: string): string => {
-  const language = shiki.BUNDLED_LANGUAGES.find(
-    (x) =>
-      x.id === lang.toLocaleLowerCase() ||
-      (x.aliases && x.aliases.includes(lang.toLocaleLowerCase()))
-  );
-  return language?.id ?? "plaintext";
-};
-
-const getThemeName = (): string => {
-  // get current vscode color UI theme name
-  let colorTheme = workspace.getConfiguration("workbench").get<string>("colorTheme", "dark-plus"); // default to dark plus
-
-  if (shiki.BUNDLED_THEMES.includes(colorTheme as shiki.Theme)) {
-    return colorTheme;
+function resolveLanguageId(lang: string): string | undefined {
+  const id = LANG_ALIASES[lang?.toLowerCase()] ?? lang?.toLowerCase();
+  if (!id) {
+    return undefined;
   }
-
-  // try normalized color theme name
-  colorTheme = colorTheme.toLowerCase().replace("theme", "").replace(/\s+/g, "-");
-  if (shiki.BUNDLED_THEMES.includes(colorTheme as shiki.Theme)) {
-    return colorTheme;
+  if (!Prism.languages[id]) {
+    loadLanguages([id]);
   }
-
-  return "css-variables";
-};
+  return Prism.languages[id] ? id : undefined;
+}
 
 const escapeHtml = (s: string): string => {
   if (typeof s !== "string") {

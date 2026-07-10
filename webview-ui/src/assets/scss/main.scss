@@ -1,28 +1,54 @@
-@media (prefers-color-scheme: light) {
-  .shiki.dark-plus {
-    display: none;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .shiki.light-plus {
-    display: none;
-  }
-}
-
 :root {
   --one-color: var(--vscode-focusBorder);
-  --shiki-color-text: var(--vscode-editor-foreground);
-  --shiki-color-background: var(--vscode-editor-background);
-  --shiki-token-constant: var(--vscode-charts-blue);
-  --shiki-token-string: var(--vscode-charts-blue);
-  --shiki-token-comment: var(--vscode-charts-lines);
-  --shiki-token-keyword: var(--vscode-charts-purple);
-  --shiki-token-parameter: var(--vscode-charts-purple);
-  --shiki-token-function: var(--vscode-charts-blue);
-  --shiki-token-string-expression: var(--vscode-charts-blue);
-  --shiki-token-punctuation: var(--vscode-charts-orange);
-  --shiki-token-link: var(--vscode-charts-blue);
+}
+
+pre.code-highlight {
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  color: var(--vscode-editor-foreground);
+  background: var(--vscode-editor-background);
+
+  code {
+    font-family: var(--vscode-editor-font-family, monospace);
+  }
+
+  .token.comment,
+  .token.prolog,
+  .token.doctype,
+  .token.cdata {
+    color: var(--vscode-charts-lines);
+  }
+  .token.string,
+  .token.attr-value,
+  .token.char,
+  .token.constant {
+    color: var(--vscode-charts-blue);
+  }
+  .token.keyword,
+  .token.selector,
+  .token.atrule,
+  .token.important {
+    color: var(--vscode-charts-purple);
+  }
+  .token.function,
+  .token.class-name {
+    color: var(--vscode-charts-yellow);
+  }
+  .token.parameter,
+  .token.property,
+  .token.attr-name,
+  .token.tag {
+    color: var(--vscode-charts-green);
+  }
+  .token.punctuation,
+  .token.operator {
+    color: var(--vscode-charts-orange);
+  }
+  .token.number,
+  .token.boolean {
+    color: var(--vscode-charts-red);
+  }
 }
 
 main {
