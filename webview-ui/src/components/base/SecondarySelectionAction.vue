@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import type { SecondaryItem, SecondaryItemSelection } from "@/types/Components";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps<{
   title: string;
@@ -33,8 +33,8 @@ const props = defineProps<{
   disabled?: boolean;
 }>();
 
-const isChevron = ref(props.title != "more");
-const isMore = ref(props.title == "more");
+const isChevron = computed(() => props.title != "more");
+const isMore = computed(() => props.title == "more");
 
 const emit = defineEmits<{
   (event: "onSelect", value: any): void;

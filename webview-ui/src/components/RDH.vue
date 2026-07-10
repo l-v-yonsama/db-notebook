@@ -674,7 +674,7 @@ defineExpose({
 thead {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 5;
   background: var(--vscode-editorPane-background);
 }
 

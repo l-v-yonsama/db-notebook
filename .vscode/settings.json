@@ -8,6 +8,10 @@
   },
   // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
   "typescript.tsc.autoDetect": "off",
+  // Use the workspace's own TypeScript (not VS Code's bundled newer version) so the
+  // editor's background diagnostics on webview-ui/tsconfig.json match what `npm run compile`
+  // actually accepts, instead of flagging options as "removed" per a much newer TS release.
+  "typescript.tsdk": "webview-ui/node_modules/typescript/lib",
   "editor.codeActionsOnSave": {
     "source.organizeImports": "explicit"
   },
