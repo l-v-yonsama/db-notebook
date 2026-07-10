@@ -34,14 +34,14 @@
 
 <script setup lang="ts">
 import type { FileAnnotation } from "@l-v-yonsama/rdh";
-import { ref } from "vue";
+import { computed } from "vue";
 
 const props = defineProps<{
   text: string;
   annotation: FileAnnotation["values"];
 }>();
 
-const renderType = ref(props.annotation?.contentTypeInfo.renderType ?? "Unknown");
+const renderType = computed(() => props.annotation?.contentTypeInfo.renderType ?? "Unknown");
 
 const createImageUrl = (): string => {
   if (props.text) {

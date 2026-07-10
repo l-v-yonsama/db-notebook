@@ -21,7 +21,7 @@
 
 <script setup lang="ts">
 import type { DropdownItem } from "@/types/Components";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import VsCodeDropdown from "./VsCodeDropdown.vue";
 import VsCodeTextField from "./VsCodeTextField.vue";
 
@@ -32,15 +32,22 @@ const props = defineProps<{
   required?: boolean;
 }>();
 
+const emit = defineEmits<{
+  (event: "update:modelValue", modelValue: string | number | Date): void;
+}>();
+
 const v = ref(props.modelValue);
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    v.value = value;
+  }
+);
 
 const changeCondition = (e: any) => {
   emit("update:modelValue", v.value);
 };
-
-const emit = defineEmits<{
-  (event: "update:modelValue", modelValue: string | number | Date): void;
-}>();
 
 function handleOnInput(event: any) {
   emit("update:modelValue", event.target.value);
