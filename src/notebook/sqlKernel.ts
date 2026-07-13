@@ -1,6 +1,5 @@
 import {
   ConnectionSetting,
-  DBDriverResolver,
   RDSBaseDriver,
   hasSetVariableClause,
   normalizeQuery,
@@ -9,6 +8,7 @@ import { ResultSetData } from "@l-v-yonsama/rdh";
 import * as os from "os";
 import { NotebookCell } from "vscode";
 import { CellMeta, NotebookExecutionVariables, RunResult, SQLMode } from "../types/Notebook";
+import { createSQLSupportDriver, flowTransaction, workflow } from "../utilities/driverResolver";
 import { log, logError } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 
@@ -60,8 +60,7 @@ export class SqlKernel {
     }
 
     try {
-      const resolver = DBDriverResolver.getInstance();
-      const driver = resolver.createSQLSupportDriver(connectionSetting);
+      const driver = await createSQLSupportDriver(connectionSetting, true);
       const toPositionedParameter = driver.isPositionedParameterAvailable();
       const toPositionalCharacter = driver.getPositionalCharacter();
       const { query, binds } = normalizeQuery({
@@ -74,7 +73,7 @@ export class SqlKernel {
       log(`${PREFIX} binds:` + JSON.stringify(binds));
 
       if (sqlMode === "ExplainAnalyze") {
-        const { message } = await resolver.flowTransaction<RDSBaseDriver>(
+        const { message } = await flowTransaction<RDSBaseDriver>(
           connectionSetting,
           async (driver) => {
             this.driver = driver;
@@ -88,7 +87,8 @@ export class SqlKernel {
           },
           {
             transactionControlType: "alwaysRollback",
-          }
+          },
+          true
         );
 
         if (message) {
@@ -97,7 +97,7 @@ export class SqlKernel {
       }
 
       if (sqlMode === "Explain") {
-        const { message } = await resolver.workflow<RDSBaseDriver>(
+        const { message } = await workflow<RDSBaseDriver>(
           connectionSetting,
           async (driver) => {
             this.driver = driver;
@@ -108,7 +108,8 @@ export class SqlKernel {
               },
               prepare: useDatabaseName ? { useDatabaseName } : undefined,
             });
-          }
+          },
+          true
         );
         if (message) {
           stderrs.push(`Explain Error: ${message}`);
@@ -116,7 +117,7 @@ export class SqlKernel {
       }
 
       if (sqlMode === "Query") {
-        const { ok, message, result } = await resolver.workflow<RDSBaseDriver, ResultSetData>(
+        const { ok, message, result } = await workflow<RDSBaseDriver, ResultSetData>(
           connectionSetting,
           async (driver) => {
             this.driver = driver;
@@ -127,7 +128,8 @@ export class SqlKernel {
               },
               prepare: useDatabaseName ? { useDatabaseName } : undefined,
             });
-          }
+          },
+          true
         );
         if (ok && result) {
           if (!result.meta.tableName) {

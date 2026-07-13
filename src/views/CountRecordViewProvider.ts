@@ -1,5 +1,4 @@
 import {
-  DBDriverResolver,
   DbSchema,
   RDSBaseDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -22,6 +21,7 @@ import { ActionCommand, OutputParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { CountRecordViewEventData } from "../shared/MessageEventData";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { workflow } from "../utilities/driverResolver";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
@@ -201,8 +201,6 @@ export class CountRecordViewProvider extends BaseViewProvider {
     this.mode = "running";
     await this.renderSub();
 
-    const resolver = DBDriverResolver.getInstance();
-
     rowValues["TIME"] = dayjs().format("HH:mm:ss");
 
     const { ok, message } = await window.withProgress(
@@ -217,7 +215,7 @@ export class CountRecordViewProvider extends BaseViewProvider {
           driverForKill?.kill();
         });
 
-        return await resolver.workflow<RDSBaseDriver>(connectionSetting, async (driver) => {
+        return await workflow<RDSBaseDriver>(connectionSetting, async (driver) => {
           driverForKill = driver;
 
           const increment = (1.0 / this.selectedTableNames.length) * 100;
@@ -249,7 +247,7 @@ export class CountRecordViewProvider extends BaseViewProvider {
             message: `Completed.`,
             increment: 100,
           });
-        });
+        }, true);
       }
     );
 

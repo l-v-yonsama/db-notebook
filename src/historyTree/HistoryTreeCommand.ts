@@ -19,7 +19,6 @@ import {
 } from "../constant";
 
 import {
-  DBDriverResolver,
   RDSBaseDriver,
   normalizeQuery,
   runRuleEngine,
@@ -29,6 +28,7 @@ import { CellMeta } from "../types/Notebook";
 import { SQLHistory } from "../types/SQLHistory";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { createRDSDriver, workflow } from "../utilities/driverResolver";
 import { existsFileOnWorkspace } from "../utilities/fsUtil";
 import { log } from "../utilities/logger";
 import { readCodeResolverFile, readRuleFile } from "../utilities/notebookUtil";
@@ -127,8 +127,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       return;
     }
 
-    const resolver = DBDriverResolver.getInstance();
-    const driver = resolver.createRDSDriver(connectionSetting);
+    const driver = await createRDSDriver(connectionSetting, true);
     const toPositionedParameter = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
     const { query, binds } = normalizeQuery({
@@ -157,7 +156,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
           increment: 50,
         });
 
-        const r = await resolver.workflow<RDSBaseDriver, ResultSetData>(
+        const r = await workflow<RDSBaseDriver, ResultSetData>(
           connectionSetting,
           async (driver) => {
             driverForKill = driver;
@@ -170,7 +169,8 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
                 ? { useDatabaseName: history.meta.useDatabase }
                 : undefined,
             });
-          }
+          },
+          true
         );
         progress.report({
           message: `Completed.`,

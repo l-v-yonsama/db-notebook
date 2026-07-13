@@ -1,6 +1,5 @@
 import {
   BaseSQLSupportDriver,
-  DBDriverResolver,
   DbConnection,
   DbDatabase,
   DbDynamoTable,
@@ -85,6 +84,7 @@ import { CellMeta } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { copyToClipboard } from "../utilities/clipboardUtil";
+import { workflow } from "../utilities/driverResolver";
 import { createErDiagram, createSimpleERDiagramParams } from "../utilities/erDiagramGenerator";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
@@ -402,14 +402,15 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
         return;
       }
       const { ok, message, result } =
-        await DBDriverResolver.getInstance().workflow<BaseSQLSupportDriver>(
+        await workflow<BaseSQLSupportDriver>(
           setting,
           async (driver) => {
             return await driver.count({
               table: tableRes.name,
               schema: driver.isSchemaSpecificationSvailable() ? schemaName : undefined,
             });
-          }
+          },
+          true
         );
 
       if (ok && result !== undefined) {
@@ -446,7 +447,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
 
   context.subscriptions.push(
     commands.registerCommand(FLUSH_DB, async (conRes: DbConnection) => {
-      await DBDriverResolver.getInstance().workflow<RedisDriver>(conRes, async (driver) => {
+      await workflow<RedisDriver>(conRes, async (driver) => {
         const answer = await window.showInformationMessage(
           `Are you sure to delete all the keys of the currently selected DB?`,
           "YES",
@@ -457,7 +458,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
         }
         await driver.flushDb();
         commands.executeCommand(LOAD_DB_SCHEMA, conRes);
-      });
+      }, true);
     })
   );
 
@@ -571,7 +572,7 @@ async function viewRows(stateStorage: StateStorage, tableRes: DbTable, limitMode
   if (!setting) {
     return;
   }
-  const { ok, message, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+  const { ok, message, result } = await workflow<RDSBaseDriver>(
     setting,
     async (driver) => {
       const schemaAndName: SchemaAndTableName = {
@@ -589,7 +590,8 @@ async function viewRows(stateStorage: StateStorage, tableRes: DbTable, limitMode
         limit: 100,
         limitLastColumn,
       });
-    }
+    },
+    true
   );
 
   if (ok && result !== undefined) {

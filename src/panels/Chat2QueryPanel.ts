@@ -1,5 +1,4 @@
 import {
-  DBDriverResolver,
   DbSchema,
   RDSBaseDriver,
   toCreateTableDDL,
@@ -26,6 +25,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { LabelValueItem } from "../shared/LabelValueItem";
 import { Chat2QueryPanelEventData } from "../shared/MessageEventData";
 import { MdhViewParams } from "../types/views";
+import { workflow } from "../utilities/driverResolver";
 import { log, logError } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -243,12 +243,13 @@ export class Chat2QueryPanel extends BasePanel {
     if (!setting) {
       return undefined;
     }
-    const { ok, result, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+    const { ok, result, message } = await workflow<RDSBaseDriver>(
       setting,
       async (driver) => {
         log(`${PREFIX} query:` + this.generatedQueryText);
         return await driver.requestSql({ sql: this.generatedQueryText });
-      }
+      },
+      true
     );
 
     if (ok && result) {
@@ -276,7 +277,7 @@ export class Chat2QueryPanel extends BasePanel {
       return undefined;
     }
 
-    const { ok, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+    const { ok, result } = await workflow<RDSBaseDriver>(
       setting,
       async (driver) => {
         const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
@@ -323,7 +324,8 @@ export class Chat2QueryPanel extends BasePanel {
             }
           }
         }
-      }
+      },
+      true
     );
 
     if (ok && result) {

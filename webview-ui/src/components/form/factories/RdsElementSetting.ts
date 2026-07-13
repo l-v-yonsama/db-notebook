@@ -65,6 +65,14 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getSqlServerEncryption(): ElementSetting {
+    return { visible: false };
+  }
+
+  getSqlServerTrustServerCertificate(): ElementSetting {
+    return { visible: false };
+  }
+
   getSqlServerDomain(): ElementSetting {
     return { visible: false };
   }
@@ -255,7 +263,20 @@ export class SQLServerElementSetting extends RdsElementSetting {
       placeholder,
     };
   }
-
+  getSqlServerEncryption(): ElementSetting {
+    const type = this.params.sqlServerAuthenticationType;
+    return {
+      visible: type !== "azure-active-directory-access-token",
+      label: "Encryption",
+    };
+  }
+  getSqlServerTrustServerCertificate(): ElementSetting {
+    const type = this.params.sqlServerAuthenticationType;
+    return {
+      visible: type !== "azure-active-directory-access-token",
+      label: "Trust Server Certificate",
+    };
+  }
   getSqlServerDomain(): ElementSetting {
     const type = this.params.sqlServerAuthenticationType;
     return {
@@ -279,7 +300,8 @@ export class SQLServerElementSetting extends RdsElementSetting {
       type !== "Use Connect String" &&
       type !== "azure-active-directory-default" &&
       type !== "azure-active-directory-msi-vm" &&
-      type !== "azure-active-directory-service-principal-secret";
+      type !== "azure-active-directory-service-principal-secret" &&
+      type !== "azure-active-directory-access-token";
     return {
       visible,
       label: "User",
@@ -293,7 +315,8 @@ export class SQLServerElementSetting extends RdsElementSetting {
       type !== "Use Connect String" &&
       type !== "azure-active-directory-default" &&
       type !== "azure-active-directory-msi-vm" &&
-      type !== "azure-active-directory-service-principal-secret";
+      type !== "azure-active-directory-service-principal-secret" &&
+      type !== "azure-active-directory-access-token";
     return { visible, label: "Password", defaultValue: "" };
   }
 
@@ -321,7 +344,11 @@ export class SQLServerElementSetting extends RdsElementSetting {
     const isOptional =
       type === "azure-active-directory-default" || type === "azure-active-directory-msi-vm";
     return {
-      visible: type !== "Use Connect String" && type !== "default" && type !== "ntlm",
+      visible:
+        type !== "Use Connect String" &&
+        type !== "default" &&
+        type !== "ntlm" &&
+        type !== "azure-active-directory-access-token",
       defaultValue: "",
       label: isOptional ? "ClientId(Optional)" : "ClientId",
       placeholder: "A client id to use",
@@ -332,14 +359,20 @@ export class SQLServerElementSetting extends RdsElementSetting {
     const type = this.params.sqlServerAuthenticationType;
     const isVisible =
       type === "azure-active-directory-service-principal-secret" ||
-      type === "azure-active-directory-password";
+      type === "azure-active-directory-password" ||
+      type === "azure-active-directory-access-token";
     return {
       visible: isVisible,
-      label: type === "azure-active-directory-password" ? "TenantId(Optional)" : "TenantId",
+      label:
+        type === "azure-active-directory-service-principal-secret"
+          ? "TenantId"
+          : "TenantId(Optional)",
       placeholder:
-        type === "azure-active-directory-password"
-          ? "Azure tenant ID"
-          : "your registered Azure application",
+        type === "azure-active-directory-service-principal-secret"
+          ? "your registered Azure application"
+          : type === "azure-active-directory-access-token"
+          ? "Azure tenant ID (only needed for guest accounts in multiple tenants)"
+          : "Azure tenant ID",
       defaultValue: "",
     };
   }

@@ -3,7 +3,7 @@
     <slot></slot>
   </vscode-radio-group> -->
   <vscode-dropdown :value="modelValue" :class="{ transparent, verr: isError }" :disabled="disabled"
-    @change="handleOnChange" @focus="handleOnFocus" @blur="handleOnBlur" :style="{ 'z-index': calcZIndex }">
+    @change="handleOnChange" @focus="handleOnFocus" @blur="handleOnBlur" :style="dropdownStyle">
     <!-- <vscode-option value="" aria-disabled="true" style="display: none">-- Select --</vscode-option> -->
     <vscode-option v-for="(item, index) in items" :key="index" :value="item.value">
       {{ item.label }}
@@ -29,6 +29,7 @@ type Props = {
   required?: boolean;
   disabled?: boolean;
   baseZIndex?: number;
+  width?: number;
 };
 
 const props = withDefaults(defineProps<Props>(), {
@@ -41,6 +42,16 @@ const hasFocus = ref(false);
 const isError = ref(false);
 
 const calcZIndex = computed((): number => props.baseZIndex + (hasFocus.value ? 100 : 0));
+
+const dropdownStyle = computed(() => {
+  const style: Record<string, string | number> = {
+    "z-index": calcZIndex.value,
+  };
+  if (props.width !== undefined) {
+    style.width = `${props.width}px`;
+  }
+  return style;
+});
 
 watch(
   () => props.modelValue,

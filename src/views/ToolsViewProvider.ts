@@ -1,6 +1,5 @@
 import {
   ConnectionSetting,
-  DBDriverResolver,
   DbResource,
   RDSBaseDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -14,6 +13,7 @@ import { ActionCommand, OutputParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { ToolsViewEventData } from "../shared/MessageEventData";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { workflow } from "../utilities/driverResolver";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
 import { StateStorage } from "../utilities/StateStorage";
@@ -135,7 +135,7 @@ export class ToolsViewProvider extends BaseViewProvider {
       if (res === undefined) {
         return;
       }
-      const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+      const { ok, message, result } = await workflow<
         RDSBaseDriver,
         ResultSetData
       >(settings, async (driver) => {
@@ -144,7 +144,7 @@ export class ToolsViewProvider extends BaseViewProvider {
         } else {
           return await driver.getLocks(res.name);
         }
-      });
+      }, true);
       if (ok && result) {
         this.rdh = result;
       } else {
@@ -204,12 +204,12 @@ export class ToolsViewProvider extends BaseViewProvider {
     if (answer !== "YES") {
       return;
     }
-    const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+    const { ok, message, result } = await workflow<
       RDSBaseDriver,
       string
     >(settings, async (driver) => {
       return await driver.kill(sessionOrPid);
-    });
+    }, true);
     if (ok) {
       if (result) {
         showWindowErrorMessage(result);

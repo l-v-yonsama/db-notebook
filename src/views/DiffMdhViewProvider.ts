@@ -1,6 +1,5 @@
 import {
   createUndoChangeSQL,
-  DBDriverResolver,
   DBType,
   RDSBaseDriver,
   runRuleEngine,
@@ -41,6 +40,7 @@ import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { DiffMdhViewTabParam } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getRdhViewConfig } from "../utilities/configUtil";
+import { workflow } from "../utilities/driverResolver";
 import { createBookFromDiffList } from "../utilities/excelGenerator";
 import { createHtmlFromDiffList } from "../utilities/htmlGenerator";
 import { StateStorage } from "../utilities/StateStorage";
@@ -522,7 +522,7 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             continue;
           }
 
-          const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+          const { ok, message } = await workflow<RDSBaseDriver>(
             setting,
             async (driver) => {
               for (let i = 0; i < beforeList.length; i++) {
@@ -555,7 +555,8 @@ export class DiffMdhViewProvider extends BaseViewProvider {
                 }
                 afterList[i] = afterRdh;
               }
-            }
+            },
+            true
           );
 
           if (!ok) {

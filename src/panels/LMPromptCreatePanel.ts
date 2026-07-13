@@ -1,6 +1,5 @@
 import {
   AwsDatabase,
-  DBDriverResolver,
   isRDSType,
   RDSBaseDriver,
   RdsDatabase,
@@ -27,6 +26,7 @@ import { LMPromptCreatePanelEventData } from "../shared/MessageEventData";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { CellMeta } from "../types/Notebook";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { workflow } from "../utilities/driverResolver";
 import { createPrompt } from "../utilities/lmUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -172,7 +172,7 @@ export class LMPromptCreatePanel extends BasePanel {
 
     if (isRDSType(setting.dbType)) {
       const db = dbs[0] as RdsDatabase;
-      const { ok, result } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+      const { ok, result } = await workflow<RDSBaseDriver>(
         setting,
         async (driver) => {
           return await createPrompt({
@@ -186,7 +186,8 @@ export class LMPromptCreatePanel extends BasePanel {
             withRetrievedExecutionPlan: this.withRetrievedExecutionPlan,
             withJSONResponseFormartForEngine: false,
           });
-        }
+        },
+        true
       );
 
       if (ok && result) {

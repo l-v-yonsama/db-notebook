@@ -2,7 +2,6 @@ import {
   Auth0Database,
   AwsDatabase,
   ConnectionSetting,
-  DBDriverResolver,
   DBType,
   DbDatabase,
   DbDynamoTable,
@@ -25,6 +24,7 @@ import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
 import { showStatusMessage } from "../statusBar";
 import { SQLHistory } from "../types/SQLHistory";
+import { workflow } from "./driverResolver";
 import { log } from "./logger";
 
 const uid = new ShortUniqueId();
@@ -116,9 +116,10 @@ export class StateStorage {
       this.resMap.set(connectionName, resInfo);
     }
 
-    const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
+    const { ok, message, result } = await workflow(
       conRes,
-      async (driver) => await driver.getInfomationSchemas()
+      async (driver) => await driver.getInfomationSchemas(),
+      reload
     );
 
     if (ok && result) {

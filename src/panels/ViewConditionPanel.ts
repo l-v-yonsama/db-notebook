@@ -1,6 +1,5 @@
 import {
   BaseSQLSupportDriver,
-  DBDriverResolver,
   DbDynamoTable,
   DbTable,
   toDeleteStatement,
@@ -38,6 +37,7 @@ import { CellMeta } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
+import { createSQLSupportDriver, workflow } from "../utilities/driverResolver";
 import { log, logError } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -145,7 +145,7 @@ export class ViewConditionPanel extends BasePanel {
     if (!setting) {
       return "";
     }
-    const driver = DBDriverResolver.getInstance().createSQLSupportDriver(setting);
+    const driver = await createSQLSupportDriver(setting, true);
     const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
     const isLimitAsTop = driver.isLimitAsTop();
@@ -255,7 +255,7 @@ export class ViewConditionPanel extends BasePanel {
       return;
     }
 
-    const { ok, message, result } = await DBDriverResolver.getInstance().workflow<
+    const { ok, message, result } = await workflow<
       BaseSQLSupportDriver,
       ResultSetData
     >(setting, async (driver) => {
@@ -285,10 +285,10 @@ export class ViewConditionPanel extends BasePanel {
           editable,
         },
       });
-    });
+    }, true);
 
     if (ok && result) {
-      const driver = DBDriverResolver.getInstance().createSQLSupportDriver(setting);
+      const driver = await createSQLSupportDriver(setting, true);
 
       const { query, binds } = toViewDataQuery({
         tableRes,
@@ -353,7 +353,7 @@ export class ViewConditionPanel extends BasePanel {
         cancellable: true,
       },
       async (progress, token) => {
-        return await DBDriverResolver.getInstance().workflow<BaseSQLSupportDriver>(
+        return await workflow<BaseSQLSupportDriver>(
           setting,
           async (driver) => {
             const toPositionedParameter = driver.isPositionedParameterAvailable();
@@ -495,7 +495,8 @@ export class ViewConditionPanel extends BasePanel {
             if (errorMessage) {
               throw new Error(errorMessage);
             }
-          }
+          },
+          true
         );
       }
     );

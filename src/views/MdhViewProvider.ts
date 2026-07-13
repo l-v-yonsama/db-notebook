@@ -1,5 +1,4 @@
 import {
-  DBDriverResolver,
   RDSBaseDriver,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -23,6 +22,7 @@ import { DiffMdhViewTabParam, MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { copyToClipboard } from "../utilities/clipboardUtil";
 import { getRdhViewConfig } from "../utilities/configUtil";
+import { workflow } from "../utilities/driverResolver";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
 import { log } from "../utilities/logger";
@@ -325,7 +325,7 @@ export class MdhViewProvider extends BaseViewProvider {
             continue;
           }
 
-          const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+          const { ok, message } = await workflow<RDSBaseDriver>(
             setting,
             async (driver) => {
               for (let i = 0; i < beforeList.length; i++) {
@@ -358,7 +358,8 @@ export class MdhViewProvider extends BaseViewProvider {
                 }
                 afterList[i] = afterRdh;
               }
-            }
+            },
+            true
           );
 
           if (!ok) {
@@ -397,7 +398,7 @@ export class MdhViewProvider extends BaseViewProvider {
         continue;
       }
 
-      const { ok, message } = await DBDriverResolver.getInstance().workflow<RDSBaseDriver>(
+      const { ok, message } = await workflow<RDSBaseDriver>(
         setting,
         async (driver) => {
           for (let i = 0; i < tabItem.list.length; i++) {
@@ -425,7 +426,8 @@ export class MdhViewProvider extends BaseViewProvider {
 
             tabItem.list[i] = newRdh;
           }
-        }
+        },
+        true
       );
 
       if (!ok) {

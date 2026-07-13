@@ -63,6 +63,10 @@ const sqlServerAuthenticationTypeItems: DropdownItem[] = [
     value: "azure-active-directory-service-principal-secret",
   },
   {
+    label: "AAD Access Token (Interactive)", 
+    value: "azure-active-directory-access-token"
+  },
+  {
     label: "Azure AD MsiVm",
     value: "azure-active-directory-msi-vm",
   },
@@ -618,7 +622,7 @@ defineExpose({
         {{ sqlServerAuthenticationType }}
       </p>
       <VsCodeDropdown v-else v-show="elmSettings.getSqlServerAuthenticationType().visible" id="authenticationType"
-        v-model="sqlServerAuthenticationType" :items="sqlServerAuthenticationTypeItems"></VsCodeDropdown>
+        v-model="sqlServerAuthenticationType" :items="sqlServerAuthenticationTypeItems" :width="185"></VsCodeDropdown>
 
       <!-- PROTOCOL -->
       <label v-if="elmSettings.getProtocol().visible" for="protocol">{{ elmSettings.getProtocol().label }}</label>
@@ -733,15 +737,15 @@ defineExpose({
 
       <!-- SQL Server -->
       <div v-if="dbType === 'SQLServer'" class="sql-server">
-        <label v-if="isShowMode" for="encryption">Encryption</label>
-        <p v-if="isShowMode" id="encryption">{{ isSqlServerEncrypt }}</p>
-        <vscode-checkbox id="encryption" v-if="!isShowMode" :checked="isSqlServerEncrypt"
+        <label v-if="isShowMode && elmSettings.getSqlServerEncryption().visible" for="encryption">Encryption</label>
+        <p v-if="isShowMode && elmSettings.getSqlServerEncryption().visible" id="encryption">{{ isSqlServerEncrypt }}</p>
+        <vscode-checkbox id="encryption" v-if="!isShowMode && elmSettings.getSqlServerEncryption().visible" :checked="isSqlServerEncrypt"
           @change="($e: InputEvent) => handleIsSqlServerEncrypt($e)" style="margin-right: auto">Use
           encrypt</vscode-checkbox>
 
-        <label v-if="isShowMode" for="trustServerCertificate">TrustServerCertificate</label>
-        <p v-if="isShowMode" id="trustServerCertificate">{{ isSqlServerTrustServerCertificate }}</p>
-        <vscode-checkbox id="trustServerCertificate" v-if="!isShowMode" :checked="isSqlServerTrustServerCertificate"
+        <label v-if="isShowMode && elmSettings.getSqlServerTrustServerCertificate().visible" for="trustServerCertificate">TrustServerCertificate</label>
+        <p v-if="isShowMode && elmSettings.getSqlServerTrustServerCertificate().visible" id="trustServerCertificate">{{ isSqlServerTrustServerCertificate }}</p>
+        <vscode-checkbox id="trustServerCertificate" v-if="!isShowMode && elmSettings.getSqlServerTrustServerCertificate().visible" :checked="isSqlServerTrustServerCertificate"
           @change="($e: InputEvent) => handleIsSqlServerTrustServerCertificate($e)" style="margin-right: auto">Trust
           server
           certificate</vscode-checkbox>

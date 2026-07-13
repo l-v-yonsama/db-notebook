@@ -1,5 +1,4 @@
 import {
-  DBDriverResolver,
   DbConnection,
   DbResource,
   ResourceType,
@@ -11,6 +10,7 @@ import { ComponentName } from "./shared/ComponentName";
 import { DBFormEventData } from "./shared/MessageEventData";
 import { ModeType } from "./shared/ModeType";
 import { showWindowErrorMessage } from "./utilities/alertUtil";
+import { createDriver } from "./utilities/driverResolver";
 import { log } from "./utilities/logger";
 import { StateStorage } from "./utilities/StateStorage";
 import { createWebviewContent } from "./utilities/webviewUtil";
@@ -97,8 +97,8 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           break;
         case "testConnectionSetting":
           {
-            log(`Test connection ${params.dbType}`);
-            const driver = DBDriverResolver.getInstance().createDriver(params);
+            log(`${PREFIX} Test connection ${params.dbType}`);
+            const driver = await createDriver(params, true);
             const message = await driver.test(true);
             if (message) {
               showWindowErrorMessage(message);
