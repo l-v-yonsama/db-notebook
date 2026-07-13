@@ -25,5 +25,25 @@
     {
       "text": "時として人間らしく喜怒哀楽を表現します。"
     },
-  ]
+  ],
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#b8e5c3",
+    "activityBar.background": "#b8e5c3",
+    "activityBar.foreground": "#15202b",
+    "activityBar.inactiveForeground": "#15202b99",
+    "activityBarBadge.background": "#9c8ad4",
+    "activityBarBadge.foreground": "#15202b",
+    "commandCenter.border": "#15202b99",
+    "sash.hoverBorder": "#b8e5c3",
+    "statusBar.background": "#92d8a3",
+    "statusBar.foreground": "#15202b",
+    "statusBarItem.hoverBackground": "#6ccb83",
+    "statusBarItem.remoteBackground": "#92d8a3",
+    "statusBarItem.remoteForeground": "#15202b",
+    "titleBar.activeBackground": "#92d8a3",
+    "titleBar.activeForeground": "#15202b",
+    "titleBar.inactiveBackground": "#92d8a399",
+    "titleBar.inactiveForeground": "#15202b99"
+  },
+  "peacock.color": "#92d8a3"
 }
