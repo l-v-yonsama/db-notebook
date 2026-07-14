@@ -227,103 +227,150 @@ function createQueryResultSheet(
   let plusNo = 0;
   const outputCondig = getOutputConfig();
 
-  const { tableName, comment, ruleViolationSummary } = rdh.meta;
-  // table name / comment
+  if (outputCondig.excel.displayTableNameAndStatement) {
+    plusNo += writeTitleAndSqlStatementSection(sheet, rdh, baseRowNo + plusNo, {
+      sqlStatementLabel: options?.sqlStatementLabel,
+    });
+  }
+
+  if (rdh.meta.ruleViolationSummary) {
+    plusNo += writeRuleViolationSummarySection(
+      sheet,
+      rdh.meta.ruleViolationSummary,
+      baseRowNo + plusNo
+    );
+  }
+
+  plusNo += writeHeaderSection(sheet, rdh, baseRowNo + plusNo, rdhConfig);
+
+  plusNo += writeDataRowsSection(book, sheet, rdh, baseRowNo + plusNo, rdhConfig, options);
+
+  return plusNo;
+}
+
+// table name / comment / sql statement / binds
+function writeTitleAndSqlStatementSection(
+  sheet: Excel.Worksheet,
+  rdh: ResultSetData,
+  baseRowNo: number,
+  options?: {
+    sqlStatementLabel?: string;
+  }
+): number {
+  let plusNo = 0;
+  const { tableName, comment } = rdh.meta;
+
   let cell = sheet.getCell(baseRowNo, 2);
   let titleValue = tableName;
   if (comment) {
     titleValue += ` (${comment})`;
   }
-  if (outputCondig.excel.displayTableNameAndStatement) {
-    cell.value = "■ " + titleValue;
+  cell.value = "■ " + titleValue;
+  plusNo++;
+
+  // sql statement
+  if (rdh.sqlStatement) {
     plusNo++;
-
-    // sql statement
-    if (rdh.sqlStatement) {
-      plusNo++;
-      const lines = rdh.sqlStatement
-        .trim()
-        .replace(/\r\n|\r/g, "\n")
-        .split("\n");
-      cell = sheet.getCell(baseRowNo + plusNo, 2);
-      cell.value = options?.sqlStatementLabel ? options.sqlStatementLabel : "SQL";
-      setTableHeaderCell(cell);
-      sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + lines.length - 1}`);
-      lines.forEach((line) => {
-        cell = sheet.getCell(baseRowNo + plusNo, 3);
-        cell.value = line;
-        plusNo++;
-      });
-      if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
-        cell = sheet.getCell(baseRowNo + plusNo, 2);
-        cell.value = "BINDS";
-        setTableHeaderCell(cell);
-        // テーブル見出しの行分もマージするので -1 は不要
-        sheet.mergeCells(
-          `B${baseRowNo + plusNo}:B${baseRowNo + plusNo + rdh.queryConditions?.binds.length}`
-        );
-
-        cell = sheet.getCell(baseRowNo + plusNo, 3);
-        cell.value = "Position";
-        setTableHeaderCell(cell);
-        cell = sheet.getCell(baseRowNo + plusNo, 4);
-        cell.value = "Value";
-        setTableHeaderCell(cell);
-        plusNo++;
-        rdh.queryConditions?.binds.forEach((v, idx) => {
-          cell = sheet.getCell(baseRowNo + plusNo, 3);
-          cell.value = `$${idx + 1}`;
-          cell = sheet.getCell(baseRowNo + plusNo, 4);
-          cell.value = v;
-          plusNo++;
-        });
-      }
-      plusNo++;
-    }
-  }
-
-  if (ruleViolationSummary) {
-    const names = Object.keys(ruleViolationSummary);
+    const lines = rdh.sqlStatement
+      .trim()
+      .replace(/\r\n|\r/g, "\n")
+      .split("\n");
     cell = sheet.getCell(baseRowNo + plusNo, 2);
+    cell.value = options?.sqlStatementLabel ? options.sqlStatementLabel : "SQL";
     setTableHeaderCell(cell);
-    if (names.length === 1) {
-      cell.value = `Rule violation`;
-      sheet.mergeCells(`B${baseRowNo + plusNo}:C${baseRowNo + plusNo}`);
-    } else {
-      cell.value = `Rule violations`;
-      sheet.mergeCells(`B${baseRowNo + plusNo}:C${baseRowNo + plusNo + names.length - 1}`);
-    }
-    names.forEach((name, idx) => {
-      cell = sheet.getCell(baseRowNo + plusNo, 4);
-      cell.value = `*${idx + 1}: ${name}: ${ruleViolationSummary[name]}`;
+    sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + lines.length - 1}`);
+    lines.forEach((line) => {
+      cell = sheet.getCell(baseRowNo + plusNo, 3);
+      cell.value = line;
       plusNo++;
     });
+    if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
+      cell = sheet.getCell(baseRowNo + plusNo, 2);
+      cell.value = "BINDS";
+      setTableHeaderCell(cell);
+      // テーブル見出しの行分もマージするので -1 は不要
+      sheet.mergeCells(
+        `B${baseRowNo + plusNo}:B${baseRowNo + plusNo + rdh.queryConditions?.binds.length}`
+      );
+
+      cell = sheet.getCell(baseRowNo + plusNo, 3);
+      cell.value = "Position";
+      setTableHeaderCell(cell);
+      cell = sheet.getCell(baseRowNo + plusNo, 4);
+      cell.value = "Value";
+      setTableHeaderCell(cell);
+      plusNo++;
+      rdh.queryConditions?.binds.forEach((v, idx) => {
+        cell = sheet.getCell(baseRowNo + plusNo, 3);
+        cell.value = `$${idx + 1}`;
+        cell = sheet.getCell(baseRowNo + plusNo, 4);
+        cell.value = v;
+        plusNo++;
+      });
+    }
     plusNo++;
   }
 
-  // resulet set
+  return plusNo;
+}
+
+// rule violation summary
+function writeRuleViolationSummarySection(
+  sheet: Excel.Worksheet,
+  ruleViolationSummary: Record<string, number>,
+  baseRowNo: number
+): number {
+  let plusNo = 0;
+  const names = Object.keys(ruleViolationSummary);
+  let cell = sheet.getCell(baseRowNo, 2);
+  setTableHeaderCell(cell);
+  if (names.length === 1) {
+    cell.value = `Rule violation`;
+    sheet.mergeCells(`B${baseRowNo}:C${baseRowNo}`);
+  } else {
+    cell.value = `Rule violations`;
+    sheet.mergeCells(`B${baseRowNo}:C${baseRowNo + names.length - 1}`);
+  }
+  names.forEach((name, idx) => {
+    cell = sheet.getCell(baseRowNo + plusNo, 4);
+    cell.value = `*${idx + 1}: ${name}: ${ruleViolationSummary[name]}`;
+    plusNo++;
+  });
+  plusNo++;
+
+  return plusNo;
+}
+
+// column name / comment / type header row(s)
+function writeHeaderSection(
+  sheet: Excel.Worksheet,
+  rdh: ResultSetData,
+  baseRowNo: number,
+  rdhConfig: ResultsetConfigType
+): number {
+  let plusNo = 0;
   const { displayRowno } = rdhConfig;
 
   if (displayRowno) {
-    cell = sheet.getCell(baseRowNo + plusNo, 2);
+    const cell = sheet.getCell(baseRowNo, 2);
     cell.value = "No";
     setTableHeaderCell(cell);
   }
 
   rdh.keys.forEach((column: RdhKey, idx: number) => {
     let colBasePos = displayRowno ? 3 : 2;
-    const cellPhy = sheet.getCell(baseRowNo + plusNo, colBasePos + idx);
+    const cellPhy = sheet.getCell(baseRowNo, colBasePos + idx);
     cellPhy.value = column.name;
     setTableHeaderCell(cellPhy);
 
     if (rdhConfig.header.displayComment) {
-      const cellLog = sheet.getCell(baseRowNo + plusNo + 1, colBasePos + idx);
+      const cellLog = sheet.getCell(baseRowNo + 1, colBasePos + idx);
       cellLog.value = column.comment;
       setTableHeaderCell(cellLog);
     }
     if (rdhConfig.header.displayType) {
       const cellType = sheet.getCell(
-        baseRowNo + plusNo + (rdhConfig.header.displayComment ? 2 : 1),
+        baseRowNo + (rdhConfig.header.displayComment ? 2 : 1),
         colBasePos + idx
       );
       cellType.value = EnumValues.getNameFromValue(GeneralColumnType, column.type);
@@ -332,17 +379,38 @@ function createQueryResultSheet(
   });
   if (rdhConfig.header.displayComment && rdhConfig.header.displayType) {
     if (displayRowno) {
-      sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 2}`);
+      sheet.mergeCells(`B${baseRowNo}:B${baseRowNo + 2}`);
     }
     plusNo += 3;
   } else if (rdhConfig.header.displayComment || rdhConfig.header.displayType) {
     if (displayRowno) {
-      sheet.mergeCells(`B${baseRowNo + plusNo}:B${baseRowNo + plusNo + 1}`);
+      sheet.mergeCells(`B${baseRowNo}:B${baseRowNo + 1}`);
     }
     plusNo += 2;
   } else {
     plusNo += 1;
   }
+
+  return plusNo;
+}
+
+// data rows (or "No records.")
+function writeDataRowsSection(
+  book: Excel.Workbook,
+  sheet: Excel.Worksheet,
+  rdh: ResultSetData,
+  baseRowNo: number,
+  rdhConfig: ResultsetConfigType,
+  options?: {
+    adjustRow?: {
+      maxRowCount: number;
+      calcKeys: string[];
+    };
+  }
+): number {
+  let plusNo = 0;
+  const { displayRowno } = rdhConfig;
+  const { ruleViolationSummary } = rdh.meta;
 
   if (rdh.rows.length > 0) {
     rdh.rows.forEach((rdhRow, ri: number) => {
