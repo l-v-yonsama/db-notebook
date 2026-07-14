@@ -1,5 +1,5 @@
 import { DBType, runRuleEngine } from "@l-v-yonsama/multi-platform-database-drivers";
-import { resolveCodeLabel, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
+import { resolveCodeLabel, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import {
   CancellationTokenSource,
   commands,
@@ -18,7 +18,12 @@ import {
   WorkspaceEdit,
 } from "vscode";
 import { NOTEBOOK_TYPE, OPEN_CHARTS_VIEWER, REFRESH_SQL_HISTORIES } from "../constant";
-import type { RunResultMetadata } from "../shared/RunResultMetadata";
+import type {
+  JSONCellValues,
+  MqttPublishResult,
+  NodeRunAxiosEvent,
+  RunResultMetadata,
+} from "../shared/RunResultMetadata";
 import { CellMeta, LMEvaluateTarget, RunResult, SQLMode } from "../types/Notebook";
 import { ChartsViewParams } from "../types/views";
 import {
@@ -446,131 +451,26 @@ export class MainController {
         } = metadata;
 
         if (rdh) {
-          rdh.meta["languageId"] = cell.document.languageId;
-          const toMarkdownConfig = getToStringParamByConfig({
-            maxPrintLines: getResultsetConfig().maxRowsInPreview,
-            maxCellValueLength: getResultsetConfig().maxCharactersInCell,
-            withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
-            withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
-          });
-          const title = rdh.meta.command ? "Command Result" : "Query Result";
-          outputs.push(
-            new NotebookCellOutput(
-              [
-                NotebookCellOutputItem.text(
-                  `\`[${title}]\` ${rdh.summary?.info}\n` +
-                    ResultSetDataBuilder.from(rdh).toMarkdown(toMarkdownConfig),
-                  "text/markdown"
-                ),
-              ],
-              metadata
-            )
-          );
-          if (cellMeta && cellMeta.chart) {
-            const commandParam: ChartsViewParams = { ...cellMeta.chart, rdh };
-            commands.executeCommand(OPEN_CHARTS_VIEWER, commandParam);
-          }
+          outputs.push(this.buildRdhOutput(rdh, cell, cellMeta, metadata));
+          this.notifyChartsViewerIfNeeded(rdh, cellMeta);
         }
-
         if (explainRdh) {
-          const md = ResultSetDataBuilder.from(explainRdh).toMarkdown(
-            getToStringParamByConfig({
-              maxPrintLines: getResultsetConfig().maxRowsInPreview,
-              maxCellValueLength: getResultsetConfig().maxCharactersInCell,
-              withComment: true,
-              withRowNo: false,
-            })
-          );
-
-          outputs.push(
-            new NotebookCellOutput(
-              [NotebookCellOutputItem.text(`\`[Explain plan]\`\n${md}`, "text/markdown")],
-              metadata
-            )
-          );
+          outputs.push(this.buildExplainRdhOutput(explainRdh, metadata));
         }
         if (analyzedRdh) {
-          const md = ResultSetDataBuilder.from(analyzedRdh).toMarkdown(
-            getToStringParamByConfig({
-              maxPrintLines: getResultsetConfig().maxRowsInPreview,
-              maxCellValueLength: getResultsetConfig().maxCharactersInCell,
-              withComment: false,
-              withRowNo: false,
-            })
-          );
-
-          outputs.push(
-            new NotebookCellOutput(
-              [NotebookCellOutputItem.text(`\`[Explain analyze]\`\n${md}`, "text/markdown")],
-              metadata
-            )
-          );
+          outputs.push(this.buildAnalyzedRdhOutput(analyzedRdh, metadata));
         }
         if (axiosEvent) {
-          outputs.push(
-            new NotebookCellOutput(
-              [
-                NotebookCellOutputItem.text(
-                  createResponseBodyMarkdown(axiosEvent),
-                  "text/markdown"
-                ),
-              ],
-              metadata
-            )
-          );
+          outputs.push(this.buildAxiosEventOutput(axiosEvent, metadata));
         }
         if (mqttPublishResult) {
-          outputs.push(
-            new NotebookCellOutput(
-              [
-                NotebookCellOutputItem.text(
-                  createMqttPublishResultMarkdownText(mqttPublishResult),
-                  "text/markdown"
-                ),
-              ],
-              metadata
-            )
-          );
+          outputs.push(this.buildMqttPublishResultOutput(mqttPublishResult, metadata));
         }
-
         if (lmResult && lmResult.markdownText) {
-          outputs.push(
-            new NotebookCellOutput(
-              [NotebookCellOutputItem.text(lmResult.markdownText, "text/markdown")],
-              metadata
-            )
-          );
+          outputs.push(this.buildLmResultOutput(lmResult.markdownText, metadata));
         }
-
         if (updateJSONCellValues) {
-          for (const updateJsonCell of updateJSONCellValues) {
-            const { cellIndex, replaceAll, data } = updateJsonCell;
-            const jsonCells = notebook.getCells().filter((it) => isJsonValueCell(it));
-            if (cellIndex < jsonCells.length) {
-              const jsonCell = jsonCells[cellIndex];
-              const doc = jsonCell.document;
-              const st = doc.positionAt(0);
-              const ed = doc.positionAt(doc.getText().length);
-              const range = new Range(st, ed);
-
-              let edit;
-              if (replaceAll) {
-                edit = new TextEdit(range, JSON.stringify(data, null, 2));
-              } else {
-                const jsonObj = JSON.parse(doc.getText());
-                Object.keys(data).forEach((key) => {
-                  jsonObj[key] = data[key];
-                });
-                edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
-              }
-
-              var formatEdit = new WorkspaceEdit();
-              formatEdit.set(doc.uri, [edit]);
-              await workspace.applyEdit(formatEdit);
-            } else {
-              throw new Error(`JSON cell index[${cellIndex}] is out of range[${jsonCells.length}]`);
-            }
-          }
+          await this.applyJsonCellValueUpdates(notebook, updateJSONCellValues);
         }
       }
     } catch (err) {
@@ -604,6 +504,143 @@ export class MainController {
         status,
         metadata,
       });
+    }
+  }
+
+  private buildRdhOutput(
+    rdh: ResultSetData,
+    cell: NotebookCell,
+    cellMeta: CellMeta,
+    metadata: RunResultMetadata
+  ): NotebookCellOutput {
+    rdh.meta["languageId"] = cell.document.languageId;
+    const toMarkdownConfig = getToStringParamByConfig({
+      maxPrintLines: getResultsetConfig().maxRowsInPreview,
+      maxCellValueLength: getResultsetConfig().maxCharactersInCell,
+      withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
+      withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
+    });
+    const title = rdh.meta.command ? "Command Result" : "Query Result";
+    return new NotebookCellOutput(
+      [
+        NotebookCellOutputItem.text(
+          `\`[${title}]\` ${rdh.summary?.info}\n` +
+            ResultSetDataBuilder.from(rdh).toMarkdown(toMarkdownConfig),
+          "text/markdown"
+        ),
+      ],
+      metadata
+    );
+  }
+
+  private notifyChartsViewerIfNeeded(rdh: ResultSetData, cellMeta: CellMeta): void {
+    if (cellMeta && cellMeta.chart) {
+      const commandParam: ChartsViewParams = { ...cellMeta.chart, rdh };
+      commands.executeCommand(OPEN_CHARTS_VIEWER, commandParam);
+    }
+  }
+
+  private buildExplainRdhOutput(
+    explainRdh: ResultSetData,
+    metadata: RunResultMetadata
+  ): NotebookCellOutput {
+    const md = ResultSetDataBuilder.from(explainRdh).toMarkdown(
+      getToStringParamByConfig({
+        maxPrintLines: getResultsetConfig().maxRowsInPreview,
+        maxCellValueLength: getResultsetConfig().maxCharactersInCell,
+        withComment: true,
+        withRowNo: false,
+      })
+    );
+    return new NotebookCellOutput(
+      [NotebookCellOutputItem.text(`\`[Explain plan]\`\n${md}`, "text/markdown")],
+      metadata
+    );
+  }
+
+  private buildAnalyzedRdhOutput(
+    analyzedRdh: ResultSetData,
+    metadata: RunResultMetadata
+  ): NotebookCellOutput {
+    const md = ResultSetDataBuilder.from(analyzedRdh).toMarkdown(
+      getToStringParamByConfig({
+        maxPrintLines: getResultsetConfig().maxRowsInPreview,
+        maxCellValueLength: getResultsetConfig().maxCharactersInCell,
+        withComment: false,
+        withRowNo: false,
+      })
+    );
+    return new NotebookCellOutput(
+      [NotebookCellOutputItem.text(`\`[Explain analyze]\`\n${md}`, "text/markdown")],
+      metadata
+    );
+  }
+
+  private buildAxiosEventOutput(
+    axiosEvent: NodeRunAxiosEvent,
+    metadata: RunResultMetadata
+  ): NotebookCellOutput {
+    return new NotebookCellOutput(
+      [NotebookCellOutputItem.text(createResponseBodyMarkdown(axiosEvent), "text/markdown")],
+      metadata
+    );
+  }
+
+  private buildMqttPublishResultOutput(
+    mqttPublishResult: MqttPublishResult,
+    metadata: RunResultMetadata
+  ): NotebookCellOutput {
+    return new NotebookCellOutput(
+      [
+        NotebookCellOutputItem.text(
+          createMqttPublishResultMarkdownText(mqttPublishResult),
+          "text/markdown"
+        ),
+      ],
+      metadata
+    );
+  }
+
+  private buildLmResultOutput(
+    markdownText: string,
+    metadata: RunResultMetadata
+  ): NotebookCellOutput {
+    return new NotebookCellOutput(
+      [NotebookCellOutputItem.text(markdownText, "text/markdown")],
+      metadata
+    );
+  }
+
+  private async applyJsonCellValueUpdates(
+    notebook: NotebookDocument,
+    updateJSONCellValues: JSONCellValues[]
+  ): Promise<void> {
+    for (const updateJsonCell of updateJSONCellValues) {
+      const { cellIndex, replaceAll, data } = updateJsonCell;
+      const jsonCells = notebook.getCells().filter((it) => isJsonValueCell(it));
+      if (cellIndex >= jsonCells.length) {
+        throw new Error(`JSON cell index[${cellIndex}] is out of range[${jsonCells.length}]`);
+      }
+      const jsonCell = jsonCells[cellIndex];
+      const doc = jsonCell.document;
+      const st = doc.positionAt(0);
+      const ed = doc.positionAt(doc.getText().length);
+      const range = new Range(st, ed);
+
+      let edit;
+      if (replaceAll) {
+        edit = new TextEdit(range, JSON.stringify(data, null, 2));
+      } else {
+        const jsonObj = JSON.parse(doc.getText());
+        Object.keys(data).forEach((key) => {
+          jsonObj[key] = data[key];
+        });
+        edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
+      }
+
+      const formatEdit = new WorkspaceEdit();
+      formatEdit.set(doc.uri, [edit]);
+      await workspace.applyEdit(formatEdit);
     }
   }
 
