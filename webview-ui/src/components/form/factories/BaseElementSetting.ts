@@ -63,6 +63,10 @@ export abstract class BaseElementSetting {
     return { visible: false };
   }
 
+  getReadOnly(): ElementSetting {
+    return { visible: false };
+  }
+
   getResourceFilters(): ElementSetting {
     return { visible: false };
   }

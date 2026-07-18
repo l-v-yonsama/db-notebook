@@ -165,7 +165,7 @@ export type TestConnectionSettingActionCommand = {
 export type SaveConnectionSettingActionCommand = {
   command: "saveConnectionSetting";
   mode: ModeType;
-  params: ConnectionSetting;
+  params: ConnectionSetting & { mcpEnabled?: boolean };
 };
 
 export type CancelActionCommand = BaseActionCommand<"cancel">;
@@ -336,6 +336,7 @@ export type SearchScanPanelParams = {
   startTime?: any;
   endTime?: any;
   resourceType: ResourceType;
+  matchType?: "exact" | "partial";
   execComparativeProcess?: boolean;
 };
 

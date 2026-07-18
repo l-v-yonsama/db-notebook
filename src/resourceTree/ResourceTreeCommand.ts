@@ -234,6 +234,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       const message = await manager.connect();
       conRes.isInProgress = false;
       if (message) {
+        dbResourceTree.changeConnectionTreeData(conRes);
         showWindowErrorMessage(message);
         return;
       }
@@ -256,6 +257,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       }
       conRes.isConnected = true;
     } catch (e) {
+      dbResourceTree.changeConnectionTreeData(conRes);
       showWindowErrorMessage(e);
       conRes.isInProgress = false;
     }

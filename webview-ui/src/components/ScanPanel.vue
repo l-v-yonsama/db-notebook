@@ -124,7 +124,7 @@ function search() {
     return;
   }
   inProgress.value = true;
-  const { tabId, limit, jsonExpansion, keyword, startDt, endDt } = tabItem;
+  const { tabId, limit, jsonExpansion, keyword, matchType, startDt, endDt } = tabItem;
 
   let resourceType = tabItem.resourceType.value;
   if (tabItem.resourceType.visible) {
@@ -138,6 +138,7 @@ function search() {
       limit: limit.visible ? toNum(limit.value) : undefined,
       jsonExpansion: jsonExpansion.visible ? jsonExpansion.value === true : undefined,
       keyword: keyword.visible ? keyword.value : undefined,
+      matchType: matchType.visible ? matchType.value : undefined,
       startTime: toIso8601String(startDt, true),
       endTime: toIso8601String(endDt, false),
       resourceType,
@@ -371,7 +372,7 @@ const compare = (): void => {
   }
 
   inProgress.value = true;
-  const { tabId, limit, jsonExpansion, keyword, startDt, endDt } = tabItem;
+  const { tabId, limit, jsonExpansion, keyword, matchType, startDt, endDt } = tabItem;
 
   let resourceType = tabItem.resourceType.value;
   if (tabItem.resourceType.visible) {
@@ -385,6 +386,7 @@ const compare = (): void => {
       limit: limit.visible ? toNum(limit.value) : undefined,
       jsonExpansion: jsonExpansion.visible ? jsonExpansion.value === true : undefined,
       keyword: keyword.visible ? keyword.value : undefined,
+      matchType: matchType.visible ? matchType.value : undefined,
       startTime: toIso8601String(startDt, true),
       endTime: toIso8601String(endDt, false),
       resourceType,
@@ -458,6 +460,10 @@ defineExpose({
               <label v-if="tabItem.resourceType.visible" for="resource-type">Resource</label>
               <VsCodeRadioGroupVue v-if="tabItem.resourceType.visible" id="resource-type"
                 v-model="tabItem.resourceType.value" :items="tabItem.resourceType.items" style="z-index: 15" />
+
+              <label v-if="tabItem.matchType.visible" for="match-type">Match</label>
+              <VsCodeRadioGroupVue v-if="tabItem.matchType.visible" id="match-type"
+                v-model="tabItem.matchType.value" :items="tabItem.matchType.items" style="z-index: 15" />
 
               <label v-if="tabItem.startDt.visible" for="startTime">{{
                 tabItem.startDt.label

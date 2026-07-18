@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "0.12.1",
+  "version": "1.0.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -51,7 +51,8 @@
     "virtualWorkspaces": true
   },
   "activationEvents": [
-    "onNotebook:database-notebook-type"
+    "onNotebook:database-notebook-type",
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -1399,6 +1400,395 @@
         ],
         "url": "./node_modules/@l-v-yonsama/multi-platform-database-drivers/built/schema/log-parse-config.schema.json"
       }
+    ],
+    "languageModelTools": [
+      {
+        "name": "database-notebook_testConnection",
+        "toolReferenceName": "testDbConnection",
+        "displayName": "Test Database Connection",
+        "modelDescription": "Performs a live network connectivity test against a specific named database connection saved in Database Notebook's DB Explorer, by actually attempting to connect right now. Use this tool whenever the user asks things like 'is connection X reachable/working/up?', 'can I connect to X?', 'test/check/verify/troubleshoot the X connection' for any connection managed by Database Notebook (.dbn files, MySQL/PostgreSQL/SQL Server/SQLite/Redis/etc.). This performs a real, live check -- do not answer from static analysis of files or guesses, call this tool to get the current, authoritative answer. Requires the exact saved connection name; if the given name doesn't match, the tool returns the list of valid connection names instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+        "userDescription": "Tests whether a saved Database Notebook connection can connect.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(plug)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionName": {
+              "type": "string",
+              "description": "The exact name of the connection as configured in Database Notebook's DB Explorer."
+            }
+          },
+          "required": [
+            "connectionName"
+          ]
+        }
+      },
+      {
+        "name": "database-notebook_listConnections",
+        "toolReferenceName": "listDbConnections",
+        "displayName": "List Database Connections",
+        "modelDescription": "Lists the database connections configured in Database Notebook that are allowed for AI tool access: name, database/resource type, environment label (e.g. local/development/staging/production, if set), an optional free-text description of what the connection is for, and a short type-specific detail (e.g. which AWS services -- DynamoDB, S3, CloudWatch Logs, SQS, SES -- an AWS connection is configured for, the protocol for an MQTT connection, or whether a SQL connection (MySQL/PostgreSQL/SQL Server/SQLite) is marked read-only -- for SQL Server this is only a routing hint, not an enforced guarantee, so write attempts can still succeed there). No credentials are included. Use this when the user asks what connections exist, which databases/services they can use, what a given connection is configured for, which one is the local/dev/production one, or asks a question like 'which connection was it again?' before using another Database Notebook tool such as checking connectivity or running a query. A connection marked read-only will reject write/DDL statements (except the SQL Server hint-only case above) -- prefer it for read-heavy tasks and avoid it, or warn the user, before attempting writes.",
+        "userDescription": "Lists the Database Notebook connections available to AI tools.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-unordered)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "database-notebook_getSchema",
+        "toolReferenceName": "getDbSchema",
+        "displayName": "Get Database Schema",
+        "modelDescription": "Returns schema or resource information for a connection managed by Database Notebook, in a format appropriate to its type. For a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite): the CREATE TABLE DDL (columns, types, primary/foreign keys, comments) for a table, or all tables -- optionally narrow with schemaName and/or tableName. For an AWS connection: the configured resources -- S3 bucket names, SQS queue names/URLs, CloudWatch log group names, and DynamoDB table key schemas (partition/sort key, attribute types, GSI/LSI counts) -- optionally narrow with serviceType and/or resourceName. For a Redis connection: each DB index and its key count. For a Memcache connection: key counts per cache tier (hot/warm/cold) and the configured servers. For a Keycloak connection: each realm with user/group counts -- optionally narrow with realmName. For an Auth0 connection: user/organization counts, plus organization/client lists where the connection is configured to retrieve them. For an MQTT connection: the configured topic subscriptions with QoS. All filters are optional and independent; omit any of them to get every match. Use this when the user asks about table/resource structure, columns, relationships, or before writing SQL/inspecting resources against a connection you haven't inspected yet. For searching/browsing individual records or keys within a resource (not just its structure/summary), use scanDbResource instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+        "userDescription": "Gets table structure (DDL) from a SQL connection, resource details from an AWS connection, or a summary (key counts, realms, topics, etc.) from a Redis/Memcache/Keycloak/Auth0/MQTT connection.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-structure)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionName": {
+              "type": "string",
+              "description": "The exact name of the connection as configured in Database Notebook's DB Explorer."
+            },
+            "schemaName": {
+              "type": "string",
+              "description": "SQL connections only. Optional: limit results to tables in a single schema/database. Omit to search every schema."
+            },
+            "tableName": {
+              "type": "string",
+              "description": "SQL connections only. Optional: limit results to a single table name. Omit to get every table."
+            },
+            "serviceType": {
+              "type": "string",
+              "enum": [
+                "S3",
+                "SQS",
+                "SES",
+                "Cloudwatch",
+                "DynamoDB"
+              ],
+              "description": "AWS connections only. Optional: limit results to a single AWS service. Omit to include every configured service."
+            },
+            "resourceName": {
+              "type": "string",
+              "description": "AWS connections only. Optional: limit results to a single bucket/queue/log group/table name. Omit to get every resource."
+            },
+            "realmName": {
+              "type": "string",
+              "description": "Keycloak connections only. Optional: limit results to a single realm name. Omit to get every realm."
+            }
+          },
+          "required": [
+            "connectionName"
+          ]
+        }
+      },
+      {
+        "name": "database-notebook_runQuery",
+        "toolReferenceName": "runDbQuery",
+        "displayName": "Run Database Query",
+        "modelDescription": "Runs a SQL statement against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite) managed by Database Notebook and returns the results. Prefer read-only SELECT/EXPLAIN/SHOW statements. Write/DDL statements (INSERT/UPDATE/DELETE/CREATE/ALTER/DROP/etc.) will always require the user's explicit confirmation before running, and on SQL Server connections every statement requires confirmation regardless of type. Not supported for non-SQL connections (Redis, MQTT, AWS resources, etc.) -- use scanDbResource to search those instead. To run multiple statements as one atomic transaction, use runDbTransaction instead of calling this tool repeatedly. Use getDbSchema first if you don't already know the table structure. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+        "userDescription": "Runs a SQL query against a Database Notebook connection.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(play)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionName": {
+              "type": "string",
+              "description": "The exact name of the connection as configured in Database Notebook's DB Explorer."
+            },
+            "sql": {
+              "type": "string",
+              "description": "The SQL statement to run."
+            }
+          },
+          "required": [
+            "connectionName",
+            "sql"
+          ]
+        }
+      },
+      {
+        "name": "database-notebook_scanResource",
+        "toolReferenceName": "scanDbResource",
+        "displayName": "Scan Database Resource",
+        "modelDescription": "Searches/browses data in a non-SQL connection managed by Database Notebook (Redis, Memcache, Mqtt, Keycloak, Auth0, or AWS S3/SQS/CloudWatch Logs) using resource-specific scan parameters, since these connections cannot run SQL. Not supported for SQL connections (MySQL, PostgreSQL, SQL Server, SQLite) or AWS DynamoDB -- use runDbQuery for SQL connections. Set connectionName and fill in exactly ONE of the nested parameter objects matching the connection's type: redis, memcache, mqtt, awsS3, awsSqs, awsCloudWatchLogGroup, awsCloudWatchLogStream, keycloak, or auth0 -- each object's fields only apply to that connection type, do not mix fields from different objects. Call getDbSchema first if you don't know the connection's exact resource names (bucket/queue/log group/log stream names) or which AWS sub-resource it is, and call listDbConnections first if you don't know the exact connection name. Mqtt scanning requires the connection to already be connected and subscribed to the relevant topics via the MQTT panel -- it does not auto-connect, and returns an error telling you so if it isn't.",
+        "userDescription": "Searches a Redis/Memcache/Mqtt/Keycloak/Auth0/AWS connection using Database Notebook's scan feature.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(search)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionName": {
+              "type": "string",
+              "description": "The exact name of the connection as configured in Database Notebook's DB Explorer."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of results to return. Defaults to the configured default query row limit."
+            },
+            "redis": {
+              "type": "object",
+              "description": "Scan a Redis connection. Use only when connectionName refers to a Redis connection.",
+              "properties": {
+                "dbIndex": {
+                  "type": "number",
+                  "description": "DB index to scan. Defaults to 0."
+                },
+                "keyGlob": {
+                  "type": "string",
+                  "description": "SCAN MATCH glob pattern applied to key names (e.g. \"session:*\"). Defaults to all keys."
+                },
+                "fetchValueLimitSize": {
+                  "type": "number",
+                  "description": "Byte size cap for including a matched key's value in the result."
+                }
+              }
+            },
+            "memcache": {
+              "type": "object",
+              "description": "Scan a Memcache connection. Use only when connectionName refers to a Memcache connection.",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The key name."
+                },
+                "matchType": {
+                  "type": "string",
+                  "enum": ["exact", "partial"],
+                  "description": "'exact': key must equal a key name exactly. 'partial': key is matched as a substring."
+                }
+              },
+              "required": ["key", "matchType"]
+            },
+            "mqtt": {
+              "type": "object",
+              "description": "Scan an Mqtt connection. Use only when connectionName refers to an Mqtt connection. The connection must already be connected and subscribed to the relevant topics via the MQTT panel before scanning.",
+              "properties": {
+                "topicFilter": {
+                  "type": "string",
+                  "description": "Subscription topic filter to scan. Empty/omitted scans across all subscribed topics."
+                },
+                "matchType": {
+                  "type": "string",
+                  "enum": ["exact", "partial"],
+                  "description": "'exact': topicFilter must equal a subscription exactly. 'partial' (default): wildcard/substring match."
+                },
+                "payloadContains": {
+                  "type": "string",
+                  "description": "Substring match against the message payload text."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "Optional ISO 8601 start of a message-timestamp range filter."
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "Optional ISO 8601 end of a message-timestamp range filter."
+                },
+                "jsonExpansion": {
+                  "type": "boolean",
+                  "description": "Expand nested JSON payloads into individual columns. Only applied when a single topic matched."
+                },
+                "fetchValueLimitSize": {
+                  "type": "number",
+                  "description": "Byte size cap for including a message's payload in the result."
+                }
+              }
+            },
+            "awsS3": {
+              "type": "object",
+              "description": "Scan an AWS S3 bucket. Use only when connectionName refers to an AWS connection and the target resource is an S3 bucket.",
+              "properties": {
+                "bucketName": {
+                  "type": "string",
+                  "description": "The S3 bucket name. Call getDbSchema first to find exact bucket names."
+                },
+                "keyPrefix": {
+                  "type": "string",
+                  "description": "Object key prefix filter."
+                },
+                "lastModifiedAfter": {
+                  "type": "string",
+                  "description": "Optional ISO 8601 start of a LastModified range filter."
+                },
+                "lastModifiedBefore": {
+                  "type": "string",
+                  "description": "Optional ISO 8601 end of a LastModified range filter."
+                },
+                "fetchValueLimitSize": {
+                  "type": "number",
+                  "description": "Byte size cap for including an object's body in the result."
+                }
+              },
+              "required": ["bucketName"]
+            },
+            "awsSqs": {
+              "type": "object",
+              "description": "Scan an AWS SQS queue. Use only when connectionName refers to an AWS connection and the target resource is an SQS queue.",
+              "properties": {
+                "queueUrl": {
+                  "type": "string",
+                  "description": "The SQS queue URL. Call getDbSchema first to find exact queue URLs."
+                },
+                "bodyOrMessageIdContains": {
+                  "type": "string",
+                  "description": "Substring match against the message body or messageId."
+                }
+              },
+              "required": ["queueUrl"]
+            },
+            "awsCloudWatchLogGroup": {
+              "type": "object",
+              "description": "Run a CloudWatch Logs Insights query against a log group. Use only when connectionName refers to an AWS connection and the target resource is a CloudWatch log group.",
+              "properties": {
+                "logGroupName": {
+                  "type": "string",
+                  "description": "The CloudWatch log group name. Call getDbSchema first to find exact log group names."
+                },
+                "insightsQuery": {
+                  "type": "string",
+                  "description": "A CloudWatch Logs Insights query string."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "Optional ISO 8601 start of the query's time range."
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "Optional ISO 8601 end of the query's time range."
+                }
+              },
+              "required": ["logGroupName"]
+            },
+            "awsCloudWatchLogStream": {
+              "type": "object",
+              "description": "Scan a single CloudWatch log stream. Use only when connectionName refers to an AWS connection and the target resource is a CloudWatch log stream.",
+              "properties": {
+                "logGroupName": {
+                  "type": "string",
+                  "description": "The parent log group's name."
+                },
+                "logStreamName": {
+                  "type": "string",
+                  "description": "The log stream name. Call getDbSchema first to find exact log stream names."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "Optional ISO 8601 start of a timestamp range filter (there is no end bound)."
+                }
+              },
+              "required": ["logGroupName", "logStreamName"]
+            },
+            "keycloak": {
+              "type": "object",
+              "description": "Scan a Keycloak connection. Use only when connectionName refers to a Keycloak connection.",
+              "properties": {
+                "resourceType": {
+                  "type": "string",
+                  "enum": ["IamRealm", "IamGroup", "IamRole", "IamUser", "IamSession"],
+                  "description": "Which kind of Keycloak resource to list."
+                },
+                "realmName": {
+                  "type": "string",
+                  "description": "Realm name. Required except for resourceType \"IamRealm\"."
+                },
+                "parentId": {
+                  "type": "string",
+                  "description": "Client or group id to scope results to. Only used by \"IamSession\"."
+                },
+                "searchQuery": {
+                  "type": "string",
+                  "description": "Free-text search, passed through to Keycloak's own search param."
+                },
+                "jsonExpansion": {
+                  "type": "boolean",
+                  "description": "Expand the nested attributes object into individual columns. Only used by \"IamUser\"."
+                }
+              },
+              "required": ["resourceType"]
+            },
+            "auth0": {
+              "type": "object",
+              "description": "Scan an Auth0 connection. Use only when connectionName refers to an Auth0 connection.",
+              "properties": {
+                "resourceType": {
+                  "type": "string",
+                  "enum": ["IamClient", "IamUser", "IamRole", "IamOrganization"],
+                  "description": "Which kind of Auth0 resource to list."
+                },
+                "parentId": {
+                  "type": "string",
+                  "description": "Organization id to scope results to its members. Only used by \"IamUser\"."
+                },
+                "searchQuery": {
+                  "type": "string",
+                  "description": "Free-text search, passed through to the Auth0 Management API."
+                },
+                "jsonExpansion": {
+                  "type": "boolean",
+                  "description": "Expand nested metadata objects into individual columns."
+                }
+              },
+              "required": ["resourceType"]
+            }
+          },
+          "required": [
+            "connectionName"
+          ],
+          "oneOf": [
+            { "required": ["redis"] },
+            { "required": ["memcache"] },
+            { "required": ["mqtt"] },
+            { "required": ["awsS3"] },
+            { "required": ["awsSqs"] },
+            { "required": ["awsCloudWatchLogGroup"] },
+            { "required": ["awsCloudWatchLogStream"] },
+            { "required": ["keycloak"] },
+            { "required": ["auth0"] }
+          ]
+        }
+      },
+      {
+        "name": "database-notebook_runTransaction",
+        "toolReferenceName": "runDbTransaction",
+        "displayName": "Run Database Transaction",
+        "modelDescription": "Runs multiple SQL statements against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite) managed by Database Notebook as a single atomic transaction, in order, stopping at the first failure. Use this instead of calling runDbQuery repeatedly whenever the statements must all succeed or all be undone together (e.g. a sequence of INSERT/UPDATE/DELETE across related tables). For a single statement, use runDbQuery instead. Choose transactionControlType carefully: 'rollbackOnError' (default, recommended) commits only if every statement succeeds and rolls back everything on any failure; 'alwaysCommit' commits whatever ran even after a failure, keeping partial writes -- use only when partial progress is acceptable; 'alwaysRollback' always rolls back even on full success, useful for a dry run. Not supported for non-SQL connections (Redis, Memcache, MQTT, Keycloak, Auth0, AWS) -- use scanDbResource for those. Every invocation always requires the user's explicit confirmation, showing every statement and the chosen transaction mode, before running -- this is not skipped even if every statement looks like a read. If you don't already know the exact connection name, call listDbConnections first, and use getDbSchema first if you don't already know the table structure.",
+        "userDescription": "Runs multiple SQL statements as one all-or-nothing transaction against a Database Notebook connection.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(run-all)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionName": {
+              "type": "string",
+              "description": "The exact name of the connection as configured in Database Notebook's DB Explorer."
+            },
+            "statements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The SQL statements to run in order, inside one transaction."
+            },
+            "transactionControlType": {
+              "type": "string",
+              "enum": [
+                "rollbackOnError",
+                "alwaysCommit",
+                "alwaysRollback"
+              ],
+              "description": "How to commit/roll back. 'rollbackOnError' (default): commit only if all statements succeed. 'alwaysCommit': commit even after a failure (partial writes kept). 'alwaysRollback': always roll back, even on success (dry run)."
+            }
+          },
+          "required": [
+            "connectionName",
+            "statements"
+          ]
+        }
+      }
     ]
   },
   "scripts": {
@@ -1433,7 +1823,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^0.14.4",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-1.0.0.tgz",
     "@l-v-yonsama/rdh": "^0.2.17",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",

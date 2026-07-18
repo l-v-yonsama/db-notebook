@@ -117,16 +117,18 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           break;
         case "saveConnectionSetting":
           const mode = message.mode;
+          const { mcpEnabled, ...setting } = params;
           if (mode === "create" || mode === "duplicate") {
             if (mode === "duplicate") {
-              params.id = undefined;
+              setting.id = undefined;
             }
-            await this.stateStorage.addConnectionSetting(params);
+            await this.stateStorage.addConnectionSetting(setting);
           } else {
-            await this.stateStorage.editConnectionSetting(params);
+            await this.stateStorage.editConnectionSetting(setting);
           }
+          await this.stateStorage.setMcpEnabledForConnection(setting.name, mcpEnabled === true);
           await vscode.commands.executeCommand(REFRESH_RESOURCES);
-          const res = Object.assign(new DbConnection(params.name), params);
+          const res = Object.assign(new DbConnection(setting.name), setting);
           this.setForm("show", res);
 
           break;
@@ -165,7 +167,10 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           subComponentName: "ConnectionSetting",
           connectionSetting: {
             mode,
-            setting: res as DbConnection,
+            setting: {
+              ...(res as DbConnection),
+              mcpEnabled: this.stateStorage.isMcpEnabledForConnection(res?.name ?? ""),
+            },
             prohibitedNames,
           },
         },

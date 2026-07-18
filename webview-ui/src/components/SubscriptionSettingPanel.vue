@@ -137,7 +137,7 @@ defineExpose({
     </div>
     <section class="content scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div>
-        <label for="name">Name:</label>
+        <label for="name">Topic filter:</label>
         <span v-if="!isNew" id="name" v-text="name"></span>
         <VsCodeTextField v-if="isNew" id="name" v-model="name" placeholder="e.g. sensor/temp/room1" :required="true">
         </VsCodeTextField>

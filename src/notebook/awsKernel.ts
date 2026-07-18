@@ -7,7 +7,9 @@ import { ResultSetData } from "@l-v-yonsama/rdh";
 import * as os from "os";
 import { NotebookCell } from "vscode";
 import { CellMeta, NotebookExecutionVariables, RunResult } from "../types/Notebook";
+import { getDatabaseConfig } from "../utilities/configUtil";
 import { log, logError } from "../utilities/logger";
+import { buildAwsCloudWatchLogGroupScanParams } from "../utilities/scanParamsBuilder";
 import { StateStorage } from "../utilities/StateStorage";
 
 const PREFIX = "  [notebook/AwsKernel]";
@@ -102,14 +104,15 @@ export class AwsKernel {
             default:
               throw new Error("Invalid logGroupStartTimeOffset");
           }
-          return await driver.cloudwatchClient.scan({
-            limit: undefined as unknown as number,
-            keyword: queryString,
-            target: logGroupName,
-            targetResourceType: "LogGroup",
-            startTime,
-            endTime: now,
-          });
+          return await driver.cloudwatchClient.scan(
+            buildAwsCloudWatchLogGroupScanParams({
+              logGroupName,
+              insightsQuery: queryString,
+              startTime,
+              endTime: now,
+              limit: getDatabaseConfig().limitRows,
+            })
+          );
         }
       );
       if (ok && result) {

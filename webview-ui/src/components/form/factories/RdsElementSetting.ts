@@ -93,6 +93,10 @@ abstract class RdsElementSetting extends BaseElementSetting {
     return { visible: false };
   }
 
+  getReadOnly(): ElementSetting {
+    return { visible: true, label: "Read only" };
+  }
+
   getResourceFilters(): ElementSetting {
     return { visible: true };
   }
@@ -329,6 +333,10 @@ export class SQLServerElementSetting extends RdsElementSetting {
   }
   getTimezone(): ElementSetting {
     return { visible: false };
+  }
+
+  getReadOnly(): ElementSetting {
+    return { visible: true, label: "Read only (hint only)" };
   }
 
   getSqlServerAuthenticationType(): ElementSetting {

@@ -1,12 +1,19 @@
 import {
+  Auth0Driver,
+  Auth0ScanParams,
+  AwsCloudwatchServiceClient,
   AwsDriver,
+  AwsS3ServiceClient,
+  AwsSQSServiceClient,
   DBDriverResolver,
   DBType,
   DbLogStream,
   DbResource,
+  KeycloakDriver,
+  KeycloakScanParams,
+  MemcacheDriver,
   RedisDriver,
   ResourceType,
-  ScanParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
@@ -24,6 +31,16 @@ import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
 import { createBookFromRdh } from "../utilities/excelGenerator";
 import { log } from "../utilities/logger";
+import {
+  buildAuth0ScanParams,
+  buildAwsCloudWatchLogGroupScanParams,
+  buildAwsCloudWatchLogStreamScanParams,
+  buildAwsS3ScanParams,
+  buildAwsSQSScanParams,
+  buildKeycloakScanParams,
+  buildMemcacheScanParams,
+  buildRedisScanParams,
+} from "../utilities/scanParamsBuilder";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
 
@@ -99,6 +116,11 @@ export class ScanPanel extends BasePanel {
     const startDt = createCondition("StartDt", now.format("YYYY-MM-DD"));
     const endDt = createCondition("EndDt", now.format("YYYY-MM-DD"));
     const resourceType = createCondition("resourceType", rootRes.resourceType);
+    const matchType = createCondition("matchType", "partial");
+    matchType.items = [
+      { label: "Partial", value: "partial" },
+      { label: "Exact", value: "exact" },
+    ];
     let parentTarget: string | undefined = undefined;
     let targetName = rootRes.name;
 
@@ -108,10 +130,16 @@ export class ScanPanel extends BasePanel {
     endDt.visible = false;
     resourceType.visible = false;
     jsonExpansion.visible = false;
+    matchType.visible = false;
 
     switch (dbType) {
       case DBType.Redis:
         keyword.value = "*";
+        break;
+      case DBType.Memcache:
+        keyword.label = "Key";
+        keyword.value = "";
+        matchType.visible = true;
         break;
       case DBType.Auth0:
         resourceType.visible = true;
@@ -219,6 +247,7 @@ export class ScanPanel extends BasePanel {
       dbType,
       rootRes,
       keyword,
+      matchType,
       limit,
       jsonExpansion,
       startDt,
@@ -375,6 +404,7 @@ export class ScanPanel extends BasePanel {
       startTime,
       endTime,
       resourceType,
+      matchType,
       execComparativeProcess,
     } = data;
     const panelItem = this.items.find((it) => it.tabId === tabId);
@@ -386,35 +416,144 @@ export class ScanPanel extends BasePanel {
     if (!setting) {
       return;
     }
-    const { rootRes, parentTarget, targetName } = panelItem;
+    const { rootRes, dbType, parentTarget, targetName } = panelItem;
 
     const targetResourceType = resourceType;
+    const resolvedLimit = limit ?? 100;
+    const startTimeSec = this.getEpochTimeInSec(startTime);
+    const endTimeSec = this.getEpochTimeInSec(endTime);
+    const VALUE_LIMIT_SIZE = 100_000;
 
     const { ok, message, result } = await DBDriverResolver.getInstance().workflow(
       setting,
-      async (driver) => {
-        let scannable: any = driver;
-        if (driver instanceof AwsDriver) {
-          const awsDriver = driver as AwsDriver;
-          scannable = awsDriver.getClientByResourceType(targetResourceType);
+      async (driver): Promise<ResultSetData> => {
+        switch (dbType) {
+          case DBType.Redis: {
+            if (!(driver instanceof RedisDriver)) {
+              throw new Error(`Connection "${panelItem.conName}" is not a Redis connection.`);
+            }
+            return await driver.scan(
+              buildRedisScanParams({
+                dbIndex: targetName ?? "0",
+                keyGlob: keyword,
+                limit: resolvedLimit,
+                fetchValueLimitSize: VALUE_LIMIT_SIZE,
+              })
+            );
+          }
+          case DBType.Memcache: {
+            if (!(driver instanceof MemcacheDriver)) {
+              throw new Error(`Connection "${panelItem.conName}" is not a Memcache connection.`);
+            }
+            return await driver.scan(
+              buildMemcacheScanParams({
+                key: keyword ?? "",
+                matchType: matchType ?? "partial",
+                limit: resolvedLimit,
+              })
+            );
+          }
+          case DBType.Keycloak: {
+            if (!(driver instanceof KeycloakDriver)) {
+              throw new Error(`Connection "${panelItem.conName}" is not a Keycloak connection.`);
+            }
+            return await driver.scan(
+              buildKeycloakScanParams({
+                resourceType: targetResourceType as KeycloakScanParams["resourceType"],
+                realmName: targetName,
+                parentId: parentTarget,
+                searchQuery: keyword,
+                limit: resolvedLimit,
+                jsonExpansion,
+              })
+            );
+          }
+          case DBType.Auth0: {
+            if (!(driver instanceof Auth0Driver)) {
+              throw new Error(`Connection "${panelItem.conName}" is not an Auth0 connection.`);
+            }
+            return await driver.scan(
+              buildAuth0ScanParams({
+                resourceType: targetResourceType as Auth0ScanParams["resourceType"],
+                parentId: parentTarget,
+                searchQuery: keyword,
+                limit: resolvedLimit,
+                jsonExpansion,
+              })
+            );
+          }
+          case DBType.Aws: {
+            if (!(driver instanceof AwsDriver)) {
+              throw new Error(`Connection "${panelItem.conName}" is not an AWS connection.`);
+            }
+            switch (targetResourceType) {
+              case ResourceType.Bucket: {
+                const client = driver.getClientByResourceType<AwsS3ServiceClient>(targetResourceType);
+                if (!client) {
+                  throw new Error("S3 is not configured for this connection.");
+                }
+                return await client.scan(
+                  buildAwsS3ScanParams({
+                    bucketName: targetName ?? "",
+                    keyPrefix: keyword,
+                    lastModifiedAfter: startTimeSec,
+                    lastModifiedBefore: endTimeSec,
+                    limit: resolvedLimit,
+                    fetchValueLimitSize: VALUE_LIMIT_SIZE,
+                  })
+                );
+              }
+              case ResourceType.Queue: {
+                const client = driver.getClientByResourceType<AwsSQSServiceClient>(targetResourceType);
+                if (!client) {
+                  throw new Error("SQS is not configured for this connection.");
+                }
+                return await client.scan(
+                  buildAwsSQSScanParams({
+                    queueUrl: targetName ?? "",
+                    bodyOrMessageIdContains: keyword,
+                    limit: resolvedLimit,
+                  })
+                );
+              }
+              case ResourceType.LogGroup: {
+                const client =
+                  driver.getClientByResourceType<AwsCloudwatchServiceClient>(targetResourceType);
+                if (!client) {
+                  throw new Error("CloudWatch Logs is not configured for this connection.");
+                }
+                return await client.scan(
+                  buildAwsCloudWatchLogGroupScanParams({
+                    logGroupName: targetName ?? "",
+                    insightsQuery: keyword,
+                    startTime: startTimeSec,
+                    endTime: endTimeSec,
+                    limit: resolvedLimit,
+                  })
+                );
+              }
+              case ResourceType.LogStream: {
+                const client =
+                  driver.getClientByResourceType<AwsCloudwatchServiceClient>(targetResourceType);
+                if (!client) {
+                  throw new Error("CloudWatch Logs is not configured for this connection.");
+                }
+                return await client.scan(
+                  buildAwsCloudWatchLogStreamScanParams({
+                    logGroupName: parentTarget ?? "",
+                    logStreamName: targetName ?? "",
+                    startTime: startTimeSec,
+                    limit: resolvedLimit,
+                  })
+                );
+              }
+              default:
+                throw new Error(`Resource type "${targetResourceType}" is not scannable.`);
+            }
+          }
+          default:
+            throw new Error(`Connection type "${dbType}" does not support scanning.`);
         }
-
-        var input: ScanParams = {
-          targetResourceType,
-          parentTarget,
-          target: targetName ?? "",
-          keyword: keyword,
-          limit: limit ?? 100,
-          jsonExpansion,
-          startTime: this.getEpochTimeInSec(startTime),
-          endTime: this.getEpochTimeInSec(endTime),
-          withValue: {
-            limitSize: 100_000,
-          },
-        };
-
-        log(`${PREFIX} search(${JSON.stringify(input)})`);
-        return await scannable.scan(input);
       }
     );
 
