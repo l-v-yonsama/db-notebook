@@ -1788,6 +1788,594 @@
             "statements"
           ]
         }
+      },
+      {
+        "name": "database-notebook_createNotebook",
+        "toolReferenceName": "createDbNotebook",
+        "displayName": "Create Database Notebook",
+        "modelDescription": "Creates a new Database Notebook (.dbn) file from a list of cells and opens it in the editor. Use this whenever the user asks to create/make/generate a notebook, save queries as a notebook, or put an analysis somewhere they can re-run it -- do not just print SQL/code in chat when the user wants a runnable notebook artifact. Provide notebookPath for a NEW file: this tool refuses to overwrite an existing file or an already-open notebook, so use editDbNotebook instead if one already exists there. Provide either cells (an ordered array of code/markup cells -- use this for mixed-language notebooks, markdown explanations, or per-cell connection/metadata overrides) or sqlText (a convenience that splits raw, possibly multi-statement SQL text into one SQL cell per statement, the same way Database Notebook's own \"Create Notebook from SQL\" command does). Any cell that runs against a connection (sql, cwql, memcached, or an MQTT publish cell) needs a connectionName -- set it per-cell, or once via the top-level connectionName to apply it to every cell that needs one. Only connections enabled for AI tool use can be set; if you don't already know the exact connection name, call listDbConnections first, and call getDbSchema first if you need table/column names to write correct SQL. This tool only authors the notebook -- it never runs any cell itself.",
+        "userDescription": "Creates a new Database Notebook (.dbn) file from a list of cells or raw SQL, and opens it.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(notebook)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "notebookPath": {
+              "type": "string",
+              "description": "Where to save the new notebook: a path relative to the first workspace folder (e.g. \"reports/monthly.dbn\") or an absolute path. A \".dbn\" extension is appended automatically if omitted. Fails if a file (or an already-open notebook) already exists at the resolved path -- use editDbNotebook to modify an existing notebook instead of calling this again."
+            },
+            "connectionName": {
+              "type": "string",
+              "description": "Optional default connection name applied to every generated cell that needs one (from sqlText, or any cells[] entry that omits its own metadata.connectionName). Must be a connection enabled for AI tool use; call listDbConnections first if you don't already know the exact name."
+            },
+            "sqlText": {
+              "type": "string",
+              "description": "Convenience alternative to cells: raw, possibly multi-statement SQL text. Split into one SQL code cell per statement the same way Database Notebook's own \"Create Notebook from SQL\" command splits it (on top-level semicolons, respecting quoted strings and comments). Provide exactly one of cells or sqlText."
+            },
+            "cells": {
+              "type": "array",
+              "minItems": 1,
+              "description": "Explicit ordered list of cells to create. Provide exactly one of cells or sqlText. Use this (not sqlText) for markup cells, non-SQL code cells, mixed-language notebooks, or when different cells need different connections/metadata.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "code",
+                      "markup"
+                    ],
+                    "description": "\"code\": an executable cell in the given language. \"markup\": a documentation cell, always rendered as markdown (language is ignored)."
+                  },
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "sql",
+                      "javascript",
+                      "json",
+                      "cwql",
+                      "memcached",
+                      "plaintext"
+                    ],
+                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "The cell's source text: code for a code cell, or markdown for a markup cell."
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "Optional per-cell settings. Only meaningful for code cells.",
+                    "properties": {
+                      "connectionName": {
+                        "type": "string",
+                        "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                      },
+                      "useDatabaseName": {
+                        "type": "string",
+                        "description": "SQL cells only. Overrides which database/schema the query runs against, for connections that support multiple databases."
+                      },
+                      "markAsSkip": {
+                        "type": "boolean",
+                        "description": "If true, this cell is skipped when the notebook is run top-to-bottom (still runnable individually)."
+                      },
+                      "logGroupName": {
+                        "type": "string",
+                        "description": "Required for cwql cells. The CloudWatch log group the query targets."
+                      },
+                      "logGroupStartTimeOffset": {
+                        "type": "string",
+                        "enum": [
+                          "1m",
+                          "5m",
+                          "15m",
+                          "30m",
+                          "1h",
+                          "6h",
+                          "12h",
+                          "1d",
+                          "1w"
+                        ],
+                        "description": "cwql cells only. How far back from now the query's time range starts."
+                      },
+                      "sharedVariableName": {
+                        "type": "string",
+                        "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                      },
+                      "publishParams": {
+                        "type": "object",
+                        "description": "Turns a json/plaintext code cell into an MQTT publish cell. connectionName must refer to an Mqtt connection.",
+                        "properties": {
+                          "topicName": {
+                            "type": "string",
+                            "description": "The MQTT topic to publish to."
+                          },
+                          "qos": {
+                            "type": "number",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ],
+                            "description": "MQTT QoS level."
+                          },
+                          "retain": {
+                            "type": "boolean",
+                            "description": "Whether the broker should retain the published message."
+                          }
+                        },
+                        "required": [
+                          "topicName",
+                          "qos",
+                          "retain"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "value"
+                ]
+              }
+            }
+          },
+          "required": [
+            "notebookPath"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "cells"
+              ]
+            },
+            {
+              "required": [
+                "sqlText"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "database-notebook_editNotebook",
+        "toolReferenceName": "editDbNotebook",
+        "displayName": "Edit Database Notebook",
+        "modelDescription": "Applies one or more structural edits -- inserting, replacing, or deleting cells, or updating a single cell's metadata or source text -- to an EXISTING Database Notebook (.dbn) file, identified by notebookPath. Use this to modify a notebook the user is working on (e.g. \"add a cell that...\", \"delete the second cell\", \"change the connection cell 3 uses\", \"fix the SQL in the last cell\") instead of describing the change in chat. This tool never creates a notebook -- if notebookPath doesn't exist yet, call createDbNotebook instead. It always asks the user to confirm before making any change, showing every planned operation -- this is not skipped even for additive-looking operations, because an AI silently rewriting a file's content is a different trust situation than a human's own editor click. Provide operations as an ordered array; they are applied one at a time, in order, and cell index/range values for operation N refer to cell positions AFTER operations 1..N-1 in the SAME array have already been applied, not the notebook's original layout -- e.g. inserting 2 cells at index 3, then referencing index 3 or 4 in a later operation in the same call, refers to a cell you just inserted. Ranges are 0-based with an EXCLUSIVE end, like an array slice: {start:1,end:3} covers cells 1 and 2 only. Cells you insert or replace follow the same shape, and the same connectionName rules, as createDbNotebook's cells -- call listDbConnections first if you don't already know the exact, AI-enabled connection name. If any single operation in the array is invalid (an out-of-range index, or a disallowed connectionName), the entire call fails with no changes applied -- fix the batch and call again rather than retrying operation by operation. Edits are left unsaved in the editor afterward, so the user has a final chance to review (or undo) before the change reaches disk.",
+        "userDescription": "Inserts, replaces, deletes, or updates cells in an existing Database Notebook (.dbn) file.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(edit)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "notebookPath": {
+              "type": "string",
+              "description": "Path to an EXISTING Database Notebook (.dbn) file: relative to the first workspace folder, or absolute. \".dbn\" is appended automatically if omitted. This tool never creates a new notebook -- if nothing exists at this path, call createDbNotebook instead."
+            },
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "description": "Ordered list of edit operations, applied one at a time in array order. Cell index/range values in operation N refer to cell positions AFTER operations 1..N-1 in THIS array have already been applied -- not the notebook's original layout. If any operation is invalid, none of the operations in this call are applied.",
+              "items": {
+                "type": "object",
+                "description": "Exactly one of insertCells, replaceCells, deleteCells, updateCellMetadata, or updateCellSource must be set.",
+                "properties": {
+                  "insertCells": {
+                    "type": "object",
+                    "description": "Insert one or more new cells before the given index.",
+                    "properties": {
+                      "index": {
+                        "type": "number",
+                        "description": "0-based position to insert before. Equal to the notebook's current cell count to append at the end."
+                      },
+                      "cells": {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": "The new cell(s), inserted in order starting at index.",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "code",
+                                "markup"
+                              ],
+                              "description": "\"code\": an executable cell in the given language. \"markup\": a documentation cell, always rendered as markdown (language is ignored)."
+                            },
+                            "language": {
+                              "type": "string",
+                              "enum": [
+                                "sql",
+                                "javascript",
+                                "json",
+                                "cwql",
+                                "memcached",
+                                "plaintext"
+                              ],
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                            },
+                            "value": {
+                              "type": "string",
+                              "description": "The cell's source text: code for a code cell, or markdown for a markup cell."
+                            },
+                            "metadata": {
+                              "type": "object",
+                              "description": "Optional per-cell settings. Only meaningful for code cells.",
+                              "properties": {
+                                "connectionName": {
+                                  "type": "string",
+                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                                },
+                                "useDatabaseName": {
+                                  "type": "string",
+                                  "description": "SQL cells only. Overrides which database/schema the query runs against, for connections that support multiple databases."
+                                },
+                                "markAsSkip": {
+                                  "type": "boolean",
+                                  "description": "If true, this cell is skipped when the notebook is run top-to-bottom (still runnable individually)."
+                                },
+                                "logGroupName": {
+                                  "type": "string",
+                                  "description": "Required for cwql cells. The CloudWatch log group the query targets."
+                                },
+                                "logGroupStartTimeOffset": {
+                                  "type": "string",
+                                  "enum": [
+                                    "1m",
+                                    "5m",
+                                    "15m",
+                                    "30m",
+                                    "1h",
+                                    "6h",
+                                    "12h",
+                                    "1d",
+                                    "1w"
+                                  ],
+                                  "description": "cwql cells only. How far back from now the query's time range starts."
+                                },
+                                "sharedVariableName": {
+                                  "type": "string",
+                                  "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                                },
+                                "publishParams": {
+                                  "type": "object",
+                                  "description": "Turns a json/plaintext code cell into an MQTT publish cell. connectionName must refer to an Mqtt connection.",
+                                  "properties": {
+                                    "topicName": {
+                                      "type": "string",
+                                      "description": "The MQTT topic to publish to."
+                                    },
+                                    "qos": {
+                                      "type": "number",
+                                      "enum": [
+                                        0,
+                                        1,
+                                        2
+                                      ],
+                                      "description": "MQTT QoS level."
+                                    },
+                                    "retain": {
+                                      "type": "boolean",
+                                      "description": "Whether the broker should retain the published message."
+                                    }
+                                  },
+                                  "required": [
+                                    "topicName",
+                                    "qos",
+                                    "retain"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "value"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "index",
+                      "cells"
+                    ]
+                  },
+                  "replaceCells": {
+                    "type": "object",
+                    "description": "Replace a contiguous range of existing cells with new cell(s). The replacement count doesn't need to match the range size -- this can grow or shrink the notebook.",
+                    "properties": {
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "start": {
+                            "type": "number"
+                          },
+                          "end": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "start",
+                          "end"
+                        ],
+                        "description": "0-based cell range to replace. end is exclusive, like an array slice: {start:1,end:3} covers cells 1 and 2 only."
+                      },
+                      "cells": {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": "The cell(s) to put in place of the range.",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "code",
+                                "markup"
+                              ],
+                              "description": "\"code\": an executable cell in the given language. \"markup\": a documentation cell, always rendered as markdown (language is ignored)."
+                            },
+                            "language": {
+                              "type": "string",
+                              "enum": [
+                                "sql",
+                                "javascript",
+                                "json",
+                                "cwql",
+                                "memcached",
+                                "plaintext"
+                              ],
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                            },
+                            "value": {
+                              "type": "string",
+                              "description": "The cell's source text: code for a code cell, or markdown for a markup cell."
+                            },
+                            "metadata": {
+                              "type": "object",
+                              "description": "Optional per-cell settings. Only meaningful for code cells.",
+                              "properties": {
+                                "connectionName": {
+                                  "type": "string",
+                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                                },
+                                "useDatabaseName": {
+                                  "type": "string",
+                                  "description": "SQL cells only. Overrides which database/schema the query runs against, for connections that support multiple databases."
+                                },
+                                "markAsSkip": {
+                                  "type": "boolean",
+                                  "description": "If true, this cell is skipped when the notebook is run top-to-bottom (still runnable individually)."
+                                },
+                                "logGroupName": {
+                                  "type": "string",
+                                  "description": "Required for cwql cells. The CloudWatch log group the query targets."
+                                },
+                                "logGroupStartTimeOffset": {
+                                  "type": "string",
+                                  "enum": [
+                                    "1m",
+                                    "5m",
+                                    "15m",
+                                    "30m",
+                                    "1h",
+                                    "6h",
+                                    "12h",
+                                    "1d",
+                                    "1w"
+                                  ],
+                                  "description": "cwql cells only. How far back from now the query's time range starts."
+                                },
+                                "sharedVariableName": {
+                                  "type": "string",
+                                  "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                                },
+                                "publishParams": {
+                                  "type": "object",
+                                  "description": "Turns a json/plaintext code cell into an MQTT publish cell. connectionName must refer to an Mqtt connection.",
+                                  "properties": {
+                                    "topicName": {
+                                      "type": "string",
+                                      "description": "The MQTT topic to publish to."
+                                    },
+                                    "qos": {
+                                      "type": "number",
+                                      "enum": [
+                                        0,
+                                        1,
+                                        2
+                                      ],
+                                      "description": "MQTT QoS level."
+                                    },
+                                    "retain": {
+                                      "type": "boolean",
+                                      "description": "Whether the broker should retain the published message."
+                                    }
+                                  },
+                                  "required": [
+                                    "topicName",
+                                    "qos",
+                                    "retain"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "value"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "range",
+                      "cells"
+                    ]
+                  },
+                  "deleteCells": {
+                    "type": "object",
+                    "description": "Delete a contiguous range of existing cells.",
+                    "properties": {
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "start": {
+                            "type": "number"
+                          },
+                          "end": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "start",
+                          "end"
+                        ],
+                        "description": "0-based cell range to delete. end is exclusive, like an array slice."
+                      }
+                    },
+                    "required": [
+                      "range"
+                    ]
+                  },
+                  "updateCellMetadata": {
+                    "type": "object",
+                    "description": "Merge fields into one existing cell's metadata. This is a MERGE, not a replace -- fields you don't include are left untouched, so any existing metadata this tool doesn't expose (e.g. chart settings) survives.",
+                    "properties": {
+                      "cellIndex": {
+                        "type": "number",
+                        "description": "0-based index of the cell to update."
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "description": "Optional per-cell settings. Only meaningful for code cells.",
+                        "properties": {
+                          "connectionName": {
+                            "type": "string",
+                            "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                          },
+                          "useDatabaseName": {
+                            "type": "string",
+                            "description": "SQL cells only. Overrides which database/schema the query runs against, for connections that support multiple databases."
+                          },
+                          "markAsSkip": {
+                            "type": "boolean",
+                            "description": "If true, this cell is skipped when the notebook is run top-to-bottom (still runnable individually)."
+                          },
+                          "logGroupName": {
+                            "type": "string",
+                            "description": "Required for cwql cells. The CloudWatch log group the query targets."
+                          },
+                          "logGroupStartTimeOffset": {
+                            "type": "string",
+                            "enum": [
+                              "1m",
+                              "5m",
+                              "15m",
+                              "30m",
+                              "1h",
+                              "6h",
+                              "12h",
+                              "1d",
+                              "1w"
+                            ],
+                            "description": "cwql cells only. How far back from now the query's time range starts."
+                          },
+                          "sharedVariableName": {
+                            "type": "string",
+                            "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                          },
+                          "publishParams": {
+                            "type": "object",
+                            "description": "Turns a json/plaintext code cell into an MQTT publish cell. connectionName must refer to an Mqtt connection.",
+                            "properties": {
+                              "topicName": {
+                                "type": "string",
+                                "description": "The MQTT topic to publish to."
+                              },
+                              "qos": {
+                                "type": "number",
+                                "enum": [
+                                  0,
+                                  1,
+                                  2
+                                ],
+                                "description": "MQTT QoS level."
+                              },
+                              "retain": {
+                                "type": "boolean",
+                                "description": "Whether the broker should retain the published message."
+                              }
+                            },
+                            "required": [
+                              "topicName",
+                              "qos",
+                              "retain"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "required": [
+                      "cellIndex",
+                      "metadata"
+                    ]
+                  },
+                  "updateCellSource": {
+                    "type": "object",
+                    "description": "Replace one existing cell's full source text. Its kind, language, and metadata are unchanged.",
+                    "properties": {
+                      "cellIndex": {
+                        "type": "number",
+                        "description": "0-based index of the cell to update."
+                      },
+                      "source": {
+                        "type": "string",
+                        "description": "The cell's new full source text, entirely replacing its current content."
+                      }
+                    },
+                    "required": [
+                      "cellIndex",
+                      "source"
+                    ]
+                  }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "insertCells"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "replaceCells"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "deleteCells"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "updateCellMetadata"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "updateCellSource"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "notebookPath",
+            "operations"
+          ]
+        }
       }
     ]
   },

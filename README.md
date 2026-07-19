@@ -188,6 +188,7 @@ This action copies not only the cell content, but also all associated metadataâ€
 - [Database Notebook file Variable sharing â€“ SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
+- [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
 
 ## Keyboard shortcuts
 

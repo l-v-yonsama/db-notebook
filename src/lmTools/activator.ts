@@ -1,5 +1,7 @@
 import { ExtensionContext, lm } from "vscode";
 import { StateStorage } from "../utilities/StateStorage";
+import { CreateNotebookTool } from "./CreateNotebookTool";
+import { EditNotebookTool } from "./EditNotebookTool";
 import { GetSchemaTool } from "./GetSchemaTool";
 import { ListConnectionsTool } from "./ListConnectionsTool";
 import { RunQueryTool } from "./RunQueryTool";
@@ -25,5 +27,11 @@ export function activateLmTools(context: ExtensionContext, stateStorage: StateSt
   );
   context.subscriptions.push(
     lm.registerTool("database-notebook_runTransaction", new RunTransactionTool(stateStorage))
+  );
+  context.subscriptions.push(
+    lm.registerTool("database-notebook_createNotebook", new CreateNotebookTool(stateStorage))
+  );
+  context.subscriptions.push(
+    lm.registerTool("database-notebook_editNotebook", new EditNotebookTool(stateStorage))
   );
 }
