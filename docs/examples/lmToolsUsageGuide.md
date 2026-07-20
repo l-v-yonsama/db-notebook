@@ -112,20 +112,23 @@ non-SQL examples.
 Takes no input. Returns name, DB type, environment, and a short type-specific detail for every
 AI-enabled connection — no credentials.
 
-**Prompt**
+**Prompt(EN)**
 
-> What database connections do I have available?
+`What database connections do I have available?`
+
+**Prompt(JA)**
+
+`利用可能な接続定義一覧は?`
 
 **Tool input**
 
-```json
-{}
-```
+Nothing
 
 **Result**
 
 ```
-- localMysql (MySQL, env: local) — seeded with sample customer/order data
+Available database connections
+- localMysql (MySQL, env: local)
 - prodMysql (MySQL, env: production, read-only)
 - awsProd (Aws, env: production, services: DynamoDB, S3, Cloudwatch)
 - localRedis (Redis, env: local)
@@ -143,9 +146,13 @@ No connections are currently available to AI tools. The user needs to enable at 
 Actually attempts to connect right now — not a guess from static config. Use this before trusting
 an answer like "is prod up?".
 
-**Prompt**
+**Prompt(EN)**
 
-> Is the prodMysql connection reachable right now?
+`Is the prodMysql connection reachable right now?`
+
+**Prompt(JA)**
+
+`接続定義 prodMysql で繋がる?`
 
 **Tool input**
 
@@ -174,9 +181,13 @@ Returns `CREATE TABLE` DDL for SQL connections, or a type-appropriate summary fo
 `connectionName` is the only required field; `schemaName`/`tableName` (SQL) or
 `serviceType`/`resourceName` (AWS) narrow the result.
 
-**Prompt**
+**Prompt(EN)**
 
-> Show me the structure of the customer table on localMysql
+`Show me the structure of the customer table on localMysql`
+
+**Prompt(JA)**
+
+`localMysql の customer テーブルのスキーマ定義を教えて`
 
 **Tool input**
 
@@ -233,9 +244,18 @@ orders_table (
 Runs one SQL statement and returns the result. Prefer this for a single `SELECT`; use
 `#runDbTransaction` instead for several statements that must succeed or fail together.
 
-**Prompt**
+**Prompt(EN)**
 
-> Run this against localMysql: SELECT customer_no, age FROM customer WHERE age IN (10, 20, 30) ORDER BY customer_no
+```
+Run this against localMysql: SELECT customer_no, age FROM customer WHERE age IN (10, 20, 30) ORDER BY customer_no
+```
+
+**Prompt(JA)**
+
+```
+localMysql の接続定義で以下のSQLを発行して
+SELECT customer_no, age FROM customer WHERE age IN (10, 20, 30) ORDER BY customer_no
+```
 
 **Tool input**
 
@@ -257,9 +277,13 @@ customer_no age
 
 A write/DDL statement is never run silently — you'll see a confirmation dialog first:
 
-**Prompt**
+**Prompt(EN)**
 
-> On localMysql, set customer 7698's age to 31
+`On localMysql, set customer 7698's age to 31`
+
+**Prompt(JA)**
+
+`localMysql の接続定義を利用して customer 7698 の age を 31 に更新して`
 
 **Tool input**
 
@@ -289,9 +313,17 @@ Runs several statements as one atomic transaction, in order, stopping at the fir
 `transactionControlType` defaults to `rollbackOnError`; `alwaysCommit` keeps partial writes after a
 failure, `alwaysRollback` is a dry run. Always asks for confirmation.
 
-**Prompt**
+**Prompt(EN)**
 
 > As one transaction on localMysql: insert a new order for customer 7566 dated today for 300, then set that customer's age to 11
+
+**Prompt(JA)**
+
+```
+localMysql の接続定義を利用して、後続の更新内容を1トランザクションで実施して
+- order テーブルに「customer: 7566, dated: today, amount: 300」で新規レコード追加
+- customer テーブルの該当レコードの age を 11 に更新
+```
 
 **Tool input**
 
@@ -341,9 +373,13 @@ CloudWatch Logs). Fill in exactly **one** of the resource-specific nested object
 (`redis`/`memcache`/`mqtt`/`awsS3`/`awsSqs`/`awsCloudWatchLogGroup`/`awsCloudWatchLogStream`/
 `keycloak`/`auth0`) matching the connection's type.
 
-**Prompt**
+**Prompt(EN)**
 
 > Scan localRedis for keys matching session:*
+
+**Prompt(JA)**
+
+> 接続定義 localRedis を利用して キー session:* に該当する内容を教えて
 
 **Tool input**
 
@@ -370,9 +406,13 @@ SQL cell per statement, same as the "Create Notebook from SQL" command), and ope
 overwrite an existing file or an already-open notebook — modify those with `#editDbNotebook`
 instead — so there's nothing to confirm here.
 
-**Prompt**
+**Prompt(EN)**
 
 > Create a notebook at reports/customer_age_report.dbn with a title cell and a query against localMysql for customers aged 10, 20, or 30
+
+**Prompt(JA)**
+
+> reports/customer_age_report.dbn にノートブックを作成し、タイトルセルと、localMysql に対する「年齢が 10、20、または 3 の顧客」を取得するクエリを含めてください。
 
 **Tool input**
 
@@ -408,9 +448,13 @@ are interpreted **after** operations 1..N-1 in the same call have already applie
 confirmation, listing every planned operation, and applies none of them if any single operation
 turns out to be invalid.
 
-**Prompt**
+**Prompt(EN)**
 
 > In reports/customer_age_report.dbn, add a cell at the end that counts all customers on localMysql
+
+**Prompt(JA)**
+
+> reports/customer_age_report.dbn にあるノートブックの最後にセルを追加し、localMysql に対して全顧客数を数えるクエリを追加してください
 
 **Tool input**
 

@@ -168,8 +168,13 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       }
       subTitle = `${before} ⇔ ${after}`;
     }
-    list1.forEach((it) => RdhHelper.clearAllAnotations(it));
-    list2.forEach((it) => RdhHelper.clearAllAnotations(it));
+    // asyncDiff自体は非破壊化されており、Upd/Del/Addの重複はresolveDiffContext側で
+    // 型スコープクリアされる。一方runRuleEngine/resolveCodeLabelはRul/Codを常に
+    // 追記するだけなので、再チェック(compare)を繰り返すとここが重複蓄積する。
+    // そのため対象をRul/Codに絞ってクリアし、Fil/Cinなど無関係な既存アノテーション
+    // は保持する。
+    list1.forEach((it) => RdhHelper.clearAnnotationsByType(it, ["Rul", "Cod"]));
+    list2.forEach((it) => RdhHelper.clearAnnotationsByType(it, ["Rul", "Cod"]));
 
     const createTabId = () => createHash("md5").update(title).digest("hex");
     const tabId = createTabId();
@@ -192,8 +197,8 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       async (progress, token) => {
         const increment = list1.length === 0 ? 1 : Math.floor(100 / list1.length);
         for (let i = 0; i < list1.length; i++) {
-          const rdh1 = list1[i];
-          const rdh2 = list2[i];
+          let rdh1 = list1[i];
+          let rdh2 = list2[i];
 
           progress.report({
             message: `Comparing [${i + 1}/${list1.length}] ${rdh2.meta.tableName}`,
@@ -213,6 +218,10 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             showWindowErrorMessage(diffResult.message);
             return;
           }
+          // asyncDiffは引数rdh1/rdh2を変更せず、Upd/Del/Addアノテーションを付与した
+          // クローンをdiffResult.rdh1/rdh2として返す。以降はそのクローンを使う。
+          rdh1 = diffResult.rdh1!;
+          rdh2 = diffResult.rdh2!;
 
           if (rdh1.meta.tableRule) {
             await runRuleEngine(rdh1);
