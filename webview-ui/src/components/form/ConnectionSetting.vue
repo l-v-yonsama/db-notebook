@@ -2,6 +2,7 @@
 import * as AwsRegionConst from "@/types/lib/AwsRegion";
 import { AwsServiceType, AwsServiceTypeValues } from "@/types/lib/AwsServiceType";
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
+import * as ConnectionEnvironmentConst from "@/types/lib/ConnectionEnvironment";
 import * as DBTypeConst from "@/types/lib/DBType";
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { computed, ref } from "vue";
@@ -10,10 +11,12 @@ import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeCheckboxGroup from "../base/VsCodeCheckboxGroup.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
 import VsCodeRadioGroupVue from "../base/VsCodeRadioGroup.vue";
+import VsCodeTextArea from "../base/VsCodeTextArea.vue";
 import VsCodeTextField from "../base/VsCodeTextField.vue";
 
 import type {
   AwsSetting,
+  ConnectionEnvironment,
   ConnectionSetting,
   IamSolutionSetting,
   MqttSetting,
@@ -99,6 +102,17 @@ const resourceFilterTypeItems: DropdownItem[] = [
   },
 ];
 
+const environmentItems: DropdownItem[] = [
+  {
+    label: "(Unspecified)",
+    value: "",
+  },
+  ...ConnectionEnvironmentConst.ConnectionEnvironmentValues.map((it) => ({
+    label: it,
+    value: it,
+  })),
+];
+
 const protocolTypeItems: DropdownItem[] = [
   {
     label: "mqtt",
@@ -138,7 +152,7 @@ const CA_FILE_FILTERS: { [name: string]: string[] } = {
 
 type Props = {
   mode: ModeType;
-  item: ConnectionSetting;
+  item: ConnectionSetting & { mcpEnabled?: boolean };
   prohibitedNames: string[];
 };
 
@@ -198,6 +212,8 @@ const props = withDefaults(defineProps<Props>(), {
   mode: "create",
   item: () => ({
     name: "",
+    comment: "",
+    environment: undefined,
     host: "",
     port: 0,
     database: "",
@@ -249,6 +265,8 @@ const isShowMode = ref(props.mode === "show");
 const isInProgress = ref(false);
 
 const name = ref(props.item.name);
+const comment = ref(props.item.comment ?? "");
+const environment = ref<ConnectionEnvironment | "">(props.item.environment ?? "");
 const host = ref(props.item.host);
 const port = ref(props.item.port);
 const database = ref(props.item.database);
@@ -294,6 +312,7 @@ const clientId = ref(props.item.iamSolution?.clientId ?? "");
 const clientSecret = ref(props.item.iamSolution?.clientSecret ?? "");
 
 const useSsl = ref(props.item.ssl?.use ?? false);
+const isReadOnly = ref(props.item.readOnly === true);
 
 const isSqlServerEncrypt = ref(props.item.sqlServer?.encrypt === true);
 const isSqlServerTrustServerCertificate = ref(props.item.sqlServer?.trustServerCertificate === true);
@@ -324,6 +343,8 @@ const mqttKey = ref(props.item.mqttSetting?.key ?? '');
 const mqttClientId = ref(props.item.mqttSetting?.clientId ?? '');
 const mqttRejectUnauthorized = ref(props.item.mqttSetting?.rejectUnauthorized ?? true);
 const mqttClean = ref(props.item.mqttSetting?.clean ?? true);
+
+const mcpEnabled = ref(props.item.mcpEnabled ?? false);
 let mqttSubscriptionList = props.item.mqttSetting?.subscriptionList ?? [];
 
 
@@ -348,6 +369,20 @@ const handleUseSsl = (e: any) => {
     return;
   }
   useSsl.value = e.target["checked"] === true;
+};
+
+const handleMcpEnabled = (e: any) => {
+  if (!e.target) {
+    return;
+  }
+  mcpEnabled.value = e.target["checked"] === true;
+};
+
+const handleReadOnly = (e: any) => {
+  if (!e.target) {
+    return;
+  }
+  isReadOnly.value = e.target["checked"] === true;
 };
 
 const handleIsSqlServerEncrypt = (e: any) => {
@@ -460,6 +495,8 @@ function createItem(): ConnectionSetting {
 
   const a: ConnectionSetting = {
     name: name.value,
+    comment: comment.value || undefined,
+    environment: environment.value || undefined,
     host: host.value,
     port: toNum(port.value),
     database: database.value,
@@ -468,6 +505,7 @@ function createItem(): ConnectionSetting {
     password: password.value,
     timezone: timezone.value,
     url: url.value,
+    readOnly: isReadOnly.value,
     awsSetting,
     iamSolution,
     sqlServer,
@@ -500,7 +538,7 @@ function save() {
   vscode.postCommand({
     command: "saveConnectionSetting",
     mode: props.mode,
-    params: createItem(),
+    params: { ...createItem(), mcpEnabled: mcpEnabled.value },
   });
 }
 
@@ -549,6 +587,7 @@ function setDefault() {
   database.value = elmSettings.value.getDatabase().defaultValue ?? "";
   port.value = elmSettings.value.getPort().defaultValue ?? 0;
   useSsl.value = false;
+  isReadOnly.value = false;
 
   if (elmSettings.value.getProtocol().visible) {
     protocolType.value = 'mqtt';
@@ -615,6 +654,17 @@ defineExpose({
       <p v-if="isShowMode" id="name">{{ name }}</p>
       <VsCodeTextField v-else id="name" v-model="name" :disabled="mode === 'update'" :maxlength="128"></VsCodeTextField>
       <p v-if="isDuplicateName" class="marker-error">Duplicate name</p>
+
+      <label for="environment">Environment</label>
+      <p v-if="isShowMode" id="environment">{{ environment || "(Unspecified)" }}</p>
+      <VsCodeDropdown v-else id="environment" v-model="environment" :items="environmentItems" :width="185">
+      </VsCodeDropdown>
+
+      <label for="mcpEnabled">AI Tools</label>
+      <p v-if="isShowMode" id="mcpEnabled">{{ mcpEnabled ? 'Enabled' : 'Disabled' }}</p>
+      <vscode-checkbox id="mcpEnabled" v-if="!isShowMode" :checked="mcpEnabled"
+        @change="($e: InputEvent) => handleMcpEnabled($e)" style="margin-right: auto">Allow AI tools (e.g. Copilot
+        Chat)<br> to check and query this connection</vscode-checkbox>
 
       <!-- SQL Server -->
       <label v-if="elmSettings.getSqlServerAuthenticationType().visible" for="authenticationType">Authentication</label>
@@ -802,6 +852,16 @@ defineExpose({
       <VsCodeTextField v-if="!isShowMode && elmSettings.getLockWaitTimeoutMs().visible" id="lockTimeoutMs"
         v-model="lockWaitTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 30000"></VsCodeTextField>
 
+      <label v-show="elmSettings.getReadOnly().visible" for="readOnly">{{ elmSettings.getReadOnly().label }}</label>
+      <p v-if="isShowMode && elmSettings.getReadOnly().visible" id="readOnly">{{ isReadOnly }}</p>
+      <vscode-checkbox id="readOnly" v-if="!isShowMode && elmSettings.getReadOnly().visible" :checked="isReadOnly"
+        @change="($e: InputEvent) => handleReadOnly($e)" style="margin-right: auto">Reject write/DDL statements on
+        this connection</vscode-checkbox>
+      <p v-if="elmSettings.getReadOnly().visible && dbType === 'SQLServer'" class="file-placeholder">
+        SQL Server only requests read-only routing on an Always-On Availability Group; on a standalone
+        instance or without routing configured, writes will still succeed.
+      </p>
+
       <!-- MQTT -->
       <div v-if="dbType === 'Mqtt'" class="mqtt">
         <LabeledText v-show="elmSettings.getMqttClientId().visible" id="mqttClientId" v-model="mqttClientId"
@@ -852,6 +912,11 @@ defineExpose({
         <p>{{ mqttKey }}</p>
         <br v-if="!isShowMode" />
       </div>
+
+      <label for="comment">Description</label>
+      <p v-if="isShowMode" id="comment">{{ comment }}</p>
+      <VsCodeTextArea v-else id="comment" v-model="comment" :rows="2" :maxlength="256"
+        placeholder="What is this connection used for? (e.g. local development database)"></VsCodeTextArea>
 
       <!-- Resource filters -->
       <fieldset class="resource-filters" v-if="elmSettings.getResourceFilters().visible">

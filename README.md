@@ -36,6 +36,9 @@ It also provides a CSV and Har file preview feature.
   - Har file preview
 - Evaluate SQL statements with AI
 - Generate SQL queries with AI
+- Use Database Notebook's connections as AI tools in GitHub Copilot Chat (Agent mode)
+  - List/test connections, inspect schema, run queries & transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create/edit `.dbn` notebooks — all reusing the credentials you've already saved
+  - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)
 - MQTT Client
   - Intuitive publish/subscribe interface
   - Query subscribed payloads using SQLite directly from the notebook
@@ -188,6 +191,7 @@ This action copies not only the cell content, but also all associated metadata�
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
+- [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
 
 ## Keyboard shortcuts
 

@@ -35,6 +35,7 @@ export const DEFAULT_CON_NAME_KEY = `${EXTENSION_NAME}-DEFAULT-CON-NAME`;
 export const STORAGE_KEY = `${EXTENSION_NAME}-settings`;
 export const SQL_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
 export const PREV_SAVE_FOLDER = `${EXTENSION_NAME}-previous-save-folder`;
+export const MCP_ENABLED_CONNECTIONS_KEY = `${EXTENSION_NAME}-mcp-enabled-connections`;
 
 type DbResInfo = {
   isInProgress: boolean;
@@ -342,6 +343,24 @@ export class StateStorage {
     return list.some((it) => it.name === name);
   }
 
+  isMcpEnabledForConnection(name: string): boolean {
+    const list = this.context.globalState.get<string[]>(MCP_ENABLED_CONNECTIONS_KEY, []);
+    return list.includes(name);
+  }
+
+  async setMcpEnabledForConnection(name: string, enabled: boolean): Promise<void> {
+    const list = this.context.globalState.get<string[]>(MCP_ENABLED_CONNECTIONS_KEY, []);
+    const idx = list.indexOf(name);
+    if (enabled && idx < 0) {
+      list.push(name);
+    } else if (!enabled && idx >= 0) {
+      list.splice(idx, 1);
+    } else {
+      return;
+    }
+    await this.context.globalState.update(MCP_ENABLED_CONNECTIONS_KEY, list);
+  }
+
   getDBTypeByConnectionName(name: string): DBType | undefined {
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
     const setting = list.find((it) => it.name === name);
@@ -410,6 +429,7 @@ export class StateStorage {
     }
     await this.context.globalState.update(STORAGE_KEY, list);
     this.resMap.delete(name);
+    await this.setMcpEnabledForConnection(name, false);
     return true;
   }
 

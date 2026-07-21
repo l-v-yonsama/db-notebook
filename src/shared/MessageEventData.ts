@@ -332,6 +332,7 @@ export type ScanTabItem = {
   limit: ScanConditionItem;
   jsonExpansion: ScanConditionItem;
   keyword: ScanConditionItem;
+  matchType: ScanConditionItem;
   startDt: ScanConditionItem;
   endDt: ScanConditionItem;
   multilineKeyword: boolean;
@@ -697,7 +698,7 @@ export type DBFormEventDataValue = {
   subComponentName: "ConnectionSetting" | "ResourceProperties";
   connectionSetting?: {
     mode: ModeType;
-    setting: ConnectionSetting;
+    setting: ConnectionSetting & { mcpEnabled?: boolean };
     prohibitedNames: string[];
   };
   resourceProperties?: {

@@ -12,6 +12,22 @@ export class ThemeColor {
   constructor(public id: string) {}
 }
 
+export class Uri {
+  private constructor(public readonly fsPath: string) {}
+
+  static file(fsPath: string): Uri {
+    return new Uri(fsPath);
+  }
+
+  static joinPath(base: Uri, ...segments: string[]): Uri {
+    return new Uri([base.fsPath, ...segments].join("/").replace(/\/+/g, "/"));
+  }
+
+  toString(): string {
+    return `file://${this.fsPath}`;
+  }
+}
+
 export const window = {
   visibleNotebookEditors: [] as unknown[],
   activeNotebookEditor: undefined as unknown,
@@ -21,6 +37,7 @@ export const window = {
   })),
   setStatusBarMessage: vi.fn((..._args: unknown[]) => ({ dispose: () => {} })),
   createTextEditorDecorationType: vi.fn((_options: unknown) => ({ dispose: () => {} })),
+  showNotebookDocument: vi.fn(async (_document: unknown) => undefined),
 };
 
 export const commands = {
@@ -41,10 +58,54 @@ export const workspace = {
   getConfiguration: vi.fn((_section?: string) => ({
     get: (_key: string, defaultValue?: unknown) => defaultValue,
   })),
+  workspaceFolders: undefined as { uri: Uri; name?: string; index?: number }[] | undefined,
+  notebookDocuments: [] as unknown[],
+  openNotebookDocument: vi.fn(async (_uri: Uri) => {
+    throw new Error("workspace.openNotebookDocument is not mocked in this test");
+  }),
+  fs: {
+    stat: vi.fn(async (_uri: Uri) => {
+      throw new Error("workspace.fs.stat is not mocked in this test");
+    }),
+    writeFile: vi.fn(async (_uri: Uri, _content: Uint8Array) => undefined),
+    readFile: vi.fn(async (_uri: Uri) => new Uint8Array()),
+    createDirectory: vi.fn(async (_uri: Uri) => undefined),
+  },
 };
 
 export class Range {
   constructor(public start: unknown, public end: unknown) {}
+}
+
+export class NotebookRange {
+  constructor(public start: number, public end: number) {}
+}
+
+export class NotebookCellData {
+  metadata?: Record<string, unknown>;
+  outputs?: unknown[];
+  constructor(
+    public kind: NotebookCellKind,
+    public value: string,
+    public languageId: string
+  ) {}
+}
+
+export class NotebookData {
+  metadata?: Record<string, unknown>;
+  constructor(public cells: NotebookCellData[]) {}
+}
+
+export class MarkdownString {
+  constructor(public value: string = "") {}
+}
+
+export class LanguageModelTextPart {
+  constructor(public value: string) {}
+}
+
+export class LanguageModelToolResult {
+  constructor(public content: unknown[]) {}
 }
 
 export class TextEdit {
@@ -64,6 +125,15 @@ export class WorkspaceEdit {
 export class NotebookEdit {
   static updateCellMetadata(index: number, metadata: unknown) {
     return { index, metadata };
+  }
+  static insertCells(index: number, newCells: unknown[]) {
+    return { index, newCells };
+  }
+  static replaceCells(range: unknown, newCells: unknown[]) {
+    return { range, newCells };
+  }
+  static deleteCells(range: unknown) {
+    return { range };
   }
 }
 

@@ -1,6 +1,6 @@
 import {
   AwsDatabase,
-  createTableDefinisionsForPrompt,
+  createTableDefinitionsForPrompt,
   DBDriverResolver,
   isRDSType,
   RDSBaseDriver,
@@ -47,7 +47,7 @@ export const createPrompt = async (params: CreatePromptParams): Promise<CreatePr
   const assistantContents: string[] = [];
   let tableDefinitionsContent: string | undefined = undefined;
   if (withTableDefinition) {
-    tableDefinitionsContent = await createTableDefinisionsForPrompt({
+    tableDefinitionsContent = await createTableDefinitionsForPrompt({
       db,
       sql,
       rdsDriver,

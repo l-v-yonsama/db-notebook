@@ -39,6 +39,7 @@ import {
 } from "./constant";
 import { HelpProvider } from "./help/HelpProvider";
 import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
+import { activateLmTools } from "./lmTools/activator";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
@@ -113,6 +114,8 @@ export async function activate(context: ExtensionContext) {
   SubscriptionSettingPanel.setStateStorage(stateStorage);
   DBDumpSettingsPanel.setStateStorage(stateStorage);
   DBRestoreSettingsPanel.setStateStorage(stateStorage);
+
+  activateLmTools(context, stateStorage);
 
   window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);

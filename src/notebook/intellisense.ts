@@ -43,7 +43,7 @@ import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
 const PREFIX = "[notebook/intellisense]";
 
 const throttleFunc = throttle(400, async (connectionName: string): Promise<void> => {
-  log(`  ${PREFIX} throttleFunc(setupDbResource(${connectionName}))`);
+  // log(`  ${PREFIX} throttleFunc(setupDbResource(${connectionName}))`);
   if (!storage.hasConnectionSettingByName(connectionName)) {
     // log(`  ${PREFIX} end throttleFunc. No connection setting.`);
     return;

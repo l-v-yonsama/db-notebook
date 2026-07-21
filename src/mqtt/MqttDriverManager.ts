@@ -6,6 +6,7 @@ import {
   MqttDatabase,
   MqttDriver,
   MqttQoS,
+  MqttScanParams,
   MqttSubscriptionSetting,
   QueryParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -23,6 +24,12 @@ import { SubscriptionPayloadsViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { log } from "../utilities/logger";
 
+/**
+ * MQTTはSQL等のリクエスト/レスポンス型と異なり、subscribe中は
+ * ブローカーから継続的にpayloadがpushされ続けるpub/sub型のプロトコル。
+ * そのためクエリ単位で接続を開閉するのではなく、ユーザーがConnect/Disconnectを
+ * 明示するまで接続を維持し、その間はコネクション経由で購読・発行などの操作を行う。
+ */
 export class MqttDriverManager {
   private static manageMap = new Map<string, MqttDriverManager>();
   private subscribeTimer: NodeJS.Timeout | undefined = undefined;
@@ -67,6 +74,10 @@ export class MqttDriverManager {
 
   isConnected(): boolean {
     return this.driver.isConnected;
+  }
+
+  scan(params: MqttScanParams): Promise<ResultSetData> {
+    return this.driver.scan(params);
   }
 
   async publish(
