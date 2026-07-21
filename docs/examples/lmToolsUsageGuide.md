@@ -25,7 +25,8 @@ shows an example prompt / tool input / result for every tool currently available
   - 5.6. [Scan Database Resource — `#scanDbResource`](#56-scan-database-resource--scandbresource)
   - 5.7. [Create Database Notebook — `#createDbNotebook`](#57-create-database-notebook--createdbnotebook)
   - 5.8. [Edit Database Notebook — `#editDbNotebook`](#58-edit-database-notebook--editdbnotebook)
-- 6. [Troubleshooting](#6-troubleshooting)
+- 6. [Putting it together: a chained example](#6-putting-it-together-a-chained-example)
+- 7. [Troubleshooting](#7-troubleshooting)
 
 ## 1. Overview
 
@@ -498,7 +499,113 @@ turns out to be invalid.
 The notebook is left **unsaved** after the edit — one more chance to look it over (or hit Undo)
 before it's written to disk.
 
-## 6. Troubleshooting
+## 6. Putting it together: a chained example
+
+The sections above show one tool at a time, but Agent mode's real value shows up when a single
+plain-language request makes Copilot call **several tools back-to-back on its own** — you don't
+invoke `#listDbConnections`, then `#getDbSchema`, then `#runDbQuery` yourself; you ask once, and the
+model figures out the tool order and each tool's input from what it learned in the previous step.
+
+**Prompt(EN)**
+
+> If there's a local Postgres connection available, list its tables, then run a sample query
+> against whichever table has an age column, and show me the result as a table.
+
+**Prompt(JA)**
+
+> ローカル環境向けのPostgresのDB接続定義があれば、それを使って存在するテーブルのリストを取得し、
+> 年齢列をもつテーブルに対しデータをサンプリングするクエリを発行し、結果をテーブル形式で提示して。
+
+**Step 1 — find the connection (`#listDbConnections`)**
+
+Tool input:
+
+```json
+{}
+```
+
+Result:
+
+```
+Available database connections
+- localMysql (MySQL, env: local)
+- localPostgres (PostgreSQL, env: local)
+- prodMysql (MySQL, env: production, read-only)
+- awsProd (Aws, env: production, services: DynamoDB, S3, Cloudwatch)
+- localRedis (Redis, env: local)
+- mqttBroker (Mqtt, env: local, protocol: mqtt)
+```
+
+Copilot picks out `localPostgres` from this list on its own — nothing in the prompt named it
+directly.
+
+**Step 2 — find a table with an age column (`#getDbSchema`)**
+
+Tool input (no `tableName` yet — Copilot doesn't know which table has `age` until it sees the whole
+schema):
+
+```json
+{ "connectionName": "localPostgres" }
+```
+
+Result:
+
+```sql
+CREATE TABLE "customer" (
+  "customer_no" integer NOT NULL,
+  "name" varchar(100),
+  "age" integer,
+  PRIMARY KEY ("customer_no")
+)
+
+CREATE TABLE "order" (
+  "order_no" integer NOT NULL,
+  "customer_no" integer,
+  "order_date" date,
+  "amount" numeric(10,2),
+  PRIMARY KEY ("order_no")
+)
+
+CREATE TABLE "order_detail" (
+  "order_no" integer NOT NULL,
+  "line_no" integer NOT NULL,
+  "item" varchar(100),
+  "qty" integer,
+  PRIMARY KEY ("order_no", "line_no")
+)
+```
+
+Copilot spots `age` on `customer` and moves straight to sampling it — no follow-up question needed.
+
+**Step 3 — sample the table (`#runDbQuery`)**
+
+Tool input:
+
+```json
+{
+  "connectionName": "localPostgres",
+  "sql": "SELECT customer_no, name, age FROM customer LIMIT 20"
+}
+```
+
+This is a plain `SELECT`, so — unlike a write/DDL statement — it runs without a confirmation dialog.
+
+Result:
+
+```
+customer_no name    age
+7566        Alice   10
+7698        Bob     30
+7782        Carol   20
+```
+
+Copilot then explains the sample in its own words. The whole exchange above is **one chat turn**:
+you asked once, in plain language, and the model chose which three tools to call, in what order,
+and with what input — purely from what each previous result told it.
+
+![](../images/23_ai_tools_flow.gif)
+
+## 7. Troubleshooting
 
 - **A connection you expect doesn't show up / a tool says "no connection named X was found" even
   though X exists** — check the **AI Tools** checkbox on that connection ([2.1](#21-enable-a-connection-for-ai-tool-use)).

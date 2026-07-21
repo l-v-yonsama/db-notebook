@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -19,7 +19,8 @@
     "Programming Languages",
     "Data Science",
     "Notebooks",
-    "Visualization"
+    "Visualization",
+    "AI"
   ],
   "keywords": [
     "SQL",
@@ -42,7 +43,11 @@
     "CSV",
     "CsvViewer",
     "MQTT",
-    "mqtt-client"
+    "mqtt-client",
+    "Copilot",
+    "Copilot Chat",
+    "AI tools",
+    "Agent mode"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -1557,11 +1562,17 @@
                 },
                 "matchType": {
                   "type": "string",
-                  "enum": ["exact", "partial"],
+                  "enum": [
+                    "exact",
+                    "partial"
+                  ],
                   "description": "'exact': key must equal a key name exactly. 'partial': key is matched as a substring."
                 }
               },
-              "required": ["key", "matchType"]
+              "required": [
+                "key",
+                "matchType"
+              ]
             },
             "mqtt": {
               "type": "object",
@@ -1573,7 +1584,10 @@
                 },
                 "matchType": {
                   "type": "string",
-                  "enum": ["exact", "partial"],
+                  "enum": [
+                    "exact",
+                    "partial"
+                  ],
                   "description": "'exact': topicFilter must equal a subscription exactly. 'partial' (default): wildcard/substring match."
                 },
                 "payloadContains": {
@@ -1623,7 +1637,9 @@
                   "description": "Byte size cap for including an object's body in the result."
                 }
               },
-              "required": ["bucketName"]
+              "required": [
+                "bucketName"
+              ]
             },
             "awsSqs": {
               "type": "object",
@@ -1638,7 +1654,9 @@
                   "description": "Substring match against the message body or messageId."
                 }
               },
-              "required": ["queueUrl"]
+              "required": [
+                "queueUrl"
+              ]
             },
             "awsCloudWatchLogGroup": {
               "type": "object",
@@ -1661,7 +1679,9 @@
                   "description": "Optional ISO 8601 end of the query's time range."
                 }
               },
-              "required": ["logGroupName"]
+              "required": [
+                "logGroupName"
+              ]
             },
             "awsCloudWatchLogStream": {
               "type": "object",
@@ -1680,7 +1700,10 @@
                   "description": "Optional ISO 8601 start of a timestamp range filter (there is no end bound)."
                 }
               },
-              "required": ["logGroupName", "logStreamName"]
+              "required": [
+                "logGroupName",
+                "logStreamName"
+              ]
             },
             "keycloak": {
               "type": "object",
@@ -1688,7 +1711,13 @@
               "properties": {
                 "resourceType": {
                   "type": "string",
-                  "enum": ["IamRealm", "IamGroup", "IamRole", "IamUser", "IamSession"],
+                  "enum": [
+                    "IamRealm",
+                    "IamGroup",
+                    "IamRole",
+                    "IamUser",
+                    "IamSession"
+                  ],
                   "description": "Which kind of Keycloak resource to list."
                 },
                 "realmName": {
@@ -1708,7 +1737,9 @@
                   "description": "Expand the nested attributes object into individual columns. Only used by \"IamUser\"."
                 }
               },
-              "required": ["resourceType"]
+              "required": [
+                "resourceType"
+              ]
             },
             "auth0": {
               "type": "object",
@@ -1716,7 +1747,12 @@
               "properties": {
                 "resourceType": {
                   "type": "string",
-                  "enum": ["IamClient", "IamUser", "IamRole", "IamOrganization"],
+                  "enum": [
+                    "IamClient",
+                    "IamUser",
+                    "IamRole",
+                    "IamOrganization"
+                  ],
                   "description": "Which kind of Auth0 resource to list."
                 },
                 "parentId": {
@@ -1732,22 +1768,60 @@
                   "description": "Expand nested metadata objects into individual columns."
                 }
               },
-              "required": ["resourceType"]
+              "required": [
+                "resourceType"
+              ]
             }
           },
           "required": [
             "connectionName"
           ],
           "oneOf": [
-            { "required": ["redis"] },
-            { "required": ["memcache"] },
-            { "required": ["mqtt"] },
-            { "required": ["awsS3"] },
-            { "required": ["awsSqs"] },
-            { "required": ["awsCloudWatchLogGroup"] },
-            { "required": ["awsCloudWatchLogStream"] },
-            { "required": ["keycloak"] },
-            { "required": ["auth0"] }
+            {
+              "required": [
+                "redis"
+              ]
+            },
+            {
+              "required": [
+                "memcache"
+              ]
+            },
+            {
+              "required": [
+                "mqtt"
+              ]
+            },
+            {
+              "required": [
+                "awsS3"
+              ]
+            },
+            {
+              "required": [
+                "awsSqs"
+              ]
+            },
+            {
+              "required": [
+                "awsCloudWatchLogGroup"
+              ]
+            },
+            {
+              "required": [
+                "awsCloudWatchLogStream"
+              ]
+            },
+            {
+              "required": [
+                "keycloak"
+              ]
+            },
+            {
+              "required": [
+                "auth0"
+              ]
+            }
           ]
         }
       },
@@ -2411,8 +2485,8 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-1.0.0.tgz",
-    "@l-v-yonsama/rdh": "^0.2.17",
+    "@l-v-yonsama/multi-platform-database-drivers": "^1.0.0",
+    "@l-v-yonsama/rdh": "^0.3.0",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",
