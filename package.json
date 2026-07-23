@@ -51,7 +51,8 @@
     "MCP",
     "LLM",
     "Language Model Tools",
-    "AI agent"
+    "AI agent",
+    "multi-language notebook"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
