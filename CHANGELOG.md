@@ -4,6 +4,20 @@ All notable changes to the "Database notebook" extension are documented in this 
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-23
+
+### Added
+
+- Documented the multi-language flow (SQL → JavaScript → Markdown) with variable sharing between cells, including passing a SQL cell's result set into a later JavaScript cell. See [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown).
+
+### Changed
+
+- Expanded the README to describe mixing SQL, JavaScript, and Markdown cells in a single notebook file with shared variables.
+
+### Fixed
+
+- Default database type in the connection setting form now defaults to MySQL.
+
 ## [1.0.1] - 2026-07-21
 
 ### Added
