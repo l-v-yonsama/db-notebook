@@ -1,7 +1,7 @@
 {
   "name": "database-notebook",
   "displayName": "Database notebook",
-  "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite. Supports evaluating SQL statements with AI.",
+  "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Use your saved connections as AI tools in GitHub Copilot Chat (Agent mode) -- list/test connections, inspect schemas, run queries and transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create or edit .dbn notebooks directly from chat. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite.",
   "version": "1.0.1",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
@@ -47,7 +47,11 @@
     "Copilot",
     "Copilot Chat",
     "AI tools",
-    "Agent mode"
+    "Agent mode",
+    "MCP",
+    "LLM",
+    "Language Model Tools",
+    "AI agent"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
