@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { commands, NotebookCellKind, notebooks, window, workspace } from "vscode";
 import type { ExtensionContext, NotebookCell, NotebookDocument } from "vscode";
-import { OPEN_CHARTS_VIEWER, REFRESH_SQL_HISTORIES } from "../constant";
-import type { RunResult } from "../types/Notebook";
-import type { CellMeta } from "../types/Notebook";
-import type { StateStorage } from "../utilities/StateStorage";
+import { OPEN_CHARTS_VIEWER, REFRESH_SQL_HISTORIES } from "../../src/constant";
+import type { RunResult } from "../../src/types/Notebook";
+import type { CellMeta } from "../../src/types/Notebook";
+import type { StateStorage } from "../../src/utilities/StateStorage";
 
 const {
   nodeKernelCreateMock,
@@ -37,38 +37,38 @@ const {
   existsFileOnWorkspaceMock: vi.fn(async () => false),
 }));
 
-vi.mock("./NodeKernel", () => ({
+vi.mock("../../src/notebook/NodeKernel", () => ({
   NodeKernel: { create: nodeKernelCreateMock },
 }));
-vi.mock("./sqlKernel", () => ({
+vi.mock("../../src/notebook/sqlKernel", () => ({
   SqlKernel: vi.fn().mockImplementation(() => ({
     run: sqlKernelRunMock,
     interrupt: sqlKernelInterruptMock,
   })),
 }));
-vi.mock("./MqttKernel", () => ({
+vi.mock("../../src/notebook/MqttKernel", () => ({
   MqttKernel: vi.fn().mockImplementation(() => ({
     run: mqttKernelRunMock,
     requestSql: mqttKernelRequestSqlMock,
     interrupt: mqttKernelInterruptMock,
   })),
 }));
-vi.mock("./awsKernel", () => ({
+vi.mock("../../src/notebook/awsKernel", () => ({
   AwsKernel: vi.fn().mockImplementation(() => ({
     run: awsKernelRunMock,
     interrupt: awsKernelInterruptMock,
   })),
 }));
-vi.mock("./MemcachedKernel", () => ({
+vi.mock("../../src/notebook/MemcachedKernel", () => ({
   MemcachedKernel: vi.fn().mockImplementation(() => ({
     run: memcachedKernelRunMock,
     interrupt: memcachedKernelInterruptMock,
   })),
 }));
-vi.mock("./JsonKernel", () => ({
+vi.mock("../../src/notebook/JsonKernel", () => ({
   jsonKernelRun: jsonKernelRunMock,
 }));
-vi.mock("../utilities/configUtil", () => ({
+vi.mock("../../src/utilities/configUtil", () => ({
   getNodeConfig: () => ({
     commandPath: "",
     dataEncoding: "utf8",
@@ -99,15 +99,15 @@ vi.mock("../utilities/configUtil", () => ({
     ...options,
   }),
 }));
-vi.mock("../utilities/fsUtil", () => ({
+vi.mock("../../src/utilities/fsUtil", () => ({
   existsFileOnWorkspace: existsFileOnWorkspaceMock,
   initializeStorageTmpPath: vi.fn(async () => undefined),
 }));
-vi.mock("../utilities/lmUtil", () => ({
+vi.mock("../../src/utilities/lmUtil", () => ({
   runLm: vi.fn(async () => undefined),
 }));
 
-import { MainController } from "./controller";
+import { MainController } from "../../src/notebook/controller";
 
 type NodeKernelFake = {
   getStoredVariables: Mock;

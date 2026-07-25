@@ -10,7 +10,7 @@ import {
   isMemcachedCell,
   isMqttCell,
   isSqlCell,
-} from "./notebookUtil";
+} from "../../src/utilities/notebookUtil";
 
 type FakeCellOptions = {
   kind?: NotebookCellKind;

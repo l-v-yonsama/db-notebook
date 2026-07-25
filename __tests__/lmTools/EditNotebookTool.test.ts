@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StateStorage } from "../utilities/StateStorage";
-import { EditOperation, validateOperations } from "./EditNotebookTool";
+import type { StateStorage } from "../../src/utilities/StateStorage";
+import { EditOperation, validateOperations } from "../../src/lmTools/EditNotebookTool";
 
 type ConnectionFixture = { dbType?: string };
 

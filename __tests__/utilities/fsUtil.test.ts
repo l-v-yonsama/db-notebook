@@ -26,7 +26,7 @@ import {
   writeBytesToResource,
   writeToResource,
   writeToResourceOnStorage,
-} from "./fsUtil";
+} from "../../src/utilities/fsUtil";
 
 let scratchRoot: string;
 

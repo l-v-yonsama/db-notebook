@@ -9,7 +9,11 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { BookCreateOption, createBookFromList, createBookFromRdh } from "./excelGenerator";
+import {
+  BookCreateOption,
+  createBookFromList,
+  createBookFromRdh,
+} from "../../src/utilities/excelGenerator";
 
 const tmpFiles: string[] = [];
 

@@ -4,10 +4,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      vscode: path.resolve(__dirname, "src/test/mocks/vscode.ts"),
+      vscode: path.resolve(__dirname, "__tests__/mocks/vscode.ts"),
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["__tests__/**/*.test.ts"],
   },
 });

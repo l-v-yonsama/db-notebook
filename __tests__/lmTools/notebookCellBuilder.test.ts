@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotebookCellData, NotebookCellKind } from "vscode";
-import type { StateStorage } from "../utilities/StateStorage";
-import { CellInput, buildNotebookCells } from "./notebookCellBuilder";
+import type { StateStorage } from "../../src/utilities/StateStorage";
+import { CellInput, buildNotebookCells } from "../../src/lmTools/notebookCellBuilder";
 
 type ConnectionFixture = { dbType?: string };
 

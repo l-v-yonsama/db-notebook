@@ -1,7 +1,7 @@
 import { AwsServiceType, DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { describe, expect, it, vi } from "vitest";
-import type { StateStorage } from "../utilities/StateStorage";
-import { resolveQueryConnection, resolveSqlOnlyConnection } from "./sqlConnectionResolver";
+import type { StateStorage } from "../../src/utilities/StateStorage";
+import { resolveQueryConnection, resolveSqlOnlyConnection } from "../../src/lmTools/sqlConnectionResolver";
 
 type ConnectionFixture = { dbType: DBType; awsSetting?: { services: AwsServiceType[] } };
 

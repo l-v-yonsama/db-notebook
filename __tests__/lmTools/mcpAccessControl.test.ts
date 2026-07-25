@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StateStorage } from "../utilities/StateStorage";
-import { resolveMcpEnabledConnection, suggestConnectionNames } from "./mcpAccessControl";
+import type { StateStorage } from "../../src/utilities/StateStorage";
+import { resolveMcpEnabledConnection, suggestConnectionNames } from "../../src/lmTools/mcpAccessControl";
 
 type ConnectionFixture = Record<string, never>;
 

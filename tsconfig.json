@@ -15,8 +15,7 @@
     "node_modules",
     ".vscode-test",
     "webview-ui",
-    "src/test",
-    "src/**/*.test.ts",
+    "__tests__",
     "vitest.config.ts"
   ]
 }
