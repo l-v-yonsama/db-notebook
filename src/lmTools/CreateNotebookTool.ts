@@ -13,7 +13,7 @@ import {
   workspace,
 } from "vscode";
 import { DBNotebookSerializer } from "../notebook/serializer";
-import { existsUri } from "../utilities/fsUtil";
+import { createDirectory, existsUri, writeBytesToResource } from "../utilities/fsUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { CellInput, buildNotebookCells } from "./notebookCellBuilder";
@@ -37,9 +37,9 @@ export class CreateNotebookTool implements LanguageModelTool<CreateNotebookToolI
   ): Promise<LanguageModelToolResult> {
     const { notebookPath, connectionName, sqlText, cells } = options.input;
     log(
-      `${PREFIX} invoked notebookPath:[${notebookPath}] connectionName:[${connectionName ?? ""}] cells:[${
-        cells?.length ?? 0
-      }] sqlText:[${sqlText ? "yes" : "no"}]`
+      `${PREFIX} invoked notebookPath:[${notebookPath}] connectionName:[${
+        connectionName ?? ""
+      }] cells:[${cells?.length ?? 0}] sqlText:[${sqlText ? "yes" : "no"}]`
     );
 
     try {
@@ -116,11 +116,11 @@ async function createNotebook(
     };
   }
 
-  await workspace.fs.createDirectory(Uri.file(path.dirname(uri.fsPath)));
+  await createDirectory(Uri.file(path.dirname(uri.fsPath)));
 
   const notebookData = new NotebookData(buildResult.cells);
   const bytes = await new DBNotebookSerializer().serializeNotebook(notebookData, token);
-  await workspace.fs.writeFile(uri, bytes);
+  await writeBytesToResource(uri, bytes);
 
   const document = await workspace.openNotebookDocument(uri);
   await window.showNotebookDocument(document);

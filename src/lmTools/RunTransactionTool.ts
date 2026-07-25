@@ -80,39 +80,55 @@ export class RunTransactionTool implements LanguageModelTool<RunTransactionToolI
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName, statements, transactionControlType = "rollbackOnError" } = options.input;
-    log(
-      `${PREFIX} invoked connectionName:[${connectionName}] statements:[${statements?.length ?? 0}] transactionControlType:[${transactionControlType}]`
-    );
-    try {
-      if (!statements?.length) {
-        return new LanguageModelToolResult([new LanguageModelTextPart("❌ No statements were provided.")]);
-      }
-      const result = await runTransaction(this.stateStorage, connectionName, statements, transactionControlType);
-      const lines: string[] = [];
-      if (!result.ok) {
-        lines.push(`❌ ${result.message}`);
-        lines.push(`${result.completed.length} of ${statements.length} statement(s) completed before the failure.`);
-        if (result.availableConnectionNames?.length) {
-          lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
-        }
-      } else {
-        lines.push(`✅ All ${statements.length} statement(s) completed (${transactionControlType}).`);
-      }
-      result.completed.forEach((s, i) => {
-        lines.push(`\nStatement ${i + 1}/${statements.length}: ${abbr(s.sql, LOGGED_SQL_MAX_LENGTH)}\n${s.resultText}`);
-      });
-      const text = lines.join("\n");
-      log(`${PREFIX} result: ${result.completed.length}/${statements.length} completed, ok:[${result.ok}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    } catch (e: any) {
-      const message = `❌ Failed to run transaction on "${connectionName}": ${e?.message ?? e}`;
-      log(`${PREFIX} result:[${message}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(message)]);
-    }
+    const text = await runTransactionText(this.stateStorage, connectionName, statements, transactionControlType);
+    return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
 
-async function runTransaction(
+/**
+ * Fetches, formats, logs, and error-handles a transaction run in one place, so every
+ * caller (the Copilot Chat tool above, the MCP server's tool handler, ...) gets
+ * identical behavior -- and identical logging -- without each caller repeating the
+ * same steps. Never throws; failures come back as a `❌ ...` result string.
+ */
+export async function runTransactionText(
+  stateStorage: StateStorage,
+  connectionName: string,
+  statements: string[],
+  transactionControlType: TransactionControlType
+): Promise<string> {
+  log(
+    `${PREFIX} invoked connectionName:[${connectionName}] statements:[${statements?.length ?? 0}] transactionControlType:[${transactionControlType}]`
+  );
+  try {
+    if (!statements?.length) {
+      return "❌ No statements were provided.";
+    }
+    const result = await runTransaction(stateStorage, connectionName, statements, transactionControlType);
+    const lines: string[] = [];
+    if (!result.ok) {
+      lines.push(`❌ ${result.message}`);
+      lines.push(`${result.completed.length} of ${statements.length} statement(s) completed before the failure.`);
+      if (result.availableConnectionNames?.length) {
+        lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
+      }
+    } else {
+      lines.push(`✅ All ${statements.length} statement(s) completed (${transactionControlType}).`);
+    }
+    result.completed.forEach((s, i) => {
+      lines.push(`\nStatement ${i + 1}/${statements.length}: ${abbr(s.sql, LOGGED_SQL_MAX_LENGTH)}\n${s.resultText}`);
+    });
+    const text = lines.join("\n");
+    log(`${PREFIX} result: ${result.completed.length}/${statements.length} completed, ok:[${result.ok}]`);
+    return text;
+  } catch (e: any) {
+    const message = `❌ Failed to run transaction on "${connectionName}": ${e?.message ?? e}`;
+    log(`${PREFIX} result:[${message}]`);
+    return message;
+  }
+}
+
+export async function runTransaction(
   stateStorage: StateStorage,
   connectionName: string,
   statements: string[],

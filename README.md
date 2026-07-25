@@ -41,6 +41,8 @@ It also provides a CSV and Har file preview feature.
 - Use Database Notebook's connections as AI tools in GitHub Copilot Chat (Agent mode)
   - List/test connections, inspect schema, run queries & transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create/edit `.dbn` notebooks â€” all reusing the credentials you've already saved
   - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)
+- Run a standalone MCP server so external clients (Claude Code, Claude Desktop, Cursor, ...) can use the same connections outside VS Code
+  - [MCP Server Usage Guide](/docs/examples/mcpServerUsageGuide.md)
 - MQTT Client
   - Intuitive publish/subscribe interface
   - Query subscribed payloads using SQLite directly from the notebook
@@ -194,6 +196,7 @@ This action copies not only the cell content, but also all associated metadataâ€
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
 - [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
+- [Using Database Notebook's AI Tools via a Standalone MCP Server](/docs/examples/mcpServerUsageGuide.md)
 
 ## Keyboard shortcuts
 

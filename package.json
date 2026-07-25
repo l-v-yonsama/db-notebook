@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Use your saved connections as AI tools in GitHub Copilot Chat (Agent mode) -- list/test connections, inspect schemas, run queries and transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create or edit .dbn notebooks directly from chat. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite.",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -245,6 +245,13 @@
           "visibility": "visible",
           "icon": "media/logo.png",
           "contextualTitle": "Histories"
+        },
+        {
+          "id": "database-notebook-mcpserver",
+          "name": "MCP Server",
+          "visibility": "visible",
+          "icon": "media/logo.png",
+          "contextualTitle": "MCP Server"
         },
         {
           "id": "database-notebook-helpfeedback",
@@ -639,6 +646,21 @@
           "group": "navigation"
         },
         {
+          "command": "database-notebook.start-mcp-server",
+          "when": "view == database-notebook-mcpserver && !databaseNotebook.mcpServerRunning",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.stop-mcp-server",
+          "when": "view == database-notebook-mcpserver && databaseNotebook.mcpServerRunning",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.show-mcp-connection-info",
+          "when": "view == database-notebook-mcpserver && databaseNotebook.mcpServerRunning",
+          "group": "navigation"
+        },
+        {
           "command": "database-notebook.refresh-resources",
           "when": "view == ResultSetsType",
           "group": "navigation"
@@ -939,6 +961,34 @@
         "command": "database-notebook.focus-filter",
         "title": "Filter",
         "icon": "$(search)"
+      },
+      {
+        "command": "database-notebook.start-mcp-server",
+        "title": "Start Database Notebook MCP Server",
+        "shortTitle": "Start MCP Server",
+        "category": "Database Notebook",
+        "icon": "$(broadcast)"
+      },
+      {
+        "command": "database-notebook.stop-mcp-server",
+        "title": "Stop Database Notebook MCP Server",
+        "shortTitle": "Stop MCP Server",
+        "category": "Database Notebook",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "database-notebook.regenerate-mcp-token",
+        "title": "Regenerate Database Notebook MCP Server Token",
+        "shortTitle": "Regenerate Token",
+        "category": "Database Notebook",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "database-notebook.show-mcp-connection-info",
+        "title": "Show Database Notebook MCP Server Connection Info",
+        "shortTitle": "Show Connection Info",
+        "category": "Database Notebook",
+        "icon": "$(info)"
       },
       {
         "command": "database-notebook.load-database-schema",
@@ -1355,6 +1405,20 @@
           "default": 100,
           "description": "Default LIMIT applied to SQL queries when no explicit limit is specified."
         },
+        "mcpServer.autoStart": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": false,
+          "description": "Start the MCP server automatically when the extension activates, instead of requiring the Start MCP Server command."
+        },
+        "mcpServer.port": {
+          "scope": "resource",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 0,
+          "description": "Port for the MCP server to listen on. 0 reuses the port from the last time it ran (falling back to a free OS-assigned port if that one is unavailable); set a fixed value to pin it explicitly."
+        },
         "output.Excel: Create Table of Contents": {
           "scope": "resource",
           "type": "boolean",
@@ -1498,7 +1562,7 @@
         "name": "database-notebook_runQuery",
         "toolReferenceName": "runDbQuery",
         "displayName": "Run Database Query",
-        "modelDescription": "Runs a SQL statement against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite) managed by Database Notebook and returns the results. Prefer read-only SELECT/EXPLAIN/SHOW statements. Write/DDL statements (INSERT/UPDATE/DELETE/CREATE/ALTER/DROP/etc.) will always require the user's explicit confirmation before running, and on SQL Server connections every statement requires confirmation regardless of type. Not supported for non-SQL connections (Redis, MQTT, AWS resources, etc.) -- use scanDbResource to search those instead. To run multiple statements as one atomic transaction, use runDbTransaction instead of calling this tool repeatedly. Use getDbSchema first if you don't already know the table structure. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+        "modelDescription": "Runs a SQL statement against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite) managed by Database Notebook, or a PartiQL statement against an AWS connection configured for DynamoDB, and returns the results. Prefer read-only SELECT/EXPLAIN/SHOW statements. Write/DDL statements (INSERT/UPDATE/DELETE/CREATE/ALTER/DROP/etc.) will always require the user's explicit confirmation before running, and on SQL Server or DynamoDB connections every statement requires confirmation regardless of type. Not supported for other non-SQL connections (Redis, MQTT, other AWS resources like S3/SQS/CloudWatch, etc.) -- use scanDbResource to search those instead. To run multiple statements as one atomic transaction, use runDbTransaction instead of calling this tool repeatedly (DynamoDB connections are not supported by runDbTransaction). Use getDbSchema first if you don't already know the table structure. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
         "userDescription": "Runs a SQL query against a Database Notebook connection.",
         "canBeReferencedInPrompt": true,
         "icon": "$(play)",
@@ -2492,6 +2556,7 @@
   "dependencies": {
     "@l-v-yonsama/multi-platform-database-drivers": "^1.0.0",
     "@l-v-yonsama/rdh": "^0.3.0",
+    "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",
@@ -2510,10 +2575,13 @@
     "short-unique-id": "^4.4.4",
     "store": "^2.0.12",
     "throttle-debounce": "^5.0.0",
-    "xregexp": "^5.1.2"
+    "xregexp": "^5.1.2",
+    "zod": "3.24.1"
   },
   "overrides": {
-    "@types/readable-stream": "4.0.19"
+    "@types/readable-stream": "4.0.19",
+    "zod": "3.24.1",
+    "zod-to-json-schema": "3.24.1"
   },
   "volta": {
     "node": "18.13.0",

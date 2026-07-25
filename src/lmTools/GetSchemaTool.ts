@@ -49,37 +49,57 @@ export class GetSchemaTool implements LanguageModelTool<GetSchemaToolInput> {
   ): Promise<LanguageModelToolResult> {
     const { connectionName, schemaName, tableName, serviceType, resourceName, realmName } =
       options.input;
-    log(
-      `${PREFIX} invoked connectionName:[${connectionName}] schemaName:[${
-        schemaName ?? ""
-      }] tableName:[${tableName ?? ""}] serviceType:[${serviceType ?? ""}] resourceName:[${
-        resourceName ?? ""
-      }] realmName:[${realmName ?? ""}]`
-    );
-    try {
-      const result = await getSchemaInfo(this.stateStorage, connectionName, {
-        schemaName,
-        tableName,
-        serviceType,
-        resourceName,
-        realmName,
-      });
-      const lines = [result.ok ? result.schemaText ?? "" : `❌ ${result.message}`];
-      if (!result.ok && result.availableConnectionNames?.length) {
-        lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
-      }
-      const text = lines.join("\n");
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    } catch (e: any) {
-      const text = `❌ Failed to get schema for "${connectionName}": ${e?.message ?? e}`;
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    }
+    const text = await getSchemaText(this.stateStorage, connectionName, {
+      schemaName,
+      tableName,
+      serviceType,
+      resourceName,
+      realmName,
+    });
+    return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
 
-type GetSchemaFilters = {
+/**
+ * Fetches, formats, logs, and error-handles a schema lookup in one place, so every
+ * caller (the Copilot Chat tool above, the MCP server's tool handler, ...) gets
+ * identical behavior -- and identical logging -- without each caller repeating the
+ * same steps. Never throws; failures come back as a `❌ ...` result string, same as
+ * `formatSchemaResultForModel` already does for an `ok: false` result.
+ */
+export async function getSchemaText(
+  stateStorage: StateStorage,
+  connectionName: string,
+  filters: GetSchemaFilters
+): Promise<string> {
+  const { schemaName, tableName, serviceType, resourceName, realmName } = filters;
+  log(
+    `${PREFIX} invoked connectionName:[${connectionName}] schemaName:[${
+      schemaName ?? ""
+    }] tableName:[${tableName ?? ""}] serviceType:[${serviceType ?? ""}] resourceName:[${
+      resourceName ?? ""
+    }] realmName:[${realmName ?? ""}]`
+  );
+  let text: string;
+  try {
+    const result = await getSchemaInfo(stateStorage, connectionName, filters);
+    text = formatSchemaResultForModel(result);
+  } catch (e: any) {
+    text = `❌ Failed to get schema for "${connectionName}": ${e?.message ?? e}`;
+  }
+  log(`${PREFIX} result:[${text}]`);
+  return text;
+}
+
+export function formatSchemaResultForModel(result: SchemaFetchResult): string {
+  const lines = [result.ok ? result.schemaText ?? "" : `❌ ${result.message}`];
+  if (!result.ok && result.availableConnectionNames?.length) {
+    lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+export type GetSchemaFilters = {
   schemaName?: string;
   tableName?: string;
   serviceType?: AwsServiceType;
@@ -93,7 +113,7 @@ type GetSchemaFilters = {
  * which internally routes to the right vendor-specific renderer based on
  * the runtime type of the resolved resource tree.
  */
-async function getSchemaInfo(
+export async function getSchemaInfo(
   stateStorage: StateStorage,
   connectionName: string,
   { schemaName, tableName, serviceType, resourceName, realmName }: GetSchemaFilters

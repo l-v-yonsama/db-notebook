@@ -34,26 +34,39 @@ export class ListConnectionsTool implements LanguageModelTool<ListConnectionsToo
     _options: LanguageModelToolInvocationOptions<ListConnectionsToolInput>,
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
-    log(`${PREFIX} invoked`);
-    const connections = listMcpEnabledConnections(this.stateStorage);
-    const text =
-      connections.length === 0
-        ? "No connections are currently available to AI tools. The user needs to enable at least one connection for AI access in Database Notebook's connection settings."
-        : connections
-            .map((c) => {
-              const attrs = [c.dbType, c.environment ? `env: ${c.environment}` : undefined, c.detail]
-                .filter((it) => !!it)
-                .join(", ");
-              const suffix = c.comment ? ` — ${c.comment}` : "";
-              return `- ${c.name} (${attrs})${suffix}`;
-            })
-            .join("\n");
-    log(`${PREFIX} result:[${text}]`);
+    const text = listConnectionsText(this.stateStorage);
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
 
-function listMcpEnabledConnections(stateStorage: StateStorage): ConnectionListItem[] {
+/**
+ * Fetches, formats, and logs the connection list in one place, so every caller
+ * (the Copilot Chat tool above, the MCP server's tool handler, ...) gets identical
+ * behavior -- and identical logging -- without each caller repeating the same steps.
+ */
+export function listConnectionsText(stateStorage: StateStorage): string {
+  log(`${PREFIX} invoked`);
+  const connections = listMcpEnabledConnections(stateStorage);
+  const text = formatConnectionListForModel(connections);
+  log(`${PREFIX} result:[${text}]`);
+  return text;
+}
+
+export function formatConnectionListForModel(connections: ConnectionListItem[]): string {
+  return connections.length === 0
+    ? "No connections are currently available to AI tools. The user needs to enable at least one connection for AI access in Database Notebook's connection settings."
+    : connections
+        .map((c) => {
+          const attrs = [c.dbType, c.environment ? `env: ${c.environment}` : undefined, c.detail]
+            .filter((it) => !!it)
+            .join(", ");
+          const suffix = c.comment ? ` — ${c.comment}` : "";
+          return `- ${c.name} (${attrs})${suffix}`;
+        })
+        .join("\n");
+}
+
+export function listMcpEnabledConnections(stateStorage: StateStorage): ConnectionListItem[] {
   return stateStorage
     .getPasswordlessConnectionSettingList()
     .filter((it) => stateStorage.isMcpEnabledForConnection(it.name))

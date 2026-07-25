@@ -24,7 +24,7 @@ export const initializeStorageTmpPath = async (tmpDirPath?: string): Promise<voi
   }
 };
 
-const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
+export const mkdirsOnStorage = async (fsPath: string): Promise<void> => {
   try {
     await fs.promises.mkdir(fsPath, { recursive: true });
   } catch (err) {
@@ -69,6 +69,14 @@ export const deleteDirsOnStorage = async (fsPath: string): Promise<void> => {
   await fs.promises.rm(fsPath, { recursive: true, force: true });
 };
 
+export const deleteFileOnStorage = async (fsPath: string): Promise<void> => {
+  try {
+    await fs.promises.unlink(fsPath);
+  } catch {
+    // Already gone -- fine.
+  }
+};
+
 export const getNodeModulePath = (name: string): string => {
   const moduleUri = Uri.joinPath(nodeModulesPath, name);
   return winToLinuxPath(moduleUri.fsPath);
@@ -101,6 +109,17 @@ export const writeToResource = async (targetResource: Uri, text: string): Promis
   // log(`${PREFIX} writeToResource [${targetResource}]`);
   const fileContents = Buffer.from(text, "utf8");
   await workspace.fs.writeFile(targetResource, fileContents);
+};
+
+export const writeBytesToResource = async (
+  targetResource: Uri,
+  bytes: Uint8Array
+): Promise<void> => {
+  await workspace.fs.writeFile(targetResource, bytes);
+};
+
+export const createDirectory = async (targetResource: Uri): Promise<void> => {
+  await workspace.fs.createDirectory(targetResource);
 };
 
 export const readResource = async (targetResource: Uri): Promise<string> => {

@@ -19,7 +19,7 @@ import { workflow } from "../utilities/driverResolver";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { formatRdhForModel } from "./resultFormatter";
-import { resolveSqlOnlyConnection } from "./sqlConnectionResolver";
+import { resolveQueryConnection } from "./sqlConnectionResolver";
 
 const PREFIX = "[lmTools/RunQueryTool]";
 const LOGGED_SQL_MAX_LENGTH = 500;
@@ -45,7 +45,7 @@ export class RunQueryTool implements LanguageModelTool<RunQueryToolInput> {
   ): Promise<PreparedToolInvocation | undefined> {
     const { connectionName, sql } = options.input;
     const invocationMessage = `Running query on "${connectionName}"...`;
-    const resolution = await resolveSqlOnlyConnection(this.stateStorage, connectionName);
+    const resolution = await resolveQueryConnection(this.stateStorage, connectionName);
     if (!resolution.ok) {
       // invoke() will surface the same "not found"/unsupported message; no
       // need to prompt for confirmation on a call that can't succeed anyway.
@@ -53,15 +53,15 @@ export class RunQueryTool implements LanguageModelTool<RunQueryToolInput> {
     }
 
     // Engines where the driver's readOnly session setting isn't a reliable backstop
-    // (currently just SQL Server's routing hint) require confirmation for every
-    // statement, not just ones that look like writes.
+    // (SQL Server's routing hint, or DynamoDB which has no such session concept at
+    // all) require confirmation for every statement, not just ones that look like writes.
     const alwaysConfirm = !isReadOnlyEnforcementReliable(resolution.setting.dbType);
     if (isReadOnlyQuery(sql) && !alwaysConfirm) {
       return { invocationMessage };
     }
 
     const reason = alwaysConfirm
-      ? "Database Notebook cannot enforce read-only isolation for SQL Server connections, so every query on this connection needs confirmation."
+      ? `Database Notebook cannot enforce read-only isolation for ${resolution.setting.dbType} connections, so every query on this connection needs confirmation.`
       : "This looks like a write/DDL statement.";
 
     return {
@@ -80,38 +80,54 @@ export class RunQueryTool implements LanguageModelTool<RunQueryToolInput> {
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName, sql } = options.input;
-    log(`${PREFIX} invoked connectionName:[${connectionName}] sql:[${abbr(sql, LOGGED_SQL_MAX_LENGTH)}]`);
-    try {
-      const result = await runQuery(this.stateStorage, connectionName, sql);
-      if (!result.ok || !result.rdh) {
-        const lines = [`❌ ${result.message}`];
-        if (result.availableConnectionNames?.length) {
-          lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
-        }
-        log(`${PREFIX} result:[${lines.join(" ")}]`);
-        return new LanguageModelToolResult([new LanguageModelTextPart(lines.join("\n"))]);
-      }
-      const text = formatRdhForModel(result.rdh, getDatabaseConfig().limitRows);
-      // Row data can contain PII/secrets, so only a row-count summary is logged, never the rows themselves.
-      const affected = result.rdh.summary?.affectedRows;
-      log(
-        `${PREFIX} result: ${affected !== undefined ? `${affected} row(s) affected` : `${result.rdh.rows.length} row(s) returned`}`
-      );
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    } catch (e: any) {
-      const message = `❌ Failed to run query on "${connectionName}": ${e?.message ?? e}`;
-      log(`${PREFIX} result:[${message}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(message)]);
-    }
+    const text = await runQueryText(this.stateStorage, connectionName, sql);
+    return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
 
-async function runQuery(
+/**
+ * Fetches, formats, logs, and error-handles a query run in one place, so every caller
+ * (the Copilot Chat tool above, the MCP server's tool handler, ...) gets identical
+ * behavior -- and identical logging -- without each caller repeating the same steps.
+ * Never throws; failures come back as a `❌ ...` result string.
+ */
+export async function runQueryText(
+  stateStorage: StateStorage,
+  connectionName: string,
+  sql: string
+): Promise<string> {
+  log(`${PREFIX} invoked connectionName:[${connectionName}] sql:[${abbr(sql, LOGGED_SQL_MAX_LENGTH)}]`);
+  try {
+    const result = await runQuery(stateStorage, connectionName, sql);
+    if (!result.ok || !result.rdh) {
+      const lines = [`❌ ${result.message}`];
+      if (result.availableConnectionNames?.length) {
+        lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
+      }
+      const text = lines.join("\n");
+      log(`${PREFIX} result:[${lines.join(" ")}]`);
+      return text;
+    }
+    const text = formatRdhForModel(result.rdh, getDatabaseConfig().limitRows);
+    // Row data can contain PII/secrets, so only a row-count summary is logged, never the rows themselves.
+    const affected = result.rdh.summary?.affectedRows;
+    log(
+      `${PREFIX} result: ${affected !== undefined ? `${affected} row(s) affected` : `${result.rdh.rows.length} row(s) returned`}`
+    );
+    return text;
+  } catch (e: any) {
+    const message = `❌ Failed to run query on "${connectionName}": ${e?.message ?? e}`;
+    log(`${PREFIX} result:[${message}]`);
+    return message;
+  }
+}
+
+export async function runQuery(
   stateStorage: StateStorage,
   connectionName: string,
   sql: string
 ): Promise<QueryRunResult> {
-  const resolution = await resolveSqlOnlyConnection(stateStorage, connectionName);
+  const resolution = await resolveQueryConnection(stateStorage, connectionName);
   if (!resolution.ok) {
     return {
       ok: false,

@@ -185,26 +185,40 @@ export class ScanResourceTool implements LanguageModelTool<ScanResourceToolInput
     options: LanguageModelToolInvocationOptions<ScanResourceToolInput>,
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
-    const input = options.input;
-    log(`${PREFIX} invoked connectionName:[${input.connectionName}] kind:[${resolveScanKind(input).kind ?? ""}]`);
-    try {
-      const result = await scanResource(this.stateStorage, input);
-      if (!result.ok || !result.rdh) {
-        const lines = [`❌ ${result.message}`];
-        if (result.availableConnectionNames?.length) {
-          lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
-        }
-        log(`${PREFIX} result:[${lines.join(" ")}]`);
-        return new LanguageModelToolResult([new LanguageModelTextPart(lines.join("\n"))]);
+    const text = await scanResourceText(this.stateStorage, options.input);
+    return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
+  }
+}
+
+/**
+ * Fetches, formats, logs, and error-handles a resource scan in one place, so every
+ * caller (the Copilot Chat tool above, the MCP server's tool handler, ...) gets
+ * identical behavior -- and identical logging -- without each caller repeating the
+ * same steps. Never throws; failures come back as a `❌ ...` result string.
+ */
+export async function scanResourceText(
+  stateStorage: StateStorage,
+  input: ScanResourceToolInput
+): Promise<string> {
+  log(`${PREFIX} invoked connectionName:[${input.connectionName}] kind:[${resolveScanKind(input).kind ?? ""}]`);
+  try {
+    const result = await scanResource(stateStorage, input);
+    if (!result.ok || !result.rdh) {
+      const lines = [`❌ ${result.message}`];
+      if (result.availableConnectionNames?.length) {
+        lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
       }
-      const text = formatRdhForModel(result.rdh, getDatabaseConfig().limitRows);
-      log(`${PREFIX} result: ${result.rdh.rows.length} row(s) returned`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    } catch (e: any) {
-      const message = `❌ Failed to scan "${input.connectionName}": ${e?.message ?? e}`;
-      log(`${PREFIX} result:[${message}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(message)]);
+      const text = lines.join("\n");
+      log(`${PREFIX} result:[${lines.join(" ")}]`);
+      return text;
     }
+    const text = formatRdhForModel(result.rdh, getDatabaseConfig().limitRows);
+    log(`${PREFIX} result: ${result.rdh.rows.length} row(s) returned`);
+    return text;
+  } catch (e: any) {
+    const message = `❌ Failed to scan "${input.connectionName}": ${e?.message ?? e}`;
+    log(`${PREFIX} result:[${message}]`);
+    return message;
   }
 }
 
@@ -228,7 +242,7 @@ function resolveScanKind(
   return { ok: true, kind: present[0] };
 }
 
-async function scanResource(
+export async function scanResource(
   stateStorage: StateStorage,
   input: ScanResourceToolInput
 ): Promise<ScanRunResult> {

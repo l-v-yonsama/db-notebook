@@ -108,6 +108,18 @@ export type DatabaseConfigType = {
 };
 
 /* =========================================================
+ * MCP Server
+ * Corresponds to: mcpServer.*
+ * ========================================================= */
+export type McpServerConfigType = {
+  /** Start the MCP server automatically when the extension activates */
+  autoStart: boolean;
+
+  /** Port to listen on. 0 means an OS-assigned ephemeral port. */
+  port: number;
+};
+
+/* =========================================================
  * Output (HTML / Excel)
  * Corresponds to: output.*
  * These settings DO NOT affect the VS Code preview.

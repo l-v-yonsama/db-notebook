@@ -40,6 +40,9 @@ import {
 import { HelpProvider } from "./help/HelpProvider";
 import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
 import { activateLmTools } from "./lmTools/activator";
+import { activateMcpServer } from "./mcpServer/activator";
+import { onDidChangeRunningState } from "./mcpServer/server";
+import { McpServerTreeProvider } from "./mcpServerTree/McpServerTreeProvider";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
@@ -93,6 +96,7 @@ export async function activate(context: ExtensionContext) {
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
   const historyTreeProvider = new HistoryTreeProvider(context, stateStorage);
+  const mcpServerTreeProvider = new McpServerTreeProvider(context);
 
   activateLogger(context, EXTENSION_NAME);
   log(`${PREFIX} start activation.`);
@@ -116,9 +120,21 @@ export async function activate(context: ExtensionContext) {
   DBRestoreSettingsPanel.setStateStorage(stateStorage);
 
   activateLmTools(context, stateStorage);
+  activateMcpServer(context, stateStorage);
 
   window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
+
+  const mcpServerTreeView = window.createTreeView("database-notebook-mcpserver", {
+    treeDataProvider: mcpServerTreeProvider,
+  });
+  onDidChangeRunningState(() => mcpServerTreeProvider.refresh());
+  mcpServerTreeView.onDidChangeVisibility((e) => {
+    if (e.visible) {
+      mcpServerTreeProvider.refresh();
+    }
+  });
+  context.subscriptions.push(mcpServerTreeView);
 
   // VIEWS
   const dbResourceTreeView = window.createTreeView(CONNECTION_VIEW_ID, {

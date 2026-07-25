@@ -30,17 +30,19 @@ shows an example prompt / tool input / result for every tool currently available
 
 ## 1. Overview
 
-These tools are only reachable from **VS Code's own built-in Copilot Chat, in Agent mode** — they
-are not an MCP server, so they aren't visible to Claude Code, Copilot CLI, or any other MCP client.
-They run entirely in-process inside the extension, which is what lets them reuse a connection's
-already-saved credentials instead of asking you to configure anything a second time.
+These tools are reachable from **VS Code's own built-in Copilot Chat, in Agent mode**, through
+VS Code's native Language Model Tool API — not through MCP, so they aren't visible to Claude Code,
+Copilot CLI, or any other MCP client. They run entirely in-process inside the extension, which is
+what lets them reuse a connection's already-saved credentials instead of asking you to configure
+anything a second time. For those same connections from an external MCP client, see the
+[MCP Server Usage Guide](./mcpServerUsageGuide.md) instead.
 
 | Tool | `#` reference | What it does |
 | --- | --- | --- |
 | List Database Connections | `#listDbConnections` | Lists the connections available to AI tools |
 | Test Database Connection | `#testDbConnection` | Live connectivity check for one named connection |
 | Get Database Schema | `#getDbSchema` | Table DDL / resource structure for one connection |
-| Run Database Query | `#runDbQuery` | Runs one SQL statement |
+| Run Database Query | `#runDbQuery` | Runs one SQL statement (or one PartiQL statement against DynamoDB) |
 | Run Database Transaction | `#runDbTransaction` | Runs several SQL statements as one all-or-nothing transaction |
 | Scan Database Resource | `#scanDbResource` | Searches a non-SQL resource (Redis, Memcache, MQTT, Keycloak, Auth0, AWS S3/SQS/CloudWatch) |
 | Create Database Notebook | `#createDbNotebook` | Creates a new `.dbn` notebook from cells or raw SQL |
@@ -86,8 +88,8 @@ Anything that can change data always asks you to confirm first, showing exactly 
 run:
 
 - `#runDbQuery` asks for confirmation for anything that isn't a plain read (`SELECT`/`EXPLAIN`/
-  `SHOW`/...), and — because Database Notebook can't force a read-only session on SQL Server —
-  **every** statement on a SQL Server connection, reads included.
+  `SHOW`/...), and — because Database Notebook can't force a read-only session on SQL Server or on
+  a DynamoDB (PartiQL) connection — **every** statement on either of those, reads included.
 - `#runDbTransaction` always asks, regardless of what the statements are.
 - `#editDbNotebook` always asks, regardless of which operations are in the batch.
 - `#listDbConnections`, `#testDbConnection`, `#getDbSchema`, `#scanDbResource`, and
@@ -242,8 +244,10 @@ orders_table (
 
 ### 5.4. Run Database Query — `#runDbQuery`
 
-Runs one SQL statement and returns the result. Prefer this for a single `SELECT`; use
-`#runDbTransaction` instead for several statements that must succeed or fail together.
+Runs one SQL statement and returns the result — or, against an AWS connection configured for
+DynamoDB, one PartiQL statement instead. Prefer this for a single `SELECT`; use `#runDbTransaction`
+instead for several SQL statements that must succeed or fail together (DynamoDB connections aren't
+supported there — PartiQL has no equivalent atomic-batch support in Database Notebook today).
 
 **Prompt(EN)**
 
@@ -306,6 +310,53 @@ A write/DDL statement is never run silently — you'll see a confirmation dialog
 
 ```
 OK. 1 row(s) affected.
+```
+
+Against `awsProd` (an AWS connection configured for DynamoDB), the same tool runs PartiQL instead of
+SQL — everything else about calling it is identical:
+
+**Prompt(EN)**
+
+```
+Run this PartiQL against awsProd: SELECT order_no, amount FROM "orders_table" WHERE customer_no = '7566' LIMIT 20
+```
+
+**Prompt(JA)**
+
+```
+awsProd の接続定義で以下のPartiQLを発行して
+SELECT order_no, amount FROM "orders_table" WHERE customer_no = '7566' LIMIT 20
+```
+
+**Tool input**
+
+```json
+{
+  "connectionName": "awsProd",
+  "sql": "SELECT order_no, amount FROM \"orders_table\" WHERE customer_no = '7566' LIMIT 20"
+}
+```
+
+**Confirmation dialog**
+
+Database Notebook can't enforce read-only isolation for a DynamoDB connection the way it can for
+MySQL/Postgres/SQLite, so — just like SQL Server — every statement needs confirmation here,
+`SELECT`s included:
+
+> **Run SQL on "awsProd"?**
+>
+> Database Notebook cannot enforce read-only isolation for Aws connections, so every query on this connection needs confirmation.
+>
+> ```sql
+> SELECT order_no, amount FROM "orders_table" WHERE customer_no = '7566' LIMIT 20
+> ```
+
+**Result (after confirming)**
+
+```
+order_no amount
+1024     300
+1031     125
 ```
 
 ### 5.5. Run Database Transaction — `#runDbTransaction`
@@ -623,5 +674,7 @@ and with what input — purely from what each previous result told it.
   tool explicitly with `#toolName` ([3](#3-how-to-invoke-a-tool)).
 - **These tools don't show up outside VS Code's own Copilot Chat** (e.g. in Claude Code, Copilot
   CLI, or another editor) — expected. They're registered through VS Code's Language Model Tool
-  API, which only Copilot Chat's Agent mode inside VS Code consumes; this extension does not run a
-  standalone MCP server.
+  API, which only Copilot Chat's Agent mode inside VS Code consumes. To reach the same connections
+  from Claude Code, Claude Desktop, Cursor, or another MCP client, use Database Notebook's separate
+  standalone MCP server instead — see the
+  [MCP Server Usage Guide](./mcpServerUsageGuide.md).

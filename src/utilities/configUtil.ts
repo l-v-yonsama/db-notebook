@@ -3,6 +3,7 @@ import { workspace } from "vscode";
 import { RdhViewConfig } from "../shared/MessageEventData";
 import {
   DatabaseConfigType,
+  McpServerConfigType,
   NodeConfigType,
   OutputConfigType,
   ResultsetConfigType,
@@ -65,6 +66,15 @@ export const getDatabaseConfig = (): DatabaseConfigType => {
 
   return {
     limitRows: settings.get("Default limit rows", 100),
+  };
+};
+
+export const getMcpServerConfig = (): McpServerConfigType => {
+  const settings = workspace.getConfiguration("mcpServer", null);
+
+  return {
+    autoStart: settings.get("autoStart", false),
+    port: settings.get("port", 0),
   };
 };
 

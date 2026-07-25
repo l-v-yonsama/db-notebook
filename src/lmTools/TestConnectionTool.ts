@@ -37,25 +37,38 @@ export class TestConnectionTool implements LanguageModelTool<TestConnectionToolI
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName } = options.input;
-    log(`${PREFIX} invoked connectionName:[${connectionName}]`);
-    try {
-      const result = await testConnectionByName(this.stateStorage, connectionName);
-      const lines = [result.connectable ? `✅ ${result.message}` : `❌ ${result.message}`];
-      if (result.availableConnectionNames?.length) {
-        lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
-      }
-      const text = lines.join("\n");
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    } catch (e: any) {
-      const text = `❌ Failed to test connection "${connectionName}": ${e?.message ?? e}`;
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    }
+    const text = await testConnectionText(this.stateStorage, connectionName);
+    return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
 
-async function testConnectionByName(
+/**
+ * Fetches, formats, logs, and error-handles a connectivity test in one place, so every
+ * caller (the Copilot Chat tool above, the MCP server's tool handler, ...) gets
+ * identical behavior -- and identical logging -- without each caller repeating the
+ * same steps. Never throws; failures come back as a `❌ ...` result string.
+ */
+export async function testConnectionText(
+  stateStorage: StateStorage,
+  connectionName: string
+): Promise<string> {
+  log(`${PREFIX} invoked connectionName:[${connectionName}]`);
+  let text: string;
+  try {
+    const result = await testConnectionByName(stateStorage, connectionName);
+    const lines = [result.connectable ? `✅ ${result.message}` : `❌ ${result.message}`];
+    if (result.availableConnectionNames?.length) {
+      lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
+    }
+    text = lines.join("\n");
+  } catch (e: any) {
+    text = `❌ Failed to test connection "${connectionName}": ${e?.message ?? e}`;
+  }
+  log(`${PREFIX} result:[${text}]`);
+  return text;
+}
+
+export async function testConnectionByName(
   stateStorage: StateStorage,
   connectionName: string
 ): Promise<ConnectionTestResult> {

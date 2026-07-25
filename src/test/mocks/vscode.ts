@@ -70,6 +70,9 @@ export const workspace = {
     writeFile: vi.fn(async (_uri: Uri, _content: Uint8Array) => undefined),
     readFile: vi.fn(async (_uri: Uri) => new Uint8Array()),
     createDirectory: vi.fn(async (_uri: Uri) => undefined),
+    delete: vi.fn(
+      async (_uri: Uri, _options?: { recursive?: boolean; useTrash?: boolean }) => undefined
+    ),
   },
 };
 
@@ -84,11 +87,7 @@ export class NotebookRange {
 export class NotebookCellData {
   metadata?: Record<string, unknown>;
   outputs?: unknown[];
-  constructor(
-    public kind: NotebookCellKind,
-    public value: string,
-    public languageId: string
-  ) {}
+  constructor(public kind: NotebookCellKind, public value: string, public languageId: string) {}
 }
 
 export class NotebookData {
@@ -180,7 +179,10 @@ const makeNotebookCellExecution = (_cell: unknown) => ({
   end(success?: boolean, time?: number) {
     this.endedAt = { success, time: time ?? 0 };
   },
-  replaceOutput: vi.fn(async function (this: { outputs: NotebookCellOutput[] }, outputs: NotebookCellOutput[]) {
+  replaceOutput: vi.fn(async function (
+    this: { outputs: NotebookCellOutput[] },
+    outputs: NotebookCellOutput[]
+  ) {
     this.outputs = outputs;
   }),
 });
