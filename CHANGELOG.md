@@ -4,6 +4,14 @@ All notable changes to the "Database notebook" extension are documented in this 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-25
+
+### Added
+
+- Standalone MCP server, reachable from external MCP clients (Claude Code, Claude Desktop, Cursor, etc.), exposing the same connection/schema/query tools as the Copilot Chat Language Model Tools. Start/stop it and inspect its connection info/token from the new "MCP Server" view in the activity bar. See [MCP Server Usage Guide](/docs/examples/mcpServerUsageGuide.md).
+- `mcpServer.autoStart` and `mcpServer.port` settings to control whether the MCP server starts automatically and which port it listens on.
+- `runDbQuery`/the `#runDbQuery` tool can now run PartiQL statements against AWS connections configured for DynamoDB, in addition to SQL statements against SQL connections.
+
 ## [1.0.2] - 2026-07-23
 
 ### Added
