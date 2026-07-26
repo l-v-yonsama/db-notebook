@@ -74,6 +74,7 @@ export class ToolsViewProvider extends BaseViewProvider {
   }
 
   async render(params: ToolsViewParams) {
+    this.clear();
     const { viewMode, conName, res } = params;
     this.viewMode = viewMode;
     this.res = res;
@@ -83,7 +84,6 @@ export class ToolsViewProvider extends BaseViewProvider {
       return;
     }
     this.settings = setting;
-    this.clear();
 
     await this.search();
 
