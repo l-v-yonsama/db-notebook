@@ -458,6 +458,11 @@ SQL cell per statement, same as the "Create Notebook from SQL" command), and ope
 overwrite an existing file or an already-open notebook — modify those with `#editDbNotebook`
 instead — so there's nothing to confirm here.
 
+Every cell runs on its own independent, auto-committing connection, so each SQL cell must be
+exactly one statement (a stored procedure/function/trigger body counts as one statement) — never
+multiple statements joined together, and never `BEGIN`/`COMMIT`/`ROLLBACK`, which are unnecessary
+and can error.
+
 **Prompt(EN)**
 
 > Create a notebook at reports/customer_age_report.dbn with a title cell and a query against localMysql for customers aged 10, 20, or 30
