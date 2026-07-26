@@ -1082,11 +1082,17 @@ div.first {
 }
 
 div.commands {
-  margin-top: 0.5em;
+  position: sticky;
+  bottom: 0;
+  margin-top: 2em;
+  padding: 0.5em 0;
   display: flex;
   flex-direction: row;
   justify-content: space-around;
   width: 100%;
+  background-color: var(--vscode-editorPane-background);
+  border-top: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  z-index: 100;
 }
 
 .file-placeholder {
