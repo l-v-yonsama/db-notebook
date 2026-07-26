@@ -1,5 +1,6 @@
 import type {
   ConnectionSetting,
+  OracleConnectionType,
   SQLServerAuthenticationType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { BaseElementSetting, type ElementSetting } from "./BaseElementSetting";
@@ -90,6 +91,14 @@ abstract class RdsElementSetting extends BaseElementSetting {
   }
 
   getSqlServerConnectString(): ElementSetting {
+    return { visible: false };
+  }
+
+  getOracleConnectionType(): ElementSetting {
+    return { visible: false };
+  }
+
+  getOracleConnectString(): ElementSetting {
     return { visible: false };
   }
 
@@ -419,6 +428,76 @@ export class SQLServerElementSetting extends RdsElementSetting {
         return false;
       }
       if (type === "default" && (user === "" || password === "")) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+}
+
+export class OracleElementSetting extends RdsElementSetting {
+  constructor(private params: { oracleConnectionType: OracleConnectionType }) {
+    super();
+  }
+
+  getDatabase(): ElementSetting {
+    return {
+      visible: this.params.oracleConnectionType !== "Use Connect String",
+      placeholder: "FREEPDB1",
+      label: "Service Name",
+      defaultValue: "FREEPDB1",
+    };
+  }
+
+  getHost(): ElementSetting {
+    return {
+      visible: this.params.oracleConnectionType !== "Use Connect String",
+      label: "Host",
+      defaultValue: "127.0.0.1",
+    };
+  }
+
+  getPort(): ElementSetting<number> {
+    return {
+      visible: this.params.oracleConnectionType !== "Use Connect String",
+      defaultValue: 1521,
+    };
+  }
+
+  getOracleConnectionType(): ElementSetting {
+    return {
+      visible: true,
+      defaultValue: "structured",
+      label: "Connection Type",
+    };
+  }
+
+  getOracleConnectString(): ElementSetting {
+    return {
+      visible: this.params.oracleConnectionType === "Use Connect String",
+      label: "Connect String",
+      defaultValue: "",
+      placeholder: "host:port/service_name",
+    };
+  }
+
+  getSsl(): ElementSetting {
+    return { visible: false };
+  }
+
+  accept(setting: ConnectionSetting): boolean {
+    const { name, database, user, password, oracle } = setting;
+    if (name === "") {
+      return false;
+    }
+
+    if (this.params.oracleConnectionType === "Use Connect String") {
+      if (!oracle?.connectString) {
+        return false;
+      }
+    } else {
+      if (database === "" || user === "" || password === "") {
         return false;
       }
     }

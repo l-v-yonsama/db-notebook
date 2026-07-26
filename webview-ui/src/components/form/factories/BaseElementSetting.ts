@@ -53,6 +53,10 @@ export abstract class BaseElementSetting {
 
   abstract getSqlServerConnectString(): ElementSetting;
 
+  abstract getOracleConnectionType(): ElementSetting;
+
+  abstract getOracleConnectString(): ElementSetting;
+
   abstract getMqttClientId(): ElementSetting;
 
   getProtocol(): ElementSetting {
@@ -114,6 +118,14 @@ export abstract class BaseNoSqlElementSetting extends BaseElementSetting {
   }
 
   getSqlServerConnectString(): ElementSetting {
+    return { visible: false };
+  }
+
+  getOracleConnectionType(): ElementSetting {
+    return { visible: false };
+  }
+
+  getOracleConnectString(): ElementSetting {
     return { visible: false };
   }
 

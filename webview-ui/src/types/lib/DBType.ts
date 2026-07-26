@@ -3,6 +3,7 @@ export const DBType = {
   Postgres: "Postgres",
   SQLServer: "SQLServer",
   SQLite: "SQLite",
+  Oracle: "Oracle",
   Redis: "Redis",
   Auth0: "Auth0",
   Keycloak: "Keycloak",
@@ -26,6 +27,7 @@ export const isRDSType = (dbType: DBType): boolean => {
     case DBType.Postgres:
     case DBType.SQLServer:
     case DBType.SQLite:
+    case DBType.Oracle:
       return true;
   }
   return false;

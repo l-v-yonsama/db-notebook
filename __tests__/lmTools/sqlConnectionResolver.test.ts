@@ -27,6 +27,12 @@ describe("resolveSqlOnlyConnection", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("Oracle接続はRDS接続としてそのまま解決される", async () => {
+    const stateStorage = makeStateStorage({ connections: { oracle1: { dbType: DBType.Oracle } } });
+    const result = await resolveSqlOnlyConnection(stateStorage, "oracle1");
+    expect(result.ok).toBe(true);
+  });
+
   it("DynamoDB設定のAWS接続は拒否される(resolveQueryConnectionと違って変更していないことの回帰確認)", async () => {
     const stateStorage = makeStateStorage({
       connections: { dynamo1: { dbType: DBType.Aws, awsSetting: { services: [AwsServiceType.DynamoDB] } } },
@@ -40,6 +46,12 @@ describe("resolveQueryConnection", () => {
   it("RDS接続はそのまま解決される", async () => {
     const stateStorage = makeStateStorage({ connections: { mysql1: { dbType: DBType.MySQL } } });
     const result = await resolveQueryConnection(stateStorage, "mysql1");
+    expect(result.ok).toBe(true);
+  });
+
+  it("Oracle接続はRDS接続としてそのまま解決される", async () => {
+    const stateStorage = makeStateStorage({ connections: { oracle1: { dbType: DBType.Oracle } } });
+    const result = await resolveQueryConnection(stateStorage, "oracle1");
     expect(result.ok).toBe(true);
   });
 

@@ -20,6 +20,7 @@ import type {
   ConnectionSetting,
   IamSolutionSetting,
   MqttSetting,
+  OracleSetting,
   ResourceFilter,
   ResourceFilterDetail,
   SQLServerSetting,
@@ -72,6 +73,17 @@ const sqlServerAuthenticationTypeItems: DropdownItem[] = [
   {
     label: "Azure AD MsiVm",
     value: "azure-active-directory-msi-vm",
+  },
+  {
+    label: "Use Connect String",
+    value: "Use Connect String",
+  },
+];
+
+const oracleConnectionTypeItems: DropdownItem[] = [
+  {
+    label: "Host / Port / Service Name",
+    value: "structured",
   },
   {
     label: "Use Connect String",
@@ -246,6 +258,10 @@ const props = withDefaults(defineProps<Props>(), {
       token: "",
       domain: ""
     },
+    oracle: {
+      connectionType: "structured",
+      connectString: "",
+    },
     mqttSetting: {
       protocol: 'mqtt',
       ca: '',
@@ -324,6 +340,9 @@ const sqlServerTenantId = ref(props.item.sqlServer?.tenantId ?? "");
 const sqlServerConnectString = ref(props.item.sqlServer?.connectString ?? "");
 const sqlServerDomain = ref(props.item.sqlServer?.domain ?? "");
 
+const oracleConnectionType = ref(props.item.oracle?.connectionType ?? "structured");
+const oracleConnectString = ref(props.item.oracle?.connectString ?? "");
+
 // resource filters
 const schemaFilterType = ref(props.item.resourceFilter?.schema?.type ?? "");
 const schemaFilterValue = ref(props.item.resourceFilter?.schema?.value ?? "");
@@ -353,6 +372,7 @@ const elmSettings = computed(() => {
     dbType: dbType.value,
     awsCredentialType: awsCredentialType.value,
     sqlServerAuthenticationType: sqlServerAuthenticationType.value,
+    oracleConnectionType: oracleConnectionType.value,
   });
   return it;
 });
@@ -410,6 +430,7 @@ function createItem(): ConnectionSetting {
   let awsSetting: AwsSetting | undefined = undefined;
   let iamSolution: IamSolutionSetting | undefined = undefined;
   let sqlServer: SQLServerSetting | undefined = undefined;
+  let oracle: OracleSetting | undefined = undefined;
   let resourceFilter: ResourceFilter | undefined = undefined;
   let mqttSetting: MqttSetting | undefined = undefined;
 
@@ -450,6 +471,12 @@ function createItem(): ConnectionSetting {
       tenantId: sqlServerTenantId.value,
       connectString: sqlServerConnectString.value,
       domain: sqlServerDomain.value,
+    };
+  }
+  if (dbType.value === 'Oracle') {
+    oracle = {
+      connectionType: oracleConnectionType.value,
+      connectString: oracleConnectString.value,
     };
   }
   if (dbType.value === 'Mqtt') {
@@ -509,6 +536,7 @@ function createItem(): ConnectionSetting {
     awsSetting,
     iamSolution,
     sqlServer,
+    oracle,
     mqttSetting,
     resourceFilter
   };
@@ -674,6 +702,15 @@ defineExpose({
       <VsCodeDropdown v-else v-show="elmSettings.getSqlServerAuthenticationType().visible" id="authenticationType"
         v-model="sqlServerAuthenticationType" :items="sqlServerAuthenticationTypeItems" :width="185"></VsCodeDropdown>
 
+      <!-- Oracle -->
+      <label v-if="elmSettings.getOracleConnectionType().visible" for="oracleConnectionType">{{
+        elmSettings.getOracleConnectionType().label }}</label>
+      <p v-if="isShowMode" v-show="elmSettings.getOracleConnectionType().visible" id="oracleConnectionType">
+        {{ oracleConnectionType }}
+      </p>
+      <VsCodeDropdown v-else v-show="elmSettings.getOracleConnectionType().visible" id="oracleConnectionType"
+        v-model="oracleConnectionType" :items="oracleConnectionTypeItems" :width="185"></VsCodeDropdown>
+
       <!-- PROTOCOL -->
       <label v-if="elmSettings.getProtocol().visible" for="protocol">{{ elmSettings.getProtocol().label }}</label>
       <p v-if="isShowMode" v-show="elmSettings.getProtocol().visible" id="protocol">
@@ -829,6 +866,14 @@ defineExpose({
           v-model="sqlServerConnectString" :isShowMode="isShowMode"
           :label="elmSettings.getSqlServerConnectString().label ?? ''"
           :placeholder="elmSettings.getSqlServerConnectString().placeholder ?? ''" />
+      </div>
+
+      <!-- Oracle -->
+      <div v-if="dbType === 'Oracle'" class="oracle">
+        <LabeledText v-show="elmSettings.getOracleConnectString().visible" id="oracleConnectString"
+          v-model="oracleConnectString" :isShowMode="isShowMode"
+          :label="elmSettings.getOracleConnectString().label ?? ''"
+          :placeholder="elmSettings.getOracleConnectString().placeholder ?? ''" />
       </div>
 
       <label v-show="elmSettings.getConnectTimeoutMs().visible" for="connectTimeoutMs">{{

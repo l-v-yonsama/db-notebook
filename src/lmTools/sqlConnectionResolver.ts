@@ -17,7 +17,7 @@ export async function resolveSqlOnlyConnection(
   if (!isRDSType(resolution.setting.dbType)) {
     return {
       ok: false,
-      message: `Connection "${connectionName}" is a ${resolution.setting.dbType} connection. This tool only supports SQL connections (MySQL, PostgreSQL, SQL Server, SQLite).`,
+      message: `Connection "${connectionName}" is a ${resolution.setting.dbType} connection. This tool only supports SQL connections (MySQL, PostgreSQL, SQL Server, SQLite, Oracle).`,
     };
   }
   return resolution;
@@ -39,7 +39,7 @@ export async function resolveQueryConnection(
   if (!isRDSType(dbType) && !isPartiQLType(dbType, awsSetting)) {
     return {
       ok: false,
-      message: `Connection "${connectionName}" is a ${dbType} connection. This tool only supports SQL connections (MySQL, PostgreSQL, SQL Server, SQLite) or an AWS connection configured for DynamoDB (PartiQL).`,
+      message: `Connection "${connectionName}" is a ${dbType} connection. This tool only supports SQL connections (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) or an AWS connection configured for DynamoDB (PartiQL).`,
     };
   }
   return resolution;

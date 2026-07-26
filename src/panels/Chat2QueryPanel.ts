@@ -282,7 +282,7 @@ export class Chat2QueryPanel extends BasePanel {
       async (driver) => {
         const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
         const toPositionalCharacter = driver.getPositionalCharacter();
-        const isLimitAsTop = driver.isLimitAsTop();
+        const limitClauseStyle = driver.getLimitClauseStyle();
         const isSchemaSpecificationSvailable = driver.isSchemaSpecificationSvailable();
         const sqlLang = driver.getSqlLang();
 
@@ -309,7 +309,7 @@ export class Chat2QueryPanel extends BasePanel {
               schemaName: isSchemaSpecificationSvailable ? schemaName : undefined,
               toPositionedParameter: isPositionedParameterAvailable,
               toPositionalCharacter: toPositionalCharacter,
-              limitAsTop: isLimitAsTop,
+              limitClauseStyle,
               conditions: undefined,
               limit: this.limit,
               sqlLang,

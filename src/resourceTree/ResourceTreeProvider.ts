@@ -197,12 +197,16 @@ export class DBDatabaseItem extends vscode.TreeItem {
           if (
             dbType === DBType.MySQL ||
             dbType === DBType.Postgres ||
-            dbType === DBType.SQLServer
+            dbType === DBType.SQLServer ||
+            dbType === DBType.Oracle
           ) {
             showSessions = true;
           }
           exportable =
-            dbType === DBType.MySQL || dbType === DBType.Postgres || dbType === DBType.SQLite;
+            dbType === DBType.MySQL ||
+            dbType === DBType.Postgres ||
+            dbType === DBType.SQLite ||
+            dbType === DBType.Oracle;
         }
         break;
       case ResourceType.AwsDatabase:

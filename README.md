@@ -12,7 +12,7 @@ It also provides a CSV and Har file preview feature.
   - Share variables between cells, including passing a SQL cell's result set into a later JavaScript cell for further processing
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
 - Access various databases through Notebooks, Sidebars, and panel UIs
-  - MySQL, PostgreSQL, SQL Server, SQLite, Redis, Memcached, AWS, Keycloak, Auth0, MQTT
+  - MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT
 - Execute SQL mode
   - Execute query (Default)
   - Execute explain plan (Generates a query plan).

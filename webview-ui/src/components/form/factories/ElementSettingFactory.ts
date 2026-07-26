@@ -1,5 +1,6 @@
 import type {
   DBType,
+  OracleConnectionType,
   SQLServerAuthenticationType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Auth0ElementSetting } from "./Auth0ElementSetting";
@@ -10,6 +11,7 @@ import { MemcacheElementSetting } from "./MemcacheElementSetting";
 import { MqttElementSetting } from "./MqttElementSetting";
 import {
   MysqlElementSetting,
+  OracleElementSetting,
   PostgresElementSetting,
   SQLServerElementSetting,
   SQLiteElementSetting,
@@ -21,10 +23,12 @@ export class ElementSettingFactory {
     dbType,
     awsCredentialType,
     sqlServerAuthenticationType,
+    oracleConnectionType,
   }: {
     dbType: DBType;
     awsCredentialType: string;
     sqlServerAuthenticationType: string;
+    oracleConnectionType: string;
   }): BaseElementSetting {
     switch (dbType) {
       case "Aws":
@@ -48,6 +52,10 @@ export class ElementSettingFactory {
       case "SQLServer":
         return new SQLServerElementSetting({
           sqlServerAuthenticationType: sqlServerAuthenticationType as SQLServerAuthenticationType,
+        });
+      case "Oracle":
+        return new OracleElementSetting({
+          oracleConnectionType: oracleConnectionType as OracleConnectionType,
         });
     }
   }

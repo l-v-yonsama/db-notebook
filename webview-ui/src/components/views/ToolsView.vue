@@ -81,9 +81,15 @@ const kill = () => {
 
   let sessionOrPid: number | undefined = undefined;
   if (rowValues['session_id']) {
+    // MySQL (getSessions) / SQL Server (getSessions, getLocks)
     sessionOrPid = toNum(rowValues['session_id']);
   } else if (rowValues['pid']) {
+    // Postgres (getSessions, getLocks)
     sessionOrPid = toNum(rowValues['pid']);
+  } else if (rowValues['SID']) {
+    // Oracle (getSessions, getLocks) -- SERIAL# is looked up internally by
+    // OracleDriver.kill() from this SID, so only SID needs to be sent here.
+    sessionOrPid = toNum(rowValues['SID']);
   }
   vscode.postCommand({
     command: "kill",

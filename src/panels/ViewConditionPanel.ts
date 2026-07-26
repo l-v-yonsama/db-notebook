@@ -148,7 +148,7 @@ export class ViewConditionPanel extends BasePanel {
     const driver = await createSQLSupportDriver(setting, true);
     const isPositionedParameterAvailable = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
-    const isLimitAsTop = driver.isLimitAsTop();
+    const limitClauseStyle = driver.getLimitClauseStyle();
     const isSchemaSpecificationSvailable = driver.isSchemaSpecificationSvailable();
     const sqlLang = driver.getSqlLang();
 
@@ -158,7 +158,7 @@ export class ViewConditionPanel extends BasePanel {
         schemaName: isSchemaSpecificationSvailable ? schemaName : undefined,
         toPositionedParameter: isPositionedParameterAvailable,
         toPositionalCharacter: toPositionalCharacter,
-        limitAsTop: isLimitAsTop,
+        limitClauseStyle,
         conditions: specfyCondition ? conditions : undefined,
         limit: this.limit,
         sqlLang,
@@ -266,7 +266,7 @@ export class ViewConditionPanel extends BasePanel {
         toPositionalCharacter: driver.getPositionalCharacter(),
         conditions: specfyCondition ? conditions : undefined,
         limit: this.limit,
-        limitAsTop: driver.isLimitAsTop(),
+        limitClauseStyle: driver.getLimitClauseStyle(),
         sqlLang: driver.getSqlLang(),
         idQuoteCharacter: driver.getIdQuoteCharacter(),
       });
@@ -295,7 +295,7 @@ export class ViewConditionPanel extends BasePanel {
         schemaName,
         conditions: specfyCondition ? conditions : undefined,
         limit: this.limit,
-        limitAsTop: driver.isLimitAsTop(),
+        limitClauseStyle: driver.getLimitClauseStyle(),
         idQuoteCharacter: driver.getIdQuoteCharacter(),
       });
       await ViewConditionPanel.stateStorage.addSQLHistory({

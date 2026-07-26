@@ -4,6 +4,14 @@ All notable changes to the "Database notebook" extension are documented in this 
 
 ## [Unreleased]
 
+### Added
+
+- Oracle Database support (Thin mode, via `oracledb` -- no Oracle Instant Client required), covering notebook SQL cells, the DB Explorer schema tree (including DDL export via `DBMS_METADATA.GET_DDL`), and the existing AI tools/MCP server. Scoped to DQL/DML; PL/SQL blocks and stored procedure/package calls are not supported.
+
+### Fixed
+
+- `#createDbNotebook`/`#editDbNotebook` tool descriptions now state that each SQL cell must contain exactly one statement and must never include `BEGIN`/`COMMIT`/`ROLLBACK`, since every cell runs on its own independent, auto-committing connection. Previously the AI would sometimes pack multiple statements plus a trailing `COMMIT` into one cell, which fails when the cell runs.
+
 ## [1.1.0] - 2026-07-25
 
 ### Added
