@@ -4,13 +4,21 @@ All notable changes to the "Database notebook" extension are documented in this 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-27
+
 ### Added
 
 - Oracle Database support (Thin mode, via `oracledb` -- no Oracle Instant Client required), covering notebook SQL cells, the DB Explorer schema tree (including DDL export via `DBMS_METADATA.GET_DDL`), and the existing AI tools/MCP server. Scoped to DQL/DML; PL/SQL blocks and stored procedure/package calls are not supported.
 
+### Changed
+
+- Connection settings form's command buttons are now sticky to the bottom of the panel, so they stay reachable while scrolling a long form.
+
 ### Fixed
 
 - `#createDbNotebook`/`#editDbNotebook` tool descriptions now state that each SQL cell must contain exactly one statement and must never include `BEGIN`/`COMMIT`/`ROLLBACK`, since every cell runs on its own independent, auto-committing connection. Previously the AI would sometimes pack multiple statements plus a trailing `COMMIT` into one cell, which fails when the cell runs.
+- Tools view's "Kill session" button now recognizes Oracle's SID column, not just MySQL/SQL Server's `session_id` and Postgres's `pid`.
+- Tools view now clears its previous contents even when the connection setting can't be found, instead of leaving stale data displayed.
 
 ## [1.1.0] - 2026-07-25
 
