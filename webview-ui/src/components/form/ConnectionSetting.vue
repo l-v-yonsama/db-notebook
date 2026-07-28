@@ -4,10 +4,10 @@ import { AwsServiceType, AwsServiceTypeValues } from "@/types/lib/AwsServiceType
 import { SupplyCredentials } from "@/types/lib/AwsSupplyCredentialType";
 import * as ConnectionEnvironmentConst from "@/types/lib/ConnectionEnvironment";
 import * as DBTypeConst from "@/types/lib/DBType";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { computed, ref } from "vue";
 import LabeledText from "../base/LabeledText.vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
+import VsCodeCheckbox from "../base/VsCodeCheckbox.vue";
 import VsCodeCheckboxGroup from "../base/VsCodeCheckboxGroup.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
 import VsCodeRadioGroupVue from "../base/VsCodeRadioGroup.vue";
@@ -31,8 +31,6 @@ import type { ModeType } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { toNum } from "@l-v-yonsama/rdh";
 import { ElementSettingFactory } from "./factories/ElementSettingFactory";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const supplyCredentialItems: DropdownItem[] = [
   {
@@ -384,48 +382,6 @@ const urlNote = computed((): string => {
   return "";
 });
 
-const handleUseSsl = (e: any) => {
-  if (!e.target) {
-    return;
-  }
-  useSsl.value = e.target["checked"] === true;
-};
-
-const handleMcpEnabled = (e: any) => {
-  if (!e.target) {
-    return;
-  }
-  mcpEnabled.value = e.target["checked"] === true;
-};
-
-const handleReadOnly = (e: any) => {
-  if (!e.target) {
-    return;
-  }
-  isReadOnly.value = e.target["checked"] === true;
-};
-
-const handleIsSqlServerEncrypt = (e: any) => {
-  if (!e.target) {
-    return;
-  }
-  isSqlServerEncrypt.value = e.target["checked"] === true;
-};
-
-const handleIsSqlServerTrustServerCertificate = (e: any) => {
-  if (!e.target) {
-    return;
-  }
-  isSqlServerTrustServerCertificate.value = e.target["checked"] === true;
-};
-
-const handleIsSqlServerOnlyDefaultSchema = (e: any) => {
-  if (!e.target) {
-    return;
-  }
-  isSqlServerOnlyDefaultSchema.value = e.target["checked"] === true;
-};
-
 function createItem(): ConnectionSetting {
   let awsSetting: AwsSetting | undefined = undefined;
   let iamSolution: IamSolutionSetting | undefined = undefined;
@@ -690,9 +646,9 @@ defineExpose({
 
       <label for="mcpEnabled">AI Tools</label>
       <p v-if="isShowMode" id="mcpEnabled">{{ mcpEnabled ? 'Enabled' : 'Disabled' }}</p>
-      <vscode-checkbox id="mcpEnabled" v-if="!isShowMode" :checked="mcpEnabled"
-        @change="($e: InputEvent) => handleMcpEnabled($e)" style="margin-right: auto">Allow AI tools (e.g. Copilot
-        Chat)<br> to check and query this connection</vscode-checkbox>
+      <VsCodeCheckbox id="mcpEnabled" v-if="!isShowMode" v-model="mcpEnabled"
+        style="margin-right: auto">Allow AI tools (e.g. Copilot
+        Chat)<br> to check and query this connection</VsCodeCheckbox>
 
       <!-- SQL Server -->
       <label v-if="elmSettings.getSqlServerAuthenticationType().visible" for="authenticationType">Authentication</label>
@@ -818,33 +774,33 @@ defineExpose({
 
       <label v-show="elmSettings.getSsl().visible" for="useSsl">SSL(Optional)</label>
       <p v-if="isShowMode && elmSettings.getSsl().visible" id="useSsl">{{ useSsl }}</p>
-      <vscode-checkbox id="useSsl" v-if="!isShowMode && elmSettings.getSsl().visible" :checked="useSsl"
-        @change="($e: InputEvent) => handleUseSsl($e)" style="margin-right: auto">Use
-        SSL(sslmode=no-verify)</vscode-checkbox>
+      <VsCodeCheckbox id="useSsl" v-if="!isShowMode && elmSettings.getSsl().visible" v-model="useSsl"
+        style="margin-right: auto">Use
+        SSL(sslmode=no-verify)</VsCodeCheckbox>
 
       <!-- SQL Server -->
       <div v-if="dbType === 'SQLServer'" class="sql-server">
         <label v-if="isShowMode && elmSettings.getSqlServerEncryption().visible" for="encryption">Encryption</label>
         <p v-if="isShowMode && elmSettings.getSqlServerEncryption().visible" id="encryption">{{ isSqlServerEncrypt }}</p>
-        <vscode-checkbox id="encryption" v-if="!isShowMode && elmSettings.getSqlServerEncryption().visible" :checked="isSqlServerEncrypt"
-          @change="($e: InputEvent) => handleIsSqlServerEncrypt($e)" style="margin-right: auto">Use
-          encrypt</vscode-checkbox>
+        <VsCodeCheckbox id="encryption" v-if="!isShowMode && elmSettings.getSqlServerEncryption().visible"
+          v-model="isSqlServerEncrypt" style="margin-right: auto">Use
+          encrypt</VsCodeCheckbox>
 
         <label v-if="isShowMode && elmSettings.getSqlServerTrustServerCertificate().visible" for="trustServerCertificate">TrustServerCertificate</label>
         <p v-if="isShowMode && elmSettings.getSqlServerTrustServerCertificate().visible" id="trustServerCertificate">{{ isSqlServerTrustServerCertificate }}</p>
-        <vscode-checkbox id="trustServerCertificate" v-if="!isShowMode && elmSettings.getSqlServerTrustServerCertificate().visible" :checked="isSqlServerTrustServerCertificate"
-          @change="($e: InputEvent) => handleIsSqlServerTrustServerCertificate($e)" style="margin-right: auto">Trust
+        <VsCodeCheckbox id="trustServerCertificate" v-if="!isShowMode && elmSettings.getSqlServerTrustServerCertificate().visible"
+          v-model="isSqlServerTrustServerCertificate" style="margin-right: auto">Trust
           server
-          certificate</vscode-checkbox>
+          certificate</VsCodeCheckbox>
 
         <label v-if="isShowMode" for="onlyDefaultSchema">Show schemas</label>
         <p v-if="isShowMode" id="onlyDefaultSchema">
           {{ isSqlServerOnlyDefaultSchema ? "Only default schema" : "All schemas" }}
         </p>
-        <vscode-checkbox id="onlyDefaultSchema" v-if="!isShowMode" :checked="isSqlServerOnlyDefaultSchema"
-          @change="($e: InputEvent) => handleIsSqlServerOnlyDefaultSchema($e)" style="margin-right: auto">Show only
+        <VsCodeCheckbox id="onlyDefaultSchema" v-if="!isShowMode" v-model="isSqlServerOnlyDefaultSchema"
+          style="margin-right: auto">Show only
           default
-          schema</vscode-checkbox>
+          schema</VsCodeCheckbox>
 
         <LabeledText v-show="elmSettings.getSqlServerDomain().visible" id="sqlServerDomain" v-model="sqlServerDomain"
           :isShowMode="isShowMode" :label="elmSettings.getSqlServerDomain().label ?? ''"
@@ -899,9 +855,9 @@ defineExpose({
 
       <label v-show="elmSettings.getReadOnly().visible" for="readOnly">{{ elmSettings.getReadOnly().label }}</label>
       <p v-if="isShowMode && elmSettings.getReadOnly().visible" id="readOnly">{{ isReadOnly }}</p>
-      <vscode-checkbox id="readOnly" v-if="!isShowMode && elmSettings.getReadOnly().visible" :checked="isReadOnly"
-        @change="($e: InputEvent) => handleReadOnly($e)" style="margin-right: auto">Reject write/DDL statements on
-        this connection</vscode-checkbox>
+      <VsCodeCheckbox id="readOnly" v-if="!isShowMode && elmSettings.getReadOnly().visible" v-model="isReadOnly"
+        style="margin-right: auto">Reject write/DDL statements on
+        this connection</VsCodeCheckbox>
       <p v-if="elmSettings.getReadOnly().visible && dbType === 'SQLServer'" class="file-placeholder">
         SQL Server only requests read-only routing on an Always-On Availability Group; on a standalone
         instance or without routing configured, writes will still succeed.
@@ -916,16 +872,15 @@ defineExpose({
         <div>
           <label v-if="isShowMode" for="mqttRejectUnauthorized">RejectUnauthorized</label>
           <p v-if="isShowMode" id="mqttRejectUnauthorized">{{ mqttRejectUnauthorized }}</p>
-          <vscode-checkbox id="mqttRejectUnauthorized" v-if="!isShowMode" :checked="mqttRejectUnauthorized"
-            @change="($e: any) => { mqttRejectUnauthorized = $e.target.checked; }"
-            style="margin-right: auto">RejectUnauthorized</vscode-checkbox>
+          <VsCodeCheckbox id="mqttRejectUnauthorized" v-if="!isShowMode" v-model="mqttRejectUnauthorized"
+            style="margin-right: auto">RejectUnauthorized</VsCodeCheckbox>
         </div>
 
         <div>
           <label v-if="isShowMode" for="mqttClean">Clean</label>
           <p v-if="isShowMode" id="mqttClean">{{ mqttClean }}</p>
-          <vscode-checkbox id="mqttClean" v-if="!isShowMode" :checked="mqttClean"
-            @change="($e: any) => { mqttClean = $e.target.checked; }" style="margin-right: auto">Clean</vscode-checkbox>
+          <VsCodeCheckbox id="mqttClean" v-if="!isShowMode" v-model="mqttClean"
+            style="margin-right: auto">Clean</VsCodeCheckbox>
         </div>
 
         <!-- CA File -->

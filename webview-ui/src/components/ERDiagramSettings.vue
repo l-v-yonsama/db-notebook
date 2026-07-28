@@ -9,6 +9,7 @@ import type {
   ForeignKeyConstraintDetail,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { computed, nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
@@ -204,25 +205,20 @@ defineExpose({
 
 <template>
   <section class="root">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar @cancel="cancel">
+      <template #left>
         <label for="title">Title:</label>
         <VsCodeTextField id="title" v-model="title" style="width: calc(100% - 45px)" />
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton :disabled="zeroSelection" @click="action('writeToClipboard')" appearance="secondary"
-          title="Write ER diagram to clipboard">
-          <fa icon="clipboard" />Copy to clipboard
-        </VsCodeButton>
-        <VsCodeButton :disabled="zeroSelection" @click="action('createERDiagram')"
-          title="Create ER diagram in a new Notebook">
-          <fa icon="plus" />Create in a new Notebook
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton :disabled="zeroSelection" @click="action('writeToClipboard')" appearance="secondary"
+        title="Write ER diagram to clipboard">
+        <fa icon="clipboard" />Copy to clipboard
+      </VsCodeButton>
+      <VsCodeButton :disabled="zeroSelection" @click="action('createERDiagram')"
+        title="Create ER diagram in a new Notebook">
+        <fa icon="plus" />Create in a new Notebook
+      </VsCodeButton>
+    </PanelActionToolbar>
     <section class="content">
       <table>
         <thead>

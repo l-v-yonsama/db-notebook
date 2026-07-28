@@ -3,15 +3,14 @@ import type { DropdownItem } from "@/types/Components";
 import type { NotebookCellMetadataPanelEventData } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { isDateTimeOrDateOrTime, isNumericLike } from "@l-v-yonsama/rdh";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
 import type { CellMetaChart } from "../../../src/types/Notebook";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import TextOrDropdown from "./base/TextOrDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
@@ -186,17 +185,11 @@ defineExpose({
 
 <template>
   <section class="root">
-    <div class="toolbar">
-      <div class="tool-left"></div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton :disabled="disabledSaveButton" @click="save" title="Save cell metadata">
-          <fa icon="plus" />Save
-        </VsCodeButton>
-      </div>
-    </div>
+    <PanelActionToolbar @cancel="cancel">
+      <VsCodeButton :disabled="disabledSaveButton" @click="save" title="Save cell metadata">
+        <fa icon="plus" />Save
+      </VsCodeButton>
+    </PanelActionToolbar>
     <section v-if="!initialized" class="content">Initializing...</section>
     <section v-else class="content scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <fieldset v-if="preparationVisible">
@@ -214,8 +207,8 @@ defineExpose({
       <fieldset>
         <legend>SQL Editor</legend>
         <div>
-          <vscode-checkbox :checked="showComment" @change="($e: any) => showComment = $e.target.checked"
-            style="margin-right: auto">Display comments after each resource</vscode-checkbox>
+          <VsCodeCheckbox v-model="showComment"
+            style="margin-right: auto">Display comments after each resource</VsCodeCheckbox>
         </div>
       </fieldset>
       <fieldset>
@@ -236,9 +229,8 @@ defineExpose({
         <legend>Saving execution results in shared variables</legend>
         <div>
           <div>
-            <vscode-checkbox :checked="savingSharedVariables"
-              @change="($e: any) => savingSharedVariables = $e.target.checked"
-              style="margin-right: auto">Save</vscode-checkbox>
+            <VsCodeCheckbox v-model="savingSharedVariables"
+              style="margin-right: auto">Save</VsCodeCheckbox>
           </div>
           <div v-if="savingSharedVariables">
             <label for="sharedVariableName">shared variable name:</label>
@@ -260,16 +252,15 @@ defineExpose({
             <div class="dropdown-area">
               <label for="chartTitle">Title:</label>
               <VsCodeTextField id="chartTitle" v-model="chartTitle" :transparent="true" :required="true" />
-              <vscode-checkbox id="chartShowTitle" :checked="chartShowTitle"
-                @change="($e: any) => chartShowTitle = $e.target.checked"
-                style="margin-right: auto; margin-left: 10px">Displays title on chart</vscode-checkbox>
+              <VsCodeCheckbox id="chartShowTitle" v-model="chartShowTitle"
+                style="margin-right: auto; margin-left: 10px">Displays title on chart</VsCodeCheckbox>
             </div>
             <div v-if="chartType !== 'radar'" class="dropdown-area">
               <label for="chartShowDataLabels">Data values:</label>
-              <vscode-checkbox id="chartShowDataLabels" :checked="chartShowDataLabels"
-                @change="($e: any) => chartShowDataLabels = $e.target.checked" style="margin-right: auto">Displays
+              <VsCodeCheckbox id="chartShowDataLabels" v-model="chartShowDataLabels"
+                style="margin-right: auto">Displays
                 values
-                on data</vscode-checkbox>
+                on data</VsCodeCheckbox>
             </div>
             <div v-if="
               chartType !== 'pairPlot' &&
@@ -279,9 +270,8 @@ defineExpose({
               chartType !== 'pie'
             " class="dropdown-area">
               <label for="chartMultipleDataset">Databset:</label>
-              <vscode-checkbox id="chartMultipleDataset" :checked="chartMultipleDataset"
-                @change="($e: any) => chartMultipleDataset = $e.target.checked"
-                style="margin-right: auto">Multiple</vscode-checkbox>
+              <VsCodeCheckbox id="chartMultipleDataset" v-model="chartMultipleDataset"
+                style="margin-right: auto">Multiple</VsCodeCheckbox>
             </div>
 
             <div v-if="chartType === 'doughnut' || chartType === 'pie'">
@@ -303,9 +293,8 @@ defineExpose({
                 <TextOrDropdown v-model="chartData4" label="*Data(Y4)" :chartDataItems="chartDataItems" />
                 <div>
                   <label for="chartStacked">Stacked:</label>
-                  <vscode-checkbox id="chartStacked" :checked="chartStacked"
-                    @change="($e: any) => chartStacked = $e.target.checked"
-                    style="margin-right: auto">ON</vscode-checkbox>
+                  <VsCodeCheckbox id="chartStacked" v-model="chartStacked"
+                    style="margin-right: auto">ON</VsCodeCheckbox>
                 </div>
               </div>
             </div>

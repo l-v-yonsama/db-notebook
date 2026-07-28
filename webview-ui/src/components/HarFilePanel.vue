@@ -9,19 +9,11 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
-import {
-  provideVSCodeDesignSystem,
-  vsCodePanels,
-  vsCodePanelTab,
-  vsCodePanelView,
-} from "@vscode/webview-ui-toolkit";
 import { nextTick, onMounted, ref } from "vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
+import VsCodeTabPanels from "./base/VsCodeTabPanels.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import RDHViewer from "./RDHViewer.vue";
-
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
 const activeTabId = ref("");
 const tabItems = ref([] as HarFileTabItem[]);
@@ -59,11 +51,6 @@ onMounted(() => {
 function getActiveTabItem(): HarFileTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as HarFileTabItem;
-}
-
-function isActiveTabId(tabId: string): boolean {
-  const id = activeTabId.value.substring(4); // 'tab-'
-  return tabId === id;
 }
 
 const showTab = async (tabId: string) => {
@@ -290,13 +277,9 @@ defineExpose({
       </button>
     </div>
 
-    <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-      <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId" :title="`${tabItem.title}`"
-        :is-active="isActiveTabId(tabItem.tabId)" :closable="true" @click="showTab(tabItem.tabId)"
-        @close="removeTabItem(tabItem.tabId, true)">
-      </VsCodeTabHeader>
-      <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId"
-        class="panel-view">
+    <VsCodeTabPanels :tab-items="tabItems" :active-tab-id="activeTabId" view-padding="4px"
+      @clickTab="showTab" @closeTab="(tabId: string) => removeTabItem(tabId, true)">
+      <div class="panel-view">
         <div v-if="eventRdh" class="toolbar">
           <label for="keyword">
             <fa icon="search" style="margin-right: 3px" />URL
@@ -318,8 +301,8 @@ defineExpose({
             <RDHViewer :rdh="eventRdh" :width="splitterWidth" :height="splitterHeight" :config="viewConfig" @onClickCell="onClickCell" />
           </div>
         </section>
-      </vscode-panel-view>
-    </vscode-panels>
+      </div>
+    </VsCodeTabPanels>
   </section>
 </template>
 
@@ -333,6 +316,7 @@ section.HarFilePanel {
   .panel-view {
     display: flex;
     flex-direction: column;
+    width: 100%;
 
     .toolbar {
       display: flex;
@@ -346,10 +330,6 @@ section.HarFilePanel {
       }
     }
   }
-}
-
-vscode-panel-view {
-  padding: 4px;
 }
 
 .primary {

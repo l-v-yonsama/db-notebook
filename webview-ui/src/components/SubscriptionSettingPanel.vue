@@ -3,13 +3,12 @@ import type { DropdownItem } from "@/types/Components";
 import type { SubscriptionSettingPanelEventData } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { toNum } from "@l-v-yonsama/rdh";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
@@ -124,17 +123,11 @@ defineExpose({
 
 <template>
   <section class="root">
-    <div class="toolbar">
-      <div class="tool-left"></div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton @click="ok" title="Save">
-          <fa icon="plus" />Save
-        </VsCodeButton>
-      </div>
-    </div>
+    <PanelActionToolbar @cancel="cancel">
+      <VsCodeButton @click="ok" title="Save">
+        <fa icon="plus" />Save
+      </VsCodeButton>
+    </PanelActionToolbar>
     <section class="content scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div>
         <label for="name">Topic filter:</label>
@@ -150,13 +143,11 @@ defineExpose({
       </div>
       <div>
         <label for="nl">No Local:</label>
-        <vscode-checkbox :checked="nl" @change="($e: any) => { nl = $e.target.checked; }"
-          style="margin-right: auto;margin-left: 10px;">No Local</vscode-checkbox>
+        <VsCodeCheckbox v-model="nl" style="margin-right: auto;margin-left: 10px;">No Local</VsCodeCheckbox>
       </div>
       <div>
         <label for="rap">Retain As Published:</label>
-        <vscode-checkbox :checked="rap" @change="($e: any) => { rap = $e.target.checked; }"
-          style="margin-right: auto;margin-left: 10px;">Retain As Published</vscode-checkbox>
+        <VsCodeCheckbox v-model="rap" style="margin-right: auto;margin-left: 10px;">Retain As Published</VsCodeCheckbox>
         <p style="opacity: 0.7;">Preserve retain flag on retained messages</p>
       </div>
       <div>

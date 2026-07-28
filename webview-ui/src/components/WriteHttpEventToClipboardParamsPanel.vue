@@ -9,8 +9,7 @@ import {
 import type { DropdownItem } from "@/types/Components";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
-import { vsCodeCheckbox, provideVSCodeDesignSystem } from "@vscode/webview-ui-toolkit";
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 
 const fileTypeItems: DropdownItem[] = [
   {
@@ -128,39 +127,21 @@ defineExpose({
       <tr>
         <th>With</th>
         <td>
-          <vscode-checkbox
-            v-model="withRequest"
-            :checked="withRequest === true"
-            @change="($e:any) => handleChangeRequest($e.target.checked)"
-            >Request</vscode-checkbox
-          >
+          <VsCodeCheckbox :model-value="withRequest" @change="handleChangeRequest">Request</VsCodeCheckbox>
         </td>
         <td>
-          <vscode-checkbox
-            v-model="withResponse"
-            :checked="withResponse === true"
-            @change="($e:any) => handleChangeResponse($e.target.checked)"
-            >Response</vscode-checkbox
-          >
+          <VsCodeCheckbox :model-value="withResponse" @change="handleChangeResponse">Response</VsCodeCheckbox>
         </td>
         <td>
-          <vscode-checkbox
-            v-model="withCookies"
-            :checked="withCookies === true"
-            @change="($e:any) => handleChangeCookies($e.target.checked)"
-            >Cookies</vscode-checkbox
-          >
+          <VsCodeCheckbox :model-value="withCookies" @change="handleChangeCookies">Cookies</VsCodeCheckbox>
         </td>
       </tr>
       <tr>
         <th>With</th>
         <td colspan="3">
-          <vscode-checkbox
-            v-model="withBinary"
-            :checked="withBinary === true"
-            @change="($e:any) => handleChangeBinary($e.target.checked)"
+          <VsCodeCheckbox :model-value="withBinary" @change="handleChangeBinary"
             >Binary data in Base64 format
-          </vscode-checkbox>
+          </VsCodeCheckbox>
         </td>
       </tr>
     </table>

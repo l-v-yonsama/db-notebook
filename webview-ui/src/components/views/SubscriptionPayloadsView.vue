@@ -7,11 +7,9 @@ import {
   vscode
 } from "@/utilities/vscode";
 import { abbr, type ResultSetData } from "@l-v-yonsama/rdh";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { nextTick, onMounted, ref } from "vue";
+import VsCodeCheckbox from "../base/VsCodeCheckbox.vue";
 import RDHViewer from "../RDHViewer.vue";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const subscriptionName = ref("");
 const isSubscribed = ref(false);
@@ -156,8 +154,8 @@ defineExpose({
         <span id="tableName" :title="subscriptionName">{{ abbr(subscriptionName, 60) }}</span>
       </div>
       <div class="tab-container-actions">
-        <vscode-checkbox :checked="jsonExpansion" @change="($e: any) => handleJSONExpansionOnChange($e.target.checked)"
-          style="margin-right: 10px">Expand JSON column</vscode-checkbox>
+        <VsCodeCheckbox :model-value="jsonExpansion" @change="handleJSONExpansionOnChange"
+          style="margin-right: 10px">Expand JSON column</VsCodeCheckbox>
 
         <button @click="close" :disabled="inProgress" title="Close view">
           <fa icon="times" />

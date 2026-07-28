@@ -7,18 +7,18 @@ import {
 } from "@/utilities/vscode";
 import {
   provideVSCodeDesignSystem,
-  vsCodeCheckbox,
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextArea from "./base/VsCodeTextArea.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 provideVSCodeDesignSystem().register(
-  vsCodeCheckbox(),
   vsCodePanelView(),
 
 );
@@ -170,8 +170,8 @@ defineExpose({
 
 <template>
   <section class="PublishEditorPanel">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar cancel-label="Close panel" cancel-title="Close panel" @cancel="cancel">
+      <template #left>
         <label for="conName">Name:</label>
         <span id="conName">{{ conName }}</span>
         <label for="subscription">Topic:</label>
@@ -179,21 +179,16 @@ defineExpose({
           title="Specify the MQTT subscription to publish or subscribe. Use '/' for hierarchy. Wildcards like '+' and '#' are allowed only for subscriptions."
           placeholder="Enter subscription topic name (e.g. sensor/temp)">
         </VsCodeTextField>
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Close panel" style="margin-right: 5px">
-          <fa icon="times" />Close panel
-        </VsCodeButton>
-        <VsCodeButton :disabled="!executable" @click="ok(true)" appearance="secondary" title="Open in notebook"
-          style="margin-right: 5px">
-          <fa icon="book" />Open in notebook
-        </VsCodeButton>
-        <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
-        <VsCodeButton v-if="langType !== 'javascript'" :disabled="!executable" @click="ok(false)" title="Execute">
-          <fa icon="check" />Execute
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton :disabled="!executable" @click="ok(true)" appearance="secondary" title="Open in notebook"
+        style="margin-right: 5px">
+        <fa icon="book" />Open in notebook
+      </VsCodeButton>
+      <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
+      <VsCodeButton v-if="langType !== 'javascript'" :disabled="!executable" @click="ok(false)" title="Execute">
+        <fa icon="check" />Execute
+      </VsCodeButton>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="settings">
         <div>
@@ -203,8 +198,7 @@ defineExpose({
           <label for="qos" style="margin-left: 10px;">QOS:</label>
           <VsCodeDropdown id="qos" v-model="qos" :items="QosItems" style="width:148px" />
 
-          <vscode-checkbox :checked="retain" @change="($e: any) => { retain = $e.target.checked; }"
-            style="margin-right: auto;margin-left: 10px;">Retain</vscode-checkbox>
+          <VsCodeCheckbox v-model="retain" style="margin-right: auto;margin-left: 10px;">Retain</VsCodeCheckbox>
 
           <label v-if="langType === 'javascript'" for="numOfPayloads"> Num of records </label>
           <VsCodeDropdown v-if="langType === 'javascript'" id="numOfPayloads" v-model="numOfPayloads"

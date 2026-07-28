@@ -3,13 +3,13 @@ import type { DropdownItem } from "@/types/Components";
 import type { CsvParseSettingPanelEventData, RdhViewConfig, SaveCsvOptionParams } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import RDHViewer from "./RDHViewer.vue";
 
 import type { ResultSetData } from "@l-v-yonsama/rdh";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const sectionHeight = ref(300);
 const sectionRdhHeight = ref(300);
@@ -142,19 +142,9 @@ defineExpose({
 
 <template>
   <section class="csv-conditional-root">
-    <div class="toolbar">
-      <div class="tool-left"></div>
-      <div class="tool-right">
-        <VsCodeButton
-          @click="cancel"
-          appearance="secondary"
-          title="Cancel"
-          style="margin-right: 5px"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton @click="ok(false)" title="Show all"><fa icon="check" />Show all</VsCodeButton>
-      </div>
-    </div>
+    <PanelActionToolbar @cancel="cancel">
+      <VsCodeButton @click="ok(false)" title="Show all"><fa icon="check" />Show all</VsCodeButton>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="editor">
         <fieldset class="conditions">
@@ -176,21 +166,21 @@ defineExpose({
               </div>
 
               <div>
-                <vscode-checkbox
+                <VsCodeCheckbox
                   v-if="!initilizing"
-                  :checked="firstLineAsColumn"
-                  @change="($e:any) => {firstLineAsColumn = $e.target.checked; ok(true);}"
+                  v-model="firstLineAsColumn"
+                  @change="ok(true)"
                   style="margin-right: auto"
-                  >First line as column</vscode-checkbox
+                  >First line as column</VsCodeCheckbox
                 >
               </div>
               <div>
-                <vscode-checkbox
+                <VsCodeCheckbox
                   v-if="!initilizing"
-                  :checked="bom"
-                  @change="($e:any) => {bom = $e.target.checked; ok(true);}"
+                  v-model="bom"
+                  @change="ok(true)"
                   style="margin-right: auto"
-                  >Strips the BOM</vscode-checkbox
+                  >Strips the BOM</VsCodeCheckbox
                 >
               </div>
             </div>
@@ -207,31 +197,31 @@ defineExpose({
               </div>
 
               <div>
-                <vscode-checkbox
+                <VsCodeCheckbox
                   v-if="!initilizing"
-                  :checked="cast"
-                  @change="($e:any) => {cast = $e.target.checked; ok(true);}"
+                  v-model="cast"
+                  @change="ok(true)"
                   style="margin-right: auto"
-                  >Cast column type</vscode-checkbox
+                  >Cast column type</VsCodeCheckbox
                 >
 
-                <vscode-checkbox
+                <VsCodeCheckbox
                   v-if="!initilizing"
                   :disabled="!cast"
-                  :checked="castDate"
-                  @change="($e:any) => {castDate = $e.target.checked; ok(true);}"
+                  v-model="castDate"
+                  @change="ok(true)"
                   style="margin-right: auto"
                 >
-                  Also cast date type</vscode-checkbox
+                  Also cast date type</VsCodeCheckbox
                 >
               </div>
               <div>
-                <vscode-checkbox
+                <VsCodeCheckbox
                   v-if="!initilizing"
-                  :checked="trim"
-                  @change="($e:any) => {trim = $e.target.checked; ok(true);}"
+                  v-model="trim"
+                  @change="ok(true)"
                   style="margin-right: auto"
-                  >Ignore whitespace characters</vscode-checkbox
+                  >Ignore whitespace characters</VsCodeCheckbox
                 >
               </div>
             </div>

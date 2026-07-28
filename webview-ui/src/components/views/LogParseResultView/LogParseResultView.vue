@@ -12,20 +12,12 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { isNumericLike, sleep, type ResultSetData } from "@l-v-yonsama/rdh";
-import {
-  provideVSCodeDesignSystem,
-  vsCodePanels,
-  vsCodePanelTab,
-  vsCodePanelView,
-} from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
 import RDHViewer from "../../RDHViewer.vue";
 import SecondarySelectionAction from "../../base/SecondarySelectionAction.vue";
 import VsCodeDropdown from "../../base/VsCodeDropdown.vue";
-import VsCodeTabHeader from "../../base/VsCodeTabHeader.vue";
+import VsCodeTabPanels from "../../base/VsCodeTabPanels.vue";
 import type { AddTabItemPayload, InitializePayload, SearchResultPayload } from "./LogParseResultView.types";
-
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
 const activeTabId = ref("");
 const tabItems = ref([] as InitializePayload['tabItems']);
@@ -109,11 +101,6 @@ const describable = ref(false);
 function getActiveTabItem(): LogParsedTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as LogParsedTabItem;
-}
-
-function isActiveTabId(tabId: string): boolean {
-  const id = activeTabId.value.substring(4); // 'tab-'
-  return tabId === id;
 }
 
 const showTab = async (tabId: string, innerIndex?: number) => {
@@ -416,22 +403,17 @@ defineExpose({
           <fa icon="book" />
         </button>
       </div>
-      <vscode-panels class="tab-wrapper" aria-label="With Active Tab">
-        <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
-          :title="`${tabItem.title}`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
-          @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
-        </VsCodeTabHeader>
-        <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
-          <section :style="{ width: `${splitterWidth}px` }">
-            <div v-if="activeInnerRdh && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
-              <RDHViewer :rdh="activeInnerRdh" :config="viewConfig" :width="splitterWidth" :height="splitterHeight"
-                :ref="setRdhViewerRef" />
-            </div>
-            <div v-else class="centered-content">Drawing {{ numOfRows.toLocaleString() }} rows now. Just a moment,
-              please.</div>
-          </section>
-        </vscode-panel-view>
-      </vscode-panels>
+      <VsCodeTabPanels :tab-items="tabItems" :active-tab-id="activeTabId" view-padding="4px"
+        @clickTab="showTab" @closeTab="(tabId: string) => removeTabItem(tabId, true)" v-slot="{ active }">
+        <section :style="{ width: `${splitterWidth}px` }">
+          <div v-if="activeInnerRdh && active" class="spPaneWrapper">
+            <RDHViewer :rdh="activeInnerRdh" :config="viewConfig" :width="splitterWidth" :height="splitterHeight"
+              :ref="setRdhViewerRef" />
+          </div>
+          <div v-else class="centered-content">Drawing {{ numOfRows.toLocaleString() }} rows now. Just a moment,
+            please.</div>
+        </section>
+      </VsCodeTabPanels>
     </template>
   </section>
 </template>
@@ -442,10 +424,6 @@ section.LogParseResultView {
   width: 100%;
   height: 100vh;
   position: relative;
-}
-
-vscode-panel-view {
-  padding: 4px;
 }
 
 .primary {

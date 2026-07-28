@@ -6,14 +6,13 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { DbTable, ForeignKeyConstraintDetail } from "@l-v-yonsama/multi-platform-database-drivers";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
 import VsCodeTextArea from "./base/VsCodeTextArea.vue";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 type TableItem = {
   name: string;
@@ -166,20 +165,6 @@ const cancel = () => {
 const handleLanguageModelOnChange = () => {
   ok(true);
 };
-const handleTranslateResponseOnChange = (newVal: boolean) => {
-  translateResponse.value = newVal;
-
-  ok(true);
-};
-const handleWithTableDefinitionOnChange = (newVal: boolean) => {
-  withTableDefinition.value = newVal;
-
-  ok(true);
-};
-const handlewithSampleDataOnChange = (newVal: boolean) => {
-  withSampleData.value = newVal;
-  ok(true);
-};
 const handleQueryContentExampleOnChange = () => {
   queryContent.value = queryContentExample.value;
   ok(true);
@@ -298,36 +283,31 @@ defineExpose({
 
 <template>
   <section class="chat-2-query-root">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar @cancel="cancel">
+      <template #left>
         <label for="languageModelId"> Language model</label>
         <VsCodeDropdown id="languageModelId" v-model="languageModelId" :items="languageModelItems"
           :disabled="screenMode !== 'setting'" style="width: 220px;"
           @change="handleLanguageModelOnChange()" />
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton v-if="screenMode !== 'generated'"
-          :disabled="screenMode === 'generating' || queryContent.length === 0 || errorMessage.length > 0"
-          @click="generate" title="Generate">
-          <fa icon="plus" />Generate
-        </VsCodeButton>
-        <VsCodeButton v-if="screenMode === 'generated' && errorMessage.length === 0" @click.stop="copyToClipboard()"
-          appearance="secondary" class="copy-to-clipboard" title="Copy to clipboard">
-          <fa icon="clipboard" />Copy to clipboard
-        </VsCodeButton>
-        <VsCodeButton v-if="screenMode === 'generated'" appearance="secondary" @click="refinePrompt()"
-          title="Refine prompt">
-          <fa icon="pencil" />Refine Prompt
-        </VsCodeButton>
-        <VsCodeButton v-if="screenMode === 'generated' && errorMessage.length === 0" @click="execute()"
-          title="Execute query">
-          <fa icon="check" />Execute query
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton v-if="screenMode !== 'generated'"
+        :disabled="screenMode === 'generating' || queryContent.length === 0 || errorMessage.length > 0"
+        @click="generate" title="Generate">
+        <fa icon="plus" />Generate
+      </VsCodeButton>
+      <VsCodeButton v-if="screenMode === 'generated' && errorMessage.length === 0" @click.stop="copyToClipboard()"
+        appearance="secondary" class="copy-to-clipboard" title="Copy to clipboard">
+        <fa icon="clipboard" />Copy to clipboard
+      </VsCodeButton>
+      <VsCodeButton v-if="screenMode === 'generated'" appearance="secondary" @click="refinePrompt()"
+        title="Refine prompt">
+        <fa icon="pencil" />Refine Prompt
+      </VsCodeButton>
+      <VsCodeButton v-if="screenMode === 'generated' && errorMessage.length === 0" @click="execute()"
+        title="Execute query">
+        <fa icon="check" />Execute query
+      </VsCodeButton>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div v-if="errorMessage">
         <p>{{ errorMessage }}</p>
@@ -362,17 +342,14 @@ defineExpose({
                 <legend>
                   <span style="margin-right: 30px">Prompt Conditions</span>
                 </legend>
-                <vscode-checkbox :checked="translateResponse"
-                  @change="($e: any) => handleTranslateResponseOnChange($e.target.checked)"
-                  style="margin-right: auto">Translate response</vscode-checkbox>
-                <vscode-checkbox :checked="withTableDefinition"
-                  @change="($e: any) => handleWithTableDefinitionOnChange($e.target.checked)"
+                <VsCodeCheckbox v-model="translateResponse" @change="ok(true)"
+                  style="margin-right: auto">Translate response</VsCodeCheckbox>
+                <VsCodeCheckbox v-model="withTableDefinition" @change="ok(true)"
                   style="margin-right: auto">Provide
-                  table definitions</vscode-checkbox>
-                <vscode-checkbox :checked="withSampleData"
-                  @change="($e: any) => handlewithSampleDataOnChange($e.target.checked)"
+                  table definitions</VsCodeCheckbox>
+                <VsCodeCheckbox v-model="withSampleData" @change="ok(true)"
                   style="margin-right: auto">Include
-                  Sample data</vscode-checkbox>
+                  Sample data</VsCodeCheckbox>
                 <div>
                   <label for="commentType">Explanation:</label>
                   <VsCodeRadioGroupVue id="commentType" v-model="commentType" :items="commentTypeItems"
@@ -396,9 +373,9 @@ defineExpose({
                       <template v-for="(item, idx) of allTableItems" :key="idx">
                         <tr>
                           <td style="text-align: center;">
-                            <vscode-checkbox :checked="item.selected"
-                              @change="($e: any) => handleSelectedTableNameOnChange(idx, item.name, $e.target.checked)"
-                              style="margin-right: auto"></vscode-checkbox>
+                            <VsCodeCheckbox :model-value="item.selected"
+                              @change="(v: boolean) => handleSelectedTableNameOnChange(idx, item.name, v)"
+                              style="margin-right: auto"></VsCodeCheckbox>
                           </td>
                           <td :title="item.name">{{ abbr(item.name, 44) }}</td>
                           <td :title="item.comment">{{ abbr(item.comment, 32) }}</td>

@@ -5,12 +5,11 @@ import type {
   LMPromptCreatePanelEventData,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const sectionHeight = ref(300);
 const sectionWidth = ref(300);
@@ -76,21 +75,6 @@ const cancel = () => {
 const handleLanguageModelOnChange = () => {
   ok(true);
 };
-const handleTranslateResponseOnChange = (newVal: boolean) => {
-  translateResponse.value = newVal;
-
-  ok(true);
-};
-const handleWithTableDefinitionOnChange = (newVal: boolean) => {
-  withTableDefinition.value = newVal;
-
-  ok(true);
-};
-const handleWithRetrievedExecutionPlanOnChange = (newVal: boolean) => {
-  withRetrievedExecutionPlan.value = newVal;
-
-  ok(true);
-};
 
 const ok = (preview: boolean) => {
   const params: LMPromptCreateConditionParams = {
@@ -136,21 +120,16 @@ defineExpose({
 
 <template>
   <section class="lm-prompt-creation-root">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar @cancel="cancel">
+      <template #left>
         <label for="languageModelId"> Language model</label>
         <VsCodeDropdown id="languageModelId" v-model="languageModelId" :items="languageModelItems"
           style="width: 220px;" @change="handleLanguageModelOnChange()" />
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton :disabled="errorMessage.length > 0" @click="ok(false)" title="Evaluate the sql">
-          <fa icon="check" />Evaluate SQL
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton :disabled="errorMessage.length > 0" @click="ok(false)" title="Evaluate the sql">
+        <fa icon="check" />Evaluate SQL
+      </VsCodeButton>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div v-if="errorMessage">
         <p>{{ errorMessage }}</p>
@@ -162,16 +141,13 @@ defineExpose({
               <legend>
                 <span style="margin-right: 30px">Conditions</span>
               </legend>
-              <vscode-checkbox :checked="translateResponse"
-                @change="($e: any) => handleTranslateResponseOnChange($e.target.checked)"
-                style="margin-right: auto">Translate response</vscode-checkbox>
-              <vscode-checkbox :checked="withTableDefinition"
-                @change="($e: any) => handleWithTableDefinitionOnChange($e.target.checked)"
+              <VsCodeCheckbox v-model="translateResponse" @change="ok(true)"
+                style="margin-right: auto">Translate response</VsCodeCheckbox>
+              <VsCodeCheckbox v-model="withTableDefinition" @change="ok(true)"
                 style="margin-right: auto">Provide
-                table definitions</vscode-checkbox>
-              <vscode-checkbox :checked="withRetrievedExecutionPlan" :disabled="!hasExplainPlan"
-                @change="($e: any) => handleWithRetrievedExecutionPlanOnChange($e.target.checked)"
-                style="margin-right: auto">Include retrieved "Execution Plan" *</vscode-checkbox>
+                table definitions</VsCodeCheckbox>
+              <VsCodeCheckbox v-model="withRetrievedExecutionPlan" :disabled="!hasExplainPlan" @change="ok(true)"
+                style="margin-right: auto">Include retrieved "Execution Plan" *</VsCodeCheckbox>
               <p v-if="!hasExplainPlan" style="margin-left: 8px; font-size: small; opacity: 0.7;">* Get an “Explain
                 plan”
                 in advance</p>

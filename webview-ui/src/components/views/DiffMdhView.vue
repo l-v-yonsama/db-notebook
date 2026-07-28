@@ -11,19 +11,11 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { sleep } from "@l-v-yonsama/rdh";
-import {
-  provideVSCodeDesignSystem,
-  vsCodePanels,
-  vsCodePanelTab,
-  vsCodePanelView,
-} from "@vscode/webview-ui-toolkit";
 import { nextTick, onMounted, ref } from "vue";
 import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
-import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
+import VsCodeTabPanels from "../base/VsCodeTabPanels.vue";
 import RDHViewer from "../RDHViewer.vue";
-
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
 const activeTabId = ref("");
 const tabItems = ref([] as DiffTabItem[]);
@@ -94,11 +86,6 @@ onMounted(() => {
 function getActiveTabItem(): DiffTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as DiffTabItem;
-}
-
-function isActiveTabId(tabId: string): boolean {
-  const id = activeTabId.value.substring(4); // 'tab-'
-  return tabId === id;
 }
 
 const showTab = async (tabId: string, innerIndex?: number) => {
@@ -314,33 +301,29 @@ defineExpose({
         </button>
         <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
       </div>
-      <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-        <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
-          :title="`${tabItem.title}(${tabItem.subTitle})`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
-          @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
-        </VsCodeTabHeader>
-        <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
-          <section :style="{ width: `${splitterWidth}px` }">
-            <splitpanes class="default-theme"
-              :style="{ 'max-width': `${splitterWidth}px`, 'height': `${splitterHeight}px` }">
-              <pane min-size="5">
-                <div v-if="activeInnerRdh1 && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
-                  <RDHViewer :rdh="activeInnerRdh1" :width="splitterWidth" :height="splitterHeight"
-                    :showOnlyChanged="displayOnlyChanged" :config="viewConfig">
-                  </RDHViewer>
-                </div>
-              </pane>
-              <pane min-size="5">
-                <div v-if="activeInnerRdh2 && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
-                  <RDHViewer :rdh="activeInnerRdh2" :width="splitterWidth" :height="splitterHeight"
-                    :showOnlyChanged="displayOnlyChanged" :config="viewConfig">
-                  </RDHViewer>
-                </div>
-              </pane>
-            </splitpanes>
-          </section>
-        </vscode-panel-view>
-      </vscode-panels>
+      <VsCodeTabPanels :tab-items="tabItems" :active-tab-id="activeTabId"
+        :title-formatter="(item) => `${item.title}(${item.subTitle})`" view-padding="4px"
+        @clickTab="showTab" @closeTab="(tabId: string) => removeTabItem(tabId, true)" v-slot="{ active }">
+        <section :style="{ width: `${splitterWidth}px` }">
+          <splitpanes class="default-theme"
+            :style="{ 'max-width': `${splitterWidth}px`, 'height': `${splitterHeight}px` }">
+            <pane min-size="5">
+              <div v-if="activeInnerRdh1 && active" class="spPaneWrapper">
+                <RDHViewer :rdh="activeInnerRdh1" :width="splitterWidth" :height="splitterHeight"
+                  :showOnlyChanged="displayOnlyChanged" :config="viewConfig">
+                </RDHViewer>
+              </div>
+            </pane>
+            <pane min-size="5">
+              <div v-if="activeInnerRdh2 && active" class="spPaneWrapper">
+                <RDHViewer :rdh="activeInnerRdh2" :width="splitterWidth" :height="splitterHeight"
+                  :showOnlyChanged="displayOnlyChanged" :config="viewConfig">
+                </RDHViewer>
+              </div>
+            </pane>
+          </splitpanes>
+        </section>
+      </VsCodeTabPanels>
     </template>
   </section>
 </template>
@@ -351,9 +334,5 @@ section.MdhView {
   width: 100%;
   height: 100vh;
   position: relative;
-}
-
-vscode-panel-view {
-  padding: 4px;
 }
 </style>

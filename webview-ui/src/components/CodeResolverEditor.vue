@@ -5,17 +5,16 @@ import {
   type CodeResolverParams,
   type UpdateCodeResolverTextDocumentActionCommand,
 } from "@/utilities/vscode";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import Paragraph from "./base/Paragraph.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 import type { DropdownItem } from "@/types/Components";
 import type { CodeItem, CodeItemDetail } from "@l-v-yonsama/rdh";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const sectionHeight = ref(300);
 
@@ -285,23 +284,18 @@ defineExpose({
 
 <template>
   <section class="cr-root">
-    <div v-if="visibleEditor" class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar v-if="visibleEditor" @cancel="updateTextDocument({ values: { name: 'cancel' } })">
+      <template #left>
         <label for="connectionName">Connection setting</label>
         <VsCodeDropdown id="connectionName" v-model="connectionName" :items="connectionItems"
           @change="updateTextDocument({ values: { name: 'change', detail: 'connectionName' } })"
           style="width:200px"
           />
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="updateTextDocument({ values: { name: 'cancel' } })" appearance="secondary" title="Cancel">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton @click="updateTextDocument({ values: { name: 'save-code-item' } })" title="Save">
-          <fa icon="check" />Ok
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton @click="updateTextDocument({ values: { name: 'save-code-item' } })" title="Save">
+        <fa icon="check" />Ok
+      </VsCodeButton>
+    </PanelActionToolbar>
     <div v-else class="toolbar">
       <div class="tool-left">
         <label for="keyword">
@@ -349,15 +343,15 @@ defineExpose({
               </tr>
               <tr>
                 <td style="width: 130px">
-                  <vscode-checkbox :checked="editorItem.resource.table !== undefined"
-                    @change="($e: any) => handleChangeSpecifyResourceTable($e.target.checked)"
-                    style="margin-right: auto">Specify table</vscode-checkbox>
+                  <VsCodeCheckbox :model-value="editorItem.resource.table !== undefined"
+                    @change="handleChangeSpecifyResourceTable"
+                    style="margin-right: auto">Specify table</VsCodeCheckbox>
                 </td>
                 <td style="width: 170px">
                   <template v-if="editorItem.resource.table !== undefined">
-                    <vscode-checkbox :checked="editorItem.resource.table.regex"
-                      @change="($e: any) => handleChangeRegexResource('table', $e.target.checked)">Regular
-                      expression</vscode-checkbox>
+                    <VsCodeCheckbox :model-value="editorItem.resource.table.regex"
+                      @change="(v: boolean) => handleChangeRegexResource('table', v)">Regular
+                      expression</VsCodeCheckbox>
                   </template>
                 </td>
                 <td>
@@ -377,9 +371,9 @@ defineExpose({
                   <label :for="`resourceColumn`">Column</label>
                 </td>
                 <td>
-                  <vscode-checkbox :checked="editorItem.resource.column.regex"
-                    @change="($e: any) => handleChangeRegexResource('column', $e.target.checked)">Regular
-                    expression</vscode-checkbox>
+                  <VsCodeCheckbox :model-value="editorItem.resource.column.regex"
+                    @change="(v: boolean) => handleChangeRegexResource('column', v)">Regular
+                    expression</VsCodeCheckbox>
                 </td>
                 <td>
                   <template v-if="editorItem.resource.column.regex">

@@ -5,13 +5,12 @@ import type {
   CreateScriptConditionParams,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
 import { nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 const sectionHeight = ref(300);
 const sectionWidth = ref(300);
@@ -95,27 +94,6 @@ const handleLnagTypeOnChange = (newVal: "javascript" | "sql") => {
   langType.value = newVal;
   ok(false, true);
 };
-const handleAssignSchemaNameOnChange = (newVal: boolean) => {
-  assignSchemaName.value = newVal;
-
-  ok(false, true);
-};
-const handleOnlyNotNullColumnsOnChange = (newVal: boolean) => {
-  onlyNotNullColumns.value = newVal;
-
-  ok(false, true);
-};
-const handleWithCommentsOnChange = (newVal: boolean) => {
-  withComments.value = newVal;
-
-  ok(false, true);
-};
-const handleCompactSqlOnChange = (newVal: boolean) => {
-  compactSql.value = newVal;
-
-  ok(false, true);
-};
-
 const ok = (openInNotebook: boolean, preview: boolean) => {
   const params: CreateScriptConditionParams = {
     assignSchemaName: assignSchemaName.value,
@@ -162,8 +140,8 @@ defineExpose({
 
 <template>
   <section class="script-creation-root">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar @cancel="cancel">
+      <template #left>
         <label v-if="langType === 'sql'" for="tableName">Table:</label>
         <span v-if="langType === 'sql'" id="tableName">{{ tableNameWithComment }}</span>
         <label for="langType">Lang:</label>
@@ -172,20 +150,15 @@ defineExpose({
         <label v-if="langType === 'javascript'" for="numOfRecords"> Num of records </label>
         <VsCodeDropdown v-if="langType === 'javascript'" id="numOfRecords" v-model="numOfRecords"
           :items="numOfRecordsItems" style="z-index: 15" @change="handleNumOfRecordsOnChange()" />
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton @click="ok(true, false)" appearance="secondary" title="Open in notebook"
-          style="margin-right: 5px">
-          <fa icon="book" />Open in notebook
-        </VsCodeButton>
-        <VsCodeButton @click="ok(false, false)" title="Copy to clipboard">
-          <fa icon="clipboard" />Copy to clipboard
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton @click="ok(true, false)" appearance="secondary" title="Open in notebook"
+        style="margin-right: 5px">
+        <fa icon="book" />Open in notebook
+      </VsCodeButton>
+      <VsCodeButton @click="ok(false, false)" title="Copy to clipboard">
+        <fa icon="clipboard" />Copy to clipboard
+      </VsCodeButton>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="settings">
         <div class="editor">
@@ -193,18 +166,18 @@ defineExpose({
             <legend>
               <span style="margin-right: 30px">Conditions</span>
             </legend>
-            <vscode-checkbox :checked="assignSchemaName"
-              @change="($e: any) => handleAssignSchemaNameOnChange($e.target.checked)" style="margin-right: auto">With
-              schema name</vscode-checkbox>
-            <vscode-checkbox :checked="withComments"
-              @change="($e: any) => handleWithCommentsOnChange($e.target.checked)" style="margin-right: auto">With
-              comments</vscode-checkbox>
-            <vscode-checkbox :checked="onlyNotNullColumns"
-              @change="($e: any) => handleOnlyNotNullColumnsOnChange($e.target.checked)" style="margin-right: auto">Only
-              "NOT NULL" Columns</vscode-checkbox>
-            <vscode-checkbox :disabled="langType === 'javascript'" :checked="compactSql"
-              @change="($e: any) => handleCompactSqlOnChange($e.target.checked)" style="margin-right: auto">Compact
-              SQL</vscode-checkbox>
+            <VsCodeCheckbox v-model="assignSchemaName" @change="ok(false, true)"
+              style="margin-right: auto">With
+              schema name</VsCodeCheckbox>
+            <VsCodeCheckbox v-model="withComments" @change="ok(false, true)"
+              style="margin-right: auto">With
+              comments</VsCodeCheckbox>
+            <VsCodeCheckbox v-model="onlyNotNullColumns" @change="ok(false, true)"
+              style="margin-right: auto">Only
+              "NOT NULL" Columns</VsCodeCheckbox>
+            <VsCodeCheckbox :disabled="langType === 'javascript'" v-model="compactSql" @change="ok(false, true)"
+              style="margin-right: auto">Compact
+              SQL</VsCodeCheckbox>
           </fieldset>
         </div>
         <fieldset class="conditions">

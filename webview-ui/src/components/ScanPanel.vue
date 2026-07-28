@@ -14,29 +14,16 @@ import type {
 import { vscode } from "@/utilities/vscode";
 import type { ResourceType } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
-import {
-  provideVSCodeDesignSystem,
-  vsCodeCheckbox,
-  vsCodePanels,
-  vsCodePanelTab,
-  vsCodePanelView,
-} from "@vscode/webview-ui-toolkit";
 import dayjs from "dayjs";
 import { computed, nextTick, onMounted, ref } from "vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
-import VsCodeTabHeader from "./base/VsCodeTabHeader.vue";
+import VsCodeTabPanels from "./base/VsCodeTabPanels.vue";
 import VsCodeTextArea from "./base/VsCodeTextArea.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import RDHViewer from "./RDHViewer.vue";
-
-provideVSCodeDesignSystem().register(
-  vsCodeCheckbox(),
-  vsCodePanels(),
-  vsCodePanelView(),
-  vsCodePanelTab()
-);
 
 const outputDetailItems = ref([
   {
@@ -109,11 +96,6 @@ onMounted(() => {
 function getActiveTabItem(): ScanTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as ScanTabItem;
-}
-
-function isActiveTabId(tabId: string): boolean {
-  const id = activeTabId.value.substring(4); // 'tab-'
-  return tabId === id;
 }
 
 // startDt: 表示される日付はユーザーのブラウザーに設定されたロケールに基づいた書式
@@ -408,13 +390,11 @@ defineExpose({
         <fa icon="file-excel" />
       </button>
     </div>
-    <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-      <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
-        :title="`${tabItem.title}:${tabItem.dbType}`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
-        @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
-      </VsCodeTabHeader>
-      <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
-        <section v-if="isActiveTabId(tabItem.tabId)" :style="{ width: `${splitterWidth}px` }">
+    <VsCodeTabPanels :tab-items="tabItems" :active-tab-id="activeTabId"
+      :title-formatter="(item) => `${item.title}:${item.dbType}`" view-padding="7px 4px"
+      @clickTab="showTab" @closeTab="(tabId: string) => removeTabItem(tabId, true)"
+      v-slot="{ tabItem, active }">
+        <section v-if="active" :style="{ width: `${splitterWidth}px` }">
           <div class="toolbar" :style="{ width: `${splitterWidth}px` }">
             <div v-if="isMultiLineKeyword" class="multiple">
               <div class="left">
@@ -476,9 +456,8 @@ defineExpose({
               <label v-if="tabItem.limit.visible" for="limit">{{ tabItem.limit.label }}</label>
               <VsCodeTextField v-if="tabItem.limit.visible" id="limit" class="limit" v-model="tabItem.limit.value"
                 type="number" :min="0" :size="9" :title="tabItem.limit.description"></VsCodeTextField>
-              <vscode-checkbox v-if="tabItem.jsonExpansion.visible" :checked="tabItem.jsonExpansion.value === true"
-                @change="($e: any) => tabItem.jsonExpansion.value = ($e.target.checked == true)"
-                style="margin-right: auto">JSON expansion</vscode-checkbox>
+              <VsCodeCheckbox v-if="tabItem.jsonExpansion.visible" v-model="tabItem.jsonExpansion.value"
+                style="margin-right: auto">JSON expansion</VsCodeCheckbox>
               <label v-if="tabItem.keyword.visible" for="keyword">{{ tabItem.keyword.label }}</label>
               <VsCodeTextField v-if="tabItem.keyword.visible" id="keyword" v-model="tabItem.keyword.value"
                 :maxlength="128" :title="tabItem.keyword.description" placeholder="Enter a keyword"
@@ -496,8 +475,7 @@ defineExpose({
               :height="splitterHeight" :config="null" @onClickCell="onClickCell" />
           </div>
         </section>
-      </vscode-panel-view>
-    </vscode-panels>
+    </VsCodeTabPanels>
   </section>
 </template>
 
@@ -507,10 +485,6 @@ section.ScanPanel {
   width: 100%;
   height: 100vh;
   position: relative;
-}
-
-vscode-panel-view {
-  padding: 7px 4px;
 }
 
 .toolbar {

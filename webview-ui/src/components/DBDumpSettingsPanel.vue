@@ -10,6 +10,7 @@ import type {
 import { vscode } from "@/utilities/vscode";
 import { toNum } from "@l-v-yonsama/rdh";
 import { computed, nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeRadioGroupVue from "./base/VsCodeRadioGroup.vue";
@@ -234,25 +235,20 @@ defineExpose({
 
 <template>
   <section class="root">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar @cancel="cancel">
+      <template #left>
         <div v-if="disabledReasonMessage" class="disabled-reason">
           ⚠ {{ disabledReasonMessage }}
         </div>
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton @click="writeToClipboard" appearance="secondary" title="Write to clipboard"
-          :disabled="!!disabledReasonMessage">
-          <fa icon="clipboard" />Copy to clipboard
-        </VsCodeButton>
-        <VsCodeButton @click="ok" title="Run Dump command" :disabled="!!disabledReasonMessage">
-          <fa icon="check" />Run Dump
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton @click="writeToClipboard" appearance="secondary" title="Write to clipboard"
+        :disabled="!!disabledReasonMessage">
+        <fa icon="clipboard" />Copy to clipboard
+      </VsCodeButton>
+      <VsCodeButton @click="ok" title="Run Dump command" :disabled="!!disabledReasonMessage">
+        <fa icon="check" />Run Dump
+      </VsCodeButton>
+    </PanelActionToolbar>
     <section v-if="!initialized" class="centered-content">Just a moment, please.</section>
     <section v-else class="content top-scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="params content-child">

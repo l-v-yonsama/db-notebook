@@ -6,6 +6,12 @@ export type DropdownItem = {
   };
 };
 
+export type TabItemLike = {
+  tabId: string;
+  title: string;
+  [key: string]: any;
+};
+
 type SecondaryItemDivider = {
   kind: "divider";
 };

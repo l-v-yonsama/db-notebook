@@ -6,12 +6,6 @@ import {
   type CloseTabActionCommand,
 } from "@/utilities/vscode";
 import {
-  provideVSCodeDesignSystem,
-  vsCodePanels,
-  vsCodePanelTab,
-  vsCodePanelView,
-} from "@vscode/webview-ui-toolkit";
-import {
   ArcElement,
   BarElement,
   CategoryScale,
@@ -30,7 +24,7 @@ import "chartjs-adapter-date-fns";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { nextTick, onMounted, ref } from "vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
-import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
+import VsCodeTabPanels from "../base/VsCodeTabPanels.vue";
 import PairPlotChart from "./charts/PairPlotChart.vue";
 
 import { export2image } from "@/utilities/imageUtil";
@@ -51,8 +45,6 @@ ChartJS.register(
   RadialLinearScale,
   TimeScale
 );
-
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
 const activeTabId = ref("");
 const tabItems = ref([] as ChartTabItem[]);
@@ -81,11 +73,6 @@ onMounted(() => {
 function getActiveTabItem(): ChartTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as ChartTabItem;
-}
-
-function isActiveTabId(tabId: string): boolean {
-  const id = activeTabId.value.substring(4); // 'tab-'
-  return tabId === id;
 }
 
 const showTab = async (tabId: string, innerIndex?: number) => {
@@ -232,14 +219,11 @@ defineExpose({
         </VsCodeButton>
       </div>
     </div>
-    <vscode-panels class="tab-wrapper" :activeid="activeTabId" aria-label="With Active Tab">
-      <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId" :title="`${tabItem.title}`"
-        :is-active="isActiveTabId(tabItem.tabId)" :closable="true" @click="showTab(tabItem.tabId)"
-        @close="removeTabItem(tabItem.tabId, true)">
-      </VsCodeTabHeader>
-      <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
+    <VsCodeTabPanels :tab-items="tabItems" :active-tab-id="activeTabId"
+      @clickTab="showTab" @closeTab="(tabId: string) => removeTabItem(tabId, true)"
+      v-slot="{ tabItem, active }">
         <section :style="{ width: `${sectionWidth}px` }">
-          <div :id="'chart-' + tabItem.tabId" v-if="activeChartTabItem && isActiveTabId(tabItem.tabId)"
+          <div :id="'chart-' + tabItem.tabId" v-if="activeChartTabItem && active"
             class="spPaneWrapper" :style="{
               backgroundColor: isCapturing ? 'white' : '',
             }">
@@ -262,8 +246,7 @@ defineExpose({
               :options="activeChartTabItem.options" :style="{ height: `${sectionHeight}px`, position: 'relative' }" />
           </div>
         </section>
-      </vscode-panel-view>
-    </vscode-panels>
+    </VsCodeTabPanels>
   </section>
 </template>
 

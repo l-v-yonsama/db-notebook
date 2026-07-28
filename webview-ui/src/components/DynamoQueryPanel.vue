@@ -9,16 +9,16 @@ import {
 } from "@/utilities/vscode";
 import {
   provideVSCodeDesignSystem,
-  vsCodeCheckbox,
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 provideVSCodeDesignSystem().register(
-  vsCodeCheckbox(),
   vsCodePanelView(),
 
 );
@@ -186,11 +186,6 @@ const deleteFilter = (idx: number) => {
 const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {
   ok(true);
 };
-const setSortDesc = (v: boolean) => {
-  sortDesc.value = v;
-  ok(true);
-};
-
 const recieveMessage = (data: DynamoQueryPanelEventData) => {
   const { command, value } = data;
   switch (command) {
@@ -215,8 +210,8 @@ defineExpose({
 
 <template>
   <section class="DynamoQueryPanel">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar @cancel="cancel">
+      <template #left>
         <label for="tableName">Table:</label>
         <span id="tableName">{{ tableName }}</span>
         <label for="numOfRows">Estimated items:</label>
@@ -228,16 +223,11 @@ defineExpose({
         <label for="target">Table or Index:</label>
         <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="width:200px"
           @change="updateOptions()" />
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute">
-          <fa icon="check" />Execute
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute">
+        <fa icon="check" />Execute
+      </VsCodeButton>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="settings">
         <div class="editor">
@@ -261,8 +251,8 @@ defineExpose({
               </VsCodeTextField>
               <span v-if="skOpe === 'between'" style="font-size: small; margin-left:5px;opacity: 0.7;"> *Separate by
                 comma</span>
-              <vscode-checkbox :checked="sortDesc" @change="($e: any) => setSortDesc($e.target.checked)"
-                style="margin-left: 8px; font-size: small; opacity: 0.7;">Sort descending order</vscode-checkbox>
+              <VsCodeCheckbox v-model="sortDesc" @change="ok(true)"
+                style="margin-left: 8px; font-size: small; opacity: 0.7;">Sort descending order</VsCodeCheckbox>
             </div>
           </fieldset>
           <fieldset class="filter">

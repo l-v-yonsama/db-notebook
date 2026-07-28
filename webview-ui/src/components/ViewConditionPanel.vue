@@ -8,15 +8,14 @@ import type {
 import { vscode } from "@/utilities/vscode";
 import { nextTick, onMounted, ref } from "vue";
 import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 import RDHViewer from "./RDHViewer.vue";
 import TopLevelConditionVue from "./TopLevelCondition.vue";
 
 import { GeneralColumnType } from "@l-v-yonsama/rdh";
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from "@vscode/webview-ui-toolkit";
-
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 
 const sectionHeight = ref(300);
 const sectionWidth = ref(300);
@@ -185,11 +184,6 @@ const cancel = () => {
     params: {},
   });
 };
-const handleSpecifyConditionOnChange = (newVal: boolean) => {
-  specifyCondition.value = newVal;
-
-  ok(false, true);
-};
 const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {
   visibleCondition.value = false;
   nextTick(() => {
@@ -286,35 +280,28 @@ defineExpose({
 
 <template>
   <section class="view-conditional-root">
-    <div class="toolbar">
-      <div class="tool-left">
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
-          <fa icon="times" />Cancel
+    <PanelActionToolbar @cancel="cancel">
+      <template v-if="visibleSettingsMode">
+        <VsCodeButton @click="openInNotebook(true)" appearance="secondary" title="Open in notebook"
+          style="margin-right: 5px">
+          <fa icon="book" />Open in notebook
         </VsCodeButton>
-        <template v-if="visibleSettingsMode">
-          <VsCodeButton @click="openInNotebook(true)" appearance="secondary" title="Open in notebook"
-            style="margin-right: 5px">
-            <fa icon="book" />Open in notebook
-          </VsCodeButton>
-          <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
+        <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
 
-          <VsCodeButton v-if="supportEditMode" @click="ok(true, false)" appearance="secondary"
-            title="Search for records to edit" style="margin-right: 5px">
-            <fa icon="pencil" />Search &amp; Edit
-          </VsCodeButton>
-          <VsCodeButton @click="ok(false, false)" title="Search">
-            <fa icon="check" />Search
-          </VsCodeButton>
-        </template>
-        <template v-else>
-          <VsCodeButton @click="saveValues()" title="Save changes to table">
-            <fa icon="save" />Save changes
-          </VsCodeButton>
-        </template>
-      </div>
-    </div>
+        <VsCodeButton v-if="supportEditMode" @click="ok(true, false)" appearance="secondary"
+          title="Search for records to edit" style="margin-right: 5px">
+          <fa icon="pencil" />Search &amp; Edit
+        </VsCodeButton>
+        <VsCodeButton @click="ok(false, false)" title="Search">
+          <fa icon="check" />Search
+        </VsCodeButton>
+      </template>
+      <template v-else>
+        <VsCodeButton @click="saveValues()" title="Save changes to table">
+          <fa icon="save" />Save changes
+        </VsCodeButton>
+      </template>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div v-if="visibleSettingsMode" class="settings">
         <div class="db-resource">
@@ -340,9 +327,8 @@ defineExpose({
             <legend>
               <span style="margin-right: 30px">Conditions</span>
 
-              <vscode-checkbox :checked="specifyCondition === true"
-                @change="($e: any) => handleSpecifyConditionOnChange($e.target.checked)"
-                style="margin-right: auto">Specify</vscode-checkbox>
+              <VsCodeCheckbox v-model="specifyCondition" @change="ok(false, true)"
+                style="margin-right: auto">Specify</VsCodeCheckbox>
             </legend>
             <TopLevelConditionVue v-if="visibleCondition && specifyCondition" v-model="editorItem.conditions"
               :columnItems="columnItems" :rule-base-mode="false" :lv="0" @change="updateTextDocument()" />

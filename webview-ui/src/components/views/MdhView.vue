@@ -12,20 +12,12 @@ import type {
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { isNumericLike, sleep, type ResultSetData } from "@l-v-yonsama/rdh";
-import {
-  provideVSCodeDesignSystem,
-  vsCodePanels,
-  vsCodePanelTab,
-  vsCodePanelView,
-} from "@vscode/webview-ui-toolkit";
 import { nextTick, onMounted, ref } from "vue";
 import CompareKeySettings from "../CompareKeySettings.vue";
 import RDHViewer from "../RDHViewer.vue";
 import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
-import VsCodeTabHeader from "../base/VsCodeTabHeader.vue";
-
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
+import VsCodeTabPanels from "../base/VsCodeTabPanels.vue";
 
 const activeTabId = ref("");
 const tabItems = ref([] as RdhTabItem[]);
@@ -94,11 +86,6 @@ const describable = ref(false);
 function getActiveTabItem(): RdhTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as RdhTabItem;
-}
-
-function isActiveTabId(tabId: string): boolean {
-  const id = activeTabId.value.substring(4); // 'tab-'
-  return tabId === id;
 }
 
 const showTab = async (tabId: string, innerIndex?: number) => {
@@ -416,23 +403,18 @@ defineExpose({
       </div>
       <CompareKeySettings v-if="contentMode == 'keys'" :rdhList="activeTabRdhList" @cancel="contentMode = 'tab'"
         @save="saveCompareKeys" />
-      <vscode-panels v-if="contentMode == 'tab'" class="tab-wrapper" :activeid="activeTabId"
-        aria-label="With Active Tab">
-        <VsCodeTabHeader v-for="tabItem in tabItems" :id="tabItem.tabId" :key="tabItem.tabId"
-          :title="`${tabItem.title}`" :is-active="isActiveTabId(tabItem.tabId)" :closable="true"
-          @click="showTab(tabItem.tabId)" @close="removeTabItem(tabItem.tabId, true)">
-        </VsCodeTabHeader>
-        <vscode-panel-view v-for="tabItem of tabItems" :id="'view-' + tabItem.tabId" :key="tabItem.tabId">
-          <section :style="{ width: `${splitterWidth}px` }">
-            <div v-if="activeInnerRdh && isActiveTabId(tabItem.tabId)" class="spPaneWrapper">
-              <RDHViewer :rdh="activeInnerRdh" :config="viewConfig" :width="splitterWidth" :height="splitterHeight"
-                :ref="setRdhViewerRef" />
-            </div>
-            <div v-else class="centered-content">Drawing {{ numOfRows.toLocaleString() }} rows now. Just a moment,
-              please.</div>
-          </section>
-        </vscode-panel-view>
-      </vscode-panels>
+      <VsCodeTabPanels v-if="contentMode == 'tab'" :tab-items="tabItems" :active-tab-id="activeTabId"
+        view-padding="4px" @clickTab="showTab" @closeTab="(tabId: string) => removeTabItem(tabId, true)"
+        v-slot="{ active }">
+        <section :style="{ width: `${splitterWidth}px` }">
+          <div v-if="activeInnerRdh && active" class="spPaneWrapper">
+            <RDHViewer :rdh="activeInnerRdh" :config="viewConfig" :width="splitterWidth" :height="splitterHeight"
+              :ref="setRdhViewerRef" />
+          </div>
+          <div v-else class="centered-content">Drawing {{ numOfRows.toLocaleString() }} rows now. Just a moment,
+            please.</div>
+        </section>
+      </VsCodeTabPanels>
     </template>
   </section>
 </template>
@@ -443,10 +425,6 @@ section.MdhView {
   width: 100%;
   height: 100vh;
   position: relative;
-}
-
-vscode-panel-view {
-  padding: 4px;
 }
 
 .primary {

@@ -8,6 +8,7 @@ import {
 import type { DbColumn, DbSchema } from "@l-v-yonsama/multi-platform-database-drivers";
 import { computed, nextTick, onMounted, ref } from "vue";
 import Paragraph from "./base/Paragraph.vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
@@ -244,8 +245,8 @@ defineExpose({
 
 <template>
   <section v-if="initialized" class="rr-root">
-    <div v-if="visibleEditor" class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar v-if="visibleEditor" @cancel="updateTextDocument({ name: 'cancel' })">
+      <template #left>
         <label for="connectionName">Connection setting</label>
         <VsCodeDropdown
           id="connectionName"
@@ -262,19 +263,11 @@ defineExpose({
           style="z-index: 7"
           @change="updateTextDocument({ name: 'change', detail: 'tableName' })"
         />
-      </div>
-      <div class="tool-right">
-        <VsCodeButton
-          @click="updateTextDocument({ name: 'cancel' })"
-          appearance="secondary"
-          title="Cancel"
-          ><fa icon="times" />Cancel</VsCodeButton
-        >
-        <VsCodeButton @click="updateTextDocument({ name: 'save-rule' })" title="Save"
-          ><fa icon="check" />Ok</VsCodeButton
-        >
-      </div>
-    </div>
+      </template>
+      <VsCodeButton @click="updateTextDocument({ name: 'save-rule' })" title="Save"
+        ><fa icon="check" />Ok</VsCodeButton
+      >
+    </PanelActionToolbar>
     <div v-else class="toolbar">
       <div class="tool-left">
         <label for="keyword"> <fa icon="search" style="margin-right: 3px" />Search </label>

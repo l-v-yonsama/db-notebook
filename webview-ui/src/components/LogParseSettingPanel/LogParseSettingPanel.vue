@@ -3,18 +3,19 @@ import type { DropdownItem } from "@/types/Components";
 import type { LogParseSettingPanelEventData, SaveLogOptionParams } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import { computed, nextTick, onMounted, ref } from "vue";
+import PanelActionToolbar from "../base/PanelActionToolbar.vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
 
 import {
-  provideVSCodeDesignSystem, vsCodeCheckbox, vsCodePanels,
+  provideVSCodeDesignSystem, vsCodePanels,
   vsCodePanelTab,
   vsCodePanelView,
 } from "@vscode/webview-ui-toolkit";
 
 import type { InitializePayload, ResetConfigFileAndItemsPayload, ResetConfigPayload } from "./LogParseSettingPanel.types";
 
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab(), vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
 
 /* state */
 
@@ -345,31 +346,26 @@ defineExpose({
 
 <template>
   <section class="log-conditional-root">
-    <div class="toolbar">
-      <div class="tool-left">
+    <PanelActionToolbar @cancel="cancel">
+      <template #left>
         <span v-if="errorMessage" class="disabled-reason">⚠️ {{ errorMessage }}</span>
-      </div>
-      <div class="tool-right">
-        <VsCodeButton @click="cancel" appearance="secondary" title="Cancel" style="margin-right: 5px">
-          <fa icon="times" />Cancel
-        </VsCodeButton>
-        <VsCodeButton @click="postOk({ 'action': 'create-new-config' })" title="Create new config"
-          :appearance="isConfigFileSelected ? 'secondary' : ''">
-          <fa icon="plus" />{{ configEditorVisible ? 'Create config' : 'Create new config' }}
-        </VsCodeButton>
-        <VsCodeButton @click="openAsJSON" title="Create new config" :disabled="configEditorVisible || configFile === ''"
-          :appearance="isConfigFileSelected ? '' : 'secondary'">
-          <fa icon="pencil" />Edit config
-        </VsCodeButton>
-        <VsCodeButton @click="postOk({ 'action': 'test-split' })" title="Test split log" appearance="secondary"
-          :disabled="!canSplitLog">
-          <fa icon="check" />Test split log
-        </VsCodeButton>
-        <VsCodeButton @click="postOk({ 'action': 'parse' })" title="Parse log" :disabled="!!errorMessage">
-          <fa icon="check" />Parse log
-        </VsCodeButton>
-      </div>
-    </div>
+      </template>
+      <VsCodeButton @click="postOk({ 'action': 'create-new-config' })" title="Create new config"
+        :appearance="isConfigFileSelected ? 'secondary' : ''">
+        <fa icon="plus" />{{ configEditorVisible ? 'Create config' : 'Create new config' }}
+      </VsCodeButton>
+      <VsCodeButton @click="openAsJSON" title="Create new config" :disabled="configEditorVisible || configFile === ''"
+        :appearance="isConfigFileSelected ? '' : 'secondary'">
+        <fa icon="pencil" />Edit config
+      </VsCodeButton>
+      <VsCodeButton @click="postOk({ 'action': 'test-split' })" title="Test split log" appearance="secondary"
+        :disabled="!canSplitLog">
+        <fa icon="check" />Test split log
+      </VsCodeButton>
+      <VsCodeButton @click="postOk({ 'action': 'parse' })" title="Parse log" :disabled="!!errorMessage">
+        <fa icon="check" />Parse log
+      </VsCodeButton>
+    </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="editor">
         <fieldset class="conditions">
