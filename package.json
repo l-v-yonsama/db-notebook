@@ -2528,11 +2528,12 @@
     "start:webview": "cd webview-ui && npm run start",
     "build:webview": "cd webview-ui && npm run build",
     "vscode:prepublish": "npm run build:webview && npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/copy-prelude-asset.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src __tests__ --ext ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck:prelude": "tsc --noEmit -p tsconfig.prelude.json"
   },
   "devDependencies": {
     "@types/bytes": "^3.1.3",

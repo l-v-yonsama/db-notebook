@@ -100,6 +100,10 @@ export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;
 export const CREATE_NOTEBOOK_FROM_SQL = `${EXTENSION_NAME}.create-dbn-from-sql`;
 export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
 
+// JS cell IntelliSense: URI scheme for the in-memory (prelude + cell body) document
+// forwarded to the built-in TypeScript language service. Never written to disk.
+export const JS_VIRTUAL_DOC_SCHEME = "db-notebook-virtual-js";
+
 // NOTEBOOK TOOL-BAR COMMANDS
 export const SHOW_NOTEBOOK_ALL_VARIABLES = `${EXTENSION_NAME}.toolbar.show-all-variables`;
 export const SHOW_NOTEBOOK_ALL_RDH = `${EXTENSION_NAME}.toolbar.show-all-rdh`;

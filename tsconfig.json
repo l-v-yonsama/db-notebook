@@ -16,6 +16,7 @@
     ".vscode-test",
     "webview-ui",
     "__tests__",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "src/notebook/jsLanguageBridge/jsRuntimePrelude.d.ts"
   ]
 }

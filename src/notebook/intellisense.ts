@@ -19,7 +19,6 @@ import {
   NotebookCell,
   Position,
   Range,
-  SnippetString,
   TextDocument,
   TextEditor,
   ThemeColor,
@@ -36,9 +35,16 @@ import { setCloudwatchQueryCompletionItems } from "./intellisenses/awsCloudwatch
 import { setMemcachedCompletionItems } from "./intellisenses/memcachedCommand";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
-import { setNodeExecaCompletionItems } from "./intellisenses/nodeExeca";
 import { setNodeVariablesCompletionItems } from "./intellisenses/nodeVariables";
 import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
+import {
+  createJsHoverProvider,
+  createJsSignatureHelpProvider,
+  getCompletionItemLabelText,
+  getForwardedCompletionItems,
+  JS_CELL_SELECTOR,
+} from "./jsLanguageBridge/requestForwarder";
+import { registerJsVirtualDocumentProvider } from "./jsLanguageBridge/virtualDocumentProvider";
 
 const PREFIX = "[notebook/intellisense]";
 
@@ -80,7 +86,10 @@ export function activateIntellisense(context: ExtensionContext, stateStorage: St
   log(`${PREFIX} start activateIntellisense`);
   storage = stateStorage;
 
+  registerJsVirtualDocumentProvider(context);
   context.subscriptions.push(createJsIntellisense());
+  context.subscriptions.push(createJsHoverProvider());
+  context.subscriptions.push(createJsSignatureHelpProvider());
   context.subscriptions.push(createSQLIntellisense());
   context.subscriptions.push(createCloudwatchQueryIntellisense());
   context.subscriptions.push(registerMemcachedCompletionProvider());
@@ -236,17 +245,35 @@ function getStoreKeys(): string[] {
   return [...keys];
 }
 
+// Set to false temporarily during development to evaluate the forwarded (real
+// type/signature) completions on their own, without the dozens of hand-authored
+// intellisenses/*.ts snippets adding visual noise alongside them. Must stay true for
+// real use: those snippets cover connection names/store keys/workflow templates that
+// forwarding can't ever provide.
+const INCLUDE_HAND_AUTHORED_JS_COMPLETIONS = true;
+
 function createJsIntellisense() {
   // log(`${PREFIX} createJsIntellisense`);
   return languages.registerCompletionItemProvider(
-    [{ language: "javascript", notebookType: NOTEBOOK_TYPE }],
+    JS_CELL_SELECTOR,
     {
-      provideCompletionItems(
+      async provideCompletionItems(
         document: TextDocument,
         position: Position,
         token: CancellationToken,
         context: CompletionContext
       ) {
+        const forwardedItems = await getForwardedCompletionItems(
+          document,
+          position,
+          token,
+          context
+        );
+        if (!INCLUDE_HAND_AUTHORED_JS_COMPLETIONS) {
+          return forwardedItems;
+        }
+        const forwardedLabels = new Set(forwardedItems.map(getCompletionItemLabelText));
+
         const storeKeys = getStoreKeys();
         const storeKeyNames = storeKeys.join(",");
         const text = document.getText();
@@ -255,27 +282,6 @@ function createJsIntellisense() {
         const lastChar = linePrefix.length > 0 ? linePrefix.substring(linePrefix.length - 1) : "";
 
         let item: CompletionItem;
-
-        item = new CompletionItem({ label: "decodeJwt", description: "accessToken" });
-        item.kind = CompletionItemKind.Function;
-        item.detail = "decodeJwt(token: string): JwtPayload";
-        item.documentation = new MarkdownString("", true);
-        item.documentation.appendCodeblock(
-          `interface decodeJwt(token: string): {header:JwtHeader, payload:JwtPayload}`,
-          "typescript"
-        );
-        list.push(item);
-
-        item = new CompletionItem({ label: "writeResultSetData", description: "rdh" });
-        item.kind = CompletionItemKind.Function;
-        item.insertText = new SnippetString("writeResultSetData('${1|title|}', ${2|rdh|});");
-        item.detail = "Write ResultSetData with a title";
-        item.documentation = new MarkdownString("", true);
-        item.documentation.appendCodeblock(
-          "function writeResultSetData(title: string, rdh: ResultSetData);",
-          "typescript"
-        );
-        list.push(item);
 
         setNodeVariablesCompletionItems(list, storeKeyNames);
 
@@ -296,18 +302,22 @@ function createJsIntellisense() {
           list.push(item);
         });
 
-        // Execa
-        setNodeExecaCompletionItems(list);
-
         // Axios
         setNodeAxiosCompletionItems(list);
 
         // DBDriverResolver
         setNodeDriverResolverCompletionItems(list, conNamesString);
 
-        return list;
+        // Forwarded items carry the built-in TS language service's real signature/type
+        // info, so they take precedence over any hand-authored placeholder with the same
+        // label.
+        const filteredList = list.filter(
+          (it) => !forwardedLabels.has(getCompletionItemLabelText(it))
+        );
+        return [...forwardedItems, ...filteredList];
       },
-    }
+    },
+    "."
   );
 }
 

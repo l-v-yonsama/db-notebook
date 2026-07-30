@@ -1,15 +1,15 @@
 import { CompletionItem, CompletionItemKind, SnippetString } from "vscode";
 import { createDocumentation } from "../intellisense";
 
+// Only the snippets whose key argument suggests real, discovered store keys stay here --
+// that's domain data (what keys does this notebook actually use) the forwarded/built-in
+// TS language service can never know about. Signature-only completions (member names,
+// argument shapes with no notebook-specific data) are covered by that forwarding instead;
+// see jsLanguageBridge/requestForwarder.ts.
 export const setNodeVariablesCompletionItems = (
   list: CompletionItem[],
   storeKeyNames: string
 ): void => {
-  let item = new CompletionItem("variables");
-  item.kind = CompletionItemKind.Variable;
-  item.detail = "variables";
-  list.push(item);
-
   let example = "";
 
   // GET
@@ -40,13 +40,6 @@ export const setNodeVariablesCompletionItems = (
     description: "variables",
   });
 
-  // EACH
-  item = new CompletionItem({ label: "variables.each(function)", description: "variables" });
-  item.insertText = new SnippetString("variables.each((val, key) => console.log(key, val));");
-  item.kind = CompletionItemKind.Function;
-  item.detail = "Loop over all stored values";
-  list.push(item);
-
   //--------------------------
   // variablesCell
   //--------------------------
@@ -74,24 +67,6 @@ export const setNodeVariablesCompletionItems = (
     label: "Set key's value at the index of json-cell",
     example,
     spec: "interface variablesCell.setKeyValueAt(cellIndex:number, key:string, value:any): void",
-    description: "variablesCell",
-  });
-
-  example = "variablesCell.replaceAllAtFirst(${1});";
-  appendCompletionItem({
-    list,
-    label: "Replace jsonObject at the first json-cell",
-    example,
-    spec: "interface variablesCell.replaceAllAtFirst(newJsonObject:any): void",
-    description: "variablesCell",
-  });
-
-  example = "variablesCell.setKeyValueAt(${1|0|}, ${2});";
-  appendCompletionItem({
-    list,
-    label: "Replace jsonObject at the index of json-cell",
-    example,
-    spec: "interface variablesCell.setKeyValueAt(cellIndex:number, newJsonObject:any): void",
     description: "variablesCell",
   });
 };
