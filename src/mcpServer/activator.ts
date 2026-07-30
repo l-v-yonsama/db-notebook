@@ -87,9 +87,12 @@ async function regenerate(context: ExtensionContext, stateStorage: StateStorage)
   await start(context, stateStorage);
 }
 
-async function showConnectionInfo(handle: McpServerHandle): Promise<void> {
+export async function showConnectionInfo(handle: McpServerHandle): Promise<void> {
+  // Never pass `claudeCommand` or `handle.token` to `log()` -- they carry the Bearer
+  // token, which is otherwise only kept in SecretStorage. Logging it would leak it to
+  // the Output panel and to any on-disk log files a user shares for support.
   const claudeCommand = `claude mcp add --transport http db-notebook ${handle.url} --header "Authorization: Bearer ${handle.token}"`;
-  log(`${PREFIX} ${claudeCommand}`);
+  log(`${PREFIX} MCP connection info displayed. URL: ${handle.url}`);
 
   const prefix = handle.startedHere
     ? "Database Notebook MCP server started."
@@ -103,12 +106,12 @@ async function showConnectionInfo(handle: McpServerHandle): Promise<void> {
   );
   if (action === "Copy claude mcp add command") {
     await env.clipboard.writeText(claudeCommand);
-    log(`${PREFIX} copied "claude mcp add" command to clipboard: ${claudeCommand}`);
+    log(`${PREFIX} copied "claude mcp add" command to clipboard.`);
   } else if (action === "Copy URL") {
     await env.clipboard.writeText(handle.url);
     log(`${PREFIX} copied URL to clipboard: ${handle.url}`);
   } else if (action === "Copy token") {
     await env.clipboard.writeText(handle.token);
-    log(`${PREFIX} copied token to clipboard: ${handle.token}`);
+    log(`${PREFIX} copied token to clipboard.`);
   }
 }

@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import { workspace } from "vscode";
+import type { NotebookDocument } from "vscode";
 import type { StateStorage } from "../../src/utilities/StateStorage";
-import { EditOperation, validateOperations } from "../../src/lmTools/EditNotebookTool";
+import {
+  applyOperations,
+  EditOperation,
+  validateOperations,
+} from "../../src/lmTools/EditNotebookTool";
 
 type ConnectionFixture = { dbType?: string };
 
@@ -146,5 +153,53 @@ describe("validateOperations", () => {
     const ops: EditOperation[] = [{ updateCellSource: { cellIndex: 3, source: "SELECT 2" } }];
     const result = await validateOperations(makeStateStorage(), 3, ops);
     expect(result.ok).toBe(false);
+  });
+});
+
+const makeDocument = (): NotebookDocument =>
+  ({
+    uri: { toString: () => "file:///fake/test.dbnb" },
+  } as unknown as NotebookDocument);
+
+describe("applyOperations", () => {
+  beforeEach(() => {
+    (workspace.applyEdit as Mock).mockReset().mockResolvedValue(true);
+  });
+
+  it("workspace.applyEditがfalseを返した操作で処理を中断し、完了数を報告する", async () => {
+    (workspace.applyEdit as Mock)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    const ops: EditOperation[] = [
+      { deleteCells: { range: { start: 0, end: 1 } } },
+      { deleteCells: { range: { start: 0, end: 1 } } },
+      { deleteCells: { range: { start: 0, end: 1 } } },
+    ];
+    const result = await applyOperations(makeStateStorage(), makeDocument(), ops);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.completed).toBe(1);
+      expect(result.message).toMatch(/Operation 2\/3/);
+      expect(result.message).toMatch(/applyEdit was rejected/);
+    }
+    // 3番目の操作は実行されないはず
+    expect(workspace.applyEdit).toHaveBeenCalledTimes(2);
+  });
+
+  it("すべてのworkspace.applyEditがtrueを返せば全操作が完了として報告される", async () => {
+    const ops: EditOperation[] = [
+      { deleteCells: { range: { start: 0, end: 1 } } },
+      { deleteCells: { range: { start: 0, end: 1 } } },
+    ];
+    const result = await applyOperations(makeStateStorage(), makeDocument(), ops);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.details).toHaveLength(2);
+    }
+    expect(workspace.applyEdit).toHaveBeenCalledTimes(2);
   });
 });

@@ -275,7 +275,19 @@ type ApplyResult =
   | { ok: true; details: string[] }
   | { ok: false; message: string; completed: number };
 
-async function applyOperations(
+/**
+ * `workspace.applyEdit` resolves to `false` (not a rejected promise) when VS Code
+ * declines the edit, e.g. a concurrent change to the notebook. Without this check the
+ * caller would treat a no-op as a success.
+ */
+async function applyOrThrow(edit: WorkspaceEdit): Promise<void> {
+  const applied = await workspace.applyEdit(edit);
+  if (!applied) {
+    throw new Error("workspace.applyEdit was rejected (edit not applied)");
+  }
+}
+
+export async function applyOperations(
   stateStorage: StateStorage,
   document: NotebookDocument,
   operations: EditOperation[]
@@ -293,7 +305,7 @@ async function applyOperations(
         }
         const edit = new WorkspaceEdit();
         edit.set(document.uri, [NotebookEdit.insertCells(index, built.cells)]);
-        await workspace.applyEdit(edit);
+        await applyOrThrow(edit);
         details.push(`${i + 1}. insertCells: ${cells.length} cell(s) at index ${index}`);
       } else if ("replaceCells" in op) {
         const { range, cells } = op.replaceCells;
@@ -305,13 +317,13 @@ async function applyOperations(
         edit.set(document.uri, [
           NotebookEdit.replaceCells(new NotebookRange(range.start, range.end), built.cells),
         ]);
-        await workspace.applyEdit(edit);
+        await applyOrThrow(edit);
         details.push(`${i + 1}. replaceCells: cells ${range.start}-${range.end} with ${cells.length} cell(s)`);
       } else if ("deleteCells" in op) {
         const { range } = op.deleteCells;
         const edit = new WorkspaceEdit();
         edit.set(document.uri, [NotebookEdit.deleteCells(new NotebookRange(range.start, range.end))]);
-        await workspace.applyEdit(edit);
+        await applyOrThrow(edit);
         details.push(`${i + 1}. deleteCells: cells ${range.start}-${range.end}`);
       } else if ("updateCellMetadata" in op) {
         const { cellIndex, metadata } = op.updateCellMetadata;
@@ -319,7 +331,7 @@ async function applyOperations(
         const merged: CellMeta = { ...(cell.metadata as CellMeta), ...metadata };
         const edit = new WorkspaceEdit();
         edit.set(document.uri, [NotebookEdit.updateCellMetadata(cellIndex, merged)]);
-        await workspace.applyEdit(edit);
+        await applyOrThrow(edit);
         details.push(`${i + 1}. updateCellMetadata: cell ${cellIndex}`);
       } else if ("updateCellSource" in op) {
         const { cellIndex, source } = op.updateCellSource;
@@ -328,7 +340,7 @@ async function applyOperations(
         const range = new Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
         const edit = new WorkspaceEdit();
         edit.set(doc.uri, [new TextEdit(range, source)]);
-        await workspace.applyEdit(edit);
+        await applyOrThrow(edit);
         details.push(`${i + 1}. updateCellSource: cell ${cellIndex}`);
       }
     } catch (e: any) {

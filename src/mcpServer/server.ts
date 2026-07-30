@@ -6,7 +6,14 @@ import { getMcpServerConfig } from "../utilities/configUtil";
 import { log, logError } from "../utilities/logger";
 import { getOrCreateToken, isAuthorized } from "./auth";
 import { getLastUsedPort, setLastUsedPort } from "./preferences";
-import { acquireOrDetect, MCP_PATH, ownsLock, removeLockFile, writeLockFile } from "./singleton";
+import {
+  acquireOrDetect,
+  MCP_PATH,
+  ownsLock,
+  releaseStartupSlot,
+  removeLockFile,
+  writeLockFile,
+} from "./singleton";
 import { registerTools } from "./tools";
 import { StateStorage } from "../utilities/StateStorage";
 
@@ -34,29 +41,37 @@ export async function startMcpServer(
     return { ...detection.existing, startedHere: false };
   }
 
-  const token = await getOrCreateToken(context);
-  const version = (context.extension.packageJSON as { version?: string }).version ?? "0.0.0";
+  // `acquireOrDetect` returning `shouldStart: true` means this process now holds the
+  // startup claim (see singleton.ts). Release it once bind+writeLockFile is done --
+  // succeeded or not -- so a bind failure can't leave every other window's
+  // `acquireOrDetect` waiting out its retries for a claim that will never be released.
+  try {
+    const token = await getOrCreateToken(context);
+    const version = (context.extension.packageJSON as { version?: string }).version ?? "0.0.0";
 
-  let port = 0;
-  const server = http.createServer((req, res) => {
-    handleRequest(req, res, token, stateStorage, version, port).catch((e) => {
-      logError(`${PREFIX} unhandled error: ${e?.message ?? e}`);
-      if (!res.headersSent) {
-        res.writeHead(500).end();
-      }
+    let port = 0;
+    const server = http.createServer((req, res) => {
+      handleRequest(req, res, token, stateStorage, version, port).catch((e) => {
+        logError(`${PREFIX} unhandled error: ${e?.message ?? e}`);
+        if (!res.headersSent) {
+          res.writeHead(500).end();
+        }
+      });
     });
-  });
 
-  const config = getMcpServerConfig();
-  port = await bind(server, context, config.port);
+    const config = getMcpServerConfig();
+    port = await bind(server, context, config.port);
 
-  httpServer = server;
-  await writeLockFile(context, port, token);
-  await setLastUsedPort(context, port);
-  log(`${PREFIX} started on 127.0.0.1:${port}`);
-  _onDidChangeRunningState.fire();
+    httpServer = server;
+    await writeLockFile(context, port, token);
+    await setLastUsedPort(context, port);
+    log(`${PREFIX} started on 127.0.0.1:${port}`);
+    _onDidChangeRunningState.fire();
 
-  return { url: `http://127.0.0.1:${port}${MCP_PATH}`, token, startedHere: true };
+    return { url: `http://127.0.0.1:${port}${MCP_PATH}`, token, startedHere: true };
+  } finally {
+    await releaseStartupSlot(context);
+  }
 }
 
 /**

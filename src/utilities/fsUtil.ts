@@ -65,6 +65,33 @@ export const readResourceOnStorage = async (fsPath: string): Promise<string> => 
   return await fs.promises.readFile(fsPath, { encoding: "utf8" });
 };
 
+/**
+ * Creates `fsPath` only if it doesn't already exist, using the `wx` flag so the
+ * create itself is atomic even across separate processes. Lets a caller use a file's
+ * mere existence as a cross-process mutex instead of a read-then-write check, which
+ * would leave a race window. Returns `false` (not an error) when the file already
+ * exists; any other failure (e.g. missing parent directory) still throws.
+ */
+export const createFileExclusiveOnStorage = async (
+  fsPath: string,
+  text: string
+): Promise<boolean> => {
+  try {
+    const handle = await fs.promises.open(fsPath, "wx");
+    try {
+      await handle.writeFile(text, { encoding: "utf8" });
+    } finally {
+      await handle.close();
+    }
+    return true;
+  } catch (err: any) {
+    if (err?.code === "EEXIST") {
+      return false;
+    }
+    throw err;
+  }
+};
+
 export const deleteDirsOnStorage = async (fsPath: string): Promise<void> => {
   await fs.promises.rm(fsPath, { recursive: true, force: true });
 };

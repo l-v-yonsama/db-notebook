@@ -199,6 +199,7 @@ export class NodeKernel {
   
         static replaceAllAt(cellIndex, value) {
           const arr = JSON.parse(variables.get('_UpdateJSONCellValues') ?? '[]');
+          let meta = arr.find(it => it.cellIndex === cellIndex);
           if ( meta === undefined ) {
             meta = { cellIndex, replaceAll: true, data: {} };
             arr.push(meta);

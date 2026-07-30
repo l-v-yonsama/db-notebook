@@ -12,6 +12,37 @@ export class ThemeColor {
   constructor(public id: string) {}
 }
 
+export class ThemeIcon {
+  constructor(public id: string, public color?: ThemeColor) {}
+}
+
+export class TreeItem {
+  description?: string;
+  iconPath?: unknown;
+  constructor(public label: string, public collapsibleState?: number) {}
+}
+
+export class EventEmitter<T> {
+  private listeners: Array<(e: T) => void> = [];
+
+  event = (listener: (e: T) => void) => {
+    this.listeners.push(listener);
+    return {
+      dispose: () => {
+        this.listeners = this.listeners.filter((l) => l !== listener);
+      },
+    };
+  };
+
+  fire(data: T): void {
+    this.listeners.forEach((listener) => listener(data));
+  }
+
+  dispose(): void {
+    this.listeners = [];
+  }
+}
+
 export class Uri {
   private constructor(public readonly fsPath: string) {}
 
@@ -38,10 +69,21 @@ export const window = {
   setStatusBarMessage: vi.fn((..._args: unknown[]) => ({ dispose: () => {} })),
   createTextEditorDecorationType: vi.fn((_options: unknown) => ({ dispose: () => {} })),
   showNotebookDocument: vi.fn(async (_document: unknown) => undefined),
+  showInformationMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
+  showErrorMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
 };
 
 export const commands = {
   executeCommand: vi.fn(async (..._args: unknown[]) => undefined),
+  registerCommand: vi.fn((_command: string, _callback: (...args: unknown[]) => unknown) => ({
+    dispose: () => {},
+  })),
+};
+
+export const env = {
+  clipboard: {
+    writeText: vi.fn(async (_text: string) => undefined),
+  },
 };
 
 export const workspace = {

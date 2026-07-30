@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { acquireOrDetect } from "../mcpServer/singleton";
+import { detectRunningServer } from "../mcpServer/singleton";
 
 export class McpServerTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
@@ -16,13 +16,16 @@ export class McpServerTreeProvider implements vscode.TreeDataProvider<vscode.Tre
   }
 
   async getChildren(): Promise<vscode.TreeItem[]> {
-    // Goes through the same detection used by the start flow (lock file + a live health
-    // check), not the cheaper `isRunningHere()`, so this reflects reality even when
-    // another VS Code window is the one actually running the server.
-    const detection = await acquireOrDetect(this.context);
-    const item = new vscode.TreeItem(detection.shouldStart ? "Stopped" : "Running");
-    if (!detection.shouldStart) {
-      item.description = detection.existing.url;
+    // Read-only status check (lock file + a live health check), so this reflects
+    // reality even when another VS Code window is the one actually running the
+    // server. Deliberately NOT `acquireOrDetect`: that claims the startup slot as a
+    // side effect, and this runs on every refresh (including right after start/stop
+    // fires `onDidChangeRunningState`) -- using it here would silently claim and
+    // never release the slot, starving real `startMcpServer` calls.
+    const running = await detectRunningServer(this.context);
+    const item = new vscode.TreeItem(running ? "Running" : "Stopped");
+    if (running) {
+      item.description = running.url;
       item.iconPath = new vscode.ThemeIcon("circle-filled", new vscode.ThemeColor("charts.green"));
     } else {
       item.iconPath = new vscode.ThemeIcon("circle-outline");
