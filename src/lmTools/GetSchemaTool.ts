@@ -14,7 +14,9 @@ import {
   LanguageModelToolResult,
 } from "vscode";
 import { MqttDriverManager } from "../mqtt/MqttDriverManager";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { workflow } from "../utilities/driverResolver";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { resolveMcpEnabledConnection } from "./mcpAccessControl";
@@ -49,13 +51,15 @@ export class GetSchemaTool implements LanguageModelTool<GetSchemaToolInput> {
   ): Promise<LanguageModelToolResult> {
     const { connectionName, schemaName, tableName, serviceType, resourceName, realmName } =
       options.input;
-    const text = await getSchemaText(this.stateStorage, connectionName, {
-      schemaName,
-      tableName,
-      serviceType,
-      resourceName,
-      realmName,
-    });
+    const text = await trackInvocation("lmTools", "GetSchemaTool", options.input, () =>
+      getSchemaText(this.stateStorage, connectionName, {
+        schemaName,
+        tableName,
+        serviceType,
+        resourceName,
+        realmName,
+      })
+    );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
@@ -84,8 +88,8 @@ export async function getSchemaText(
   try {
     const result = await getSchemaInfo(stateStorage, connectionName, filters);
     text = formatSchemaResultForModel(result);
-  } catch (e: any) {
-    text = `❌ Failed to get schema for "${connectionName}": ${e?.message ?? e}`;
+  } catch (e) {
+    text = `❌ Failed to get schema for "${connectionName}": ${getErrorMessage(e)}`;
   }
   log(`${PREFIX} result:[${text}]`);
   return text;

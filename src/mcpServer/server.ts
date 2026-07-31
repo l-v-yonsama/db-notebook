@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import * as http from "http";
 import { EventEmitter, ExtensionContext } from "vscode";
 import { getMcpServerConfig } from "../utilities/configUtil";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { log, logError } from "../utilities/logger";
 import { getOrCreateToken, isAuthorized } from "./auth";
 import { getLastUsedPort, setLastUsedPort } from "./preferences";
@@ -51,8 +52,8 @@ export async function startMcpServer(
 
     let port = 0;
     const server = http.createServer((req, res) => {
-      handleRequest(req, res, token, stateStorage, version, port).catch((e) => {
-        logError(`${PREFIX} unhandled error: ${e?.message ?? e}`);
+      handleRequest(req, res, token, stateStorage, version, port).catch((e: unknown) => {
+        logError(`${PREFIX} unhandled error: ${getErrorMessage(e)}`);
         if (!res.headersSent) {
           res.writeHead(500).end();
         }
@@ -88,8 +89,8 @@ async function bind(server: http.Server, context: ExtensionContext, configuredPo
   if (rememberedPort) {
     try {
       return await listen(server, rememberedPort);
-    } catch (e: any) {
-      log(`${PREFIX} previous port ${rememberedPort} is unavailable (${e?.message ?? e}); picking a new one`);
+    } catch (e) {
+      log(`${PREFIX} previous port ${rememberedPort} is unavailable (${getErrorMessage(e)}); picking a new one`);
     }
   }
   return listen(server, 0);

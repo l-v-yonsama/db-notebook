@@ -11,8 +11,10 @@ import {
   LanguageModelToolInvocationOptions,
   LanguageModelToolResult,
 } from "vscode";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { workflow } from "../utilities/driverResolver";
 import { acquireEntraIdAccessToken } from "../utilities/EntraIdAuth";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { resolveMcpEnabledConnection } from "./mcpAccessControl";
@@ -37,7 +39,9 @@ export class TestConnectionTool implements LanguageModelTool<TestConnectionToolI
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName } = options.input;
-    const text = await testConnectionText(this.stateStorage, connectionName);
+    const text = await trackInvocation("lmTools", "TestConnectionTool", options.input, () =>
+      testConnectionText(this.stateStorage, connectionName)
+    );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
@@ -61,8 +65,8 @@ export async function testConnectionText(
       lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
     }
     text = lines.join("\n");
-  } catch (e: any) {
-    text = `❌ Failed to test connection "${connectionName}": ${e?.message ?? e}`;
+  } catch (e) {
+    text = `❌ Failed to test connection "${connectionName}": ${getErrorMessage(e)}`;
   }
   log(`${PREFIX} result:[${text}]`);
   return text;

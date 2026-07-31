@@ -6,6 +6,7 @@ import { runQueryText } from "../lmTools/RunQueryTool";
 import { runTransactionText } from "../lmTools/RunTransactionTool";
 import { scanResourceText } from "../lmTools/ScanResourceTool";
 import { testConnectionText } from "../lmTools/TestConnectionTool";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { StateStorage } from "../utilities/StateStorage";
 
 /**
@@ -30,7 +31,9 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       inputSchema: {},
     },
     async () => {
-      const text = listConnectionsText(stateStorage);
+      const text = await trackInvocation("mcpServer", "listDbConnections", {}, async () =>
+        listConnectionsText(stateStorage)
+      );
       return { content: [{ type: "text", text }] };
     }
   );
@@ -47,7 +50,9 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       },
     },
     async ({ connectionName }) => {
-      const text = await testConnectionText(stateStorage, connectionName);
+      const text = await trackInvocation("mcpServer", "testDbConnection", { connectionName }, () =>
+        testConnectionText(stateStorage, connectionName)
+      );
       return { content: [{ type: "text", text }] };
     }
   );
@@ -84,13 +89,16 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       },
     },
     async ({ connectionName, schemaName, tableName, serviceType, resourceName, realmName }) => {
-      const text = await getSchemaText(stateStorage, connectionName, {
-        schemaName,
-        tableName,
-        serviceType,
-        resourceName,
-        realmName,
-      });
+      const input = { connectionName, schemaName, tableName, serviceType, resourceName, realmName };
+      const text = await trackInvocation("mcpServer", "getDbSchema", input, () =>
+        getSchemaText(stateStorage, connectionName, {
+          schemaName,
+          tableName,
+          serviceType,
+          resourceName,
+          realmName,
+        })
+      );
       return { content: [{ type: "text", text }] };
     }
   );
@@ -112,7 +120,9 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       },
     },
     async ({ connectionName, sql }) => {
-      const text = await runQueryText(stateStorage, connectionName, sql);
+      const text = await trackInvocation("mcpServer", "runDbQuery", { connectionName, sql }, () =>
+        runQueryText(stateStorage, connectionName, sql)
+      );
       return { content: [{ type: "text", text }] };
     }
   );
@@ -250,7 +260,9 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       },
     },
     async (input) => {
-      const text = await scanResourceText(stateStorage, input);
+      const text = await trackInvocation("mcpServer", "scanDbResource", input, () =>
+        scanResourceText(stateStorage, input)
+      );
       return { content: [{ type: "text", text }] };
     }
   );
@@ -278,11 +290,10 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       },
     },
     async ({ connectionName, statements, transactionControlType }) => {
-      const text = await runTransactionText(
-        stateStorage,
-        connectionName,
-        statements,
-        transactionControlType ?? "rollbackOnError"
+      const resolvedType = transactionControlType ?? "rollbackOnError";
+      const input = { connectionName, statements, transactionControlType: resolvedType };
+      const text = await trackInvocation("mcpServer", "runDbTransaction", input, () =>
+        runTransactionText(stateStorage, connectionName, statements, resolvedType)
       );
       return { content: [{ type: "text", text }] };
     }

@@ -14,8 +14,10 @@ import {
   MarkdownString,
   PreparedToolInvocation,
 } from "vscode";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { getDatabaseConfig } from "../utilities/configUtil";
 import { workflow } from "../utilities/driverResolver";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { formatRdhForModel } from "./resultFormatter";
@@ -80,7 +82,9 @@ export class RunQueryTool implements LanguageModelTool<RunQueryToolInput> {
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName, sql } = options.input;
-    const text = await runQueryText(this.stateStorage, connectionName, sql);
+    const text = await trackInvocation("lmTools", "RunQueryTool", options.input, () =>
+      runQueryText(this.stateStorage, connectionName, sql)
+    );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
@@ -115,8 +119,8 @@ export async function runQueryText(
       `${PREFIX} result: ${affected !== undefined ? `${affected} row(s) affected` : `${result.rdh.rows.length} row(s) returned`}`
     );
     return text;
-  } catch (e: any) {
-    const message = `❌ Failed to run query on "${connectionName}": ${e?.message ?? e}`;
+  } catch (e) {
+    const message = `❌ Failed to run query on "${connectionName}": ${getErrorMessage(e)}`;
     log(`${PREFIX} result:[${message}]`);
     return message;
   }

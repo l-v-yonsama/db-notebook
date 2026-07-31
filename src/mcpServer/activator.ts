@@ -2,6 +2,7 @@ import { commands, env, ExtensionContext, window } from "vscode";
 import { log, logError } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { getMcpServerConfig } from "../utilities/configUtil";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { regenerateToken } from "./auth";
 import { isRunningHere, McpServerHandle, startMcpServer, stopMcpServer } from "./server";
 
@@ -37,13 +38,15 @@ export function activateMcpServer(context: ExtensionContext, stateStorage: State
   context.subscriptions.push({
     dispose: () => {
       if (isRunningHere()) {
-        stopMcpServer(context).catch((e) => logError(`${PREFIX} error while stopping on deactivate: ${e?.message ?? e}`));
+        stopMcpServer(context).catch((e: unknown) =>
+          logError(`${PREFIX} error while stopping on deactivate: ${getErrorMessage(e)}`)
+        );
       }
     },
   });
 
   if (getMcpServerConfig().autoStart) {
-    start(context, stateStorage).catch((e) => logError(`${PREFIX} autoStart failed: ${e?.message ?? e}`));
+    start(context, stateStorage).catch((e: unknown) => logError(`${PREFIX} autoStart failed: ${getErrorMessage(e)}`));
   }
 }
 
@@ -52,9 +55,10 @@ async function start(context: ExtensionContext, stateStorage: StateStorage): Pro
     const handle = await startMcpServer(context, stateStorage);
     await commands.executeCommand("setContext", RUNNING_CONTEXT_KEY, true);
     await showConnectionInfo(handle);
-  } catch (e: any) {
-    logError(`${PREFIX} failed to start: ${e?.message ?? e}`);
-    window.showErrorMessage(`Failed to start the Database Notebook MCP server: ${e?.message ?? e}`);
+  } catch (e) {
+    const message = getErrorMessage(e);
+    logError(`${PREFIX} failed to start: ${message}`);
+    window.showErrorMessage(`Failed to start the Database Notebook MCP server: ${message}`);
   }
 }
 

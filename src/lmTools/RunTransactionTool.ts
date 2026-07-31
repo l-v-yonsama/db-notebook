@@ -10,8 +10,10 @@ import {
   MarkdownString,
   PreparedToolInvocation,
 } from "vscode";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { getDatabaseConfig } from "../utilities/configUtil";
 import { flowTransaction } from "../utilities/driverResolver";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { formatRdhForModel } from "./resultFormatter";
@@ -80,7 +82,9 @@ export class RunTransactionTool implements LanguageModelTool<RunTransactionToolI
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName, statements, transactionControlType = "rollbackOnError" } = options.input;
-    const text = await runTransactionText(this.stateStorage, connectionName, statements, transactionControlType);
+    const text = await trackInvocation("lmTools", "RunTransactionTool", options.input, () =>
+      runTransactionText(this.stateStorage, connectionName, statements, transactionControlType)
+    );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
@@ -121,8 +125,8 @@ export async function runTransactionText(
     const text = lines.join("\n");
     log(`${PREFIX} result: ${result.completed.length}/${statements.length} completed, ok:[${result.ok}]`);
     return text;
-  } catch (e: any) {
-    const message = `❌ Failed to run transaction on "${connectionName}": ${e?.message ?? e}`;
+  } catch (e) {
+    const message = `❌ Failed to run transaction on "${connectionName}": ${getErrorMessage(e)}`;
     log(`${PREFIX} result:[${message}]`);
     return message;
   }

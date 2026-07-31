@@ -12,6 +12,7 @@ import {
   LanguageModelToolInvocationOptions,
   LanguageModelToolResult,
 } from "vscode";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 
@@ -31,10 +32,12 @@ export class ListConnectionsTool implements LanguageModelTool<ListConnectionsToo
   constructor(private readonly stateStorage: StateStorage) {}
 
   async invoke(
-    _options: LanguageModelToolInvocationOptions<ListConnectionsToolInput>,
+    options: LanguageModelToolInvocationOptions<ListConnectionsToolInput>,
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
-    const text = listConnectionsText(this.stateStorage);
+    const text = await trackInvocation("lmTools", "ListConnectionsTool", options.input, async () =>
+      listConnectionsText(this.stateStorage)
+    );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }

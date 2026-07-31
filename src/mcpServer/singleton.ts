@@ -50,8 +50,8 @@ function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (err: any) {
-    return err?.code !== "ESRCH";
+  } catch (err) {
+    return (err as NodeJS.ErrnoException)?.code !== "ESRCH";
   }
 }
 

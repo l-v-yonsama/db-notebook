@@ -21,8 +21,10 @@ import {
   LanguageModelToolResult,
 } from "vscode";
 import { MqttDriverManager } from "../mqtt/MqttDriverManager";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { getDatabaseConfig } from "../utilities/configUtil";
 import { workflow } from "../utilities/driverResolver";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { log } from "../utilities/logger";
 import {
   buildAuth0ScanParams,
@@ -185,7 +187,9 @@ export class ScanResourceTool implements LanguageModelTool<ScanResourceToolInput
     options: LanguageModelToolInvocationOptions<ScanResourceToolInput>,
     _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
-    const text = await scanResourceText(this.stateStorage, options.input);
+    const text = await trackInvocation("lmTools", "ScanResourceTool", options.input, () =>
+      scanResourceText(this.stateStorage, options.input)
+    );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
@@ -215,8 +219,8 @@ export async function scanResourceText(
     const text = formatRdhForModel(result.rdh, getDatabaseConfig().limitRows);
     log(`${PREFIX} result: ${result.rdh.rows.length} row(s) returned`);
     return text;
-  } catch (e: any) {
-    const message = `❌ Failed to scan "${input.connectionName}": ${e?.message ?? e}`;
+  } catch (e) {
+    const message = `❌ Failed to scan "${input.connectionName}": ${getErrorMessage(e)}`;
     log(`${PREFIX} result:[${message}]`);
     return message;
   }

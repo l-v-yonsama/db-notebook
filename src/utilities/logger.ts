@@ -1,4 +1,5 @@
 import { ExtensionContext, LogOutputChannel, window } from "vscode";
+import { getErrorMessage } from "./errorUtil";
 
 let channel: LogOutputChannel | undefined;
 
@@ -46,9 +47,7 @@ export function log(...args: unknown[]) {
 export function logError(...args: unknown[]) {
   if (channel) {
     try {
-      const message = args
-        .map((arg) => (arg instanceof Error ? arg.message : String(arg)))
-        .join(" ");
+      const message = args.map(getErrorMessage).join(" ");
       channel.error(message);
     } catch (e) {
       console.error("Error:logger.ts", e);

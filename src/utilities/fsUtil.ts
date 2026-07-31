@@ -84,8 +84,8 @@ export const createFileExclusiveOnStorage = async (
       await handle.close();
     }
     return true;
-  } catch (err: any) {
-    if (err?.code === "EEXIST") {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === "EEXIST") {
       return false;
     }
     throw err;

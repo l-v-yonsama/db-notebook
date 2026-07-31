@@ -18,7 +18,9 @@ import {
   WorkspaceEdit,
 } from "vscode";
 import { NOTEBOOK_TYPE } from "../constant";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
 import { CellMeta } from "../types/Notebook";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { resolveMcpEnabledConnection } from "./mcpAccessControl";
@@ -100,63 +102,65 @@ export class EditNotebookTool implements LanguageModelTool<EditNotebookToolInput
     const { notebookPath, operations } = options.input;
     log(`${PREFIX} invoked notebookPath:[${notebookPath}] operations:[${operations?.length ?? 0}]`);
 
-    try {
-      if (!operations?.length) {
-        return new LanguageModelToolResult([
-          new LanguageModelTextPart("❌ No operations were provided."),
-        ]);
-      }
-
-      const pathResolution = resolveNotebookTargetUri(notebookPath);
-      if (!pathResolution.ok) {
-        return new LanguageModelToolResult([new LanguageModelTextPart(`❌ ${pathResolution.message}`)]);
-      }
-
-      const docResolution = await resolveNotebookDocument(pathResolution.uri);
-      if (!docResolution.ok) {
-        const text = `❌ ${docResolution.message} Use createDbNotebook to create it first, or check the path.`;
-        log(`${PREFIX} result:[${text}]`);
-        return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-      }
-      const document = docResolution.document;
-
-      if (document.notebookType !== NOTEBOOK_TYPE) {
-        const text = `❌ "${pathResolution.uri.fsPath}" is not a Database Notebook (.dbn) file.`;
-        log(`${PREFIX} result:[${text}]`);
-        return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-      }
-
-      await window.showNotebookDocument(document);
-
-      const validation = await validateOperations(this.stateStorage, document.cellCount, operations);
-      if (!validation.ok) {
-        const lines = [`❌ ${validation.message} No changes were made.`];
-        if (validation.availableConnectionNames?.length) {
-          lines.push(`Available connections: ${validation.availableConnectionNames.join(", ")}`);
+    return trackInvocation("lmTools", "EditNotebookTool", options.input, async () => {
+      try {
+        if (!operations?.length) {
+          return new LanguageModelToolResult([
+            new LanguageModelTextPart("❌ No operations were provided."),
+          ]);
         }
-        const text = lines.join("\n");
+
+        const pathResolution = resolveNotebookTargetUri(notebookPath);
+        if (!pathResolution.ok) {
+          return new LanguageModelToolResult([new LanguageModelTextPart(`❌ ${pathResolution.message}`)]);
+        }
+
+        const docResolution = await resolveNotebookDocument(pathResolution.uri);
+        if (!docResolution.ok) {
+          const text = `❌ ${docResolution.message} Use createDbNotebook to create it first, or check the path.`;
+          log(`${PREFIX} result:[${text}]`);
+          return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
+        }
+        const document = docResolution.document;
+
+        if (document.notebookType !== NOTEBOOK_TYPE) {
+          const text = `❌ "${pathResolution.uri.fsPath}" is not a Database Notebook (.dbn) file.`;
+          log(`${PREFIX} result:[${text}]`);
+          return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
+        }
+
+        await window.showNotebookDocument(document);
+
+        const validation = await validateOperations(this.stateStorage, document.cellCount, operations);
+        if (!validation.ok) {
+          const lines = [`❌ ${validation.message} No changes were made.`];
+          if (validation.availableConnectionNames?.length) {
+            lines.push(`Available connections: ${validation.availableConnectionNames.join(", ")}`);
+          }
+          const text = lines.join("\n");
+          log(`${PREFIX} result:[${text}]`);
+          return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
+        }
+
+        const applyResult = await applyOperations(this.stateStorage, document, operations);
+        if (!applyResult.ok) {
+          const text = `❌ ${applyResult.message}`;
+          log(`${PREFIX} result:[${text}]`);
+          return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
+        }
+
+        const text = [
+          `✅ Applied ${operations.length} edit(s) to "${pathResolution.uri.fsPath}".`,
+          ...applyResult.details,
+        ].join("\n");
+        log(`${PREFIX} result:[${text}]`);
+        return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
+      } catch (e) {
+        const text = `❌ Failed to edit notebook "${notebookPath}": ${getErrorMessage(e)}`;
         log(`${PREFIX} result:[${text}]`);
         return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
       }
-
-      const applyResult = await applyOperations(this.stateStorage, document, operations);
-      if (!applyResult.ok) {
-        const text = `❌ ${applyResult.message}`;
-        log(`${PREFIX} result:[${text}]`);
-        return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-      }
-
-      const text = [
-        `✅ Applied ${operations.length} edit(s) to "${pathResolution.uri.fsPath}".`,
-        ...applyResult.details,
-      ].join("\n");
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    } catch (e: any) {
-      const text = `❌ Failed to edit notebook "${notebookPath}": ${e?.message ?? e}`;
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    }
+    });
   }
 }
 
@@ -343,12 +347,12 @@ export async function applyOperations(
         await applyOrThrow(edit);
         details.push(`${i + 1}. updateCellSource: cell ${cellIndex}`);
       }
-    } catch (e: any) {
+    } catch (e) {
       return {
         ok: false,
-        message: `Operation ${i + 1}/${operations.length} ("${OPERATION_KINDS.find((k) => k in op)}") failed: ${
-          e?.message ?? e
-        }. ${i} of ${operations.length} operation(s) were already applied before the failure -- check the notebook before continuing.`,
+        message: `Operation ${i + 1}/${operations.length} ("${OPERATION_KINDS.find((k) => k in op)}") failed: ${getErrorMessage(
+          e
+        )}. ${i} of ${operations.length} operation(s) were already applied before the failure -- check the notebook before continuing.`,
         completed: i,
       };
     }

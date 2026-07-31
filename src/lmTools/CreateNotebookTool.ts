@@ -13,6 +13,8 @@ import {
   workspace,
 } from "vscode";
 import { DBNotebookSerializer } from "../notebook/serializer";
+import { trackInvocation } from "../toolActivity/ToolInvocationTracker";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { createDirectory, existsUri, writeBytesToResource } from "../utilities/fsUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
@@ -42,20 +44,23 @@ export class CreateNotebookTool implements LanguageModelTool<CreateNotebookToolI
       }] cells:[${cells?.length ?? 0}] sqlText:[${sqlText ? "yes" : "no"}]`
     );
 
-    try {
-      const result = await createNotebook(this.stateStorage, options.input, token);
-      const lines = [result.ok ? `✅ ${result.message}` : `❌ ${result.message}`];
-      if (!result.ok && result.availableConnectionNames?.length) {
-        lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
+    const text = await trackInvocation("lmTools", "CreateNotebookTool", options.input, async () => {
+      try {
+        const result = await createNotebook(this.stateStorage, options.input, token);
+        const lines = [result.ok ? `✅ ${result.message}` : `❌ ${result.message}`];
+        if (!result.ok && result.availableConnectionNames?.length) {
+          lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
+        }
+        const text = lines.join("\n");
+        log(`${PREFIX} result:[${text}]`);
+        return text;
+      } catch (e) {
+        const text = `❌ Failed to create notebook "${notebookPath}": ${getErrorMessage(e)}`;
+        log(`${PREFIX} result:[${text}]`);
+        return text;
       }
-      const text = lines.join("\n");
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    } catch (e: any) {
-      const text = `❌ Failed to create notebook "${notebookPath}": ${e?.message ?? e}`;
-      log(`${PREFIX} result:[${text}]`);
-      return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
-    }
+    });
+    return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
 }
 

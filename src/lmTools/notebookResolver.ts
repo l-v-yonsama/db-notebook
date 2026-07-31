@@ -1,5 +1,6 @@
 import * as path from "path";
 import { NotebookDocument, Uri, workspace } from "vscode";
+import { getErrorMessage } from "../utilities/errorUtil";
 import { existsUri } from "../utilities/fsUtil";
 
 export type NotebookPathResolution = { ok: true; uri: Uri } | { ok: false; message: string };
@@ -63,7 +64,7 @@ export async function resolveNotebookDocument(uri: Uri): Promise<NotebookDocumen
   try {
     const document = await workspace.openNotebookDocument(uri);
     return { ok: true, document };
-  } catch (e: any) {
-    return { ok: false, message: `Failed to open notebook "${uri.fsPath}": ${e?.message ?? e}` };
+  } catch (e) {
+    return { ok: false, message: `Failed to open notebook "${uri.fsPath}": ${getErrorMessage(e)}` };
   }
 }
