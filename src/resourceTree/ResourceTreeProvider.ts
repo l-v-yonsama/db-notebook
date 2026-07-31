@@ -1,4 +1,5 @@
 import {
+  ConnectionEnvironment,
   DbColumn,
   DbConnection,
   DbDynamoTable,
@@ -58,11 +59,17 @@ const toIconFileName = (colType: GeneralColumnType): string => {
 
 let defaultConName = "";
 
-export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+export class ResourceTreeProvider
+  implements vscode.TreeDataProvider<vscode.TreeItem>, vscode.FileDecorationProvider
+{
   private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> =
     new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
   readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> =
     this._onDidChangeTreeData.event;
+  private _onDidChangeFileDecorations = new vscode.EventEmitter<
+    vscode.Uri | vscode.Uri[] | undefined
+  >();
+  readonly onDidChangeFileDecorations = this._onDidChangeFileDecorations.event;
   private conResList: DbConnection[] = [];
   private parentMap = new Map<string, DbResource | undefined>();
 
@@ -90,6 +97,7 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     }
     this.resetDefaultConnectionName();
     this._onDidChangeTreeData.fire();
+    this._onDidChangeFileDecorations.fire(undefined);
   }
 
   async resetDefaultConnectionName(): Promise<void> {
@@ -100,6 +108,35 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     this.resetDefaultConnectionName();
     this._onDidChangeTreeData.fire(conRes);
     this._onDidChangeTreeData.fire();
+    this._onDidChangeFileDecorations.fire(this.connectionUri(conRes));
+  }
+
+  private connectionUri(conRes: DbConnection): vscode.Uri {
+    return vscode.Uri.from({ scheme: "db-notebook-connection", path: "/" + conRes.name });
+  }
+
+  provideFileDecoration(uri: vscode.Uri): vscode.ProviderResult<vscode.FileDecoration> {
+    if (uri.scheme !== "db-notebook-connection") {
+      return undefined;
+    }
+    const name = uri.path.replace(/^\//, "");
+    const conRes = this.conResList.find((c) => c.name === name);
+    if (!conRes?.environment) {
+      return undefined;
+    }
+    const map: Record<ConnectionEnvironment, { badge: string; color?: string }> = {
+      local: { badge: "L" },
+      development: { badge: "D", color: "charts.blue" },
+      test: { badge: "T", color: "charts.purple" },
+      staging: { badge: "S", color: "charts.orange" },
+      production: { badge: "P", color: "charts.red" },
+    };
+    const entry = map[conRes.environment];
+    return {
+      badge: entry.badge,
+      color: entry.color ? new vscode.ThemeColor(entry.color) : undefined,
+      tooltip: `Environment: ${conRes.environment[0].toUpperCase()}${conRes.environment.slice(1)}`,
+    };
   }
 
   changeDbResourceTreeData(dbRes: DbResource): void {
@@ -164,6 +201,11 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
 export class ConnectionListItem extends vscode.TreeItem {
   constructor(public readonly conRes: DbConnection, state: vscode.TreeItemCollapsibleState) {
     super(conRes.name, state);
+
+    this.resourceUri = vscode.Uri.from({
+      scheme: "db-notebook-connection",
+      path: "/" + conRes.name,
+    });
 
     if (conRes.isInProgress) {
       this.iconPath = new vscode.ThemeIcon("loading~spin");

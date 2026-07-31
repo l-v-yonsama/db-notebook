@@ -123,6 +123,7 @@ export async function activate(context: ExtensionContext) {
   activateMcpServer(context, stateStorage);
 
   window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
+  context.subscriptions.push(window.registerFileDecorationProvider(dbResourceTree));
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
 
   const mcpServerTreeView = window.createTreeView("database-notebook-mcpserver", {
