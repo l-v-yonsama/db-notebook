@@ -203,15 +203,18 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   });
 
   commands.registerCommand(LOAD_DB_SCHEMA, async (conRes: DbConnection) => {
+    let loaded = false;
     try {
       conRes.isInProgress = true;
       dbResourceTree.changeConnectionTreeData(conRes);
 
       const { ok, message, result } = await stateStorage.loadResource(conRes.name, true, true);
       conRes.isInProgress = false;
+      dbResourceTree.forgetResourceTree(conRes.children);
       conRes.clearChildren();
       if (ok && result?.db) {
         result.db.forEach((dbRes) => conRes.addChild(dbRes));
+        loaded = true;
       } else {
         showWindowErrorMessage(message);
       }
@@ -219,9 +222,13 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       showWindowErrorMessage(e);
     }
     dbResourceTree.changeConnectionTreeData(conRes);
+    if (loaded) {
+      await dbResourceTreeView.reveal(conRes, { select: false, focus: false, expand: 2 });
+    }
   });
 
   commands.registerCommand(CONNECT, async (conRes: DbConnection) => {
+    let loaded = false;
     try {
       conRes.isInProgress = true;
       dbResourceTree.changeConnectionTreeData(conRes);
@@ -253,7 +260,9 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
             };
           });
         }
+        dbResourceTree.forgetResourceTree(stateStorage.getResourceByName(conRes.name));
         stateStorage.resetResource(conRes.name, dbRes);
+        loaded = true;
       }
       conRes.isConnected = true;
     } catch (e) {
@@ -262,6 +271,9 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       conRes.isInProgress = false;
     }
     dbResourceTree.changeConnectionTreeData(conRes);
+    if (loaded) {
+      await dbResourceTreeView.reveal(conRes, { select: false, focus: false, expand: 2 });
+    }
   });
 
   commands.registerCommand(DISCONNECT, async (conRes: DbConnection) => {
@@ -279,6 +291,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
         showWindowErrorMessage(message);
         return;
       }
+      dbResourceTree.forgetResourceTree(stateStorage.getResourceByName(conRes.name));
       stateStorage.resetResource(conRes.name, []);
       conRes.isInProgress = false;
     } catch (e) {

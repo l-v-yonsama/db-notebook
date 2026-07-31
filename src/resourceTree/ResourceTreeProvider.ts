@@ -64,6 +64,7 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> =
     this._onDidChangeTreeData.event;
   private conResList: DbConnection[] = [];
+  private parentMap = new Map<string, DbResource | undefined>();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -85,6 +86,7 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
         const conRes = new DbConnection(setting);
         this.conResList.push(conRes);
       }
+      this.parentMap.clear();
     }
     this.resetDefaultConnectionName();
     this._onDidChangeTreeData.fire();
@@ -122,18 +124,39 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<vscode.Tree
 
   getChildren(element?: DbResource): vscode.ProviderResult<DbResource[]> {
     try {
+      let children: DbResource[];
       if (element) {
         if (element.resourceType === ResourceType.Connection) {
-          const dbDatabase = this.stateStorage.getResourceByName(element.name);
-          return Promise.resolve(dbDatabase ?? []);
+          children = this.stateStorage.getResourceByName(element.name) ?? [];
+        } else {
+          children = element.children;
         }
-        return Promise.resolve(element.children);
+      } else {
+        // connection resource
+        children = this.conResList;
       }
-      // connection resource
-      return Promise.resolve(this.conResList);
+      children.forEach((child) => this.parentMap.set(child.id, element));
+      return Promise.resolve(children);
     } catch (e) {
       console.error(e);
       return Promise.resolve([]);
+    }
+  }
+
+  getParent(element: DbResource): vscode.ProviderResult<DbResource> {
+    return this.parentMap.get(element.id);
+  }
+
+  // Drop stale parent links for a subtree that's about to be replaced (e.g. on schema reload),
+  // since DbResource ids are freshly generated per instance and would otherwise pin the old
+  // objects in `parentMap` forever, preventing them from being garbage collected.
+  forgetResourceTree(resources: DbResource[] | undefined): void {
+    if (!resources) {
+      return;
+    }
+    for (const res of resources) {
+      this.parentMap.delete(res.id);
+      this.forgetResourceTree(res.children);
     }
   }
 }
