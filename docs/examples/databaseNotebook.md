@@ -76,6 +76,14 @@ Cell[2] (SQL cell)
 
 ## 2. Controlling the Database with Javascript
 
+> **No hosted API reference for `DBDriverResolver`/`normalizeQuery`**
+>
+> These (and the other globals available in JS cells, like `variables` and
+> `writeResultSetData`) don't have a hosted API reference page right now. Hover over
+> them, or trigger signature help inside their parentheses, for the exact real types
+> and parameters. See also the
+> [Implicit Globals Quick Reference](./databaseNotebookJs.md#implicit-globals-quick-reference).
+
 ### 2.1. Inserting parent and child records in the same transaction
 
 #### Define cells.
@@ -84,12 +92,9 @@ Cell[2] (SQL cell)
 // Get a connection definition by specifying the "Connection name" defined in the "DB Explorer".
 const connectionSetting = getConnectionSettingByName("localPostgres");
 
-// https://github.com/l-v-yonsama/db-drivers/blob/main/doc/classes/DBDriverResolver.md#flowtransaction
 const { ok, message, result } = await DBDriverResolver.getInstance().flowTransaction(
   connectionSetting,
   async (driver) => {
-    // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/classes/RDSBaseDriver.md#requestsql
-
     // for PostgreSQL
     const { rows } = await driver.requestSql({
       sql: "INSERT INTO order1 (customer_no, order_date, amount) VALUES (10, '2024-01-01', 300) RETURNING order_no AS inserted_no",
@@ -101,7 +106,6 @@ const { ok, message, result } = await DBDriverResolver.getInstance().flowTransac
     // const orderNo = summary.insertId;
 
     for (let i = 1; i <= 3; i++) {
-      // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/modules.md#normalizequery
       const { query, binds } = normalizeQuery({
         query:
           "INSERT INTO order_detail (order_no, detail_no, item_no, amount) VALUES (:order_no, :detail_no, :item_no, :amount)",

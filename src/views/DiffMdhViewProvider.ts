@@ -394,9 +394,6 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     );
     contents.push(``);
     contents.push(`const requestSql = async (driver, sql) => {`);
-    contents.push(
-      `  // https://github.com/l-v-yonsama/db-drivers/blob/main/doc/classes/RDSBaseDriver.md#requestsql `
-    );
     contents.push(`  const r = await driver.requestSql({ sql });`);
     contents.push(`  const affectedRows = r?.summary?.affectedRows ?? 0;`);
     contents.push(`  totalAffectedRows += affectedRows;`);

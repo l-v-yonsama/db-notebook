@@ -2,8 +2,64 @@
 
 This page shows an example of Javascript Cell usage using the VS Code Extension "Database Notebook".
 
+## Implicit Globals Quick Reference
+
+Every JS cell has the globals below available automatically — no `require`/`import` needed. This table is a discoverability index, not a full API reference: hover over any name, or trigger signature help inside its parentheses, to see its real, live type and parameters (backed by the same TypeScript language service used elsewhere in VS Code).
+
+| Name | What it's for | Learn more |
+| --- | --- | --- |
+| `variables` | Read/write notebook-wide shared values (`get`/`set`/`each`/`remove`/`clearAll`) | `.get()`: [Multi-language flow](databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown); others: see below |
+| `variablesCell` | Write values back into a JSON cell (`setKeyValueAtFirst`/`setKeyValueAt`/`replaceAllAtFirst`/`replaceAllAt`) | `setKeyValueAtFirst`: [Multi-language flow](databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown); others: see below |
+| `getConnectionSettingByName` | Look up a saved DB connection ("DB Explorer") by name | [Controlling the Database with JavaScript](databaseNotebook.md#2-controlling-the-database-with-javascript) |
+| `DBDriverResolver` | Run a query/transaction against a saved connection | same section as above |
+| `normalizeQuery` | Convert named `:params` into a driver-specific positioned/bound query | same section as above |
+| `parseContentType` | Infer a content-type descriptor from a filename/content-type string | Hover for details (rarely called directly from JS cells) |
+| `writeResultSetData` | Save tabular data as this cell's RDH-formatted output | see below |
+| `writeResponseData` | Save an Axios response as this cell's output | [Axios use cases](#3-axios-use-cases) |
+| `decodeJwt` | Decode a JWT's header/payload | [Acquisition and decoding of ID Token](#213-acquisition-and-decoding-of-id-token) |
+| `_skipSql` | Skip the next SQL cell, conditionally | see below |
+| `axios` | HTTP client | [axios-http.com/docs/intro](https://axios-http.com/docs/intro) |
+| `execa` | Run shell commands | [github.com/sindresorhus/execa](https://github.com/sindresorhus/execa#readme) |
+| `jmespath` | Query/transform JSON | [jmespath.org/tutorial.html](https://jmespath.org/tutorial.html) |
+
+> **`variables` vs `variablesCell`**: `variables` is an in-memory store scoped to the current kernel session — fast, but gone on notebook reload/kernel restart, and never written back into the `.dbn` file. `variablesCell` instead rewrites a JSON cell's actual saved text, so the value is visible in the editor and survives reopening the notebook. Use `variables` to pass values between cells during a run; use `variablesCell` when you want that value to persist in the notebook itself (e.g. caching a freshly-fetched access token for next time).
+
+A few of these have no worked example elsewhere on this page:
+
+```js
+// variables: set / each / remove / clearAll
+variables.set("counter", 1);
+variables.each((value, key) => console.log(key, value));
+variables.remove("counter");
+// variables.clearAll(); // removes every stored variable -- use with care
+```
+
+```js
+// variablesCell: write into a specific JSON cell by index, or replace it wholesale
+variablesCell.setKeyValueAt(0, "status", "done"); // cell index 0
+variablesCell.replaceAllAtFirst({ status: "done" }); // replaces the whole first JSON cell
+```
+
+```js
+// writeResultSetData: save a plain array/object as this cell's tabular output,
+// independent of any SQL cell
+const rows = [
+  { id: 1, name: "TARO" },
+  { id: 2, name: "HANAKO" },
+];
+writeResultSetData("Employees", rows);
+```
+
+```js
+// _skipSql: conditionally skip the very next SQL cell in the notebook
+if (variables.get("skipHeavyQuery")) {
+  _skipSql(true);
+}
+```
+
 ## TOC
 
+- [Implicit Globals Quick Reference](#implicit-globals-quick-reference)
 - 1. [Console](#1-console)
 - 2. [Execa](#2-execa)
   - 2.1. [Example of operating aws cognito via aws cli](#21-example-of-operating-aws-cognito-via-aws-cli)
