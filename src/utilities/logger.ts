@@ -24,9 +24,9 @@ export function setupDisposeLogger(context: ExtensionContext) {
   context.subscriptions.push(channel);
 }
 
-export function show() {
+export function show(preserveFocus?: boolean) {
   if (channel) {
-    channel.show();
+    channel.show(preserveFocus);
   }
 }
 

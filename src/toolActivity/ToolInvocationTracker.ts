@@ -26,6 +26,16 @@ export type ToolInvocationRecord = {
 const MAX_HISTORY_PER_SOURCE = 10;
 const SUMMARY_MAX_LENGTH = 500;
 
+/**
+ * Fast invocations (a local/cached query can resolve in a few ms) fire the start and
+ * end activity events close enough together that the tree view's two renders collapse
+ * into one repaint in the renderer process -- the "Running..." state is real but never
+ * actually gets painted, so it looks like nothing happened until history silently grows.
+ * `finish()` below pads the *bookkeeping* (not the real result) out to this minimum so
+ * the transition is perceivable; it never delays what the caller gets back from `fn()`.
+ */
+export const MIN_VISIBLE_RUNNING_MS = 300;
+
 type Disposable = { dispose: () => void };
 
 /**
@@ -59,6 +69,12 @@ const activeCount: Record<ToolSource, number> = {
   mcpServer: 0,
 };
 
+/** Lifetime count of completed invocations, unlike `history` this is never capped/trimmed. */
+const totalCount: Record<ToolSource, number> = {
+  lmTools: 0,
+  mcpServer: 0,
+};
+
 const activityEmitter = new SimpleEmitter<ToolSource>();
 
 /** Fires whenever a source's active-invocation count or history changes (invocation start or end). */
@@ -70,6 +86,17 @@ export function getHistory(source: ToolSource): ToolInvocationRecord[] {
 
 export function isActive(source: ToolSource): boolean {
   return activeCount[source] > 0;
+}
+
+export function getTotalCount(source: ToolSource): number {
+  return totalCount[source];
+}
+
+/** Bulk-clear only -- there's deliberately no per-item clear (see the tree view plan's "見送る案"). */
+export function clearHistory(source: ToolSource): void {
+  history[source] = [];
+  totalCount[source] = 0;
+  activityEmitter.fire(source);
 }
 
 function summarize(value: unknown): string {
@@ -104,34 +131,40 @@ export async function trackInvocation<T>(
   activeCount[source]++;
   activityEmitter.fire(source);
 
-  let status: ToolInvocationRecord["status"] = "success";
-  let outputSummary = "";
+  // Bookkeeping only -- scheduled via setTimeout (not awaited) so it never delays the
+  // value/error this function hands back to its real caller (Copilot/MCP client).
+  const finish = (status: ToolInvocationRecord["status"], outputSummary: string): void => {
+    const durationMs = Date.now() - startedAt;
+    const delay = Math.max(0, MIN_VISIBLE_RUNNING_MS - durationMs);
+    setTimeout(() => {
+      activeCount[source]--;
+      totalCount[source]++;
+
+      const list = history[source];
+      list.unshift({
+        id: randomUUID(),
+        source,
+        toolName,
+        startedAt,
+        durationMs,
+        status,
+        inputSummary: summarize(input),
+        outputSummary,
+      });
+      if (list.length > MAX_HISTORY_PER_SOURCE) {
+        list.splice(MAX_HISTORY_PER_SOURCE, list.length - MAX_HISTORY_PER_SOURCE);
+      }
+
+      activityEmitter.fire(source);
+    }, delay);
+  };
+
   try {
     const result = await fn();
-    outputSummary = summarize(result);
+    finish("success", summarize(result));
     return result;
   } catch (e) {
-    status = "error";
-    outputSummary = getErrorMessage(e);
+    finish("error", getErrorMessage(e));
     throw e;
-  } finally {
-    activeCount[source]--;
-
-    const list = history[source];
-    list.unshift({
-      id: randomUUID(),
-      source,
-      toolName,
-      startedAt,
-      durationMs: Date.now() - startedAt,
-      status,
-      inputSummary: summarize(input),
-      outputSummary,
-    });
-    if (list.length > MAX_HISTORY_PER_SOURCE) {
-      list.splice(MAX_HISTORY_PER_SOURCE, list.length - MAX_HISTORY_PER_SOURCE);
-    }
-
-    activityEmitter.fire(source);
   }
 }

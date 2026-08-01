@@ -42,7 +42,6 @@ import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
 import { activateLmTools } from "./lmTools/activator";
 import { activateMcpServer } from "./mcpServer/activator";
 import { onDidChangeRunningState } from "./mcpServer/server";
-import { McpServerTreeProvider } from "./mcpServerTree/McpServerTreeProvider";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
@@ -60,6 +59,9 @@ import { SubscriptionSettingPanel } from "./panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
 import { activateRuleEditor } from "./ruleEditor/activator";
+import { registerToolActivityTreeCommand } from "./toolActivity/ToolActivityTreeCommand";
+import { ToolActivityTreeProvider } from "./toolActivity/ToolActivityTreeProvider";
+import { onDidChangeActivity } from "./toolActivity/ToolInvocationTracker";
 import {
   ChartsViewParams,
   DiffMdhViewTabParam,
@@ -96,7 +98,7 @@ export async function activate(context: ExtensionContext) {
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
   const historyTreeProvider = new HistoryTreeProvider(context, stateStorage);
-  const mcpServerTreeProvider = new McpServerTreeProvider(context);
+  const toolActivityTreeProvider = new ToolActivityTreeProvider(context);
 
   activateLogger(context, EXTENSION_NAME);
   log(`${PREFIX} start activation.`);
@@ -126,16 +128,18 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(window.registerFileDecorationProvider(dbResourceTree));
   window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
 
-  const mcpServerTreeView = window.createTreeView("database-notebook-mcpserver", {
-    treeDataProvider: mcpServerTreeProvider,
+  registerToolActivityTreeCommand(context);
+  const toolActivityTreeView = window.createTreeView("database-notebook-mcpserver", {
+    treeDataProvider: toolActivityTreeProvider,
   });
-  onDidChangeRunningState(() => mcpServerTreeProvider.refresh());
-  mcpServerTreeView.onDidChangeVisibility((e) => {
+  onDidChangeRunningState(() => toolActivityTreeProvider.refresh());
+  onDidChangeActivity(() => toolActivityTreeProvider.refresh());
+  toolActivityTreeView.onDidChangeVisibility((e) => {
     if (e.visible) {
-      mcpServerTreeProvider.refresh();
+      toolActivityTreeProvider.refresh();
     }
   });
-  context.subscriptions.push(mcpServerTreeView);
+  context.subscriptions.push(toolActivityTreeView);
 
   // VIEWS
   const dbResourceTreeView = window.createTreeView(CONNECTION_VIEW_ID, {

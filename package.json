@@ -249,10 +249,10 @@
         },
         {
           "id": "database-notebook-mcpserver",
-          "name": "MCP Server",
+          "name": "LM Tools / MCP Server",
           "visibility": "visible",
           "icon": "media/logo.png",
-          "contextualTitle": "MCP Server"
+          "contextualTitle": "LM Tools / MCP Server"
         },
         {
           "id": "database-notebook-helpfeedback",
@@ -599,6 +599,26 @@
           "group": "inline"
         },
         {
+          "command": "database-notebook.start-mcp-server",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /stopped/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.stop-mcp-server",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /running/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.show-mcp-connection-info",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /running/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.tool-activity.clear-history",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /toolActivityCategory.*hasHistory/",
+          "group": "inline"
+        },
+        {
           "command": "database-notebook.open-chat-2-query",
           "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
           "group": "inline"
@@ -644,21 +664,6 @@
         {
           "command": "database-notebook.focus-filter",
           "when": "view == database-notebook-connections",
-          "group": "navigation"
-        },
-        {
-          "command": "database-notebook.start-mcp-server",
-          "when": "view == database-notebook-mcpserver && !databaseNotebook.mcpServerRunning",
-          "group": "navigation"
-        },
-        {
-          "command": "database-notebook.stop-mcp-server",
-          "when": "view == database-notebook-mcpserver && databaseNotebook.mcpServerRunning",
-          "group": "navigation"
-        },
-        {
-          "command": "database-notebook.show-mcp-connection-info",
-          "when": "view == database-notebook-mcpserver && databaseNotebook.mcpServerRunning",
           "group": "navigation"
         },
         {
@@ -990,6 +995,12 @@
         "shortTitle": "Show Connection Info",
         "category": "Database Notebook",
         "icon": "$(info)"
+      },
+      {
+        "command": "database-notebook.tool-activity.clear-history",
+        "title": "Clear tool activity history",
+        "shortTitle": "Clear History",
+        "icon": "$(clear-all)"
       },
       {
         "command": "database-notebook.load-database-schema",

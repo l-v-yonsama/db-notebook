@@ -148,3 +148,11 @@ export const RECORD_RULE_TYPE = `${EXTENSION_NAME}.ruleEditor`;
 //---------------------------------------------------
 export const CREATE_CODE_RESOLVER = `${EXTENSION_NAME}.create-blank-code-resolver`;
 export const CODE_RESOLVER_TYPE = `${EXTENSION_NAME}.codeResolverEditor`;
+
+//---------------------------------------------------
+// TOOL ACTIVITY TREE (LM Tools / MCP Server)
+//---------------------------------------------------
+// Deliberately not added to package.json's `contributes.commands` -- invoked only via
+// TreeItem.command, same as OPEN_OUTPUT_CHANNEL above.
+export const SHOW_INVOCATION_LOG = `${EXTENSION_NAME}.tool-activity.show-invocation-log`;
+export const CLEAR_TOOL_ACTIVITY_HISTORY = `${EXTENSION_NAME}.tool-activity.clear-history`;

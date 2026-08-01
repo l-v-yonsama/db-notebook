@@ -194,9 +194,10 @@ describe("detectRunningServer", () => {
   });
 
   it("回帰テスト: サーバー停止中に何度呼んでも起動クレームを奪わないため、直後のacquireOrDetectは即座にshouldStart:trueになる", async () => {
-    // McpServerTreeProvider.getChildren() が旧実装のように acquireOrDetect を使っていた
-    // 場合、ツリービューの自動更新のたびに起動クレームを取得したまま解放されず、
-    // 停止直後の再起動が毎回「another window is starting」で失敗していた実際のバグの再現。
+    // ツリービュー(旧McpServerTreeProvider、現ToolActivityTreeProvider)のgetChildren()が
+    // 旧実装のように acquireOrDetect を使っていた場合、ツリービューの自動更新のたびに起動
+    // クレームを取得したまま解放されず、停止直後の再起動が毎回「another window is
+    // starting」で失敗していた実際のバグの再現。
     const context = makeContext();
 
     for (let i = 0; i < 5; i++) {

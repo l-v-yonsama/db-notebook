@@ -16,10 +16,19 @@ export class ThemeIcon {
   constructor(public id: string, public color?: ThemeColor) {}
 }
 
+export enum TreeItemCollapsibleState {
+  None = 0,
+  Collapsed = 1,
+  Expanded = 2,
+}
+
 export class TreeItem {
   description?: string;
   iconPath?: unknown;
-  constructor(public label: string, public collapsibleState?: number) {}
+  contextValue?: string;
+  tooltip?: unknown;
+  command?: unknown;
+  constructor(public label: string, public collapsibleState?: TreeItemCollapsibleState) {}
 }
 
 export class EventEmitter<T> {

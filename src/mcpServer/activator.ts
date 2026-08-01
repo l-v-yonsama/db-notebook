@@ -7,7 +7,6 @@ import { regenerateToken } from "./auth";
 import { isRunningHere, McpServerHandle, startMcpServer, stopMcpServer } from "./server";
 
 const PREFIX = "[mcpServer/activator]";
-const RUNNING_CONTEXT_KEY = "databaseNotebook.mcpServerRunning";
 
 export function activateMcpServer(context: ExtensionContext, stateStorage: StateStorage): void {
   context.subscriptions.push(
@@ -53,7 +52,6 @@ export function activateMcpServer(context: ExtensionContext, stateStorage: State
 async function start(context: ExtensionContext, stateStorage: StateStorage): Promise<void> {
   try {
     const handle = await startMcpServer(context, stateStorage);
-    await commands.executeCommand("setContext", RUNNING_CONTEXT_KEY, true);
     await showConnectionInfo(handle);
   } catch (e) {
     const message = getErrorMessage(e);
@@ -70,7 +68,6 @@ async function stop(context: ExtensionContext): Promise<void> {
     return;
   }
   await stopMcpServer(context);
-  await commands.executeCommand("setContext", RUNNING_CONTEXT_KEY, false);
   window.showInformationMessage("Database Notebook MCP server stopped.");
 }
 
