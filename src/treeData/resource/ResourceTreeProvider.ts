@@ -1,4 +1,6 @@
 import {
+  AwsDatabase,
+  AwsServiceType,
   ConnectionEnvironment,
   DbColumn,
   DbConnection,
@@ -30,6 +32,7 @@ import {
   isTextLike,
 } from "@l-v-yonsama/rdh";
 import * as vscode from "vscode";
+import { getIconPath } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
 
@@ -55,6 +58,51 @@ const toIconFileName = (colType: GeneralColumnType): string => {
     iconFile = "symbol-string";
   }
   return iconFile;
+};
+
+const DB_TYPE_DISPLAY_NAMES: Record<DBType, string> = {
+  [DBType.MySQL]: "MySQL",
+  [DBType.Postgres]: "PostgreSQL",
+  [DBType.SQLServer]: "SQL Server",
+  [DBType.SQLite]: "SQLite",
+  [DBType.Oracle]: "Oracle",
+  [DBType.Redis]: "Redis",
+  [DBType.Memcache]: "Memcached",
+  [DBType.Keycloak]: "Keycloak",
+  [DBType.Auth0]: "Auth0",
+  [DBType.Aws]: "AWS",
+  [DBType.Mqtt]: "MQTT",
+};
+
+const toDbTypeDisplayName = (dbType: DBType): string => DB_TYPE_DISPLAY_NAMES[dbType] ?? dbType;
+
+// Vendor logos for the DBTypes where a safely-licensed brand mark is available
+// (see misc/resource-tree-icons-investigation-2026-08-02.md, Tier A). Oracle/SQL
+// Server/AWS/Memcached deliberately stay on generic codicons for now.
+const VENDOR_ICONS = {
+  mysql: "db-vendor-mysql.svg",
+  postgresql: "db-vendor-postgresql.svg",
+  sqlite: "db-vendor-sqlite.svg",
+  redis: "db-vendor-redis.svg",
+  mqtt: "db-vendor-mqtt.svg",
+  auth0: "db-vendor-auth0.svg",
+} as const;
+
+const toAwsServiceIconFileName = (serviceType: AwsServiceType): string => {
+  switch (serviceType) {
+    case AwsServiceType.S3:
+      return "archive";
+    case AwsServiceType.SQS:
+      return "combine";
+    case AwsServiceType.SES:
+      return "mail";
+    case AwsServiceType.Cloudwatch:
+      return "pulse";
+    case AwsServiceType.DynamoDB:
+      return "table";
+    default:
+      return "database";
+  }
 };
 
 let defaultConName = "";
@@ -207,30 +255,59 @@ export class ConnectionListItem extends vscode.TreeItem {
       path: "/" + conRes.name,
     });
 
+    const isDefault = conRes.name === defaultConName;
+    // Connection status (spinner/connected/disconnected) always reflects the real
+    // state here -- "is the default connection" is surfaced separately below
+    // (description + tooltip), so it no longer overrides/hides a live connection.
     if (conRes.isInProgress) {
       this.iconPath = new vscode.ThemeIcon("loading~spin");
+    } else if (conRes.isConnected) {
+      this.iconPath = new vscode.ThemeIcon("pass");
     } else {
-      if (conRes.name === defaultConName) {
-        this.iconPath = new vscode.ThemeIcon(
-          "debug-disconnect",
-          new vscode.ThemeColor("errorForeground")
-        );
-      } else {
-        if (conRes.isConnected) {
-          this.iconPath = new vscode.ThemeIcon("pass");
-        } else {
-          this.iconPath = new vscode.ThemeIcon("debug-disconnect");
-        }
-      }
+      this.iconPath = new vscode.ThemeIcon("debug-disconnect");
     }
-    const clearableDefault = conRes.name === defaultConName;
-    this.description = `(${conRes.dbType})`;
+    const clearableDefault = isDefault;
+    this.description = `(${toDbTypeDisplayName(conRes.dbType)})`;
     if (conRes.dbType === DBType.Mqtt) {
       this.description += ` (${conRes.isConnected ? "connected" : "disconnected"})`;
+    }
+    if (isDefault) {
+      this.description += " (default)";
     }
     const support = DBType.Mqtt !== conRes.dbType;
     this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},CD:${clearableDefault},connected:${conRes.isConnected},support:${support},${conRes.isInProgress}`;
     this.contextValue += ",tag:dbResource";
+
+    const tooltip = new vscode.MarkdownString(encodeHtmlWeak(conRes.name), true);
+    tooltip.supportHtml = true;
+    tooltip.isTrusted = true;
+    tooltip.appendMarkdown(`\\\n${toDbTypeDisplayName(conRes.dbType)}`);
+    if (conRes.host) {
+      tooltip.appendMarkdown(
+        `\\\n${encodeHtmlWeak(conRes.host)}${conRes.port ? `:${conRes.port}` : ""}`
+      );
+    }
+    if (conRes.database) {
+      tooltip.appendMarkdown(`\\\nDatabase: ${encodeHtmlWeak(conRes.database)}`);
+    }
+    if (conRes.environment) {
+      tooltip.appendMarkdown(
+        `\\\nEnvironment: ${conRes.environment[0].toUpperCase()}${conRes.environment.slice(1)}`
+      );
+    }
+    if (conRes.comment) {
+      tooltip.appendMarkdown(`\\\n${encodeHtmlWeak(conRes.comment)}`);
+    }
+    if (conRes.hasSshSetting()) {
+      tooltip.appendMarkdown("\\\nSSH tunnel enabled");
+    }
+    if (conRes.ssl?.use) {
+      tooltip.appendMarkdown("\\\nSSL enabled");
+    }
+    if (isDefault) {
+      tooltip.appendMarkdown("\\\nDefault connection for new SQL cells");
+    }
+    this.tooltip = tooltip;
   }
 }
 
@@ -242,7 +319,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
   ) {
     super(resource.name, state);
 
-    let iconPath = new vscode.ThemeIcon("database");
+    let iconPath: vscode.TreeItem["iconPath"] = new vscode.ThemeIcon("database");
     let description = resource.comment || "";
     let scannable = false;
     let showSessions = false;
@@ -258,7 +335,31 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.RdsDatabase:
         {
           const res = resource as RdsDatabase;
-          iconPath = new vscode.ThemeIcon("database");
+          switch (dbType) {
+            case DBType.MySQL:
+              iconPath = getIconPath(VENDOR_ICONS.mysql);
+              break;
+            case DBType.Postgres:
+              iconPath = getIconPath(VENDOR_ICONS.postgresql);
+              break;
+            case DBType.SQLite:
+              iconPath = getIconPath(VENDOR_ICONS.sqlite);
+              break;
+            case DBType.Oracle:
+              iconPath = new vscode.ThemeIcon(
+                "server-environment",
+                new vscode.ThemeColor("charts.red")
+              );
+              break;
+            case DBType.SQLServer:
+              iconPath = new vscode.ThemeIcon(
+                "server-environment",
+                new vscode.ThemeColor("charts.blue")
+              );
+              break;
+            default:
+              iconPath = new vscode.ThemeIcon("database");
+          }
           if (
             dbType === DBType.MySQL ||
             dbType === DBType.Postgres ||
@@ -275,19 +376,22 @@ export class DBDatabaseItem extends vscode.TreeItem {
         }
         break;
       case ResourceType.AwsDatabase:
-        iconPath = new vscode.ThemeIcon("database");
+        {
+          const res = resource as AwsDatabase;
+          iconPath = new vscode.ThemeIcon(toAwsServiceIconFileName(res.serviceType));
+        }
         break;
       case ResourceType.KeycloakDatabase:
         iconPath = new vscode.ThemeIcon("database");
         break;
       case ResourceType.Auth0Database:
-        iconPath = new vscode.ThemeIcon("database");
+        iconPath = getIconPath(VENDOR_ICONS.auth0);
         scannable = true;
         break;
       case ResourceType.RedisDatabase:
         {
           const res = resource as RedisDatabase;
-          iconPath = new vscode.ThemeIcon("database");
+          iconPath = getIconPath(VENDOR_ICONS.redis);
           description = `${res.numOfKeys} keys`;
           scannable = true;
         }
@@ -302,7 +406,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.MqttDatabase:
         {
           const res = resource as MqttDatabase;
-          iconPath = new vscode.ThemeIcon("database");
+          iconPath = getIconPath(VENDOR_ICONS.mqtt);
           scannable = false;
         }
         break;
@@ -318,7 +422,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
         scannable = true;
         break;
       case ResourceType.Queue:
-        iconPath = new vscode.ThemeIcon("git-commit");
+        iconPath = new vscode.ThemeIcon("list-selection");
         scannable = true;
         break;
       case ResourceType.Table:
@@ -367,7 +471,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
         break;
       case ResourceType.IamClient:
         {
-          iconPath = new vscode.ThemeIcon("hubot");
+          iconPath = new vscode.ThemeIcon("symbol-class");
           const client = resource as IamClient;
           if (client.meta?.scannable) {
             // Keycloak
@@ -384,11 +488,11 @@ export class DBDatabaseItem extends vscode.TreeItem {
         }
         break;
       case ResourceType.IamRealm:
-        iconPath = new vscode.ThemeIcon("inbox");
+        iconPath = new vscode.ThemeIcon("shield");
         scannable = true;
         break;
       case ResourceType.IamGroup:
-        iconPath = new vscode.ThemeIcon("activate-breakpoints");
+        iconPath = new vscode.ThemeIcon("organization");
         // for Keycloak's group.
         // can't search by keyword.
         // scannable = true;
