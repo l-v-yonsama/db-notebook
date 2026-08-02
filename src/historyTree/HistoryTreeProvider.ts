@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import dayjs from "dayjs";
 import { StateStorage } from "../utilities/StateStorage";
 
 import { abbr } from "@l-v-yonsama/rdh";
@@ -13,6 +14,7 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
   readonly onDidChangeTreeData: vscode.Event<SQLHistory | undefined | void> =
     this._onDidChangeTreeData.event;
   private historyResList: SQLHistory[] = [];
+  private filterConnectionName: string | undefined;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -25,11 +27,29 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
   }
   getChildren(element?: SQLHistory | undefined): vscode.ProviderResult<SQLHistory[]> {
     try {
+      if (this.filterConnectionName) {
+        return Promise.resolve(
+          this.historyResList.filter((it) => it.connectionName === this.filterConnectionName)
+        );
+      }
       return Promise.resolve(this.historyResList);
     } catch (e) {
       console.error(PREFIX, e);
       return Promise.resolve([]);
     }
+  }
+
+  getConnectionNames(): string[] {
+    return [...new Set(this.historyResList.map((it) => it.connectionName))];
+  }
+
+  getConnectionFilter(): string | undefined {
+    return this.filterConnectionName;
+  }
+
+  setConnectionFilter(connectionName: string | undefined): void {
+    this.filterConnectionName = connectionName;
+    this._onDidChangeTreeData.fire();
   }
 
   init() {
@@ -56,29 +76,47 @@ export class SQLHistoryItem extends vscode.TreeItem {
       vscode.TreeItemCollapsibleState.None
     );
 
-    let description = resource.connectionName;
-    if (resource.meta?.type === "select" && resource.summary?.selectedRows !== undefined) {
+    this.contextValue = resource.status === "error" ? "sqlHistoryError" : "sqlHistorySuccess";
+
+    const descriptionParts = [resource.connectionName];
+
+    if (resource.executedAt) {
+      descriptionParts.push(dayjs(resource.executedAt).format("MM/DD HH:mm"));
+    }
+
+    if (resource.status === "error") {
+      descriptionParts.push("Error");
+    } else if (resource.meta?.type === "select" && resource.summary?.selectedRows !== undefined) {
       if (resource.summary?.selectedRows === 1) {
-        description += ` (1 row)`;
+        descriptionParts.push(`1 row`);
       } else {
-        description += ` (${resource.summary?.selectedRows} rows)`;
+        descriptionParts.push(`${resource.summary?.selectedRows} rows`);
       }
     } else if (resource.meta?.type !== "select" && resource.summary?.affectedRows !== undefined) {
       if (resource.summary?.affectedRows === 1) {
-        description += ` (1 affected row)`;
+        descriptionParts.push(`1 affected row`);
       } else {
-        description += ` (${resource.summary?.affectedRows} affected rows)`;
+        descriptionParts.push(`${resource.summary?.affectedRows} affected rows`);
       }
     }
-    let tooltip: string | vscode.MarkdownString | undefined;
 
-    tooltip = new vscode.MarkdownString(
-      encodeHtmlWeak("```sql\n" + resource.sqlDoc + "\n```"),
-      true
-    );
+    this.description = descriptionParts.join(" ・ ");
+
+    if (resource.status === "error") {
+      this.iconPath = new vscode.ThemeIcon("error", new vscode.ThemeColor("charts.red"));
+    } else if (resource.status === "success") {
+      this.iconPath = new vscode.ThemeIcon("pass");
+    }
+
+    let tooltipMarkdown = "```sql\n" + resource.sqlDoc + "\n```";
+    if (resource.status === "error" && resource.errorMessage) {
+      tooltipMarkdown += "\n\n---\n**Error**\n```\n" + resource.errorMessage + "\n```";
+    }
+    tooltipMarkdown +=
+      "\n\n---\n💡 Tip: Cmd/Ctrl+Click to select multiple entries, then right-click for bulk actions.";
+
+    const tooltip = new vscode.MarkdownString(encodeHtmlWeak(tooltipMarkdown), true);
     tooltip.isTrusted = true;
-
-    this.description = description;
 
     this.tooltip = tooltip;
   }

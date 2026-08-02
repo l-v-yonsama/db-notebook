@@ -12,4 +12,7 @@ export type SQLHistory = {
   connectionName: string;
   ruleFile?: string;
   codeResolverFile?: string;
+  executedAt?: number;
+  status?: "success" | "error";
+  errorMessage?: string;
 };

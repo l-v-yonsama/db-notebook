@@ -70,6 +70,10 @@ export const DELETE_ALL_SQL_HISTORY = `${EXTENSION_NAME}.delete-all-sql-historie
 export const EXECUTE_SQL_HISTORY = `${EXTENSION_NAME}.histories.execute`;
 export const OPEN_SQL_HISTORY = `${EXTENSION_NAME}.histories.open`;
 export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;
+export const OPEN_SQL_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openAsNotebook`;
+export const APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.histories.appendToActiveNotebook`;
+export const FILTER_SQL_HISTORIES_BY_CONNECTION = `${EXTENSION_NAME}.histories.filterByConnection`;
+export const CLEAR_SQL_HISTORIES_CONNECTION_FILTER = `${EXTENSION_NAME}.histories.clearConnectionFilter`;
 
 //---------------------------------------------------
 // OPEN VIEWERS

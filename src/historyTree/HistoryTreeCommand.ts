@@ -2,18 +2,27 @@ import {
   ExtensionContext,
   NotebookCellData,
   NotebookCellKind,
+  NotebookEdit,
   ProgressLocation,
+  WorkspaceEdit,
   commands,
   window,
+  workspace,
 } from "vscode";
+import dayjs from "dayjs";
 import { StateStorage } from "../utilities/StateStorage";
 
 import {
+  APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK,
+  CLEAR_SQL_HISTORIES_CONNECTION_FILTER,
   CREATE_NEW_NOTEBOOK,
   DELETE_ALL_SQL_HISTORY,
   DELETE_SQL_HISTORY,
   EXECUTE_SQL_HISTORY,
+  FILTER_SQL_HISTORIES_BY_CONNECTION,
+  NOTEBOOK_TYPE,
   OPEN_MDH_VIEWER,
+  OPEN_SQL_HISTORIES_AS_NOTEBOOK,
   OPEN_SQL_HISTORY,
   REFRESH_SQL_HISTORIES,
 } from "../constant";
@@ -69,6 +78,48 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     return sqlCell;
   };
 
+  const createProvenanceMarkdownCellByHistory = (history: SQLHistory) => {
+    const parts = [history.connectionName];
+    if (history.executedAt) {
+      parts.push(dayjs(history.executedAt).format("YYYY-MM-DD HH:mm"));
+    }
+    if (history.status === "error") {
+      parts.push("error");
+    } else if (history.meta?.type === "select" && history.summary?.selectedRows !== undefined) {
+      parts.push(`${history.summary.selectedRows} rows`);
+    } else if (history.meta?.type !== "select" && history.summary?.affectedRows !== undefined) {
+      parts.push(`${history.summary.affectedRows} affected rows`);
+    }
+    return new NotebookCellData(
+      NotebookCellKind.Markup,
+      `_From SQL history: ${parts.join(" ・ ")}_`,
+      "markdown"
+    );
+  };
+
+  const createNotebookCellsByHistories = (histories: SQLHistory[]): NotebookCellData[] => {
+    const cells: NotebookCellData[] = [];
+    for (const history of histories) {
+      cells.push(createProvenanceMarkdownCellByHistory(history));
+      if (history.variables && Object.keys(history.variables).length > 0) {
+        cells.push(
+          new NotebookCellData(
+            NotebookCellKind.Code,
+            JSON.stringify(history.variables, null, 2),
+            "json"
+          )
+        );
+      }
+      cells.push(createNotebookSqlCellByHistory(history));
+    }
+    return cells;
+  };
+
+  const resolveSelectedHistories = (
+    history: SQLHistory,
+    selectedHistories?: SQLHistory[]
+  ): SQLHistory[] => (selectedHistories && selectedHistories.length > 0 ? selectedHistories : [history]);
+
   registerDisposableCommand(REFRESH_SQL_HISTORIES, () => {
     historyTreeProvider.refresh(true);
   });
@@ -118,7 +169,57 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     commands.executeCommand(CREATE_NEW_NOTEBOOK, cells);
   });
 
+  registerDisposableCommand(
+    OPEN_SQL_HISTORIES_AS_NOTEBOOK,
+    async (history: SQLHistory, selectedHistories?: SQLHistory[]) => {
+      const histories = resolveSelectedHistories(history, selectedHistories);
+      const cells = createNotebookCellsByHistories(histories);
+      commands.executeCommand(CREATE_NEW_NOTEBOOK, cells);
+    }
+  );
+
+  registerDisposableCommand(
+    APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK,
+    async (history: SQLHistory, selectedHistories?: SQLHistory[]) => {
+      const activeEditor = window.activeNotebookEditor;
+      if (!activeEditor || activeEditor.notebook.notebookType !== NOTEBOOK_TYPE) {
+        showWindowErrorMessage("No active notebook editor found.");
+        return;
+      }
+
+      const histories = resolveSelectedHistories(history, selectedHistories);
+      const cells = createNotebookCellsByHistories(histories);
+      const edit = new WorkspaceEdit();
+      const notebookEdit = NotebookEdit.insertCells(activeEditor.selection.end, cells);
+      edit.set(activeEditor.notebook.uri, [notebookEdit]);
+      await workspace.applyEdit(edit);
+    }
+  );
+
+  registerDisposableCommand(FILTER_SQL_HISTORIES_BY_CONNECTION, async () => {
+    const showAllLabel = "$(list-flat) Show all connections";
+    const connectionNames = historyTreeProvider.getConnectionNames();
+    const picked = await window.showQuickPick([showAllLabel, ...connectionNames], {
+      placeHolder: "Filter SQL histories by connection",
+    });
+    if (picked === undefined) {
+      return;
+    }
+    historyTreeProvider.setConnectionFilter(picked === showAllLabel ? undefined : picked);
+  });
+
+  registerDisposableCommand(CLEAR_SQL_HISTORIES_CONNECTION_FILTER, () => {
+    historyTreeProvider.setConnectionFilter(undefined);
+  });
+
   registerDisposableCommand(EXECUTE_SQL_HISTORY, async (history: SQLHistory) => {
+    if (history.status === "error") {
+      showWindowErrorMessage(
+        "This SQL previously failed and cannot be re-executed from history. Open it in a notebook to fix and run it."
+      );
+      return;
+    }
+
     const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
     if (!connectionSetting) {
       showWindowErrorMessage("Missing connection " + history.connectionName);

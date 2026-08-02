@@ -711,15 +711,20 @@ export class MainController {
         }
       }
 
-      if (r.metadata?.rdh && metadata.connectionName) {
+      const resultRdhForHistory =
+        r.metadata?.rdh ?? r.metadata?.explainRdh ?? r.metadata?.analyzedRdh;
+      if (metadata.connectionName && (resultRdhForHistory || r.status === "error")) {
         await this.stateStorage.addSQLHistory({
           connectionName: metadata.connectionName,
           sqlDoc: cell.document.getText(),
           variables: noteSession.kernel.getStoredVariables(),
-          meta: r.metadata?.rdh.meta,
-          summary: r.metadata?.rdh.summary,
+          meta: resultRdhForHistory?.meta,
+          summary: resultRdhForHistory?.summary,
           codeResolverFile: metadata.codeResolverFile,
           ruleFile: metadata.ruleFile,
+          executedAt: Date.now(),
+          status: r.status === "error" ? "error" : "success",
+          errorMessage: r.status === "error" ? r.stderr : undefined,
         });
         commands.executeCommand(REFRESH_SQL_HISTORIES);
       }

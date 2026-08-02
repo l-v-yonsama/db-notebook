@@ -304,6 +304,8 @@ export class ViewConditionPanel extends BasePanel {
         variables: binds,
         meta: result.meta,
         summary: result.summary,
+        executedAt: Date.now(),
+        status: "success",
       });
       commands.executeCommand(REFRESH_SQL_HISTORIES);
       if (editable) {
@@ -322,6 +324,24 @@ export class ViewConditionPanel extends BasePanel {
         this.dispose();
       }
     } else {
+      const driver = await createSQLSupportDriver(setting, true);
+      const { query, binds } = toViewDataQuery({
+        tableRes,
+        schemaName,
+        conditions: specfyCondition ? conditions : undefined,
+        limit: this.limit,
+        limitClauseStyle: driver.getLimitClauseStyle(),
+        idQuoteCharacter: driver.getIdQuoteCharacter(),
+      });
+      await ViewConditionPanel.stateStorage.addSQLHistory({
+        connectionName: conName,
+        sqlDoc: query,
+        variables: binds,
+        executedAt: Date.now(),
+        status: "error",
+        errorMessage: message,
+      });
+      commands.executeCommand(REFRESH_SQL_HISTORIES);
       showWindowErrorMessage(message);
       this.dispose();
     }

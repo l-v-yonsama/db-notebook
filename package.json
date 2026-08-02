@@ -585,7 +585,7 @@
         },
         {
           "command": "database-notebook.histories.execute",
-          "when": "view == database-notebook-histories",
+          "when": "view == database-notebook-histories && viewItem == sqlHistorySuccess",
           "group": "inline"
         },
         {
@@ -597,6 +597,16 @@
           "command": "database-notebook.histories.delete",
           "when": "view == database-notebook-histories",
           "group": "inline"
+        },
+        {
+          "command": "database-notebook.histories.openAsNotebook",
+          "when": "view == database-notebook-histories",
+          "group": "history@1"
+        },
+        {
+          "command": "database-notebook.histories.appendToActiveNotebook",
+          "when": "view == database-notebook-histories",
+          "group": "history@2"
         },
         {
           "command": "database-notebook.start-mcp-server",
@@ -674,6 +684,16 @@
         {
           "command": "database-notebook.refresh-sql-histories",
           "when": "view == database-notebook-histories",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.histories.filterByConnection",
+          "when": "view == database-notebook-histories && !databaseNotebook.sqlHistoryFiltered",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.histories.clearConnectionFilter",
+          "when": "view == database-notebook-histories && databaseNotebook.sqlHistoryFiltered",
           "group": "navigation"
         },
         {
@@ -1223,6 +1243,30 @@
         "title": "Delete selected sql",
         "shortTitle": "Delete",
         "icon": "$(trash)"
+      },
+      {
+        "command": "database-notebook.histories.openAsNotebook",
+        "title": "Open selected as notebook",
+        "shortTitle": "Open as notebook",
+        "icon": "$(notebook)"
+      },
+      {
+        "command": "database-notebook.histories.appendToActiveNotebook",
+        "title": "Append selected to active notebook",
+        "shortTitle": "Append to active notebook",
+        "icon": "$(add)"
+      },
+      {
+        "command": "database-notebook.histories.filterByConnection",
+        "title": "Filter SQL histories by connection",
+        "shortTitle": "Filter by connection",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "database-notebook.histories.clearConnectionFilter",
+        "title": "Clear SQL history connection filter",
+        "shortTitle": "Clear filter",
+        "icon": "$(filter-filled)"
       },
       {
         "command": "database-notebook.open-mdh-viewer",
@@ -2567,7 +2611,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^1.1.0",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-1.1.2.tgz",
     "@l-v-yonsama/rdh": "^0.3.0",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",

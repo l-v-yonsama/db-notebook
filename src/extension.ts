@@ -126,7 +126,16 @@ export async function activate(context: ExtensionContext) {
 
   window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
   context.subscriptions.push(window.registerFileDecorationProvider(dbResourceTree));
-  window.registerTreeDataProvider("database-notebook-histories", historyTreeProvider);
+  const historyTreeView = window.createTreeView("database-notebook-histories", {
+    treeDataProvider: historyTreeProvider,
+    canSelectMany: true,
+  });
+  context.subscriptions.push(historyTreeView);
+  historyTreeProvider.onDidChangeTreeData(() => {
+    const filter = historyTreeProvider.getConnectionFilter();
+    historyTreeView.description = filter ? `Filtered by: ${filter}` : undefined;
+    commands.executeCommand("setContext", "databaseNotebook.sqlHistoryFiltered", !!filter);
+  });
 
   registerToolActivityTreeCommand(context);
   const toolActivityTreeView = window.createTreeView("database-notebook-mcpserver", {
