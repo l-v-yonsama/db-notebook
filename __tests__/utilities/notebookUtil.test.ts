@@ -4,7 +4,7 @@ import type { NotebookCell } from "vscode";
 import {
   hasConnectionCell,
   isCwqlCell,
-  isJsCell,
+  isJsOrTsCell,
   isJsonValueCell,
   isMarkupCell,
   isMemcachedCell,
@@ -73,13 +73,17 @@ describe("isMemcachedCell", () => {
   });
 });
 
-describe("isJsCell", () => {
+describe("isJsOrTsCell", () => {
   it("言語がjavascriptのcodeセルはtrue", () => {
-    expect(isJsCell(makeCell({ languageId: "javascript" }))).toBe(true);
+    expect(isJsOrTsCell(makeCell({ languageId: "javascript" }))).toBe(true);
   });
 
-  it("言語がjavascript以外ならfalse", () => {
-    expect(isJsCell(makeCell({ languageId: "sql" }))).toBe(false);
+  it("言語がtypescriptのcodeセルもtrue", () => {
+    expect(isJsOrTsCell(makeCell({ languageId: "typescript" }))).toBe(true);
+  });
+
+  it("言語がjavascript/typescript以外ならfalse", () => {
+    expect(isJsOrTsCell(makeCell({ languageId: "sql" }))).toBe(false);
   });
 });
 

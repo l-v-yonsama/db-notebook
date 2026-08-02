@@ -2031,12 +2031,13 @@
                     "enum": [
                       "sql",
                       "javascript",
+                      "typescript",
                       "json",
                       "cwql",
                       "memcached",
                       "plaintext"
                     ],
-                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
                   },
                   "value": {
                     "type": "string",
@@ -2079,7 +2080,7 @@
                       },
                       "sharedVariableName": {
                         "type": "string",
-                        "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                        "description": "JavaScript/TypeScript cells only. Exposes this cell's result under this name to later cells in the notebook."
                       },
                       "publishParams": {
                         "type": "object",
@@ -2187,12 +2188,13 @@
                               "enum": [
                                 "sql",
                                 "javascript",
+                                "typescript",
                                 "json",
                                 "cwql",
                                 "memcached",
                                 "plaintext"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
                             },
                             "value": {
                               "type": "string",
@@ -2235,7 +2237,7 @@
                                 },
                                 "sharedVariableName": {
                                   "type": "string",
-                                  "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                                  "description": "JavaScript/TypeScript cells only. Exposes this cell's result under this name to later cells in the notebook."
                                 },
                                 "publishParams": {
                                   "type": "object",
@@ -2320,12 +2322,13 @@
                               "enum": [
                                 "sql",
                                 "javascript",
+                                "typescript",
                                 "json",
                                 "cwql",
                                 "memcached",
                                 "plaintext"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
                             },
                             "value": {
                               "type": "string",
@@ -2368,7 +2371,7 @@
                                 },
                                 "sharedVariableName": {
                                   "type": "string",
-                                  "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                                  "description": "JavaScript/TypeScript cells only. Exposes this cell's result under this name to later cells in the notebook."
                                 },
                                 "publishParams": {
                                   "type": "object",
@@ -2483,7 +2486,7 @@
                           },
                           "sharedVariableName": {
                             "type": "string",
-                            "description": "JavaScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                            "description": "JavaScript/TypeScript cells only. Exposes this cell's result under this name to later cells in the notebook."
                           },
                           "publishParams": {
                             "type": "object",

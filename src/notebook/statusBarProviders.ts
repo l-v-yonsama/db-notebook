@@ -28,7 +28,7 @@ import { existsFileOnWorkspace } from "../utilities/fsUtil";
 import {
   hasConnectionCell,
   isCwqlCell,
-  isJsCell,
+  isJsOrTsCell,
   isJsonValueCell,
   isMarkupCell,
   isMemcachedCell,
@@ -184,7 +184,7 @@ export class MarkCellAsMqttProvider implements NotebookCellStatusBarItemProvider
       isMemcachedCell(cell) ||
       isSqlCell(cell) ||
       isMarkupCell(cell) ||
-      isJsCell(cell)
+      isJsOrTsCell(cell)
     ) {
       return undefined;
     }

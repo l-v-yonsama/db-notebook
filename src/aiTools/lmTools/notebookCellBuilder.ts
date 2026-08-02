@@ -3,7 +3,15 @@ import { CellMeta } from "../../types/Notebook";
 import { StateStorage } from "../../utilities/StateStorage";
 import { resolveMcpEnabledConnection } from "./mcpAccessControl";
 
-const CODE_LANGUAGES = ["sql", "javascript", "json", "cwql", "memcached", "plaintext"] as const;
+const CODE_LANGUAGES = [
+  "sql",
+  "javascript",
+  "typescript",
+  "json",
+  "cwql",
+  "memcached",
+  "plaintext",
+] as const;
 type CodeLanguage = (typeof CODE_LANGUAGES)[number];
 
 const CONNECTION_REQUIRED_LANGUAGES: ReadonlySet<string> = new Set(["sql", "cwql", "memcached"]);

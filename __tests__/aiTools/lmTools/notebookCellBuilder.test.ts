@@ -143,6 +143,15 @@ describe("buildNotebookCells", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("typescriptセルは接続名が無くても構築できる", async () => {
+    const result = await buildNotebookCells(
+      makeStateStorage(),
+      [{ kind: "code", language: "typescript", value: "const x: number = 1; console.log(x)" }],
+      undefined
+    );
+    expect(result.ok).toBe(true);
+  });
+
   it("publishParams付きのjsonセル(MQTT publish)は接続名が必須", async () => {
     const result = await buildNotebookCells(
       makeStateStorage(),

@@ -446,6 +446,17 @@ describe("MainController.execute -> run() dispatch", () => {
 
     expect(nodeKernelFake.run).toHaveBeenCalledWith(cell);
   });
+
+  it("それ以外の言語(typescript)もNodeKernel.runへフォールバックする", async () => {
+    const { controllerObj } = setupController();
+
+    const cell = makeCell({ languageId: "typescript" });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    expect(nodeKernelFake.run).toHaveBeenCalledWith(cell);
+  });
 });
 
 describe("MainController._interruptHandler", () => {

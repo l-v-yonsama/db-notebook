@@ -30,7 +30,7 @@ import {
 import { NOTEBOOK_TYPE } from "../constant";
 import { StateStorage } from "../utilities/StateStorage";
 import { log } from "../utilities/logger";
-import { isJsCell, isJsonValueCell, isSqlCell } from "../utilities/notebookUtil";
+import { isJsOrTsCell, isJsonValueCell, isSqlCell } from "../utilities/notebookUtil";
 import { setCloudwatchQueryCompletionItems } from "./intellisenses/awsCloudwatchQuery";
 import { setMemcachedCompletionItems } from "./intellisenses/memcachedCommand";
 import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
@@ -222,7 +222,7 @@ function getStoreKeys(): string[] {
     return [];
   }
   const cells = window.activeNotebookEditor?.notebook?.getCells() ?? [];
-  const texts = cells.filter((it) => isJsCell(it)).map((it) => it.document.getText());
+  const texts = cells.filter((it) => isJsOrTsCell(it)).map((it) => it.document.getText());
   const keys = new Set<string>();
   texts.forEach((text) => {
     const lines = toLines(text);

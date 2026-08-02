@@ -17,10 +17,13 @@ afterAll(() => {
   fs.rmSync(scratchRoot, { recursive: true, force: true });
 });
 
-const makeCell = (text: string): NotebookCell =>
+const makeCell = (
+  text: string,
+  languageId: "javascript" | "typescript" = "javascript"
+): NotebookCell =>
   ({
     document: {
-      languageId: "javascript",
+      languageId,
       getText: () => text,
     },
   } as unknown as NotebookCell);
@@ -48,5 +51,31 @@ describe("NodeKernel / variablesCell.replaceAllAt", () => {
     expect(result.metadata?.updateJSONCellValues).toEqual([
       { cellIndex: 0, replaceAll: true, data: { b: 2 } },
     ]);
+  }, 15000);
+});
+
+describe("NodeKernel / typescript cells", () => {
+  it("型注釈付きのTSコードがトランスパイルされて実行される", async () => {
+    const kernel = await NodeKernel.create([]);
+    const result = await kernel.run(
+      makeCell(
+        "interface Foo { a: number } const x: Foo = { a: 1 }; variablesCell.replaceAllAtFirst(x);",
+        "typescript"
+      )
+    );
+
+    expect(result.stderr).not.toMatch(/ReferenceError/);
+    expect(result.status).toBe("executed");
+    expect(result.metadata?.updateJSONCellValues).toEqual([
+      { cellIndex: 0, replaceAll: true, data: { a: 1 } },
+    ]);
+  }, 15000);
+
+  it("TSの構文エラーはtranspile段階でerrorとして返り、nodeは起動しない", async () => {
+    const kernel = await NodeKernel.create([]);
+    const result = await kernel.run(makeCell("const x: = ;", "typescript"));
+
+    expect(result.status).toBe("error");
+    expect(result.stderr.length).toBeGreaterThan(0);
   }, 15000);
 });

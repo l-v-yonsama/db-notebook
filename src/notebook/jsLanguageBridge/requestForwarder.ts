@@ -27,6 +27,7 @@ const ERROR_TAG = "[jsLanguageBridge/requestForwarder]";
 
 export const JS_CELL_SELECTOR: DocumentSelector = [
   { language: "javascript", notebookType: NOTEBOOK_TYPE },
+  { language: "typescript", notebookType: NOTEBOOK_TYPE },
 ];
 
 const plainRangeOf = (range: Range): PlainRange => ({

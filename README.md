@@ -1,6 +1,6 @@
 # Database Notebook
 
-Database Notebook is a Visual Studio Code extension that lets you manage SQL, JavaScript, and Markdown cells together in a single notebook file, with variables shared between cells — alongside a database manager that gives you access to various databases through the same Notebook interface.
+Database Notebook is a Visual Studio Code extension that lets you manage SQL, JavaScript/TypeScript, and Markdown cells together in a single notebook file, with variables shared between cells — alongside a database manager that gives you access to various databases through the same Notebook interface.
 
 It also provides a CSV and Har file preview feature.
 
@@ -8,7 +8,7 @@ It also provides a CSV and Har file preview feature.
 
 ## Features
 
-- Mix SQL, JavaScript (Node.js), and Markdown cells in a single notebook file
+- Mix SQL, JavaScript/TypeScript (Node.js), and Markdown cells in a single notebook file
   - Share variables between cells, including passing a SQL cell's result set into a later JavaScript cell for further processing
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
 - Access various databases through Notebooks, Sidebars, and panel UIs

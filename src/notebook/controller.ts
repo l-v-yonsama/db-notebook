@@ -89,7 +89,15 @@ export class MainController {
   readonly controllerId = `${NOTEBOOK_TYPE}-controller`;
   readonly notebookType = NOTEBOOK_TYPE;
   readonly label = "Database Notebook";
-  readonly supportedLanguages = ["sql", "javascript", "json", "cwql", "memcached", "plaintext"];
+  readonly supportedLanguages = [
+    "sql",
+    "javascript",
+    "typescript",
+    "json",
+    "cwql",
+    "memcached",
+    "plaintext",
+  ];
 
   private readonly _controller: NotebookController;
   private readonly noteSessions = new Map<string, NoteSession>();

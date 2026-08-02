@@ -24,8 +24,12 @@ export const isMemcachedCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "memcached";
 };
 
-export const isJsCell = (cell: NotebookCell): boolean => {
-  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "javascript";
+export const isJsOrTsCell = (cell: NotebookCell): boolean => {
+  const languageId = cell.document.languageId;
+  return (
+    cell.kind === NotebookCellKind.Code &&
+    (languageId === "javascript" || languageId === "typescript")
+  );
 };
 
 export const isJsonValueCell = (cell: NotebookCell): boolean => {
@@ -37,7 +41,7 @@ export const isJsonValueCell = (cell: NotebookCell): boolean => {
 };
 
 export const isMqttCell = (cell: NotebookCell): boolean => {
-  if (isJsCell(cell)) {
+  if (isJsOrTsCell(cell)) {
     return false;
   }
   const meta = cell.metadata as CellMeta;
@@ -127,7 +131,7 @@ export const getSelectedCells = (options?: {
       return cells.filter((it) => isSqlCell(it));
     }
     if (options.onlySql) {
-      return cells.filter((it) => isJsCell(it));
+      return cells.filter((it) => isJsOrTsCell(it));
     }
     if (options.onlyCode) {
       return cells.filter((it) => it.kind === NotebookCellKind.Code);

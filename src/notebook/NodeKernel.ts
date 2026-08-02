@@ -6,6 +6,7 @@ import { Entry } from "har-format";
 import * as iconv from "iconv-lite";
 import * as os from "os";
 import * as path from "path";
+import * as ts from "typescript";
 import { URL } from "url";
 import { NotebookCell, workspace } from "vscode";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -254,11 +255,43 @@ export class NodeKernel {
   }
 
   public async run(cell: NotebookCell): Promise<RunResult> {
-    const ext = cell.document.languageId === "javascript" ? "js" : "ts";
-    const scriptName = `script.${ext}`;
-    this.scriptFile = path.join(this.tmpDirectory, scriptName);
+    this.scriptFile = path.join(this.tmpDirectory, "script.js");
 
-    const script = await this.createScript(cell);
+    let script = await this.createScript(cell);
+
+    if (cell.document.languageId === "typescript") {
+      const { outputText, diagnostics } = ts.transpileModule(script, {
+        compilerOptions: {
+          module: ts.ModuleKind.CommonJS,
+          target: ts.ScriptTarget.ES2020,
+        },
+        reportDiagnostics: true,
+      });
+
+      if (diagnostics && diagnostics.length > 0) {
+        // Line/column numbers below are positions in the assembled script (prelude +
+        // cell text), not the cell's own source lines -- same pre-existing limitation
+        // plain JS cells already have in their runtime stderr output (no source map).
+        const messages = diagnostics.map((d) => {
+          const msg = ts.flattenDiagnosticMessageText(d.messageText, os.EOL);
+          if (d.file && d.start !== undefined) {
+            const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
+            return `TS${d.code} [${line + 1},${character + 1}]: ${msg}`;
+          }
+          return `TS${d.code}: ${msg}`;
+        });
+        return {
+          stdout: "",
+          stderr: messages.join(os.EOL),
+          skipped: false,
+          status: "error",
+          metadata: {},
+        };
+      }
+
+      script = outputText;
+    }
+
     await writeToResourceOnStorage(this.scriptFile, script);
 
     let stdout = "";

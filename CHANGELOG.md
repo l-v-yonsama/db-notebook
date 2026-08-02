@@ -4,6 +4,10 @@ All notable changes to the "Database notebook" extension are documented in this 
 
 ## [Unreleased]
 
+### Added
+
+- TypeScript notebook cells. They run on the same Node.js kernel as JavaScript cells (the cell is transpiled via the TypeScript compiler before running), so they get the same shared variables, database driver access, and completion/hover/signature-help support. Syntax errors are caught before execution and reported without starting Node; type errors are not checked (transpile-only, no semantic type-checking).
+
 ## [1.2.0] - 2026-07-27
 
 ### Added
