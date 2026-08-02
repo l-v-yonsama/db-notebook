@@ -1380,6 +1380,39 @@
           "default": "",
           "description": "Directory used for temporary files during Node.js execution."
         },
+        "shell.Shell path": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "description": "Run shellscript cells on a custom shell executable. This can be a path to a shell (e.g. bash, zsh, sh). Falls back to \"bash\" if not set."
+        },
+        "shell.Windows shell path": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "description": "[Experimental, not verified end-to-end on Windows] Run bat cells on a custom Windows shell executable. Falls back to \"cmd.exe\" if not set."
+        },
+        "shell.encoding": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "UTF8",
+            "Shift_JIS",
+            "Windows-31j",
+            "Windows932",
+            "EUC-JP",
+            "GB2312",
+            "GBK",
+            "GB18030",
+            "Windows936",
+            "EUC-CN",
+            "KS_C_5601",
+            "Windows949",
+            "EUC-KR"
+          ],
+          "description": "Character encoding for STDOUT / STDERR of the shell/batch process"
+        },
         "resultset.Header display comment": {
           "scope": "resource",
           "type": "boolean",
@@ -2035,9 +2068,11 @@
                       "json",
                       "cwql",
                       "memcached",
-                      "plaintext"
+                      "plaintext",
+                      "shellscript",
+                      "bat"
                     ],
-                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                   },
                   "value": {
                     "type": "string",
@@ -2192,9 +2227,11 @@
                                 "json",
                                 "cwql",
                                 "memcached",
-                                "plaintext"
+                                "plaintext",
+                                "shellscript",
+                                "bat"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                             },
                             "value": {
                               "type": "string",
@@ -2326,9 +2363,11 @@
                                 "json",
                                 "cwql",
                                 "memcached",
-                                "plaintext"
+                                "plaintext",
+                                "shellscript",
+                                "bat"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                             },
                             "value": {
                               "type": "string",

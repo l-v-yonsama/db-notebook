@@ -32,6 +32,13 @@ export const isJsOrTsCell = (cell: NotebookCell): boolean => {
   );
 };
 
+export const isShellCell = (cell: NotebookCell): boolean => {
+  const languageId = cell.document.languageId;
+  return (
+    cell.kind === NotebookCellKind.Code && (languageId === "shellscript" || languageId === "bat")
+  );
+};
+
 export const isJsonValueCell = (cell: NotebookCell): boolean => {
   const meta = cell.metadata as CellMeta;
   if (meta.publishParams) {
@@ -40,12 +47,24 @@ export const isJsonValueCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "json";
 };
 
+// MQTT publish cells are not a dedicated language -- they're a json/plaintext
+// cell "turned into" a publish cell via `metadata.publishParams`. Expressed as
+// an allowlist (rather than excluding every other language one by one) so
+// adding a new non-json/plaintext cell language later can never accidentally
+// make it MQTT-eligible again.
+export const isJsonOrPlaintextCell = (cell: NotebookCell): boolean => {
+  const languageId = cell.document.languageId;
+  return (
+    cell.kind === NotebookCellKind.Code && (languageId === "json" || languageId === "plaintext")
+  );
+};
+
 export const isMqttCell = (cell: NotebookCell): boolean => {
-  if (isJsOrTsCell(cell)) {
+  if (!isJsonOrPlaintextCell(cell)) {
     return false;
   }
   const meta = cell.metadata as CellMeta;
-  return cell.kind === NotebookCellKind.Code && !!meta.publishParams;
+  return !!meta.publishParams;
 };
 
 export const hasConnectionCell = (cell: NotebookCell): boolean => {

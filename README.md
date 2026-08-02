@@ -8,7 +8,8 @@ It also provides a CSV and Har file preview feature.
 
 ## Features
 
-- Mix SQL, JavaScript/TypeScript (Node.js), and Markdown cells in a single notebook file
+- Mix SQL, JavaScript/TypeScript (Node.js), shell/batch script, and Markdown cells in a single notebook file
+  - Shell script cells (`shellscript`: bash/sh/zsh) run and capture stdout/stderr like any other cell; Windows batch cells (`bat`) are also supported but experimental (not verified end-to-end on Windows)
   - Share variables between cells, including passing a SQL cell's result set into a later JavaScript cell for further processing
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
 - Access various databases through Notebooks, Sidebars, and panel UIs

@@ -4,6 +4,7 @@ import type { NotebookCell } from "vscode";
 import {
   hasConnectionCell,
   isCwqlCell,
+  isJsonOrPlaintextCell,
   isJsOrTsCell,
   isJsonValueCell,
   isMarkupCell,
@@ -103,16 +104,65 @@ describe("isJsonValueCell", () => {
   });
 });
 
+describe("isJsonOrPlaintextCell", () => {
+  it("言語がjsonのcodeセルはtrue", () => {
+    expect(isJsonOrPlaintextCell(makeCell({ languageId: "json" }))).toBe(true);
+  });
+
+  it("言語がplaintextのcodeセルはtrue", () => {
+    expect(isJsonOrPlaintextCell(makeCell({ languageId: "plaintext" }))).toBe(true);
+  });
+
+  it("json/plaintext以外ならfalse(shellscript/batを含む)", () => {
+    expect(isJsonOrPlaintextCell(makeCell({ languageId: "sql" }))).toBe(false);
+    expect(isJsonOrPlaintextCell(makeCell({ languageId: "shellscript" }))).toBe(false);
+    expect(isJsonOrPlaintextCell(makeCell({ languageId: "bat" }))).toBe(false);
+  });
+
+  it("markupセルはfalse", () => {
+    expect(
+      isJsonOrPlaintextCell(makeCell({ kind: NotebookCellKind.Markup, languageId: "json" }))
+    ).toBe(false);
+  });
+});
+
 describe("isMqttCell", () => {
-  it("publishParamsを持つ非jsセルはtrue", () => {
+  it("publishParamsを持つjsonセルはtrue", () => {
     expect(isMqttCell(makeCell({ languageId: "json", metadata: { publishParams: {} } }))).toBe(
       true
     );
   });
 
+  it("publishParamsを持つplaintextセルもtrue", () => {
+    expect(
+      isMqttCell(makeCell({ languageId: "plaintext", metadata: { publishParams: {} } }))
+    ).toBe(true);
+  });
+
   it("javascriptセルはpublishParamsがあってもfalse", () => {
     expect(
       isMqttCell(makeCell({ languageId: "javascript", metadata: { publishParams: {} } }))
+    ).toBe(false);
+  });
+
+  it("shellscript/batセルはpublishParamsがあってもfalse(誤ってMQTTセルに奪われる回帰防止)", () => {
+    expect(
+      isMqttCell(makeCell({ languageId: "shellscript", metadata: { publishParams: {} } }))
+    ).toBe(false);
+    expect(isMqttCell(makeCell({ languageId: "bat", metadata: { publishParams: {} } }))).toBe(
+      false
+    );
+  });
+
+  it("sql/cwql/memcachedセルはpublishParamsがあってもfalse", () => {
+    expect(isMqttCell(makeCell({ languageId: "sql", metadata: { publishParams: {} } }))).toBe(
+      false
+    );
+    expect(isMqttCell(makeCell({ languageId: "cwql", metadata: { publishParams: {} } }))).toBe(
+      false
+    );
+    expect(
+      isMqttCell(makeCell({ languageId: "memcached", metadata: { publishParams: {} } }))
     ).toBe(false);
   });
 

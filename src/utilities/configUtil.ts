@@ -7,6 +7,7 @@ import {
   NodeConfigType,
   OutputConfigType,
   ResultsetConfigType,
+  ShellConfigType,
   SQLFormatterConfigType,
 } from "../types/Config";
 
@@ -29,6 +30,16 @@ export const getNodeConfig = (): NodeConfigType => {
     commandPath: settings.get("Node path", ""),
     dataEncoding: settings.get("encoding", ""),
     tmpDirPath: settings.get("Tmp dir path", ""),
+  };
+};
+
+export const getShellConfig = (): ShellConfigType => {
+  const settings = workspace.getConfiguration("shell", null);
+
+  return {
+    shellPath: settings.get("Shell path", ""),
+    windowsShellPath: settings.get("Windows shell path", ""),
+    dataEncoding: settings.get("encoding", ""),
   };
 };
 

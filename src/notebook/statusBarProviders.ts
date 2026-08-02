@@ -28,10 +28,8 @@ import { existsFileOnWorkspace } from "../utilities/fsUtil";
 import {
   hasConnectionCell,
   isCwqlCell,
-  isJsOrTsCell,
+  isJsonOrPlaintextCell,
   isJsonValueCell,
-  isMarkupCell,
-  isMemcachedCell,
   isMqttCell,
   isSqlCell,
 } from "../utilities/notebookUtil";
@@ -179,13 +177,12 @@ export class MarkCellAsMqttProvider implements NotebookCellStatusBarItemProvider
   constructor(private stateStorage: StateStorage) {}
 
   provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
-    if (
-      isCwqlCell(cell) ||
-      isMemcachedCell(cell) ||
-      isSqlCell(cell) ||
-      isMarkupCell(cell) ||
-      isJsOrTsCell(cell)
-    ) {
+    // Allowlist, not a blocklist: MQTT publish cells only ever exist as a
+    // json/plaintext cell with metadata.publishParams attached, so only those
+    // two languages should ever be offered this toggle. Excluding every other
+    // language one by one here would silently miss any future cell language
+    // (as it did for shellscript/bat).
+    if (!isJsonOrPlaintextCell(cell)) {
       return undefined;
     }
 

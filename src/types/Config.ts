@@ -51,6 +51,21 @@ export type NodeProcessDataEncodingType =
   | "EUC-KR";
 
 /* =========================================================
+ * Shell / Batch Script Execution
+ * Corresponds to: shell.*
+ * ========================================================= */
+export type ShellConfigType = {
+  /** Path to a custom shell executable (shellscript cells). Falls back to "bash". */
+  shellPath?: string;
+
+  /** Path to a custom Windows shell executable (bat cells, experimental). Falls back to "cmd.exe". */
+  windowsShellPath?: string;
+
+  /** STDOUT / STDERR encoding of the shell/batch process */
+  dataEncoding: NodeProcessDataEncodingType;
+};
+
+/* =========================================================
  * ResultSet
  * - Preview  : VS Code Notebook / Webview table
  * - Format   : Value representation (shared by preview/output)

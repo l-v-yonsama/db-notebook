@@ -7,6 +7,7 @@ All notable changes to the "Database notebook" extension are documented in this 
 ### Added
 
 - TypeScript notebook cells. They run on the same Node.js kernel as JavaScript cells (the cell is transpiled via the TypeScript compiler before running), so they get the same shared variables, database driver access, and completion/hover/signature-help support. Syntax errors are caught before execution and reported without starting Node; type errors are not checked (transpile-only, no semantic type-checking).
+- Shell/batch script notebook cells (`shellscript`: bash/sh/zsh, `bat`: Windows). Output is captured as plain stdout/stderr; status is determined by the process's real exit code (not by stderr presence, since many CLI tools write informational text to stderr on success). Configurable via new `shell.*` settings (`Shell path`, `Windows shell path`, `encoding`). `bat` (Windows `cmd.exe`) support is experimental -- its interpreter-selection logic is unit-tested, but end-to-end execution has not been verified on Windows.
 
 ## [1.2.0] - 2026-07-27
 

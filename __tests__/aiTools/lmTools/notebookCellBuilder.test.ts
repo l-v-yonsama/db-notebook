@@ -152,6 +152,24 @@ describe("buildNotebookCells", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("shellscriptセルは接続名が無くても構築できる", async () => {
+    const result = await buildNotebookCells(
+      makeStateStorage(),
+      [{ kind: "code", language: "shellscript", value: "echo hello" }],
+      undefined
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("batセルは接続名が無くても構築できる", async () => {
+    const result = await buildNotebookCells(
+      makeStateStorage(),
+      [{ kind: "code", language: "bat", value: "echo hello" }],
+      undefined
+    );
+    expect(result.ok).toBe(true);
+  });
+
   it("publishParams付きのjsonセル(MQTT publish)は接続名が必須", async () => {
     const result = await buildNotebookCells(
       makeStateStorage(),

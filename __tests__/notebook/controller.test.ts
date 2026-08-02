@@ -21,6 +21,9 @@ const {
   memcachedKernelRunMock,
   memcachedKernelInterruptMock,
   jsonKernelRunMock,
+  shellKernelCreateMock,
+  shellKernelRunMock,
+  shellKernelInterruptMock,
   existsFileOnWorkspaceMock,
 } = vi.hoisted(() => ({
   nodeKernelCreateMock: vi.fn(),
@@ -34,6 +37,9 @@ const {
   memcachedKernelRunMock: vi.fn(),
   memcachedKernelInterruptMock: vi.fn(),
   jsonKernelRunMock: vi.fn(),
+  shellKernelCreateMock: vi.fn(),
+  shellKernelRunMock: vi.fn(),
+  shellKernelInterruptMock: vi.fn(),
   existsFileOnWorkspaceMock: vi.fn(async () => false),
 }));
 
@@ -67,6 +73,9 @@ vi.mock("../../src/notebook/MemcachedKernel", () => ({
 }));
 vi.mock("../../src/notebook/JsonKernel", () => ({
   jsonKernelRun: jsonKernelRunMock,
+}));
+vi.mock("../../src/notebook/ShellKernel", () => ({
+  ShellKernel: { create: shellKernelCreateMock },
 }));
 vi.mock("../../src/utilities/configUtil", () => ({
   getNodeConfig: () => ({
@@ -190,6 +199,10 @@ beforeEach(() => {
     ),
   };
   nodeKernelCreateMock.mockResolvedValue(nodeKernelFake);
+  shellKernelCreateMock.mockResolvedValue({
+    run: shellKernelRunMock,
+    interrupt: shellKernelInterruptMock,
+  });
   existsFileOnWorkspaceMock.mockResolvedValue(false);
 });
 
@@ -266,6 +279,46 @@ describe("MainController.execute -> _doExecution", () => {
     );
     expect(stderrItem.items[0].data).toBe("boom");
     expect(execution.endedAt.success).toBe(false);
+  });
+
+  it("stderrが空でもstatus=errorなら失敗として終了する(exit codeベースのShellKernelの回帰テスト)", async () => {
+    const { controllerObj } = setupController();
+    shellKernelRunMock.mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      skipped: false,
+      status: "error",
+    } as RunResult);
+
+    const cell = makeCell({ languageId: "shellscript" });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    const execution = lastExecution(controllerObj);
+    expect(execution.endedAt.success).toBe(false);
+  });
+
+  it("stderrがあってもstatus=executedなら成功として終了する(exit codeベースのShellKernelの回帰テスト)", async () => {
+    const { controllerObj } = setupController();
+    shellKernelRunMock.mockResolvedValue({
+      stdout: "",
+      stderr: "warning",
+      skipped: false,
+      status: "executed",
+    } as RunResult);
+
+    const cell = makeCell({ languageId: "shellscript" });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    const execution = lastExecution(controllerObj);
+    const stderrItem = execution.outputs.find(
+      (o: any) => o.items[0].mime === "application/vnd.code.notebook.stderr"
+    );
+    expect(stderrItem.items[0].data).toBe("warning");
+    expect(execution.endedAt.success).toBe(true);
   });
 
   it("markAsSkipのセルはカーネルを呼ばずにSKIPPED出力を積む", async () => {
@@ -400,6 +453,40 @@ describe("MainController.execute -> run() dispatch", () => {
     await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
 
     expect(memcachedKernelRunMock).toHaveBeenCalledWith(cell, nodeKernelFake.getStoredVariables());
+  });
+
+  it("shellscriptセルはshellKernel.runへ委譲する", async () => {
+    const { controllerObj } = setupController();
+    shellKernelRunMock.mockResolvedValue({
+      stdout: "hello\n",
+      stderr: "",
+      skipped: false,
+      status: "executed",
+    } as RunResult);
+
+    const cell = makeCell({ languageId: "shellscript" });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    expect(shellKernelRunMock).toHaveBeenCalledWith(cell);
+  });
+
+  it("batセルもshellKernel.runへ委譲する", async () => {
+    const { controllerObj } = setupController();
+    shellKernelRunMock.mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      skipped: false,
+      status: "executed",
+    } as RunResult);
+
+    const cell = makeCell({ languageId: "bat" });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    expect(shellKernelRunMock).toHaveBeenCalledWith(cell);
   });
 
   it("publishParams付きセルはmqttKernel.runへ委譲する", async () => {

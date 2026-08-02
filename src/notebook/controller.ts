@@ -45,6 +45,7 @@ import {
   isMemcachedCell,
   isMqttCell,
   isPreExecution,
+  isShellCell,
   isSqlCell,
   readCodeResolverFile,
   readRuleFile,
@@ -55,6 +56,7 @@ import { jsonKernelRun } from "./JsonKernel";
 import { MemcachedKernel } from "./MemcachedKernel";
 import { MqttKernel } from "./MqttKernel";
 import { NodeKernel } from "./NodeKernel";
+import { ShellKernel } from "./ShellKernel";
 import { SqlKernel } from "./sqlKernel";
 import {
   CellMetadataProvider,
@@ -81,6 +83,7 @@ type NoteSession = {
   awsKernel: AwsKernel | undefined;
   memcachedKernel: MemcachedKernel | undefined;
   mqttKernel: MqttKernel | undefined;
+  shellKernel: ShellKernel | undefined;
   cancellationTokenSourceList: CancellationTokenSource[] | undefined;
   interrupted: boolean;
 };
@@ -97,6 +100,8 @@ export class MainController {
     "cwql",
     "memcached",
     "plaintext",
+    "shellscript",
+    "bat",
   ];
 
   private readonly _controller: NotebookController;
@@ -291,6 +296,7 @@ export class MainController {
         awsKernel,
         memcachedKernel,
         mqttKernel,
+        shellKernel,
         cancellationTokenSourceList,
       } = noteSession;
       try {
@@ -313,6 +319,9 @@ export class MainController {
         }
         if (mqttKernel) {
           mqttKernel.interrupt();
+        }
+        if (shellKernel) {
+          shellKernel.interrupt();
         }
         if (cancellationTokenSourceList) {
           for (const cts of cancellationTokenSourceList) {
@@ -353,6 +362,7 @@ export class MainController {
       awsKernel: undefined,
       memcachedKernel: undefined,
       mqttKernel: undefined,
+      shellKernel: undefined,
       cancellationTokenSourceList: [],
       interrupted: false,
     };
@@ -431,12 +441,15 @@ export class MainController {
         status,
       };
 
+      if (status === "error") {
+        success = false;
+      }
+
       if (stdout.length) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.text(stdout)], metadata));
       }
       if (stderr) {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stderr(stderr)], metadata));
-        success = false;
       }
       if (skipped && !evaluated) {
         outputs.push(
@@ -764,6 +777,11 @@ export class MainController {
       return r;
     } else if (isJsonValueCell(cell)) {
       return await jsonKernelRun(cell, noteSession.kernel);
+    } else if (isShellCell(cell)) {
+      noteSession.shellKernel = await ShellKernel.create();
+      const r = await noteSession.shellKernel.run(cell);
+      noteSession.shellKernel = undefined;
+      return r;
     }
 
     return noteSession.kernel!.run(cell);

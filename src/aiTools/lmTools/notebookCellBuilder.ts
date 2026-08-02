@@ -11,6 +11,8 @@ const CODE_LANGUAGES = [
   "cwql",
   "memcached",
   "plaintext",
+  "shellscript",
+  "bat",
 ] as const;
 type CodeLanguage = (typeof CODE_LANGUAGES)[number];
 
