@@ -6,11 +6,11 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { commands, ExtensionContext, Uri, window } from "vscode";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
-import { HistoryTreeProvider } from "./historyTree/HistoryTreeProvider";
-import { ResourceTreeProvider } from "./resourceTree/ResourceTreeProvider";
+import { HistoryTreeProvider } from "./treeData/history/HistoryTreeProvider";
+import { ResourceTreeProvider } from "./treeData/resource/ResourceTreeProvider";
 import { StateStorage } from "./utilities/StateStorage";
 
-import { activateCodeResolverEditor } from "./codeResolverEditor/activator";
+import { activateCodeResolverEditor } from "./editors/codeResolver/activator";
 import {
   BOTTOM_CHARTS_VIEWID,
   BOTTOM_COUNT_FOR_ALL_TABLES_VIEWID,
@@ -37,11 +37,11 @@ import {
   SHOW_RESOURCE_PROPERTIES,
   UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER,
 } from "./constant";
-import { HelpProvider } from "./help/HelpProvider";
-import { registerHistoryTreeCommand } from "./historyTree/HistoryTreeCommand";
-import { activateLmTools } from "./lmTools/activator";
-import { activateMcpServer } from "./mcpServer/activator";
-import { onDidChangeRunningState } from "./mcpServer/server";
+import { HelpProvider } from "./treeData/help/HelpProvider";
+import { registerHistoryTreeCommand } from "./treeData/history/HistoryTreeCommand";
+import { activateLmTools } from "./aiTools/lmTools/activator";
+import { activateMcpServer } from "./aiTools/mcpServer/activator";
+import { onDidChangeRunningState } from "./aiTools/mcpServer/server";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
@@ -57,11 +57,11 @@ import { PublishEditorPanel } from "./panels/PublishEditorPanel";
 import { ScanPanel } from "./panels/ScanPanel";
 import { SubscriptionSettingPanel } from "./panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
-import { registerResourceTreeCommand } from "./resourceTree/ResourceTreeCommand";
-import { activateRuleEditor } from "./ruleEditor/activator";
-import { registerToolActivityTreeCommand } from "./toolActivity/ToolActivityTreeCommand";
-import { ToolActivityTreeProvider } from "./toolActivity/ToolActivityTreeProvider";
-import { onDidChangeActivity } from "./toolActivity/ToolInvocationTracker";
+import { registerResourceTreeCommand } from "./treeData/resource/ResourceTreeCommand";
+import { activateRuleEditor } from "./editors/rule/activator";
+import { registerToolActivityTreeCommand } from "./treeData/toolActivity/ToolActivityTreeCommand";
+import { ToolActivityTreeProvider } from "./treeData/toolActivity/ToolActivityTreeProvider";
+import { onDidChangeActivity } from "./treeData/toolActivity/ToolInvocationTracker";
 import {
   ChartsViewParams,
   DiffMdhViewTabParam,

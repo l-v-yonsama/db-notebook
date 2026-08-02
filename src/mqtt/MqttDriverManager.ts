@@ -19,7 +19,7 @@ import {
   SET_SUBSCRIPTION_PAYLOADS_VIEWER,
   UPDATE_SUBSCRIPTION_RES_AT_PAYLOADS_VIEWER,
 } from "../constant";
-import { ResourceTreeProvider } from "../resourceTree/ResourceTreeProvider";
+import { ResourceTreeProvider } from "../treeData/resource/ResourceTreeProvider";
 import { SubscriptionPayloadsViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { log } from "../utilities/logger";
