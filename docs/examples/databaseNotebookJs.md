@@ -2,6 +2,8 @@
 
 This page shows an example of Javascript Cell usage using the VS Code Extension "Database Notebook".
 
+> **TypeScript cells (`typescript`) share everything on this page.** They run on the same Node.js kernel as JavaScript cells (the cell is transpiled via the TypeScript compiler first), so `variables`, `axios`, `execa`, and every other global below work exactly the same in a `typescript`-language cell. Only syntax errors are caught before execution -- type errors are not checked (transpile-only, no semantic type-checking).
+
 ## Implicit Globals Quick Reference
 
 Every JS cell has the globals below available automatically — no `require`/`import` needed. This table is a discoverability index, not a full API reference: hover over any name, or trigger signature help inside its parentheses, to see its real, live type and parameters (backed by the same TypeScript language service used elsewhere in VS Code).

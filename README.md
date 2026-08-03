@@ -8,10 +8,12 @@ It also provides a CSV and Har file preview feature.
 
 ## Features
 
-- Mix SQL, JavaScript/TypeScript (Node.js), shell/batch script, and Markdown cells in a single notebook file
+- Mix SQL, JavaScript/TypeScript (Node.js), shell/batch script, Redis/Memcached command, and Markdown cells in a single notebook file
   - Shell script cells (`shellscript`: bash/sh/zsh) run and capture stdout/stderr like any other cell; Windows batch cells (`bat`) are also supported but experimental (not verified end-to-end on Windows)
+  - Redis/Memcached command cells (`redis`/`memcached`) run one raw command per cell (e.g. `GET mykey`, `HGETALL myhash`) against a saved connection and return a tabular (RDH) result, the same as SQL cells, instead of plain text
   - Share variables between cells, including passing a SQL cell's result set into a later JavaScript cell for further processing
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
+  - See Redis/Memcached command cell examples: [Database Notebook Redis/Memcached command cell examples](/docs/examples/databaseNotebookRedisAndMemcached.md)
 - Access various databases through Notebooks, Sidebars, and panel UIs
   - MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT
 - Execute SQL mode
