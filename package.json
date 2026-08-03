@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Use your saved connections as AI tools in GitHub Copilot Chat (Agent mode) -- list/test connections, inspect schemas, run queries and transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create or edit .dbn notebooks directly from chat. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -107,6 +107,19 @@
         "configuration": "./languages/memcached/memcached.json"
       },
       {
+        "id": "redis",
+        "filenames": [
+          "*.redis"
+        ],
+        "extensions": [
+          ".redis"
+        ],
+        "aliases": [
+          "Redis Command"
+        ],
+        "configuration": "./languages/redis/redis.json"
+      },
+      {
         "id": "rrule",
         "filenames": [
           "*.rrule"
@@ -165,6 +178,11 @@
         "language": "memcached",
         "scopeName": "source.memcached",
         "path": "./languages/memcached/syntaxe.json"
+      },
+      {
+        "language": "redis",
+        "scopeName": "source.redis",
+        "path": "./languages/redis/syntaxe.json"
       }
     ],
     "notebooks": [
@@ -2068,11 +2086,12 @@
                       "json",
                       "cwql",
                       "memcached",
+                      "redis",
                       "plaintext",
                       "shellscript",
                       "bat"
                     ],
-                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
+                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                   },
                   "value": {
                     "type": "string",
@@ -2084,7 +2103,7 @@
                     "properties": {
                       "connectionName": {
                         "type": "string",
-                        "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                        "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
                       },
                       "useDatabaseName": {
                         "type": "string",
@@ -2227,11 +2246,12 @@
                                 "json",
                                 "cwql",
                                 "memcached",
+                                "redis",
                                 "plaintext",
                                 "shellscript",
                                 "bat"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                             },
                             "value": {
                               "type": "string",
@@ -2243,7 +2263,7 @@
                               "properties": {
                                 "connectionName": {
                                   "type": "string",
-                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
                                 },
                                 "useDatabaseName": {
                                   "type": "string",
@@ -2363,11 +2383,12 @@
                                 "json",
                                 "cwql",
                                 "memcached",
+                                "redis",
                                 "plaintext",
                                 "shellscript",
                                 "bat"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                             },
                             "value": {
                               "type": "string",
@@ -2379,7 +2400,7 @@
                               "properties": {
                                 "connectionName": {
                                   "type": "string",
-                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
                                 },
                                 "useDatabaseName": {
                                   "type": "string",
@@ -2494,7 +2515,7 @@
                         "properties": {
                           "connectionName": {
                             "type": "string",
-                            "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                            "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
                           },
                           "useDatabaseName": {
                             "type": "string",
@@ -2653,7 +2674,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^1.1.2",
+    "@l-v-yonsama/multi-platform-database-drivers": "^1.2.0",
     "@l-v-yonsama/rdh": "^0.3.0",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",
