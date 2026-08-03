@@ -10,6 +10,7 @@ import {
   isMarkupCell,
   isMemcachedCell,
   isMqttCell,
+  isRedisCell,
   isSqlCell,
 } from "../../src/utilities/notebookUtil";
 
@@ -71,6 +72,22 @@ describe("isMemcachedCell", () => {
 
   it("言語がmemcached以外ならfalse", () => {
     expect(isMemcachedCell(makeCell({ languageId: "sql" }))).toBe(false);
+  });
+});
+
+describe("isRedisCell", () => {
+  it("言語がredisのcodeセルはtrue", () => {
+    expect(isRedisCell(makeCell({ languageId: "redis" }))).toBe(true);
+  });
+
+  it("言語がredis以外ならfalse", () => {
+    expect(isRedisCell(makeCell({ languageId: "memcached" }))).toBe(false);
+  });
+
+  it("markupセルはfalse", () => {
+    expect(isRedisCell(makeCell({ kind: NotebookCellKind.Markup, languageId: "redis" }))).toBe(
+      false
+    );
   });
 });
 
@@ -172,10 +189,11 @@ describe("isMqttCell", () => {
 });
 
 describe("hasConnectionCell", () => {
-  it("sql/cwql/memcached/MQTT用JSONセルはtrue", () => {
+  it("sql/cwql/memcached/redis/MQTT用JSONセルはtrue", () => {
     expect(hasConnectionCell(makeCell({ languageId: "sql" }))).toBe(true);
     expect(hasConnectionCell(makeCell({ languageId: "cwql" }))).toBe(true);
     expect(hasConnectionCell(makeCell({ languageId: "memcached" }))).toBe(true);
+    expect(hasConnectionCell(makeCell({ languageId: "redis" }))).toBe(true);
     expect(
       hasConnectionCell(makeCell({ languageId: "json", metadata: { publishParams: {} } }))
     ).toBe(true);

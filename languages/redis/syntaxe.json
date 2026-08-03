@@ -1,0 +1,21 @@
+{
+  "scopeName": "source.redis",
+  "patterns": [
+    {
+      "name": "keyword.control.redis",
+      "match": "(?i)\\b(GET|SET|DEL|EXISTS|EXPIRE|TTL|PERSIST|INCR|DECR|INCRBY|DECRBY|APPEND|STRLEN|MGET|MSET|HGET|HGETALL|HSET|HMSET|HDEL|HKEYS|HVALS|HLEN|HEXISTS|LPUSH|RPUSH|LRANGE|LPOP|RPOP|LLEN|SADD|SMEMBERS|SREM|SISMEMBER|ZADD|ZRANGE|ZSCORE|ZREM|KEYS|SCAN|TYPE|PING|INFO|CONFIG|FLUSHALL|FLUSHDB|SELECT)\\b"
+    },
+    {
+      "name": "constant.numeric.redis",
+      "match": "\\b\\d+\\b"
+    },
+    {
+      "name": "string.quoted.double.redis",
+      "match": "\"[^\"]*\""
+    },
+    {
+      "name": "string.unquoted.redis",
+      "match": "[^\\s]+"
+    }
+  ]
+}

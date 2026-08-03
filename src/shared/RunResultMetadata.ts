@@ -47,6 +47,12 @@ export type MqttPublishResult = {
   messageId?: number;
 };
 
+export type ShellResult = {
+  ok: boolean;
+  message?: string;
+  elapsedTime: number;
+};
+
 export type RunResultMetadata = {
   tableName?: string;
   type?: string;
@@ -56,6 +62,7 @@ export type RunResultMetadata = {
   axiosEvent?: NodeRunAxiosEvent;
   lmResult?: LMResult;
   mqttPublishResult?: MqttPublishResult;
+  shellResult?: ShellResult;
   updateJSONCellValues?: JSONCellValues[];
   [key: string]: any;
 };

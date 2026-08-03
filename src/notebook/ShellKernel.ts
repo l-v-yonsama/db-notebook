@@ -62,6 +62,7 @@ export class ShellKernel {
 
     let stdout = "";
     let stderr = "";
+    const startTime = new Date().getTime();
 
     try {
       const rootUri = workspace.workspaceFolders?.[0].uri;
@@ -100,7 +101,12 @@ export class ShellKernel {
         stderr,
         skipped: false,
         status: code === 0 ? "executed" : "error",
-        metadata: {},
+        metadata: {
+          shellResult: {
+            ok: code === 0,
+            elapsedTime: new Date().getTime() - startTime,
+          },
+        },
       };
     } catch (err) {
       const isBat = languageId === "bat";
@@ -121,7 +127,13 @@ export class ShellKernel {
         stderr: errorMessages.join(os.EOL),
         skipped: false,
         status: "error",
-        metadata: {},
+        metadata: {
+          shellResult: {
+            ok: false,
+            message: err instanceof Error ? err.message : undefined,
+            elapsedTime: new Date().getTime() - startTime,
+          },
+        },
       };
     } finally {
       // ShellKernel is created-run-discarded per cell (like MemcachedKernel),

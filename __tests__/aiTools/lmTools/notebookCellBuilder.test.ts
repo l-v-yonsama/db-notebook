@@ -105,6 +105,35 @@ describe("buildNotebookCells", () => {
     }
   });
 
+  it("redisセルは接続が必要でconnectionNameが無い(デフォルトも無い)場合はエラー", async () => {
+    const result = await buildNotebookCells(
+      makeStateStorage(),
+      [{ kind: "code", language: "redis", value: "GET mykey" }],
+      undefined
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toMatch(/needs a connectionName/);
+    }
+  });
+
+  it("redisセルはconnectionNameがあれば構築できる", async () => {
+    const stateStorage = makeStateStorage({ connections: { RedisConn: {} } });
+    const result = await buildNotebookCells(
+      stateStorage,
+      [
+        {
+          kind: "code",
+          language: "redis",
+          value: "GET mykey",
+          metadata: { connectionName: "RedisConn" },
+        },
+      ],
+      undefined
+    );
+    expect(result.ok).toBe(true);
+  });
+
   it("トップレベルのdefaultConnectionNameが接続必須セルに適用される", async () => {
     const stateStorage = makeStateStorage({ connections: { Prod: {} } });
     const result = await buildNotebookCells(

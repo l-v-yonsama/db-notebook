@@ -30,7 +30,7 @@ import { getOutputConfig, getToStringParamByConfig } from "./configUtil";
 import { writeToResourceOnStorage } from "./fsUtil";
 import { createResponseBodyMarkdown } from "./httpUtil";
 import { logError } from "./logger";
-import { isMarkupCell, isMemcachedCell } from "./notebookUtil";
+import { isMarkupCell, isMemcachedCell, isRedisCell } from "./notebookUtil";
 const PREFIX = "[utilities/htmlGenerator]";
 
 type CreateHtmlOptionsParams = {
@@ -38,6 +38,19 @@ type CreateHtmlOptionsParams = {
 };
 
 type MarkdownValues = { [key: string]: { lang: string; s: string } };
+
+// highlight.js doesn't recognize some of our VS Code-specific cell languageIds
+// -- map them to the closest hljs-supported language so the HTML export gets
+// real syntax highlighting instead of silently falling back to (often wrong)
+// auto-detection. "redis" needs no entry here: the report template registers
+// a dedicated hljs "redis" language (see report.html) since bash's keywords
+// are lowercase-only and don't match redis-cli's uppercase convention.
+const HLJS_LANGUAGE_ALIASES: { [languageId: string]: string } = {
+  shellscript: "bash",
+  bat: "dos",
+};
+
+const toHljsLanguage = (languageId: string): string => HLJS_LANGUAGE_ALIASES[languageId] ?? languageId;
 
 export const createHtmlFromHarItem = async (
   { title, res, rdh }: Omit<HarFileTabItem, "tabId">,
@@ -492,7 +505,7 @@ export const createHtmlFromRdhList = async (
       cell.document.languageId = "json";
       cell.document.getText = () => rdh.meta.queryInput ?? "";
     }
-    if (isMemcachedCell(cell)) {
+    if (isMemcachedCell(cell) || isRedisCell(cell)) {
       cell.document.getText = () => rdh.meta.command ?? "";
     }
 
@@ -570,7 +583,7 @@ const createHtml = async (
         htmlContents.push(`<div id="${id}" class="block">`);
         htmlContents.push("</div>");
         markdownValues[id] = {
-          lang: cell.document.languageId,
+          lang: toHljsLanguage(cell.document.languageId),
           s: escapeHtml(cell.document.getText()),
         };
 
@@ -777,6 +790,22 @@ const createHtml = async (
                 );
                 htmlContents.push(`</div>`);
               }
+              if (metadata.shellResult) {
+                const { ok, message, elapsedTime } = metadata.shellResult;
+                htmlContents.push(
+                  `<div class="notification ${
+                    ok ? "is-success" : "is-danger"
+                  } is-light" style="padding:10px; margin-bottom:10px;font-size:small;">`
+                );
+                htmlContents.push(
+                  `<span class="tag ${ok ? "is-success" : "is-danger"} is-light">${
+                    ok ? "Success" : "Error"
+                  }</span> <span class="tag is-light is-warning">Time:${escapeHtml(
+                    prettyTime(elapsedTime)
+                  )}</span>` + (message ? ` ${escapeHtml(message)}` : "")
+                );
+                htmlContents.push(`</div>`);
+              }
               if (metadata.lmResult) {
                 htmlContents.push(
                   `<div class="notification is-primary is-light" style="padding:10px; margin-bottom:10px;font-size:small;">`
@@ -834,9 +863,29 @@ const createHtml = async (
   return errorMessage;
 };
 
+const MARKDOWN_TOC_PREVIEW_MAX_LENGTH = 30;
+
+// Prefer the first heading line as a title-like preview; fall back to the
+// first non-empty line for markdown cells that don't lead with a heading.
+const getMarkdownTocPreview = (text: string): string => {
+  const lines = text.split(/\r\n|\r|\n/);
+  const headingLine = lines.find((line) => /^\s{0,3}#{1,6}\s+\S/.test(line));
+  const line = headingLine
+    ? headingLine.replace(/^\s{0,3}#{1,6}\s+/, "").trim()
+    : (lines.find((line) => line.trim().length > 0) ?? "").trim();
+  if (line.length > MARKDOWN_TOC_PREVIEW_MAX_LENGTH) {
+    return line.substring(0, MARKDOWN_TOC_PREVIEW_MAX_LENGTH) + "...";
+  }
+  return line;
+};
+
 const getTocInfoHtml = (cell: NotebookCell): string => {
   if (isMarkupCell(cell)) {
-    return '<span class="tag is-info is-light">Markdown</span>';
+    const preview = getMarkdownTocPreview(cell.document.getText());
+    return (
+      '<span class="tag is-info is-light">Markdown</span>' +
+      (preview ? ` ${escapeHtml(preview)}` : "")
+    );
   }
   let s = "";
 
@@ -898,6 +947,11 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
       if (mqttPublishResult) {
         const { subscription } = mqttPublishResult;
         s += `<span class="tag is-info is-light">${subscription}</span>`;
+      }
+      if (metadata.shellResult) {
+        s += `<span class="tag is-light is-warning">Time:${prettyTime(
+          metadata.shellResult.elapsedTime
+        )}</span>`;
       }
     }
     if (hasError) {

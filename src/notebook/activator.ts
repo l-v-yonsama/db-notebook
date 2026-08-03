@@ -77,6 +77,7 @@ import {
   isJsonValueCell,
   isMemcachedCell,
   isMqttCell,
+  isRedisCell,
   isSqlCell,
 } from "../utilities/notebookUtil";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
@@ -335,6 +336,8 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
             return it.dbType === DBType.Mqtt;
           } else if (isMemcachedCell(targetCells[0])) {
             return it.dbType === DBType.Memcache;
+          } else if (isRedisCell(targetCells[0])) {
+            return it.dbType === DBType.Redis;
           } else {
             return (
               it.dbType === DBType.Mqtt ||

@@ -45,6 +45,7 @@ import {
   isMemcachedCell,
   isMqttCell,
   isPreExecution,
+  isRedisCell,
   isShellCell,
   isSqlCell,
   readCodeResolverFile,
@@ -56,6 +57,7 @@ import { jsonKernelRun } from "./JsonKernel";
 import { MemcachedKernel } from "./MemcachedKernel";
 import { MqttKernel } from "./MqttKernel";
 import { NodeKernel } from "./NodeKernel";
+import { RedisKernel } from "./RedisKernel";
 import { ShellKernel } from "./ShellKernel";
 import { SqlKernel } from "./sqlKernel";
 import {
@@ -84,6 +86,7 @@ type NoteSession = {
   memcachedKernel: MemcachedKernel | undefined;
   mqttKernel: MqttKernel | undefined;
   shellKernel: ShellKernel | undefined;
+  redisKernel: RedisKernel | undefined;
   cancellationTokenSourceList: CancellationTokenSource[] | undefined;
   interrupted: boolean;
 };
@@ -99,6 +102,7 @@ export class MainController {
     "json",
     "cwql",
     "memcached",
+    "redis",
     "plaintext",
     "shellscript",
     "bat",
@@ -297,6 +301,7 @@ export class MainController {
         memcachedKernel,
         mqttKernel,
         shellKernel,
+        redisKernel,
         cancellationTokenSourceList,
       } = noteSession;
       try {
@@ -322,6 +327,9 @@ export class MainController {
         }
         if (shellKernel) {
           shellKernel.interrupt();
+        }
+        if (redisKernel) {
+          redisKernel.interrupt();
         }
         if (cancellationTokenSourceList) {
           for (const cts of cancellationTokenSourceList) {
@@ -363,6 +371,7 @@ export class MainController {
       memcachedKernel: undefined,
       mqttKernel: undefined,
       shellKernel: undefined,
+      redisKernel: undefined,
       cancellationTokenSourceList: [],
       interrupted: false,
     };
@@ -769,6 +778,11 @@ export class MainController {
         noteSession.kernel.getStoredVariables()
       );
       noteSession.memcachedKernel = undefined;
+      return r;
+    } else if (isRedisCell(cell)) {
+      noteSession.redisKernel = new RedisKernel(this.stateStorage);
+      const r = await noteSession.redisKernel.run(cell, noteSession.kernel.getStoredVariables());
+      noteSession.redisKernel = undefined;
       return r;
     } else if (isMqttCell(cell)) {
       noteSession.mqttKernel = new MqttKernel(this.stateStorage);

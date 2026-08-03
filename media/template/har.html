@@ -163,7 +163,16 @@
 
         var renderer = new marked.Renderer();
         renderer.code = (code, language) => {
-          return "<pre><code>" + hljs.highlightAuto(code).value + "</code></pre>";
+          let value;
+          try {
+            value =
+              language && hljs.getLanguage(language)
+                ? hljs.highlight(code, { language, ignoreIllegals: true }).value
+                : hljs.highlightAuto(code).value;
+          } catch (e) {
+            value = hljs.highlightAuto(code).value;
+          }
+          return "<pre><code>" + value + "</code></pre>";
         };
         renderer.heading = (tokens, depth) => {
           return `<h${depth} class='subtitle is-${depth}'>${tokens}</h${depth}>`;

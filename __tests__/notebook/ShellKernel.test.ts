@@ -35,6 +35,8 @@ describe("ShellKernel / shellscript (real bash spawn)", () => {
 
     expect(result.stdout).toContain("hello");
     expect(result.status).toBe("executed");
+    expect(result.metadata?.shellResult?.ok).toBe(true);
+    expect(result.metadata?.shellResult?.elapsedTime).toBeGreaterThanOrEqual(0);
   }, 15000);
 
   it("exit 1で終了するとstatus=errorになる", async () => {
@@ -42,6 +44,7 @@ describe("ShellKernel / shellscript (real bash spawn)", () => {
     const result = await kernel.run(makeCell("exit 1"));
 
     expect(result.status).toBe("error");
+    expect(result.metadata?.shellResult?.ok).toBe(false);
   }, 15000);
 
   it("stderrに書き込んでもexit 0ならstatus=executedになる(exit code優先の設計)", async () => {

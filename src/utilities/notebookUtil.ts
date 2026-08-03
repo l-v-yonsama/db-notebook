@@ -24,6 +24,10 @@ export const isMemcachedCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "memcached";
 };
 
+export const isRedisCell = (cell: NotebookCell): boolean => {
+  return cell.kind === NotebookCellKind.Code && cell.document.languageId === "redis";
+};
+
 export const isJsOrTsCell = (cell: NotebookCell): boolean => {
   const languageId = cell.document.languageId;
   return (
@@ -68,7 +72,13 @@ export const isMqttCell = (cell: NotebookCell): boolean => {
 };
 
 export const hasConnectionCell = (cell: NotebookCell): boolean => {
-  return isSqlCell(cell) || isCwqlCell(cell) || isMemcachedCell(cell) || isMqttCell(cell);
+  return (
+    isSqlCell(cell) ||
+    isCwqlCell(cell) ||
+    isMemcachedCell(cell) ||
+    isRedisCell(cell) ||
+    isMqttCell(cell)
+  );
 };
 
 export const hasAnyRdhOutputCell = (cell: NotebookCell): boolean => {

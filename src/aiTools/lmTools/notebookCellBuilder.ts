@@ -10,13 +10,19 @@ const CODE_LANGUAGES = [
   "json",
   "cwql",
   "memcached",
+  "redis",
   "plaintext",
   "shellscript",
   "bat",
 ] as const;
 type CodeLanguage = (typeof CODE_LANGUAGES)[number];
 
-const CONNECTION_REQUIRED_LANGUAGES: ReadonlySet<string> = new Set(["sql", "cwql", "memcached"]);
+const CONNECTION_REQUIRED_LANGUAGES: ReadonlySet<string> = new Set([
+  "sql",
+  "cwql",
+  "memcached",
+  "redis",
+]);
 
 export type CellMetadataInput = {
   connectionName?: string;

@@ -20,6 +20,8 @@ const {
   awsKernelInterruptMock,
   memcachedKernelRunMock,
   memcachedKernelInterruptMock,
+  redisKernelRunMock,
+  redisKernelInterruptMock,
   jsonKernelRunMock,
   shellKernelCreateMock,
   shellKernelRunMock,
@@ -36,6 +38,8 @@ const {
   awsKernelInterruptMock: vi.fn(),
   memcachedKernelRunMock: vi.fn(),
   memcachedKernelInterruptMock: vi.fn(),
+  redisKernelRunMock: vi.fn(),
+  redisKernelInterruptMock: vi.fn(),
   jsonKernelRunMock: vi.fn(),
   shellKernelCreateMock: vi.fn(),
   shellKernelRunMock: vi.fn(),
@@ -69,6 +73,12 @@ vi.mock("../../src/notebook/MemcachedKernel", () => ({
   MemcachedKernel: vi.fn().mockImplementation(() => ({
     run: memcachedKernelRunMock,
     interrupt: memcachedKernelInterruptMock,
+  })),
+}));
+vi.mock("../../src/notebook/RedisKernel", () => ({
+  RedisKernel: vi.fn().mockImplementation(() => ({
+    run: redisKernelRunMock,
+    interrupt: redisKernelInterruptMock,
   })),
 }));
 vi.mock("../../src/notebook/JsonKernel", () => ({
@@ -453,6 +463,23 @@ describe("MainController.execute -> run() dispatch", () => {
     await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
 
     expect(memcachedKernelRunMock).toHaveBeenCalledWith(cell, nodeKernelFake.getStoredVariables());
+  });
+
+  it("redisセルはredisKernel.runへ委譲する", async () => {
+    const { controllerObj } = setupController();
+    redisKernelRunMock.mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      skipped: false,
+      status: "executed",
+    } as RunResult);
+
+    const cell = makeCell({ languageId: "redis" });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    expect(redisKernelRunMock).toHaveBeenCalledWith(cell, nodeKernelFake.getStoredVariables());
   });
 
   it("shellscriptセルはshellKernel.runへ委譲する", async () => {
