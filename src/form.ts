@@ -128,7 +128,11 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           }
           await this.stateStorage.setMcpEnabledForConnection(setting.name, mcpEnabled === true);
           await vscode.commands.executeCommand(REFRESH_RESOURCES);
-          const res = Object.assign(new DbConnection(setting.name), setting);
+          // addConnectionSetting/editConnectionSetting strip secrets (password, clientSecret,
+          // sessionToken) from `setting` in place and move them to SecretStorage, so re-fetch
+          // the saved setting to get the decrypted values back for display.
+          const savedSetting = await this.stateStorage.getConnectionSettingByName(setting.name);
+          const res = Object.assign(new DbConnection(setting.name), savedSetting ?? setting);
           this.setForm("show", res);
 
           break;

@@ -4,7 +4,7 @@
     <p v-if="isShowMode" :id="id">
       {{ showModeValue ? showModeValue : modelValue }}
     </p>
-    <VsCodeTextField v-else :id="id" v-model="inputValue" :placeholder="placeholder" :maxlength="128"></VsCodeTextField>
+    <VsCodeTextField v-else :id="id" v-model="inputValue" :placeholder="placeholder" :maxlength="4096"></VsCodeTextField>
   </div>
 </template>
 

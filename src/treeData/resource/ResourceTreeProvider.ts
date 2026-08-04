@@ -7,6 +7,7 @@ import {
   DbDynamoTable,
   DbDynamoTableColumn,
   DbResource,
+  DbSESIdentity,
   DbSubscription,
   DbTable,
   DBType,
@@ -468,6 +469,28 @@ export class DBDatabaseItem extends vscode.TreeItem {
       case ResourceType.LogGroup:
         iconPath = new vscode.ThemeIcon("list-ordered");
         scannable = true;
+        break;
+      case ResourceType.Identity:
+        {
+          const identity = resource as DbSESIdentity;
+          // icon shape by identity type, color by verification status
+          const iconFile = identity.attr.identityType === "Domain" ? "globe" : "mail";
+          let color: vscode.ThemeColor | undefined = undefined;
+          switch (identity.attr.verificationStatus) {
+            case "Success":
+              color = new vscode.ThemeColor("charts.green");
+              break;
+            case "Failed":
+            case "TemporaryFailure":
+              color = new vscode.ThemeColor("charts.red");
+              break;
+            case "Pending":
+              color = new vscode.ThemeColor("charts.yellow");
+              break;
+          }
+          iconPath = new vscode.ThemeIcon(iconFile, color);
+          description = `(${identity.attr.verificationStatus ?? "NotStarted"})`;
+        }
         break;
       case ResourceType.IamClient:
         {

@@ -23,6 +23,14 @@ export class AwsElementSetting extends BaseNoSqlElementSetting {
     };
   }
 
+  getSessionToken(): ElementSetting {
+    return {
+      visible: this.params.awsCredentialType === SupplyCredentials.ExplicitInProperty,
+      label: "Session token (optional, for temporary credentials)",
+      defaultValue: "",
+    };
+  }
+
   getTimezone(): ElementSetting {
     return { visible: false };
   }

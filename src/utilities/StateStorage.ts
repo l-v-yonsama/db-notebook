@@ -42,7 +42,7 @@ type DbResInfo = {
   res?: DbDatabase[];
 };
 
-type SecretParamName = "password" | "clientSecret";
+type SecretParamName = "password" | "clientSecret" | "sessionToken";
 
 export class StateStorage {
   private resMap = new Map<string, DbResInfo>();
@@ -308,6 +308,9 @@ export class StateStorage {
         if (it.dbType === "Auth0" && it.iamSolution) {
           it.iamSolution.clientSecret = await this.getSecret(it.id, "clientSecret");
         }
+        if (it.dbType === "Aws" && it.awsSetting) {
+          it.awsSetting.sessionToken = await this.getSecret(it.id, "sessionToken");
+        }
       }
     }
     return list;
@@ -326,6 +329,9 @@ export class StateStorage {
         setting.password = await this.getSecret(setting.id, "password");
         if (setting.dbType === "Auth0" && setting.iamSolution) {
           setting.iamSolution.clientSecret = await this.getSecret(setting.id, "clientSecret");
+        }
+        if (setting.dbType === "Aws" && setting.awsSetting) {
+          setting.awsSetting.sessionToken = await this.getSecret(setting.id, "sessionToken");
         }
       }
       return setting;
@@ -390,6 +396,7 @@ export class StateStorage {
     }
     await this.removePasswordAndStoreOnSecret(setting);
     await this.removeClientSecretAndStoreOnSecret(setting);
+    await this.removeAwsSessionTokenAndStoreOnSecret(setting);
     list.push(setting);
     await this.context.globalState.update(STORAGE_KEY, list);
     return true;
@@ -406,6 +413,7 @@ export class StateStorage {
     }
     await this.removePasswordAndStoreOnSecret(setting);
     await this.removeClientSecretAndStoreOnSecret(setting);
+    await this.removeAwsSessionTokenAndStoreOnSecret(setting);
 
     list.splice(idx, 1, setting);
     await this.context.globalState.update(STORAGE_KEY, list);
@@ -425,6 +433,9 @@ export class StateStorage {
       await this.deleteSecret(removed[0].id, "password");
       if (removed[0].dbType === "Auth0" && removed[0].iamSolution) {
         await this.deleteSecret(removed[0].id, "clientSecret");
+      }
+      if (removed[0].dbType === "Aws" && removed[0].awsSetting) {
+        await this.deleteSecret(removed[0].id, "sessionToken");
       }
     }
     await this.context.globalState.update(STORAGE_KEY, list);
@@ -447,6 +458,15 @@ export class StateStorage {
       if (setting.dbType === "Auth0" && setting.iamSolution && setting.iamSolution.clientSecret) {
         await this.storeSecret(setting.id, "clientSecret", setting.iamSolution.clientSecret);
         setting.iamSolution.clientSecret = undefined;
+      }
+    }
+  }
+
+  private async removeAwsSessionTokenAndStoreOnSecret(setting: ConnectionSetting): Promise<void> {
+    if (setting.id) {
+      if (setting.dbType === "Aws" && setting.awsSetting && setting.awsSetting.sessionToken) {
+        await this.storeSecret(setting.id, "sessionToken", setting.awsSetting.sessionToken);
+        setting.awsSetting.sessionToken = undefined;
       }
     }
   }

@@ -5,6 +5,10 @@ export abstract class BaseElementSetting {
 
   abstract getPassword(): ElementSetting;
 
+  getSessionToken(): ElementSetting {
+    return { visible: false };
+  }
+
   abstract getTimezone(): ElementSetting;
 
   getConnectTimeoutMs(): ElementSetting {

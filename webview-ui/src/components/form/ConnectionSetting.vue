@@ -202,6 +202,7 @@ const maskedString = (s: string): string => {
 
 const maskedUser = computed((): string => maskedString(user.value ?? ""));
 const maskedPassword = computed((): string => maskedString(password.value ?? ""));
+const maskedSessionToken = computed((): string => maskedString(sessionToken.value ?? ""));
 const maskedClientSecret = computed((): string => maskedString(clientSecret.value ?? ""));
 const maskedSqlServerClientId = computed((): string => maskedString(sqlServerClientId.value ?? ""));
 const maskedSqlServerClientSecret = computed((): string =>
@@ -294,6 +295,7 @@ const lockWaitTimeoutMs = ref(props.item.lockWaitTimeoutMs);
 const url = ref(props.item.url);
 const region = ref(props.item.awsSetting?.region ?? "");
 const awsProfile = ref(props.item.awsSetting?.profile ?? "");
+const sessionToken = ref(props.item.awsSetting?.sessionToken ?? "");
 const awsCredentialType = ref(
   props.item.awsSetting?.supplyCredentialType ?? SupplyCredentials.ExplicitInProperty
 );
@@ -397,10 +399,12 @@ function createItem(): ConnectionSetting {
       profile: awsProfile.value,
       supplyCredentialType: awsCredentialType.value,
       region: region.value,
+      sessionToken: sessionToken.value || undefined,
     };
     if (awsCredentialType.value !== SupplyCredentials.ExplicitInProperty) {
       url.value = '';
       region.value = '';
+      sessionToken.value = '';
     }
   }
   if (DBTypeConst.isIam(dbType.value)) {
@@ -557,6 +561,7 @@ function setDefault() {
   host.value = elmSettings.value.getHost().defaultValue ?? "";
   user.value = elmSettings.value.getUser().defaultValue ?? "";
   password.value = "";
+  sessionToken.value = "";
   timezone.value = "";
   if (elmSettings.value.getConnectTimeoutMs().visible) {
     connectTimeoutMs.value = toNum(elmSettings.value.getConnectTimeoutMs().defaultValue);
@@ -740,6 +745,10 @@ defineExpose({
       <LabeledText v-show="elmSettings.getPassword().visible" id="password" v-model="password"
         :showModeValue="maskedPassword" :isShowMode="isShowMode" :label="elmSettings.getPassword().label ?? ''"
         :placeholder="elmSettings.getPassword().placeholder ?? ''" />
+
+      <LabeledText v-show="elmSettings.getSessionToken().visible" id="sessionToken" v-model="sessionToken"
+        :showModeValue="maskedSessionToken" :isShowMode="isShowMode" :label="elmSettings.getSessionToken().label ?? ''"
+        :placeholder="elmSettings.getSessionToken().placeholder ?? ''" />
 
       <label v-show="elmSettings.getTimezone().visible" for="timezone">Timezone(Optional)</label>
       <p v-if="isShowMode && elmSettings.getTimezone().visible" id="timezone">{{ timezone }}</p>

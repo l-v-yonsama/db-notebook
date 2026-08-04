@@ -1,6 +1,7 @@
 export const AwsServiceType = {
   S3: "S3",
-  // SQS: "SQS",
+  SQS: "SQS",
+  SES: "SES",
   Cloudwatch: "Cloudwatch",
   DynamoDB: "DynamoDB",
 } as const;
