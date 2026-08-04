@@ -79,6 +79,7 @@ export type ActionCommand =
   | SaveConnectionSettingActionCommand
   | SaveValuesActionCommand
   | DeleteKeyActionCommand
+  | CopyAwsSecretValueActionCommand
   | UpdateTextDocumentActionCommand
   | UpdateKeywordActionCommand
   | UpdateCodeResolverTextDocumentActionCommand
@@ -273,6 +274,18 @@ export type DeleteKeyActionCommand = {
   command: "DeleteKey";
   params: TabIdParam & {
     key: string;
+  };
+};
+
+// Fetches the real (decrypted) value of an SSM parameter / Secrets Manager
+// secret on demand and writes it directly to the clipboard from the
+// extension host. The value is deliberately never included in this message
+// or sent back to the webview - see AwsSsmServiceClient#scan() /
+// AwsSecretsManagerServiceClient#scan(), which never fetch it either.
+export type CopyAwsSecretValueActionCommand = {
+  command: "copyAwsSecretValue";
+  params: TabIdParam & {
+    name: string;
   };
 };
 export type OutputActionCommand = {

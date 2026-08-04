@@ -2,8 +2,10 @@ import {
   Auth0Driver,
   Auth0ScanParams,
   AwsCloudwatchServiceClient,
+  AwsDatabase,
   AwsDriver,
   AwsS3ServiceClient,
+  AwsServiceType,
   AwsSQSServiceClient,
   DBDriverResolver,
   DBType,
@@ -28,6 +30,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { ScanConditionItem, ScanPanelEventData, ScanTabItem } from "../shared/MessageEventData";
 import { DiffMdhViewTabParam } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
+import { copyAwsSecretValueToClipboard } from "../utilities/awsSecretValueUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
 import { createBookFromRdh } from "../utilities/excelGenerator";
 import { log } from "../utilities/logger";
@@ -36,7 +39,9 @@ import {
   buildAwsCloudWatchLogGroupScanParams,
   buildAwsCloudWatchLogStreamScanParams,
   buildAwsS3ScanParams,
+  buildAwsSecretsManagerScanParams,
   buildAwsSQSScanParams,
+  buildAwsSsmScanParams,
   buildKeycloakScanParams,
   buildMemcacheScanParams,
   buildRedisScanParams,
@@ -233,6 +238,20 @@ export class ScanPanel extends BasePanel {
             limit.value = 1000;
             keyword.label = "Highlight";
             break;
+          case "AwsDatabase": {
+            // SSM/Secrets Manager have no scannable sub-resource of their own
+            // (unlike Bucket/Queue/LogGroup) - the service node itself is the
+            // scan target, listing every parameter/secret at once.
+            const serviceType = (rootRes as AwsDatabase).serviceType;
+            if (serviceType === AwsServiceType.SSM) {
+              keyword.label = "Path prefix";
+              keyword.value = "";
+            } else if (serviceType === AwsServiceType.SecretsManager) {
+              keyword.label = "Name contains";
+              keyword.value = "";
+            }
+            break;
+          }
         }
         break;
     }
@@ -324,7 +343,19 @@ export class ScanPanel extends BasePanel {
       case "DeleteKey":
         this.deleteKey(params);
         return;
+      case "copyAwsSecretValue":
+        this.copyAwsSecretValue(params);
+        return;
     }
+  }
+
+  private async copyAwsSecretValue({ tabId, name }: { tabId: string; name: string }) {
+    const tabItem = this.items.find((it) => it.tabId === tabId);
+    if (!tabItem || !ScanPanel.stateStorage) {
+      return;
+    }
+    const serviceType = (tabItem.rootRes as AwsDatabase).serviceType;
+    await copyAwsSecretValueToClipboard(ScanPanel.stateStorage, tabItem.conName, serviceType, name);
   }
 
   private async deleteKey({ tabId, key }: { tabId: string; key: string }) {
@@ -546,6 +577,32 @@ export class ScanPanel extends BasePanel {
                     limit: resolvedLimit,
                   })
                 );
+              }
+              case ResourceType.AwsDatabase: {
+                const serviceType = (rootRes as AwsDatabase).serviceType;
+                if (serviceType === AwsServiceType.SSM) {
+                  if (!driver.ssmClient) {
+                    throw new Error("SSM is not configured for this connection.");
+                  }
+                  return await driver.ssmClient.scan(
+                    buildAwsSsmScanParams({
+                      pathPrefix: keyword,
+                      limit: resolvedLimit,
+                    })
+                  );
+                }
+                if (serviceType === AwsServiceType.SecretsManager) {
+                  if (!driver.secretsManagerClient) {
+                    throw new Error("Secrets Manager is not configured for this connection.");
+                  }
+                  return await driver.secretsManagerClient.scan(
+                    buildAwsSecretsManagerScanParams({
+                      nameContains: keyword,
+                      limit: resolvedLimit,
+                    })
+                  );
+                }
+                throw new Error(`Service "${serviceType}" is not scannable.`);
               }
               default:
                 throw new Error(`Resource type "${targetResourceType}" is not scannable.`);

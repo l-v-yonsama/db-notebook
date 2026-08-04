@@ -3,6 +3,7 @@ import type { SecondaryItem } from "@/types/Components";
 import type { CellFocusParams } from "@/types/RdhEvents";
 import type {
   CloseScanPanelActionCommand,
+  CopyAwsSecretValueActionCommand,
   DeleteKeyActionCommand,
   OpenScanPanelActionCommand,
   OutputParams,
@@ -67,6 +68,12 @@ const deleteKeyParams = ref({
   canAction: false,
   tabId: "",
   key: "",
+});
+const copySecretValueParams = ref({
+  visible: false,
+  canAction: false,
+  tabId: "",
+  name: "",
 });
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
@@ -165,6 +172,11 @@ const showTab = async (tabId: string) => {
   if (tabItem.dbType === "Redis") {
     deleteKeyParams.value.visible = true;
   }
+  copySecretValueParams.value.visible = false;
+  copySecretValueParams.value.canAction = false;
+  if (tabItem.dbType === "Aws" && tabItem.rootRes?.resourceType === "AwsDatabase") {
+    copySecretValueParams.value.visible = true;
+  }
   vscode.postCommand({ command: "selectTab", params: { tabId } });
 };
 
@@ -236,6 +248,7 @@ const output = (params: Omit<OutputParams, "tabId">): void => {
 const onClickCell = (params: CellFocusParams): void => {
   openLogStreamParams.value.canAction = false;
   deleteKeyParams.value.canAction = false;
+  copySecretValueParams.value.canAction = false;
   const tabItem = getActiveTabItem();
   if (!tabItem) {
     return;
@@ -261,7 +274,33 @@ const onClickCell = (params: CellFocusParams): void => {
         openLogStreamParams.value.canAction = true;
       }
       break;
+    case "AwsDatabase":
+      {
+        // SSM parameters / Secrets Manager secrets: the row's "name" column
+        // is the only thing needed to fetch the real value on demand. The
+        // grid's own "value" column is always a masked placeholder, never
+        // the real value - see AwsSsmServiceClient#scan()/
+        // AwsSecretsManagerServiceClient#scan() in db-drivers.
+        const name = params.rowValues["name"];
+        if (name) {
+          copySecretValueParams.value.tabId = tabItem.tabId;
+          copySecretValueParams.value.name = name;
+          copySecretValueParams.value.canAction = true;
+        }
+      }
+      break;
   }
+};
+
+const copySecretValue = (): void => {
+  const action: CopyAwsSecretValueActionCommand = {
+    command: "copyAwsSecretValue",
+    params: {
+      tabId: copySecretValueParams.value.tabId,
+      name: copySecretValueParams.value.name,
+    },
+  };
+  vscode.postCommand(action);
 };
 
 const openStream = (): void => {
@@ -435,6 +474,12 @@ defineExpose({
               <VsCodeButton v-show="deleteKeyParams.visible" appearance="secondary" class="deleteKey" @click="deleteKey"
                 :disabled="inProgress || !deleteKeyParams.canAction" title="Delete a key">
                 <span class="codicon codicon-trash"></span>Delete key
+              </VsCodeButton>
+
+              <VsCodeButton v-show="copySecretValueParams.visible" appearance="secondary" class="copySecretValue"
+                @click="copySecretValue" :disabled="inProgress || !copySecretValueParams.canAction"
+                title="Fetch the real value and copy it to the clipboard">
+                <span class="codicon codicon-clippy"></span>Copy real value
               </VsCodeButton>
 
               <label v-if="tabItem.resourceType.visible" for="resource-type">Resource</label>

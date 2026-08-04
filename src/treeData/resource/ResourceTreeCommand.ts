@@ -1,10 +1,13 @@
 import {
+  AwsServiceType,
   BaseSQLSupportDriver,
   DbConnection,
   DbDatabase,
   DbDynamoTable,
   DbResource,
   DbSchema,
+  DbSecretsManagerSecret,
+  DbSsmParameter,
   DbSubscription,
   DbTable,
   MqttDatabase,
@@ -29,6 +32,7 @@ import {
   ADD_SUBSCRIPTION,
   CLEAR_DEFAULT_CON_FOR_SQL_CELL,
   CONNECT,
+  COPY_AWS_SECRET_VALUE,
   COPY_COLUMN_NAMES,
   COPY_RESOURCE_NAME,
   COUNT_FOR_ALL_TABLES,
@@ -83,6 +87,7 @@ import { ViewConditionPanel } from "../../panels/ViewConditionPanel";
 import { CellMeta } from "../../types/Notebook";
 import { MdhViewParams } from "../../types/views";
 import { showWindowErrorMessage } from "../../utilities/alertUtil";
+import { copyAwsSecretValueToClipboard } from "../../utilities/awsSecretValueUtil";
 import { copyToClipboard } from "../../utilities/clipboardUtil";
 import { workflow } from "../../utilities/driverResolver";
 import { createErDiagram, createSimpleERDiagramParams } from "../../utilities/erDiagramGenerator";
@@ -511,6 +516,37 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     commands.registerCommand(SHOW_DYNAMO_QUERY_PANEL, async (target: DbDynamoTable) => {
       DynamoQueryPanel.render(context.extensionUri, target);
     })
+  );
+
+  // Copy the real value of an SSM parameter / Secrets Manager secret directly
+  // from the tree, without needing to open the Scan Panel first.
+  context.subscriptions.push(
+    commands.registerCommand(
+      COPY_AWS_SECRET_VALUE,
+      async (res: DbSsmParameter | DbSecretsManagerSecret) => {
+        try {
+          let target = res;
+          if (!target) {
+            const selection = dbResourceTreeView.selection;
+            if (!selection || selection.length === 0) {
+              return;
+            }
+            target = selection[0] as DbSsmParameter | DbSecretsManagerSecret;
+          }
+          if (!target) {
+            return;
+          }
+          const { conName } = target.meta;
+          const serviceType =
+            target.resourceType === ResourceType.SsmParameter
+              ? AwsServiceType.SSM
+              : AwsServiceType.SecretsManager;
+          await copyAwsSecretValueToClipboard(stateStorage, conName, serviceType, target.name);
+        } catch (e) {
+          showWindowErrorMessage(e);
+        }
+      }
+    )
   );
 
   // ER diagram

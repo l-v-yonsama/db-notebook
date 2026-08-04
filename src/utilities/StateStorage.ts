@@ -1,14 +1,18 @@
 import {
   Auth0Database,
   AwsDatabase,
+  AwsServiceType,
   ConnectionSetting,
   DBType,
   DbDatabase,
   DbDynamoTable,
   DbLogGroup,
+  DbResourceGroup,
   DbS3Bucket,
+  DbSecretsManagerSecret,
   DbSQSQueue,
   DbSchema,
+  DbSsmParameter,
   DbSubscription,
   GeneralResult,
   IamClient,
@@ -171,6 +175,77 @@ export class StateStorage {
               conName: conRes.name,
             };
           });
+        // for ssm
+        {
+          const params = dbRes.findChildren<DbSsmParameter>({
+            resourceType: ResourceType.SsmParameter,
+          });
+          params.forEach((paramRes) => {
+            paramRes.meta = {
+              conName: conRes.name,
+            };
+          });
+          // Tree-display-only grouping by parameter type. Never affects
+          // getInfomationSchemas()'s own return value (params were already
+          // direct children when the block above stamped them) or the AI
+          // tools' schema output, which calls the driver directly and never
+          // goes through this cached, UI-facing tree.
+          if (
+            dbRes instanceof AwsDatabase &&
+            dbRes.serviceType === AwsServiceType.SSM &&
+            params.length > 0
+          ) {
+            const byType = new Map<string, DbSsmParameter[]>();
+            params.forEach((p) => {
+              const list = byType.get(p.attr.type) ?? [];
+              list.push(p);
+              byType.set(p.attr.type, list);
+            });
+            const groups: DbResourceGroup[] = [];
+            (["String", "StringList", "SecureString"] as const).forEach((type) => {
+              const list = byType.get(type);
+              if (list && list.length > 0) {
+                const group = new DbResourceGroup(`${type} params`);
+                list.forEach((p) => group.addChild(p));
+                groups.push(group);
+              }
+            });
+            dbRes.children.splice(0, dbRes.children.length, ...groups);
+          }
+        }
+        // for secrets manager
+        {
+          const secrets = dbRes.findChildren<DbSecretsManagerSecret>({
+            resourceType: ResourceType.SecretsManagerSecret,
+          });
+          secrets.forEach((secretRes) => {
+            secretRes.meta = {
+              conName: conRes.name,
+            };
+          });
+          // Tree-display-only grouping by rotation status. See the note on
+          // the SSM grouping above -- same rationale applies here.
+          if (
+            dbRes instanceof AwsDatabase &&
+            dbRes.serviceType === AwsServiceType.SecretsManager &&
+            secrets.length > 0
+          ) {
+            const enabled = secrets.filter((s) => s.attr.rotationEnabled);
+            const disabled = secrets.filter((s) => !s.attr.rotationEnabled);
+            const groups: DbResourceGroup[] = [];
+            if (enabled.length > 0) {
+              const group = new DbResourceGroup(`Rotation enabled`);
+              enabled.forEach((s) => group.addChild(s));
+              groups.push(group);
+            }
+            if (disabled.length > 0) {
+              const group = new DbResourceGroup(`Rotation disabled`);
+              disabled.forEach((s) => group.addChild(s));
+              groups.push(group);
+            }
+            dbRes.children.splice(0, dbRes.children.length, ...groups);
+          }
+        }
         // for Keycloak resource ---------
         dbRes.findChildren<IamRealm>({ resourceType: ResourceType.IamRealm }).forEach((realm) => {
           realm.meta = {

@@ -131,7 +131,7 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     "scanDbResource",
     {
       description:
-        "Searches/browses data in a non-SQL connection managed by Database Notebook (Redis, Memcache, Mqtt, Keycloak, Auth0, or AWS S3/SQS/CloudWatch Logs) using resource-specific scan parameters, since these connections cannot run SQL. Not supported for SQL connections (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) or AWS DynamoDB -- use runDbQuery for SQL connections. Set connectionName and fill in exactly ONE of the nested parameter objects matching the connection's type: redis, memcache, mqtt, awsS3, awsSqs, awsCloudWatchLogGroup, awsCloudWatchLogStream, keycloak, or auth0 -- each object's fields only apply to that connection type, do not mix fields from different objects. Call getDbSchema first if you don't know the connection's exact resource names (bucket/queue/log group/log stream names) or which AWS sub-resource it is, and call listDbConnections first if you don't know the exact connection name. Mqtt scanning requires the connection to already be connected and subscribed to the relevant topics via the MQTT panel -- it does not auto-connect, and returns an error telling you so if it isn't.",
+        "Searches/browses data in a non-SQL connection managed by Database Notebook (Redis, Memcache, Mqtt, Keycloak, Auth0, or AWS S3/SQS/SSM/Secrets Manager/CloudWatch Logs) using resource-specific scan parameters, since these connections cannot run SQL. Not supported for SQL connections (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) or AWS DynamoDB -- use runDbQuery for SQL connections. Set connectionName and fill in exactly ONE of the nested parameter objects matching the connection's type: redis, memcache, mqtt, awsS3, awsSqs, awsSsm, awsSecretsManager, awsCloudWatchLogGroup, awsCloudWatchLogStream, keycloak, or auth0 -- each object's fields only apply to that connection type, do not mix fields from different objects. Call getDbSchema first if you don't know the connection's exact resource names (bucket/queue/log group/log stream names) or which AWS sub-resource it is, and call listDbConnections first if you don't know the exact connection name. Mqtt scanning requires the connection to already be connected and subscribed to the relevant topics via the MQTT panel -- it does not auto-connect, and returns an error telling you so if it isn't. awsSsm/awsSecretsManager never expose the actual value, only metadata -- fetching a real value is only possible via the manual \"Copy real value\" button in the Scan Panel UI, never through this tool.",
       inputSchema: {
         connectionName: z
           .string()
@@ -139,7 +139,9 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
         limit: z
           .number()
           .optional()
-          .describe("Maximum number of results to return. Defaults to the configured default query row limit."),
+          .describe(
+            "Maximum number of results to return. Defaults to the configured default query row limit. For awsSqs, must be between 1 and 10 (SQS's own MaxNumberOfMessages cap) -- values outside that range are rejected, not truncated."
+          ),
         redis: z
           .object({
             dbIndex: z.number().optional().describe("DB index to scan. Defaults to 0."),
@@ -208,7 +210,29 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
             bodyOrMessageIdContains: z.string().optional().describe("Substring match against the message body or messageId."),
           })
           .optional()
-          .describe("Scan an AWS SQS queue. Use only when connectionName refers to an AWS connection and the target resource is an SQS queue."),
+          .describe(
+            "Scan an AWS SQS queue. Use only when connectionName refers to an AWS connection and the target resource is an SQS queue. The top-level `limit` must be between 1 and 10 for this scan kind (SQS's own MaxNumberOfMessages cap)."
+          ),
+        awsSsm: z
+          .object({
+            pathPrefix: z
+              .string()
+              .optional()
+              .describe('Path prefix under which to list parameters (e.g. "/prod/s3/"). Empty/omitted lists all parameters.'),
+            nameContains: z.string().optional().describe("Substring match against parameter names."),
+          })
+          .optional()
+          .describe(
+            'Lists SSM parameter metadata only (name, type, version, lastModifiedDate). Use only when connectionName refers to an AWS connection and SSM is configured. Never returns the actual value, by design -- there is no tool to fetch a real parameter value; that action is only available as an explicit, human-initiated "Copy real value" button in the Scan Panel UI.'
+          ),
+        awsSecretsManager: z
+          .object({
+            nameContains: z.string().optional().describe("Substring match against secret names."),
+          })
+          .optional()
+          .describe(
+            "Lists Secrets Manager secret metadata only (name, description, rotation status). Use only when connectionName refers to an AWS connection and Secrets Manager is configured. Never returns the actual secret value, by design -- see the note on awsSsm above."
+          ),
         awsCloudWatchLogGroup: z
           .object({
             logGroupName: z.string().describe("The CloudWatch log group name. Call getDbSchema first to find exact log group names."),

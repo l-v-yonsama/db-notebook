@@ -3,7 +3,9 @@ import {
   AwsCloudwatchServiceClient,
   AwsDriver,
   AwsS3ServiceClient,
+  AwsSecretsManagerServiceClient,
   AwsSQSServiceClient,
+  AwsSsmServiceClient,
   BaseDriver,
   DBType,
   KeycloakDriver,
@@ -31,7 +33,9 @@ import {
   buildAwsCloudWatchLogGroupScanParams,
   buildAwsCloudWatchLogStreamScanParams,
   buildAwsS3ScanParams,
+  buildAwsSecretsManagerScanParams,
   buildAwsSQSScanParams,
+  buildAwsSsmScanParams,
   buildKeycloakScanParams,
   buildMemcacheScanParams,
   buildMqttScanParams,
@@ -59,6 +63,8 @@ const SCAN_KINDS = [
   "mqtt",
   "awsS3",
   "awsSqs",
+  "awsSsm",
+  "awsSecretsManager",
   "awsCloudWatchLogGroup",
   "awsCloudWatchLogStream",
   "keycloak",
@@ -74,6 +80,8 @@ const KIND_DBTYPE: Record<ScanKind, DBType> = {
   auth0: DBType.Auth0,
   awsS3: DBType.Aws,
   awsSqs: DBType.Aws,
+  awsSsm: DBType.Aws,
+  awsSecretsManager: DBType.Aws,
   awsCloudWatchLogGroup: DBType.Aws,
   awsCloudWatchLogStream: DBType.Aws,
 };
@@ -130,6 +138,26 @@ export type ScanResourceToolInput = {
     queueUrl: string;
     /** Substring match against the message body or messageId. */
     bodyOrMessageIdContains?: string;
+  };
+  /**
+   * Lists SSM parameter metadata only (name, type, version, lastModifiedDate).
+   * Never returns the actual value, by design -- there is no tool to fetch a
+   * real parameter value; that action is only available as an explicit,
+   * human-initiated "Copy real value" button in the Scan Panel UI.
+   */
+  awsSsm?: {
+    /** Path prefix under which to list parameters (e.g. "/prod/s3/"). Empty/omitted lists all parameters. */
+    pathPrefix?: string;
+    /** Substring match against parameter names. */
+    nameContains?: string;
+  };
+  /**
+   * Lists Secrets Manager secret metadata only (name, description, rotation status).
+   * Never returns the actual secret value, by design -- see the note on `awsSsm` above.
+   */
+  awsSecretsManager?: {
+    /** Substring match against secret names. */
+    nameContains?: string;
   };
   awsCloudWatchLogGroup?: {
     /** The CloudWatch log group name. Call getDbSchema first to find exact log group names. */
@@ -396,6 +424,41 @@ export async function scanResource(
             buildAwsSQSScanParams({
               queueUrl: p.queueUrl,
               bodyOrMessageIdContains: p.bodyOrMessageIdContains,
+              limit,
+            })
+          );
+        }
+        case "awsSsm": {
+          if (!(driver instanceof AwsDriver)) {
+            throw new Error(`Connection "${input.connectionName}" is not an AWS connection.`);
+          }
+          const client = driver.getClientByResourceType<AwsSsmServiceClient>(ResourceType.SsmParameter);
+          if (!client) {
+            throw new Error("SSM is not configured for this connection.");
+          }
+          const p = input.awsSsm ?? {};
+          return await client.scan(
+            buildAwsSsmScanParams({
+              pathPrefix: p.pathPrefix,
+              nameContains: p.nameContains,
+              limit,
+            })
+          );
+        }
+        case "awsSecretsManager": {
+          if (!(driver instanceof AwsDriver)) {
+            throw new Error(`Connection "${input.connectionName}" is not an AWS connection.`);
+          }
+          const client = driver.getClientByResourceType<AwsSecretsManagerServiceClient>(
+            ResourceType.SecretsManagerSecret
+          );
+          if (!client) {
+            throw new Error("Secrets Manager is not configured for this connection.");
+          }
+          const p = input.awsSecretsManager ?? {};
+          return await client.scan(
+            buildAwsSecretsManagerScanParams({
+              nameContains: p.nameContains,
               limit,
             })
           );

@@ -3,6 +3,8 @@ import {
   AwsCloudWatchLogStreamScanParams,
   AwsS3ScanParams,
   AwsSQSScanParams,
+  AwsSsmScanParams,
+  AwsSecretsManagerScanParams,
   Auth0ScanParams,
   KeycloakScanParams,
   MemcacheScanParams,
@@ -90,6 +92,30 @@ export function buildAwsSQSScanParams(params: {
     kind: "aws-sqs",
     queueUrl: params.queueUrl,
     bodyOrMessageIdContains: params.bodyOrMessageIdContains,
+    limit: params.limit,
+  };
+}
+
+export function buildAwsSsmScanParams(params: {
+  pathPrefix?: string;
+  nameContains?: string;
+  limit: number;
+}): AwsSsmScanParams {
+  return {
+    kind: "aws-ssm",
+    pathPrefix: params.pathPrefix,
+    nameContains: params.nameContains,
+    limit: params.limit,
+  };
+}
+
+export function buildAwsSecretsManagerScanParams(params: {
+  nameContains?: string;
+  limit: number;
+}): AwsSecretsManagerScanParams {
+  return {
+    kind: "aws-secretsmanager",
+    nameContains: params.nameContains,
     limit: params.limit,
   };
 }

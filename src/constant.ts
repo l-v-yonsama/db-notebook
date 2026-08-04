@@ -46,6 +46,7 @@ export const DELETE_CONNECTION_SETTING = `${EXTENSION_NAME}.delete-connection-se
 
 export const SHOW_SCAN_PANEL = `${EXTENSION_NAME}.show-scan-panel`;
 export const SHOW_DYNAMO_QUERY_PANEL = `${EXTENSION_NAME}.show-dynamo-query-panel`;
+export const COPY_AWS_SECRET_VALUE = `${EXTENSION_NAME}.copy-aws-secret-value`;
 export const SHOW_PUBLISH_EDITOR_PANEL = `${EXTENSION_NAME}.show-publish-editor-panel`;
 export const SHOW_METADATA_RDH = `${EXTENSION_NAME}.show-metadata-rdh`;
 export const SHOW_RESOURCE_PROPERTIES = `${EXTENSION_NAME}.show-resource-properties`;

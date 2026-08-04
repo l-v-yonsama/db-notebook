@@ -7,7 +7,10 @@ import {
   DbDynamoTable,
   DbDynamoTableColumn,
   DbResource,
+  DbSecretsManagerSecret,
   DbSESIdentity,
+  DbSQSQueue,
+  DbSsmParameter,
   DbSubscription,
   DbTable,
   DBType,
@@ -101,6 +104,10 @@ const toAwsServiceIconFileName = (serviceType: AwsServiceType): string => {
       return "pulse";
     case AwsServiceType.DynamoDB:
       return "table";
+    case AwsServiceType.SSM:
+      return "symbol-variable";
+    case AwsServiceType.SecretsManager:
+      return "key";
     default:
       return "database";
   }
@@ -380,6 +387,16 @@ export class DBDatabaseItem extends vscode.TreeItem {
         {
           const res = resource as AwsDatabase;
           iconPath = new vscode.ThemeIcon(toAwsServiceIconFileName(res.serviceType));
+          // Unlike S3/SQS/CloudWatch (where a child resource, e.g. a bucket or
+          // queue, is the scan target), SSM parameters/Secrets Manager secrets
+          // have no further sub-resource to drill into - the service node
+          // itself is the scan target, listing all parameters/secrets at once.
+          if (
+            res.serviceType === AwsServiceType.SSM ||
+            res.serviceType === AwsServiceType.SecretsManager
+          ) {
+            scannable = true;
+          }
         }
         break;
       case ResourceType.KeycloakDatabase:
@@ -423,7 +440,20 @@ export class DBDatabaseItem extends vscode.TreeItem {
         scannable = true;
         break;
       case ResourceType.Queue:
-        iconPath = new vscode.ThemeIcon("list-selection");
+        {
+          // Same base shape as an ordinary queue, but a queue that is
+          // itself the DLQ target of a sibling queue's RedrivePolicy gets
+          // an orange color + explicit "(DLQ)" label, so it's not only
+          // distinguishable by color. attr.isDlq is computed by
+          // AwsSQSServiceClient#getInfomationSchemas() in db-drivers.
+          const queue = resource as DbSQSQueue;
+          const isDlq = queue.attr?.isDlq === true;
+          const color = isDlq ? new vscode.ThemeColor("charts.orange") : undefined;
+          iconPath = new vscode.ThemeIcon("list-selection", color);
+          if (isDlq) {
+            description = "(DLQ)";
+          }
+        }
         scannable = true;
         break;
       case ResourceType.Table:
@@ -490,6 +520,52 @@ export class DBDatabaseItem extends vscode.TreeItem {
           }
           iconPath = new vscode.ThemeIcon(iconFile, color);
           description = `(${identity.attr.verificationStatus ?? "NotStarted"})`;
+        }
+        break;
+      case ResourceType.SsmParameter:
+        {
+          const param = resource as DbSsmParameter;
+          // icon shape by parameter type, color flags SecureString as sensitive
+          let iconFile = "symbol-variable";
+          let color: vscode.ThemeColor | undefined = undefined;
+          if (param.attr.type === "StringList") {
+            iconFile = "list-unordered";
+          } else if (param.attr.type === "SecureString") {
+            iconFile = "lock";
+            color = new vscode.ThemeColor("charts.orange");
+          }
+          iconPath = new vscode.ThemeIcon(iconFile, color);
+          description = `(${param.attr.type})`;
+        }
+        break;
+      case ResourceType.SecretsManagerSecret:
+        {
+          const secret = resource as DbSecretsManagerSecret;
+          // color flags secrets with rotation enabled
+          const color = secret.attr.rotationEnabled
+            ? new vscode.ThemeColor("charts.green")
+            : undefined;
+          iconPath = new vscode.ThemeIcon("key", color);
+          if (secret.attr.rotationEnabled) {
+            description = "(rotation enabled)";
+          }
+        }
+        break;
+      case ResourceType.Group:
+        // Generic display-only container (e.g. SSM parameters grouped by
+        // type, Secrets Manager secrets grouped by rotation status) - never
+        // scannable. Count shown as a description, same convention as
+        // DynamoTable's item count above.
+        iconPath = new vscode.ThemeIcon("folder");
+        {
+          const count = resource.children.length;
+          if (count === 1) {
+            description += ` 1 item`;
+          } else if (count === 0) {
+            description += ` No items`;
+          } else {
+            description += ` ${count} items`;
+          }
         }
         break;
       case ResourceType.IamClient:
