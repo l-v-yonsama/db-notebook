@@ -46,6 +46,8 @@ It also provides a CSV and Har file preview feature.
   - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)
 - Run a standalone MCP server so external clients (Claude Code, Claude Desktop, Cursor, ...) can use the same connections outside VS Code
   - [MCP Server Usage Guide](/docs/examples/mcpServerUsageGuide.md)
+- Have AI draw a Mermaid diagram of your AWS resources (S3/SQS/SES/Cloudwatch/DynamoDB/SSM/SecretsManager/CloudFormation) straight from `#getDbSchema` output
+  - [AWS Architecture Diagram Guide](/docs/examples/awsArchitectureDiagramGuide.md)
 - MQTT Client
   - Intuitive publish/subscribe interface
   - Query subscribed payloads using SQLite directly from the notebook
@@ -200,6 +202,7 @@ This action copies not only the cell content, but also all associated metadataâ€
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
 - [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
 - [Using Database Notebook's AI Tools via a Standalone MCP Server](/docs/examples/mcpServerUsageGuide.md)
+- [Drawing an AWS Architecture Diagram with AI](/docs/examples/awsArchitectureDiagramGuide.md)
 
 ## Keyboard shortcuts
 

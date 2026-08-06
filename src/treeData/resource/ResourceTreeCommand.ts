@@ -1,6 +1,8 @@
 import {
+  AwsDatabase,
   AwsServiceType,
   BaseSQLSupportDriver,
+  DbCfnStack,
   DbConnection,
   DbDatabase,
   DbDynamoTable,
@@ -36,6 +38,7 @@ import {
   COPY_COLUMN_NAMES,
   COPY_RESOURCE_NAME,
   COUNT_FOR_ALL_TABLES,
+  CREATE_CFN_DIAGRAM,
   CREATE_CONNECTION_SETTING,
   CREATE_ER_DIAGRAM,
   CREATE_ER_DIAGRAM_WITH_SETTINGS,
@@ -74,6 +77,7 @@ import {
 } from "../../constant";
 import { SQLConfigurationViewProvider } from "../../form";
 import { MqttDriverManager } from "../../mqtt/MqttDriverManager";
+import { CfnDiagramSettingsPanel } from "../../panels/CfnDiagramSettingsPanel";
 import { Chat2QueryPanel } from "../../panels/Chat2QueryPanel";
 import { CreateInsertScriptSettingsPanel } from "../../panels/CreateInsertScriptSettingsPanel";
 import { DBDumpSettingsPanel } from "../../panels/DBDumpSettingsPanel";
@@ -542,6 +546,57 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
               ? AwsServiceType.SSM
               : AwsServiceType.SecretsManager;
           await copyAwsSecretValueToClipboard(stateStorage, conName, serviceType, target.name);
+        } catch (e) {
+          showWindowErrorMessage(e);
+        }
+      }
+    )
+  );
+
+  // CloudFormation diagram - opens CfnDiagramSettingsPanel rather than
+  // generating straight away. generateDiagram() ended up with enough
+  // parameters (which stacks, CfnDependencyGraph vs ArchitectureDiagram,
+  // viewpoint, auxiliaryTreatment) that a single inline button press can't
+  // reasonably choose them all well - same shape as CREATE_ER_DIAGRAM_WITH_SETTINGS
+  // below. The panel always lists every stack under the connection; only the
+  // *initial* checkbox state differs by entry point (every stack, from the
+  // CloudFormation service node itself; just the selected stack(s), from a
+  // stack row).
+  context.subscriptions.push(
+    commands.registerCommand(
+      CREATE_CFN_DIAGRAM,
+      async (target: DbCfnStack | AwsDatabase, selected?: DbResource[]) => {
+        try {
+          const conName =
+            target.resourceType === ResourceType.AwsDatabase
+              ? (target as AwsDatabase).meta.conName
+              : (target as DbCfnStack).meta.conName;
+
+          const cfnDatabase = stateStorage.getCloudFormationDatabase(conName);
+          const allStacks = (cfnDatabase?.children ?? []).filter(
+            (it): it is DbCfnStack => it.resourceType === ResourceType.CfnStack
+          );
+          if (allStacks.length === 0) {
+            window.showWarningMessage("No CloudFormation stacks to diagram.");
+            return;
+          }
+
+          let initialSelectedStackNames: string[];
+          if (target.resourceType === ResourceType.AwsDatabase) {
+            initialSelectedStackNames = allStacks.map((it) => it.name);
+          } else {
+            const selectedStacks = (selected ?? []).filter(
+              (it): it is DbCfnStack => it.resourceType === ResourceType.CfnStack
+            );
+            const stacks = selectedStacks.length > 1 ? selectedStacks : [target as DbCfnStack];
+            initialSelectedStackNames = stacks.map((it) => it.name);
+          }
+
+          CfnDiagramSettingsPanel.render(context.extensionUri, {
+            conName,
+            stacks: allStacks.map((it) => ({ name: it.name, status: it.attr.stackStatus })),
+            initialSelectedStackNames,
+          });
         } catch (e) {
           showWindowErrorMessage(e);
         }

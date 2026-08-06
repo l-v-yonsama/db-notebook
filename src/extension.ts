@@ -44,6 +44,7 @@ import { activateMcpServer } from "./aiTools/mcpServer/activator";
 import { onDidChangeRunningState } from "./aiTools/mcpServer/server";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
+import { CfnDiagramSettingsPanel } from "./panels/CfnDiagramSettingsPanel";
 import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
 import { DBDumpSettingsPanel } from "./panels/DBDumpSettingsPanel";
@@ -120,6 +121,7 @@ export async function activate(context: ExtensionContext) {
   SubscriptionSettingPanel.setStateStorage(stateStorage);
   DBDumpSettingsPanel.setStateStorage(stateStorage);
   DBRestoreSettingsPanel.setStateStorage(stateStorage);
+  CfnDiagramSettingsPanel.setStateStorage(stateStorage);
 
   activateLmTools(context, stateStorage);
   activateMcpServer(context, stateStorage);

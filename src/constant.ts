@@ -55,6 +55,7 @@ export const CREATE_ER_DIAGRAM_WITH_SETTINGS = `${EXTENSION_NAME}.create-er-diag
 export const DUMP_DATABASE = `${EXTENSION_NAME}.dump-database`;
 export const RESTORE_DATABASE = `${EXTENSION_NAME}.restore-database`;
 export const WRITE_ER_DIAGRAM_TO_CLIPBOARD = `${EXTENSION_NAME}.write-er-diagram-to-clipboard`;
+export const CREATE_CFN_DIAGRAM = `${EXTENSION_NAME}.create-cfn-diagram`;
 
 export const CREATE_INSERT_SCRIPT_WITH_SETTINGS = `${EXTENSION_NAME}.create-insert-script-with-settings`;
 

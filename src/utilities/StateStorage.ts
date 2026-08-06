@@ -4,6 +4,7 @@ import {
   AwsServiceType,
   ConnectionSetting,
   DBType,
+  DbCfnStack,
   DbDatabase,
   DbDynamoTable,
   DbLogGroup,
@@ -66,6 +67,14 @@ export class StateStorage {
       return;
     }
     return dbs.find((it) => it.name === "Cloudwatch");
+  }
+
+  getCloudFormationDatabase(connectionName: string): AwsDatabase | undefined {
+    const dbs = this.getResourceByName(connectionName) as AwsDatabase[];
+    if (dbs === undefined) {
+      return;
+    }
+    return dbs.find((it) => it.name === "CloudFormation");
   }
 
   getFirstRdsDatabaseByName(connectionName: string): RdsDatabase | undefined {
@@ -175,6 +184,15 @@ export class StateStorage {
               conName: conRes.name,
             };
           });
+        // for cloudformation - not scannable (see the CfnStack case in
+        // ResourceTreeProvider), but still needs conName stamped so the
+        // "Create CloudFormation diagram" command can resolve a connection
+        // setting from the tree item alone.
+        dbRes.findChildren<DbCfnStack>({ resourceType: ResourceType.CfnStack }).forEach((stackRes) => {
+          stackRes.meta = {
+            conName: conRes.name,
+          };
+        });
         // for ssm
         {
           const params = dbRes.findChildren<DbSsmParameter>({

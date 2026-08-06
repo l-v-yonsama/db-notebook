@@ -6,6 +6,7 @@ export const AwsServiceType = {
   DynamoDB: "DynamoDB",
   SSM: "SSM",
   SecretsManager: "SecretsManager",
+  CloudFormation: "CloudFormation",
 } as const;
 export type AwsServiceType = (typeof AwsServiceType)[keyof typeof AwsServiceType];
 

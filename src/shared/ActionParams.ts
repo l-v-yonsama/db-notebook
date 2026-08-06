@@ -5,6 +5,7 @@ import type {
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { CellMeta } from "../types/Notebook";
+import type { CfnDiagramGenerateParams } from "./CfnDiagram";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ERDiagramSettingParams } from "./ERDiagram";
 import type { ModeType } from "./ModeType";
@@ -54,6 +55,7 @@ export type ActionCommand =
   | ShowMessageActionCommand
   | CompareActionCommand
   | ConnectActionCommand
+  | CreateCfnDiagramActionCommand
   | CreateERDiagramActionCommand
   | CreateCodeResolverEditorActionCommand
   | CreateUndoChangeSqlActionCommand
@@ -236,6 +238,11 @@ export type CompareActionCommand = {
 export type CreateERDiagramActionCommand = BaseActionCommand<
   "createERDiagram",
   ERDiagramSettingParams
+>;
+
+export type CreateCfnDiagramActionCommand = BaseActionCommand<
+  "createCfnDiagram",
+  CfnDiagramGenerateParams
 >;
 
 export type CreateCodeResolverEditorActionCommand = BaseActionCommand<
