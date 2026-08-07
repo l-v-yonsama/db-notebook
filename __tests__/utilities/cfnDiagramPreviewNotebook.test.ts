@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { NotebookCellKind, Uri, window, workspace } from "vscode";
+import { commands, NotebookCellKind, Uri, window, workspace } from "vscode";
 import {
+  CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME,
   CFN_DIAGRAM_PREVIEW_FILE_NAME,
+  upsertCfnDiagramPreviewDrawio,
   upsertCfnDiagramPreviewNotebook,
 } from "../../src/utilities/cfnDiagramPreviewNotebook";
 
@@ -51,7 +53,10 @@ describe("upsertCfnDiagramPreviewNotebook", () => {
     expect(written.cells[0].kind).toBe(NotebookCellKind.Markup);
     expect(written.cells[0].language).toBe("markdown");
     expect(written.cells[0].value).toBe("# hello");
-    expect(window.showNotebookDocument).toHaveBeenCalledTimes(1);
+    expect(window.showNotebookDocument).toHaveBeenCalledWith(
+      expect.anything(),
+      { viewColumn: 2 }
+    );
   });
 
   it("replaces cell 0's content in place when it's already a markdown cell, leaving later cells untouched", async () => {
@@ -114,6 +119,46 @@ describe("upsertCfnDiagramPreviewNotebook", () => {
     expect(workspace.openNotebookDocument).toHaveBeenCalledTimes(1);
     const [uri] = (workspace.openNotebookDocument as Mock).mock.calls[0];
     expect((uri as Uri).fsPath).toBe(`/workspace/${CFN_DIAGRAM_PREVIEW_FILE_NAME}`);
-    expect(window.showNotebookDocument).toHaveBeenCalledTimes(1);
+    expect(window.showNotebookDocument).toHaveBeenCalledWith(
+      expect.anything(),
+      { viewColumn: 2 }
+    );
+  });
+});
+
+describe("upsertCfnDiagramPreviewDrawio", () => {
+  it("writes and opens the editable draw.io file", async () => {
+    await upsertCfnDiagramPreviewDrawio("<mxfile />");
+
+    expect(workspace.fs.writeFile).toHaveBeenCalledTimes(1);
+    const [uri, bytes] = (workspace.fs.writeFile as Mock).mock.calls[0];
+    expect((uri as Uri).fsPath).toBe(`/workspace/${CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME}`);
+    expect(decode(bytes)).toBe("<mxfile />");
+    expect(commands.executeCommand).toHaveBeenCalledWith(
+      "vscode.openWith",
+      expect.anything(),
+      "hediet.vscode-drawio-text",
+      { viewColumn: 2 }
+    );
+  });
+
+  it("shows an error and writes nothing when no workspace folder is open", async () => {
+    setWorkspaceFolders(undefined);
+
+    await upsertCfnDiagramPreviewDrawio("<mxfile />");
+
+    expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+    expect(window.showErrorMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the generated path when the Draw.io editor cannot be opened", async () => {
+    (commands.executeCommand as Mock).mockRejectedValueOnce(new Error("editor unavailable"));
+
+    await upsertCfnDiagramPreviewDrawio("<mxfile />");
+
+    expect(workspace.fs.writeFile).toHaveBeenCalledTimes(1);
+    expect(window.showInformationMessage).toHaveBeenCalledWith(
+      expect.stringContaining(`/workspace/${CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME}`)
+    );
   });
 });

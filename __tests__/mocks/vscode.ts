@@ -8,6 +8,11 @@ export enum NotebookCellKind {
   Code = 2,
 }
 
+export enum ViewColumn {
+  One = 1,
+  Two = 2,
+}
+
 export class ThemeColor {
   constructor(public id: string) {}
 }
@@ -78,6 +83,7 @@ export const window = {
   setStatusBarMessage: vi.fn((..._args: unknown[]) => ({ dispose: () => {} })),
   createTextEditorDecorationType: vi.fn((_options: unknown) => ({ dispose: () => {} })),
   showNotebookDocument: vi.fn(async (_document: unknown) => undefined),
+  showTextDocument: vi.fn(async (_document: unknown) => undefined),
   showInformationMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
   showErrorMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
 };
@@ -114,6 +120,7 @@ export const workspace = {
   openNotebookDocument: vi.fn(async (_uri: Uri) => {
     throw new Error("workspace.openNotebookDocument is not mocked in this test");
   }),
+  openTextDocument: vi.fn(async (_uri: Uri) => ({ uri: _uri })),
   fs: {
     stat: vi.fn(async (_uri: Uri) => {
       throw new Error("workspace.fs.stat is not mocked in this test");

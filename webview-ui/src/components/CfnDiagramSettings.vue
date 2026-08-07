@@ -6,14 +6,16 @@ import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckboxGroup from "./base/VsCodeCheckboxGroup.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import VsCodeRadioGroup from "./base/VsCodeRadioGroup.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 
 const conName = ref("");
 const stackItems = ref<{ label: string; value: string }[]>([]);
 const selectedStackNames = ref<string[]>([]);
 
-type Mode = "CfnDependencyGraph" | "ArchitectureDiagram";
-const mode = ref<Mode>("CfnDependencyGraph");
+type Mode = "ApplicationDiagram" | "CfnDependencyGraph" | "ArchitectureDiagram";
+const mode = ref<Mode>("ApplicationDiagram");
 const modeItems: { label: string; value: Mode }[] = [
+  { label: "ApplicationDiagram (runtime application flow)", value: "ApplicationDiagram" },
   { label: "CfnDependencyGraph (any resource, every real dependency)", value: "CfnDependencyGraph" },
   { label: "ArchitectureDiagram (VPC/Subnet network layout)", value: "ArchitectureDiagram" },
 ];
@@ -43,9 +45,16 @@ const auxiliaryTreatmentItems: { label: string; value: AuxiliaryTreatment }[] = 
   { label: "Omit entirely", value: "Omit" },
 ];
 
-// viewpoint/auxiliaryTreatment only affect CfnDependencyGraph - ArchitectureDiagram always
-// draws its fixed VPC/AZ/Subnet layout regardless of who's looking or how auxiliary resources
-// would otherwise be treated.
+type OutputFormat = "Mermaid" | "Drawio";
+const outputFormat = ref<OutputFormat>("Mermaid");
+const outputFormatItems: { label: string; value: OutputFormat }[] = [
+  { label: "Mermaid (preview notebook)", value: "Mermaid" },
+  { label: "draw.io (editable XML file)", value: "Drawio" },
+];
+const includeLegend = ref(true);
+
+// viewpoint/auxiliaryTreatment only affect CfnDependencyGraph. ApplicationDiagram selects
+// runtime relationships and ArchitectureDiagram draws its fixed VPC/AZ/Subnet layout.
 const viewpointControlsApply = () => mode.value === "CfnDependencyGraph";
 
 const initialize = (v: CfnDiagramSettingsPanelEventData["value"]["initialize"]): void => {
@@ -75,6 +84,8 @@ const generate = () => {
       mode: mode.value,
       viewpoint: viewpoint.value,
       auxiliaryTreatment: auxiliaryTreatment.value,
+      outputFormat: outputFormat.value,
+      includeLegend: includeLegend.value,
     },
   });
 };
@@ -126,6 +137,14 @@ defineExpose({
         <VsCodeDropdown v-model="auxiliaryTreatment" :items="auxiliaryTreatmentItems"
           :disabled="!viewpointControlsApply()" />
         <p v-if="!viewpointControlsApply()" class="hint">Not used by ArchitectureDiagram mode.</p>
+      </div>
+      <div class="field">
+        <label>Output format</label>
+        <VsCodeDropdown v-model="outputFormat" :items="outputFormatItems" />
+        <p class="hint">Mermaid opens the preview notebook. draw.io writes an editable XML file.</p>
+      </div>
+      <div class="field checkbox-field">
+        <VsCodeCheckbox v-model="includeLegend">Include relationship legend</VsCodeCheckbox>
       </div>
     </section>
   </section>

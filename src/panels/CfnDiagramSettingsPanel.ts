@@ -1,4 +1,10 @@
-import { AwsDriver, generateDiagram } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  AwsDriver,
+  generateDiagram,
+  generateDrawioApplicationDiagram,
+  generateDrawioArchitectureDiagram,
+  generateDrawioCfnDependencyGraph,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
 import { CfnDiagramGenerateParams } from "../shared/CfnDiagram";
@@ -8,7 +14,10 @@ import {
   CfnDiagramSettingsPanelEventData,
 } from "../shared/MessageEventData";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
-import { upsertCfnDiagramPreviewNotebook } from "../utilities/cfnDiagramPreviewNotebook";
+import {
+  upsertCfnDiagramPreviewDrawio,
+  upsertCfnDiagramPreviewNotebook,
+} from "../utilities/cfnDiagramPreviewNotebook";
 import { workflow } from "../utilities/driverResolver";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
@@ -40,12 +49,12 @@ export class CfnDiagramSettingsPanel extends BasePanel {
   public static render(extensionUri: Uri, params: CfnDiagramSettingsInputParams) {
     log(`${PREFIX} render`);
     if (CfnDiagramSettingsPanel.currentPanel) {
-      CfnDiagramSettingsPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.Two);
+      CfnDiagramSettingsPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     } else {
       const panel = window.createWebviewPanel(
         "CfnDiagramSettingsType",
         "CloudFormation Diagram Settings",
-        ViewColumn.Two,
+        ViewColumn.One,
         {
           enableScripts: true,
           retainContextWhenHidden: true,
@@ -90,7 +99,6 @@ export class CfnDiagramSettingsPanel extends BasePanel {
         return;
       case "createCfnDiagram":
         await this.createCfnDiagram(params);
-        this.dispose();
         return;
     }
   }
@@ -100,7 +108,14 @@ export class CfnDiagramSettingsPanel extends BasePanel {
       return;
     }
     const { conName } = this.variables;
-    const { stackNames, mode, viewpoint, auxiliaryTreatment } = params;
+    const {
+      stackNames,
+      mode,
+      viewpoint,
+      auxiliaryTreatment,
+      outputFormat = "Mermaid",
+      includeLegend = true,
+    } = params;
     if (stackNames.length === 0) {
       window.showWarningMessage("Select at least one stack.");
       return;
@@ -128,7 +143,17 @@ export class CfnDiagramSettingsPanel extends BasePanel {
             }),
           }))
         );
-        const diagram = generateDiagram({ mode, viewpoint, auxiliaryTreatment, list });
+        if (outputFormat === "Drawio") {
+          const drawioParams = { mode, viewpoint, auxiliaryTreatment, list, options: { includeLegend } };
+          if (mode === "ApplicationDiagram") {
+            return generateDrawioApplicationDiagram(drawioParams);
+          }
+          if (mode === "ArchitectureDiagram") {
+            return generateDrawioArchitectureDiagram(drawioParams);
+          }
+          return generateDrawioCfnDependencyGraph(drawioParams);
+        }
+        const diagram = generateDiagram({ mode, viewpoint, auxiliaryTreatment, list, options: { includeLegend } });
         const heading = `## CloudFormation diagram: ${stackNames.join(", ")} (${mode})\n\n`;
         return heading + diagram;
       },
@@ -140,6 +165,10 @@ export class CfnDiagramSettingsPanel extends BasePanel {
       return;
     }
 
-    await upsertCfnDiagramPreviewNotebook(result);
+    if (outputFormat === "Drawio") {
+      await upsertCfnDiagramPreviewDrawio(result);
+    } else {
+      await upsertCfnDiagramPreviewNotebook(result);
+    }
   }
 }

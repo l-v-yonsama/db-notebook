@@ -555,7 +555,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
 
   // CloudFormation diagram - opens CfnDiagramSettingsPanel rather than
   // generating straight away. generateDiagram() ended up with enough
-  // parameters (which stacks, CfnDependencyGraph vs ArchitectureDiagram,
+  // parameters (which stacks, ApplicationDiagram/CfnDependencyGraph vs ArchitectureDiagram,
   // viewpoint, auxiliaryTreatment) that a single inline button press can't
   // reasonably choose them all well - same shape as CREATE_ER_DIAGRAM_WITH_SETTINGS
   // below. The panel always lists every stack under the connection; only the
