@@ -258,10 +258,20 @@ function createErDiagram(params: ERDiagramParams): string {
           pkOrFk = "FK";
         }
 
-        if (columnRes.comment) {
+        // Mermaid supports PK/FK as key markers, but not a custom NN marker.
+        // Keep NOT NULL visible as an annotation instead of emitting invalid ER syntax.
+        const notNullNote = !columnRes.primaryKey && !columnRes.nullable ? "NN" : "";
+        const comment = [columnRes.comment, notNullNote]
+          .filter(Boolean)
+          .join(" [");
+        const commentText = comment
+          ? `${comment}${notNullNote && columnRes.comment ? "]" : ""}`
+          : "";
+
+        if (commentText) {
           text += `  ${displayGeneralColumnType(columnRes.colType)} ${escapeQuot(
             columnRes.name
-          )} ${pkOrFk} "${escapeQuot(columnRes.comment)}"\n`;
+          )} ${pkOrFk} "${escapeQuot(commentText)}"\n`;
         } else {
           text += `  ${displayGeneralColumnType(columnRes.colType)} ${escapeQuot(
             columnRes.name

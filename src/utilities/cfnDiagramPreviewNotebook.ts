@@ -15,6 +15,7 @@ import { readResource, writeBytesToResource, writeToResource } from "./fsUtil";
 
 export const CFN_DIAGRAM_PREVIEW_FILE_NAME = "preview.cfn-diagram.dbn";
 export const CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME = "preview.cfn-diagram.drawio";
+export const ER_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME = "preview.er-diagram.drawio";
 export type CfnTemplatePreview = { stackName: string; source: string };
 
 /**
@@ -93,14 +94,22 @@ async function readFileIfExists(uri: Uri): Promise<Uint8Array | undefined> {
 
 /** Writes and opens the fixed-name editable diagrams.net XML preview. */
 export async function upsertCfnDiagramPreviewDrawio(drawioContent: string): Promise<void> {
+  await upsertDrawioPreview(drawioContent, CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME);
+}
+
+export async function upsertERDiagramPreviewDrawio(drawioContent: string): Promise<void> {
+  await upsertDrawioPreview(drawioContent, ER_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME);
+}
+
+async function upsertDrawioPreview(drawioContent: string, fileName: string): Promise<void> {
   const wsFolder = workspace.workspaceFolders?.[0];
   if (!wsFolder) {
     showWindowErrorMessage(
-      `Open a workspace folder first - ${CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME} is created relative to it.`
+      `Open a workspace folder first - ${fileName} is created relative to it.`
     );
     return;
   }
-  const uri = Uri.joinPath(wsFolder.uri, CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME);
+  const uri = Uri.joinPath(wsFolder.uri, fileName);
   await writeToResource(uri, drawioContent);
   try {
     await commands.executeCommand(
