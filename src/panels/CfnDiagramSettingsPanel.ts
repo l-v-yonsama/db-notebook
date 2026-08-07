@@ -16,6 +16,7 @@ import {
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import {
   upsertCfnDiagramPreviewDrawio,
+  type CfnTemplatePreview,
   upsertCfnDiagramPreviewNotebook,
 } from "../utilities/cfnDiagramPreviewNotebook";
 import { workflow } from "../utilities/driverResolver";
@@ -128,21 +129,29 @@ export class CfnDiagramSettingsPanel extends BasePanel {
       return;
     }
 
+    const templateSources: CfnTemplatePreview[] = [];
     const { ok, message, result } = await workflow<AwsDriver>(
       setting,
       async (driver) => {
         if (!driver.cloudFormationClient) {
           throw new Error("CloudFormation is not configured for this connection.");
         }
-        const list = await Promise.all(
+        const stackTemplates = await Promise.all(
           stackNames.map(async (stackName) => ({
             fileName: stackName,
-            templateJSONString: await driver.cloudFormationClient.getTemplate({
-              stackName,
-              convertTo: "json",
-            }),
+            templateJSONString: await driver.cloudFormationClient!.getTemplate({ stackName, convertTo: "json" }),
+            templateSource: await driver.cloudFormationClient!.getTemplate({ stackName, convertTo: "yaml" }),
           }))
         );
+        const list = stackTemplates.map(({ fileName, templateJSONString, templateSource }) => ({
+          fileName,
+          templateJSONString,
+          templateSource,
+        }));
+        templateSources.push(...stackTemplates.map(({ fileName, templateSource }) => ({
+          stackName: fileName,
+          source: templateSource,
+        })));
         if (outputFormat === "Drawio") {
           const drawioParams = { mode, viewpoint, auxiliaryTreatment, list, options: { includeLegend } };
           if (mode === "ApplicationDiagram") {
@@ -168,7 +177,7 @@ export class CfnDiagramSettingsPanel extends BasePanel {
     if (outputFormat === "Drawio") {
       await upsertCfnDiagramPreviewDrawio(result);
     } else {
-      await upsertCfnDiagramPreviewNotebook(result);
+      await upsertCfnDiagramPreviewNotebook(result, templateSources);
     }
   }
 }

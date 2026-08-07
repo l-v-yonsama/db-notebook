@@ -7,7 +7,7 @@
       :disabled="item.disabled"
       :checked="modelValue == item.value"
       @change="($e:InputEvent) => clickBox(item.value, $e)"
-      >{{ item.label }}</vscode-radio
+      ><span v-if="item.icon" class="codicon" :class="`codicon-${item.icon}`"></span><span class="radio-label">{{ item.label }}</span></vscode-radio
     >
   </vscode-radio-group>
 </template>
@@ -26,6 +26,7 @@ const props = withDefaults(
     items: {
       label: string;
       value: string | number;
+      icon?: string;
       disabled?: boolean;
       checked?: boolean;
     }[];

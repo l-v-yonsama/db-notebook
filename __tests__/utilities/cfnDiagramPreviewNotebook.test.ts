@@ -59,6 +59,21 @@ describe("upsertCfnDiagramPreviewNotebook", () => {
     );
   });
 
+  it("adds one Markdown source cell per CloudFormation template", async () => {
+    (workspace.fs.readFile as Mock).mockRejectedValue(new Error("ENOENT"));
+
+    await upsertCfnDiagramPreviewNotebook("# diagram", [
+      { stackName: "stack-a", source: "Resources:\n  Api:\n    Type: AWS::ApiGateway::RestApi" },
+    ]);
+
+    const written = writtenNotebook();
+    expect(written.cells).toHaveLength(2);
+    expect(written.cells[0].value).toBe("# diagram");
+    expect(written.cells[1].language).toBe("markdown");
+    expect(written.cells[1].value).toContain("## CloudFormation template: stack-a");
+    expect(written.cells[1].value).toContain("```yaml");
+  });
+
   it("replaces cell 0's content in place when it's already a markdown cell, leaving later cells untouched", async () => {
     const existing = {
       cells: [

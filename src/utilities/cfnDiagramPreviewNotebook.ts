@@ -15,6 +15,7 @@ import { readResource, writeBytesToResource, writeToResource } from "./fsUtil";
 
 export const CFN_DIAGRAM_PREVIEW_FILE_NAME = "preview.cfn-diagram.dbn";
 export const CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME = "preview.cfn-diagram.drawio";
+export type CfnTemplatePreview = { stackName: string; source: string };
 
 /**
  * Writes (or updates) a single, fixed-name notebook - `preview.cfn-diagram.dbn` at the
@@ -31,7 +32,10 @@ export const CFN_DIAGRAM_PREVIEW_DRAWIO_FILE_NAME = "preview.cfn-diagram.drawio"
  * - Existing file, first cell is something else (or the file has no cells): a new Markdown
  *   cell is inserted at index 0. Every other cell is left untouched either way.
  */
-export async function upsertCfnDiagramPreviewNotebook(markdownContent: string): Promise<void> {
+export async function upsertCfnDiagramPreviewNotebook(
+  markdownContent: string,
+  templates: CfnTemplatePreview[] = []
+): Promise<void> {
   const wsFolder = workspace.workspaceFolders?.[0];
   if (!wsFolder) {
     showWindowErrorMessage(
@@ -43,19 +47,33 @@ export async function upsertCfnDiagramPreviewNotebook(markdownContent: string): 
   const serializer = new DBNotebookSerializer();
   const token = new CancellationTokenSource().token;
   const newCell = new NotebookCellData(NotebookCellKind.Markup, markdownContent, "markdown");
+  newCell.metadata = { cfnDiagramPreview: "diagram" };
+  const templateCells = templates.map((template) => {
+    const cell = new NotebookCellData(
+      NotebookCellKind.Markup,
+      `## CloudFormation template: ${template.stackName}\n\n\`\`\`yaml\n${template.source}\n\`\`\``,
+      "markdown"
+    );
+    cell.metadata = { cfnDiagramPreview: "template", stackName: template.stackName };
+    return cell;
+  });
 
   let notebookData: NotebookData;
   const existingBytes = await readFileIfExists(uri);
   if (existingBytes) {
     notebookData = await serializer.deserializeNotebook(existingBytes, token);
-    const firstCell = notebookData.cells[0];
-    if (firstCell?.kind === NotebookCellKind.Markup) {
+    const hadPreviewCells = notebookData.cells[0]?.metadata?.cfnDiagramPreview === "diagram";
+    while (notebookData.cells[0]?.metadata?.cfnDiagramPreview) notebookData.cells.shift();
+    if (hadPreviewCells) {
+      notebookData.cells.unshift(newCell, ...templateCells);
+    } else if (notebookData.cells[0]?.kind === NotebookCellKind.Markup) {
       notebookData.cells[0] = newCell;
+      notebookData.cells.splice(1, 0, ...templateCells);
     } else {
-      notebookData.cells.unshift(newCell);
+      notebookData.cells.unshift(newCell, ...templateCells);
     }
   } else {
-    notebookData = new NotebookData([newCell]);
+    notebookData = new NotebookData([newCell, ...templateCells]);
   }
 
   const bytes = await serializer.serializeNotebook(notebookData, token);
