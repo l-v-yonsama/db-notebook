@@ -44,8 +44,9 @@ It also provides a CSV and Har file preview feature.
 - Use Database Notebook's connections as AI tools in GitHub Copilot Chat (Agent mode)
   - List/test connections, inspect schema, run queries & transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create/edit `.dbn` notebooks — all reusing the credentials you've already saved
   - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)
-- Run a standalone MCP server so external clients (Claude Code, Claude Desktop, Cursor, ...) can use the same connections outside VS Code
+- Run a standalone MCP server so supported external MCP clients (Claude Code, Claude Desktop, Cursor, ...) can use the same connections outside VS Code
   - [MCP Server Usage Guide](/docs/examples/mcpServerUsageGuide.md)
+  - The local MCP server has been verified with ChatGPT **Work** and Codex. ChatGPT's regular **Chat** mode does not expose these tools in the tested setup; see the usage guide for client-specific limitations.
 - MQTT Client
   - Intuitive publish/subscribe interface
   - Query subscribed payloads using SQLite directly from the notebook

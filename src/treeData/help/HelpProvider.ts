@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-const DOCS_BASE = "https://l-v-yonsama.github.io/db-notebook";
+export const DOCS_BASE = "https://l-v-yonsama.github.io/db-notebook";
 
 const HELP_ITEMS = [
   {

@@ -68,6 +68,10 @@ export class Uri {
     return new Uri([base.fsPath, ...segments].join("/").replace(/\/+/g, "/"));
   }
 
+  static parse(value: string): Uri {
+    return new Uri(value);
+  }
+
   toString(): string {
     return `file://${this.fsPath}`;
   }
@@ -85,7 +89,9 @@ export const window = {
   showNotebookDocument: vi.fn(async (_document: unknown) => undefined),
   showTextDocument: vi.fn(async (_document: unknown) => undefined),
   showInformationMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
+  showWarningMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
   showErrorMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
+  showQuickPick: vi.fn(async (..._args: unknown[]) => undefined as unknown),
 };
 
 export const commands = {
@@ -99,6 +105,7 @@ export const env = {
   clipboard: {
     writeText: vi.fn(async (_text: string) => undefined),
   },
+  openExternal: vi.fn(async (_uri: Uri) => true),
 };
 
 export const workspace = {
