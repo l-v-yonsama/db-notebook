@@ -101,6 +101,10 @@ export const commands = {
   })),
 };
 
+export const authentication = {
+  getSession: vi.fn(async (..._args: unknown[]) => undefined),
+};
+
 export const env = {
   clipboard: {
     writeText: vi.fn(async (_text: string) => undefined),
