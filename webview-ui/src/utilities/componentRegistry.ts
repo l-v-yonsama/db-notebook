@@ -12,6 +12,7 @@ import SubscriptionPayloadsView from "@/components/views/SubscriptionPayloadsVie
 import ToolsView from "@/components/views/ToolsView.vue";
 
 // ===== Panel(設定・入力フォーム系) =====
+import CfnDiagramSettings from "@/components/CfnDiagramSettings.vue";
 import Chat2QueryPanel from "@/components/Chat2QueryPanel.vue";
 import CreateInsertScriptSettingsPanel from "@/components/CreateInsertScriptSettingsPanel.vue";
 import CsvParseSettingPanel from "@/components/CsvParseSettingPanel.vue";
@@ -67,6 +68,7 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> = {
   VariablesPanel: VariablesPanel, // 変数の一覧・編集
   WriteHttpEventToClipboardParamsPanel: WriteHttpEventToClipboardParamsPanel, // HTTPイベントのクリップボードコピー設定
   ERDiagramSettingsPanel: ERDiagramSettings, // ER図生成の設定
+  CfnDiagramSettingsPanel: CfnDiagramSettings, // CloudFormation構成図生成の設定
   NotebookCellMetadataPanel: NotebookCellMetadataPanel, // ノートブックセルのメタデータ(グラフ設定等)編集
 
   // ----- Editor -----

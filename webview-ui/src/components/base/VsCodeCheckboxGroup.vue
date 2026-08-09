@@ -2,15 +2,25 @@
   <div>
     <fieldset>
       <legend v-if="legend">{{ legend }}</legend>
-      <vscode-checkbox
-        v-for="item of items"
-        :value="item.value"
-        :key="item.value"
-        :disabled="item.disabled"
-        :checked="modelValue.includes(item.value)"
-        @change="($e:InputEvent) => clickBox(item.value, $e)"
-        >{{ item.label }}</vscode-checkbox
-      >
+      <template v-for="item of items" :key="`${item.value}:${modelValue.includes(item.value)}`">
+        <div v-if="itemWrapper" class="checkbox-option-wrapper">
+          <vscode-checkbox
+            :value="item.value"
+            :disabled="item.disabled"
+            :checked="modelValue.includes(item.value)"
+            @change="($e:InputEvent) => clickBox(item.value, $e)"
+            ><span class="checkbox-label">{{ item.label }}</span></vscode-checkbox
+          >
+        </div>
+        <vscode-checkbox
+          v-else
+          :value="item.value"
+          :disabled="item.disabled"
+          :checked="modelValue.includes(item.value)"
+          @change="($e:InputEvent) => clickBox(item.value, $e)"
+          ><span class="checkbox-label">{{ item.label }}</span></vscode-checkbox
+        >
+      </template>
     </fieldset>
   </div>
 </template>
@@ -35,6 +45,7 @@ const clickBox = (value: string, $e: InputEvent) => {
 const props = withDefaults(
   defineProps<{
     legend?: string;
+    itemWrapper?: boolean;
     items: {
       label: string;
       value: string;
@@ -47,6 +58,7 @@ const props = withDefaults(
     legend: "",
     items: () => [],
     modelValue: () => [],
+    itemWrapper: false,
   }
 );
 
@@ -81,5 +93,15 @@ const emit = defineEmits<{
 <style scoped>
 fieldset {
   text-align: left;
+}
+
+.checkbox-option-wrapper {
+  width: 100%;
+  margin: 7px 0;
+}
+
+.checkbox-option-wrapper vscode-checkbox {
+  display: inline-flex;
+  width: auto;
 }
 </style>

@@ -30,4 +30,7 @@ export type ERDiagramSettingItem = {
 export type ERDiagramSettingParams = {
   title: string;
   items: ERDiagramSettingItem[];
+  outputFormat?: ERDiagramOutputFormat;
 };
+
+export type ERDiagramOutputFormat = "Mermaid" | "Drawio";

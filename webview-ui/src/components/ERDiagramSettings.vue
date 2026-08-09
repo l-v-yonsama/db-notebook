@@ -11,6 +11,7 @@ import type {
 import { computed, nextTick, onMounted, ref } from "vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeRadioGroup from "./base/VsCodeRadioGroup.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 const sectionHeight = ref(300);
@@ -33,7 +34,7 @@ window.addEventListener("resize", () => resetSectionHeight());
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector("section.root");
   if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 76, 100);
+    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 116, 100);
   }
 };
 
@@ -51,6 +52,12 @@ function getReferenceTableNames(references?: {
 }
 
 const title = ref("");
+type OutputFormat = "Mermaid" | "Drawio";
+const outputFormat = ref<OutputFormat>("Mermaid");
+const outputFormatItems: { label: string; value: OutputFormat; icon: string }[] = [
+  { label: "Mermaid (preview notebook)", value: "Mermaid", icon: "file-code" },
+  { label: "draw.io (editable XML file)", value: "Drawio", icon: "graph-line" },
+];
 const allTableItems = ref([] as TableItem[]);
 let tables: DbTable[] = [];
 
@@ -171,6 +178,7 @@ const action = (command: ActionCommand["command"]): void => {
         options: {
           title: title.value,
           items,
+          outputFormat: outputFormat.value,
         },
       },
     });
@@ -182,6 +190,7 @@ const action = (command: ActionCommand["command"]): void => {
     params: {
       title: title.value,
       items,
+      outputFormat: outputFormat.value,
     },
   });
 };
@@ -215,10 +224,14 @@ defineExpose({
         <fa icon="clipboard" />Copy to clipboard
       </VsCodeButton>
       <VsCodeButton :disabled="zeroSelection" @click="action('createERDiagram')"
-        title="Create ER diagram in a new Notebook">
-        <fa icon="plus" />Create in a new Notebook
+        title="Generate ER diagram">
+        <fa icon="plus" />Generate ER diagram
       </VsCodeButton>
     </PanelActionToolbar>
+    <div class="output-format">
+      <label>Output format</label>
+      <VsCodeRadioGroup v-model="outputFormat" :items="outputFormatItems" />
+    </div>
     <section class="content">
       <table>
         <thead>
@@ -314,12 +327,26 @@ defineExpose({
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .root {
   width: 100%;
   height: 100%;
   margin: 1px;
   padding: 1px;
+}
+
+.output-format {
+  margin: 1px 0 1px 12px;
+
+  & > label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: bold;
+  }
+
+  :deep(vscode-radio) {
+    margin: 6px 0;
+  }
 }
 
 table {

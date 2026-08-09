@@ -19,6 +19,8 @@ import {
 } from "../shared/MessageEventData";
 import { copyToClipboard } from "../utilities/clipboardUtil";
 import { createERDiagramParams, createErDiagram } from "../utilities/erDiagramGenerator";
+import { createDrawioErDiagram } from "../utilities/erDiagramDrawioGenerator";
+import { upsertERDiagramPreviewDrawio } from "../utilities/cfnDiagramPreviewNotebook";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -104,7 +106,7 @@ export class ERDiagramSettingsPanel extends BasePanel {
         this.writeToClipboard(params);
         return;
       case "createERDiagram":
-        this.createERDiagram(params);
+        await this.createERDiagram(params);
         this.dispose();
         return;
     }
@@ -125,9 +127,12 @@ export class ERDiagramSettingsPanel extends BasePanel {
       return;
     }
     const erParams = createERDiagramParams(this.variables.tables, options);
-    const content = createErDiagram(erParams);
-    const cell = new NotebookCellData(NotebookCellKind.Markup, content, "markdown");
-
-    commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+    if (options.outputFormat === "Drawio") {
+      await upsertERDiagramPreviewDrawio(createDrawioErDiagram(erParams));
+    } else {
+      const content = createErDiagram(erParams);
+      const cell = new NotebookCellData(NotebookCellKind.Markup, content, "markdown");
+      await commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+    }
   }
 }

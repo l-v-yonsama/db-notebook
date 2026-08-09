@@ -39,6 +39,7 @@ import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 export type MessageEventData =
   | ChartsViewEventData
   | Chat2QueryPanelEventData
+  | CfnDiagramSettingsPanelEventData
   | CodeResolverEditorEventData
   | CountRecordViewEventData
   | CreateInsertScriptSettingsPanelEventData
@@ -575,6 +576,25 @@ export type ERDiagramSettingsPanelEventData = BaseMessageEventData<
   {
     initialize?: {
       params: ERDiagramSettingsInputParams;
+    };
+  }
+>;
+
+/** Entry points are the CloudFormation service node (every stack pre-selected) or one or more
+ * selected stacks (just those pre-selected) - either way, `stacks` always lists every stack
+ * under the connection so the panel can freely add/remove from the initial selection. */
+export type CfnDiagramSettingsInputParams = {
+  conName: string;
+  stacks: { name: string; status: string }[];
+  initialSelectedStackNames: string[];
+};
+
+export type CfnDiagramSettingsPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "CfnDiagramSettingsPanel",
+  {
+    initialize?: {
+      params: CfnDiagramSettingsInputParams;
     };
   }
 >;

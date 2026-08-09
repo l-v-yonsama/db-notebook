@@ -29,7 +29,8 @@ same input/output — only the transport and the confirmation mechanism differ:
   - 3.2. [Configuration](#32-configuration)
 - 4. [Connecting an MCP client](#4-connecting-an-mcp-client)
   - 4.1. [Claude Code CLI](#41-claude-code-cli)
-  - 4.2. [Other MCP clients](#42-other-mcp-clients)
+  - 4.2. [Codex CLI / Codex IDE extension / ChatGPT Desktop (Work)](#42-codex-cli--codex-ide-extension--chatgpt-desktop-work)
+  - 4.3. [Other MCP clients](#43-other-mcp-clients)
 - 5. [Registering, re-registering, and rotating the token](#5-registering-re-registering-and-rotating-the-token)
   - 5.1. [Initial registration](#51-initial-registration)
   - 5.2. [Re-registering after the URL or token changes](#52-re-registering-after-the-url-or-token-changes)
@@ -59,7 +60,8 @@ the table above for why — use Copilot Chat in VS Code for those.
 ## 2. Prerequisites
 
 - An MCP client that supports the **Streamable HTTP** transport with a custom `Authorization`
-  header (Claude Code CLI is used for every example below; see [4.2](#42-other-mcp-clients) for
+  header (Claude Code CLI is used for every example below; see [4.2](#42-codex-cli--codex-ide-extension--chatgpt-desktop-work)
+  for Codex or the ChatGPT desktop app's **Work** mode, or [4.3](#43-other-mcp-clients) for
   others).
 - At least one connection configured in the DB Explorer, with AI tool access turned on for it.
   Connections are **opt-in** — this is the same flag Copilot's tools use, so a connection already
@@ -82,17 +84,23 @@ The server never starts on its own. In the sidebar's **MCP Server** section (a s
 Explorer/SQL histories/Help, not inside DB Explorer itself), click the broadcast icon
 (**Start Database Notebook MCP Server**), or run it from the Command Palette as
 **Database Notebook: Start Database Notebook MCP Server**. A notification shows the server's URL
-and offers three clipboard actions:
+and offers three actions (kept to three so VS Code doesn't shrink every label into an unreadable
+"Co…" trying to fit them all on one row):
 
 *(Ports and tokens shown throughout this guide, like `57731` or `0123456789abcdef...`, are made-up
 examples illustrating the shape of real output — yours will be different every time the server
 starts. Only `<angle-bracket>` placeholders are meant to be typed in literally.)*
 
-- **Copy claude mcp add command** — a ready-to-run registration command (see
+- **Claude command** — copies a ready-to-run `claude mcp add` registration command (see
   [5.1](#51-initial-registration))
-- **Copy URL** — just the URL, e.g. `http://127.0.0.1:57731/db-notebook-mcp`, for a client whose
-  settings UI has separate URL/header fields
-- **Copy token** — just the bearer token, for the same kind of client
+- **Codex setup** — opens `~/.codex/config.toml` in a normal editor tab *and* copies a
+  `[mcp_servers.db_notebook]` TOML block (current URL and token already filled in) to the
+  clipboard in the same step, ready to paste (see
+  [4.2](#42-codex-cli--codex-ide-extension--chatgpt-desktop-work))
+- **More…** — opens a picker with the remaining, less-common actions: **Copy URL** (just the URL,
+  e.g. `http://127.0.0.1:57731/db-notebook-mcp`, for a client whose settings UI has separate
+  URL/header fields), **Copy token** (just the bearer token, for the same kind of client), and
+  **Open MCP setup guide** (this page)
 
 Once running, the toolbar icon switches to **Stop Database Notebook MCP Server**
 (`Database Notebook: Stop Database Notebook MCP Server` in the Command Palette), and the **MCP
@@ -131,7 +139,7 @@ Two settings, under `mcpServer.*`:
 
 ### 4.1. Claude Code CLI
 
-The simplest path is to paste in the command from **Copy claude mcp add command**
+The simplest path is to paste in the command from **Claude command**
 ([3](#3-starting-the-server)) — it already has the current URL and token filled in:
 
 ```bash
@@ -149,7 +157,97 @@ db-notebook: http://127.0.0.1:57731/db-notebook-mcp (HTTP) - ✓ Connected
 From here, just ask Claude Code a question in chat — it decides on its own when to call a tool, the
 same way Copilot Chat's Agent mode does (see [7](#7-tool-reference)).
 
-### 4.2. Other MCP clients
+### 4.2. Codex CLI / Codex IDE extension / ChatGPT Desktop (Work)
+
+The ChatGPT desktop app's **Work** experience and Codex Desktop/CLI/IDE extension can use this
+local MCP server after its definition is registered in `~/.codex/config.toml`. The registration is
+shared by those supported experiences, whether they were launched from the Dock, a terminal, or an
+editor. This is a plain [TOML](https://toml.io/) config file, not something the extension writes to
+for you: **Database Notebook only opens it and offers a snippet to paste — it never edits it
+automatically.**
+
+**Important:** this does not mean that the regular **Chat** mode in ChatGPT can use the local MCP
+server. In the currently tested setup, Database Notebook MCP tools were available in **ChatGPT
+Work** and **Codex**, but not in **Chat**. Do not describe this local `127.0.0.1` server as
+generally available to ChatGPT; the client experience must explicitly support the MCP connection.
+
+1. In the connection info dialog ([3](#3-starting-the-server)), click **Codex setup**. This opens
+   `~/.codex/config.toml` in an editor tab *and* copies a block shaped like this to the clipboard,
+   with the current URL and token already filled in — both in one click:
+
+   ```toml
+   [mcp_servers.db_notebook]
+   url = "http://127.0.0.1:57731/db-notebook-mcp"
+   http_headers = { Authorization = "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef" }
+   ```
+
+   If `~/.codex/config.toml` doesn't exist yet, you're offered a choice between creating an empty
+   one (and opening it, then continuing as above) or going straight to this guide instead.
+2. Insert the copied block as a new top-level MCP server section. The easiest way to find the
+   correct location is to look for the existing sections whose names start with
+   `[mcp_servers.` (for example, `[mcp_servers.node_repl]` or `[mcp_servers.computer-use]`).
+   Paste the new block **after the last `[mcp_servers.*]` section and before the next unrelated
+   section**, such as `[shell_environment_policy.set]`, `[desktop]`, or `[projects."..."]`.
+
+   For example, if the file contains this:
+
+   ```toml
+   [mcp_servers.computer-use]
+   command = "..."
+   args = ["mcp"]
+   enabled = false
+
+   [shell_environment_policy.set]
+   BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+   ```
+
+   insert the copied block between those two sections:
+
+   ```toml
+   [mcp_servers.computer-use]
+   command = "..."
+   args = ["mcp"]
+   enabled = false
+
+   [mcp_servers.db_notebook]
+   url = "http://127.0.0.1:57731/db-notebook-mcp"
+   http_headers = { Authorization = "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef" }
+
+   [shell_environment_policy.set]
+   BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+   ```
+
+   Do not paste it inside a section such as `[mcp_servers.node_repl.env]`. In TOML, the text in
+   square brackets starts a new section; the new block must begin at the left margin with its own
+   `[mcp_servers.db_notebook]` header. If a `[mcp_servers.db_notebook]` block is already there from
+   a previous setup, **replace** that block instead of adding a second one — TOML doesn't merge
+   duplicate table headers, and Codex's behavior with two of them is undefined.
+
+   Save the file after inserting the block.
+3. Save the file, then fully quit and relaunch the ChatGPT desktop app (Work mode) or Codex
+   Desktop. Closing or minimizing the window alone may leave the application running, so use the
+   application's **Quit** or **Exit** command, or the **Quit**/**Exit** option from its Dock or
+   taskbar menu. For the Codex CLI or IDE extension, end the current process or session and start
+   a new one. The client does not reload `~/.codex/config.toml` while it is running.
+
+`http_headers` is how Codex attaches the `Authorization: Bearer <token>` header on every request;
+this is the same static-token model Claude Code CLI uses in [4.1](#41-claude-code-cli), just spelled
+differently for Codex's config format. Codex also supports a `bearer_token_env_var` form that reads
+the token from a shell environment variable instead — that isn't used here, since Dock-launched apps
+don't reliably inherit shell `export`s, while `~/.codex/config.toml` is read the same way regardless
+of how the client was launched.
+
+Whenever the token changes ([5.3](#53-rotating-the-token-on-purpose)), redo step 1 onward — the URL
+usually stays the same across a normal restart, but the token in the pasted block goes stale the
+moment it's rotated.
+
+This flow assumes the client and VS Code are running on the **same Mac**, exactly like every other
+client in this guide ([1](#1-overview)). It doesn't apply to regular Chat mode, ChatGPT Web, Claude
+Web, or the OpenAI Responses API's hosted MCP support — those all need a separately supported
+connection path and, for hosted clients, a publicly reachable server, which is out of scope here
+(see [OpenAI's MCP docs](https://developers.openai.com/codex/extend/mcp/) for that setup instead).
+
+### 4.3. Other MCP clients
 
 Any client that speaks Streamable HTTP and lets you attach a custom header can connect using the
 same URL and `Authorization: Bearer <token>` header — for example Claude Desktop, Cursor, or the
@@ -228,12 +326,19 @@ Start the server and compare its URL against what's registered to tell those apa
 
 ### 5.3. Rotating the token on purpose
 
-Run **Database Notebook: Regenerate Database Notebook MCP Server Token** (Command Palette) to issue a brand-new token — for
-example if you suspect the old one leaked (shared clipboard history, screen share, etc.). If the
-server is currently running in this VS Code window, it restarts in place, normally on the *same*
-port (see [3.2](#32-configuration)), so only the token actually changes. Either way, follow
+Run **Database Notebook: Regenerate Database Notebook MCP Server Token** — from the Command
+Palette, or by right-clicking the **MCP Server** row in the sidebar — to issue a brand-new token,
+for example if you suspect the old one leaked (shared clipboard history, screen share, etc.). If
+the server is currently running in this VS Code window, it restarts in place, normally on the
+*same* port (see [3.2](#32-configuration)), so only the token actually changes. Either way, follow
 [5.2](#52-re-registering-after-the-url-or-token-changes) afterward to update the registration —
 regenerating the token deliberately invalidates every client currently registered with the old one.
+
+The confirmation dialog only has room to say the token changed; the extension's Output channel
+(**View → Output**, then pick **database-notebook** from the dropdown) prints the fuller
+consequence — a bordered block spelling out that every already-registered client will start
+getting 401s until reconfigured — so it's still visible if you miss the dialog or come back to
+this later.
 
 ## 6. Confirmation for writes
 
@@ -290,10 +395,16 @@ CREATE TABLE `customer` (
   [5.2](#52-re-registering-after-the-url-or-token-changes).
 - **Connection refused** — the server isn't running (start it, [3](#3-starting-the-server)), or
   `mcpServer.port` is pinned to a value nothing is currently listening on, or you're hitting a
-  networking boundary like a devcontainer's loopback ([4.2](#42-other-mcp-clients)).
+  networking boundary like a devcontainer's loopback ([4.3](#43-other-mcp-clients)).
 - **`claude mcp add` says the server "already exists"** — expected; it never silently overwrites an
   existing entry with the same name in the same scope. Remove the old one first
   ([5.2](#52-re-registering-after-the-url-or-token-changes)).
+- **Codex or the ChatGPT desktop app (Work mode) still can't connect after editing
+  `~/.codex/config.toml`** — almost always
+  a missed restart ([4.2](#42-codex-cli--codex-ide-extension--chatgpt-desktop-work)): none of Codex's
+  hosts re-read that file while running. Also check for a stray duplicate
+  `[mcp_servers.db_notebook]` block left over from an earlier setup — TOML doesn't merge repeated
+  table headers, so having two produces undefined behavior rather than a clear error.
 - **A connection you expect doesn't show up / a tool says "no connection named X was found" even
   though X exists** — check the **AI Tools** checkbox on that connection
   ([2.1](#21-enable-a-connection-for-ai-tool-use)). A connection that exists but isn't enabled is

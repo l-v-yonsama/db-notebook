@@ -2,6 +2,7 @@ import {
   AwsDatabase,
   AwsServiceType,
   ConnectionEnvironment,
+  DbCfnStack,
   DbColumn,
   DbConnection,
   DbDynamoTable,
@@ -108,6 +109,8 @@ const toAwsServiceIconFileName = (serviceType: AwsServiceType): string => {
       return "symbol-variable";
     case AwsServiceType.SecretsManager:
       return "key";
+    case AwsServiceType.CloudFormation:
+      return "layers";
     default:
       return "database";
   }
@@ -551,6 +554,20 @@ export class DBDatabaseItem extends vscode.TreeItem {
           }
         }
         break;
+      case ResourceType.CfnStack:
+        {
+          // Not scannable: a stack's resources are DescribeStackResources
+          // data on attr.resources, not individually-scannable child nodes
+          // (see AwsCfnStackAttributes.ts). Color flags a non-*_COMPLETE
+          // status (failed/rollback/in-progress) as noteworthy.
+          const stack = resource as DbCfnStack;
+          const status = stack.attr.stackStatus;
+          const isHealthy = status?.endsWith("_COMPLETE") && !status.includes("ROLLBACK");
+          const color = isHealthy ? undefined : new vscode.ThemeColor("charts.orange");
+          iconPath = new vscode.ThemeIcon("layers", color);
+          description = `(${status})`;
+        }
+        break;
       case ResourceType.Group:
         // Generic display-only container (e.g. SSM parameters grouped by
         // type, Secrets Manager secrets grouped by rotation status) - never
@@ -658,6 +675,14 @@ export class DBDatabaseItem extends vscode.TreeItem {
     if (resource.resourceType === ResourceType.Subscription) {
       const subscription = resource as DbSubscription;
       contextValue += `,isSubscribed=${subscription.isSubscribed}`;
+    }
+    if (resource.resourceType === ResourceType.AwsDatabase) {
+      // Distinguishes which AWS service this node represents (S3/SQS/.../
+      // CloudFormation all share resourceType AwsDatabase) so a menu entry
+      // can target just one, e.g. the CloudFormation node's "diagram every
+      // stack" command.
+      const awsDb = resource as AwsDatabase;
+      contextValue += `,service:${awsDb.serviceType}`;
     }
     contextValue += ",properties";
     if (showSessions) {

@@ -344,14 +344,18 @@ const oracleConnectionType = ref(props.item.oracle?.connectionType ?? "structure
 const oracleConnectString = ref(props.item.oracle?.connectString ?? "");
 
 // resource filters
+type ResourceFilterWithAwsResourceName = ResourceFilter & {
+  resourceName?: ResourceFilterDetail;
+};
+const initialResourceFilter = props.item.resourceFilter as
+  | ResourceFilterWithAwsResourceName
+  | undefined;
+const resourceNameFilterType = ref(initialResourceFilter?.resourceName?.type ?? "");
+const resourceNameFilterValue = ref(initialResourceFilter?.resourceName?.value ?? "");
 const schemaFilterType = ref(props.item.resourceFilter?.schema?.type ?? "");
 const schemaFilterValue = ref(props.item.resourceFilter?.schema?.value ?? "");
 const tableFilterType = ref(props.item.resourceFilter?.table?.type ?? "");
 const tableFilterValue = ref(props.item.resourceFilter?.table?.value ?? "");
-const groupFilterType = ref(props.item.resourceFilter?.group?.type ?? "");
-const groupFilterValue = ref(props.item.resourceFilter?.group?.value ?? "");
-const bucketFilterType = ref(props.item.resourceFilter?.bucket?.type ?? "");
-const bucketFilterValue = ref(props.item.resourceFilter?.bucket?.value ?? "");
 
 // mqtt
 const protocolType = ref(props.item.mqttSetting?.protocol ?? 'mqtt');
@@ -389,7 +393,7 @@ function createItem(): ConnectionSetting {
   let iamSolution: IamSolutionSetting | undefined = undefined;
   let sqlServer: SQLServerSetting | undefined = undefined;
   let oracle: OracleSetting | undefined = undefined;
-  let resourceFilter: ResourceFilter | undefined = undefined;
+  let resourceFilter: ResourceFilterWithAwsResourceName | undefined = undefined;
   let mqttSetting: MqttSetting | undefined = undefined;
 
   if (DBTypeConst.isAws(dbType.value)) {
@@ -454,6 +458,12 @@ function createItem(): ConnectionSetting {
   }
   if (elmSettings.value.getResourceFilters().visible) {
     resourceFilter = {};
+    if (elmSettings.value.getAwsResourceNameFilter().visible && resourceNameFilterType.value) {
+      resourceFilter.resourceName = {
+        type: resourceNameFilterType.value as ResourceFilterDetail['type'],
+        value: resourceNameFilterValue.value,
+      };
+    }
     if (elmSettings.value.getSchemaResourceFilter().visible && schemaFilterType.value) {
       resourceFilter.schema = {
         type: schemaFilterType.value as ResourceFilterDetail['type'],
@@ -464,18 +474,6 @@ function createItem(): ConnectionSetting {
       resourceFilter.table = {
         type: tableFilterType.value as ResourceFilterDetail['type'],
         value: tableFilterValue.value,
-      };
-    }
-    if (elmSettings.value.getGroupResourceFilter().visible && groupFilterType.value) {
-      resourceFilter.group = {
-        type: groupFilterType.value as ResourceFilterDetail['type'],
-        value: groupFilterValue.value,
-      };
-    }
-    if (elmSettings.value.getBucketResourceFilter().visible && bucketFilterType.value) {
-      resourceFilter.bucket = {
-        type: bucketFilterType.value as ResourceFilterDetail['type'],
-        value: bucketFilterValue.value,
       };
     }
   }
@@ -594,14 +592,12 @@ function setDefault() {
   mqttKey.value = '';
 
   // resource filters
+  resourceNameFilterType.value = "";
+  resourceNameFilterValue.value = "";
   schemaFilterType.value = "";
   schemaFilterValue.value = "";
   tableFilterType.value = "";
   tableFilterValue.value = "";
-  groupFilterType.value = "";
-  groupFilterValue.value = "";
-  bucketFilterType.value = "";
-  bucketFilterValue.value = "";
 }
 
 const stopProgress = () => {
@@ -940,6 +936,18 @@ defineExpose({
             </tr>
           </thead>
           <tbody>
+            <tr v-if="elmSettings.getAwsResourceNameFilter().visible">
+              <td>Resource name</td>
+              <td>
+                <span v-if="isShowMode">{{ resourceNameFilterType === '' ? '<None>' : resourceNameFilterType }}</span>
+                <VsCodeDropdown v-else v-model="resourceNameFilterType" :items="resourceFilterTypeItems" />
+              </td>
+              <td>
+                <span v-if="isShowMode">{{ resourceNameFilterValue }}</span>
+                <VsCodeTextField v-else v-model="resourceNameFilterValue" :disabled="resourceNameFilterType === ''"
+                  placeholder="filter value" />
+              </td>
+            </tr>
             <tr v-if="elmSettings.getSchemaResourceFilter().visible">
               <td>Schema</td>
               <td>
@@ -961,30 +969,6 @@ defineExpose({
               <td>
                 <span v-if="isShowMode">{{ tableFilterValue }}</span>
                 <VsCodeTextField v-else v-model="tableFilterValue" :disabled="tableFilterType === ''"
-                  placeholder="filter value" />
-              </td>
-            </tr>
-            <tr v-if="elmSettings.getGroupResourceFilter().visible">
-              <td>Group</td>
-              <td>
-                <span v-if="isShowMode">{{ groupFilterType === '' ? '<None>' : groupFilterType }}</span>
-                <VsCodeDropdown v-else v-model="groupFilterType" :items="resourceFilterTypeItems" />
-              </td>
-              <td>
-                <span v-if="isShowMode">{{ groupFilterValue }}</span>
-                <VsCodeTextField v-else v-model="groupFilterValue" :disabled="groupFilterType === ''"
-                  placeholder="filter value" />
-              </td>
-            </tr>
-            <tr v-if="elmSettings.getBucketResourceFilter().visible">
-              <td>Bucket</td>
-              <td>
-                <span v-if="isShowMode">{{ bucketFilterType === '' ? '<None>' : bucketFilterType }}</span>
-                <VsCodeDropdown v-else v-model="bucketFilterType" :items="resourceFilterTypeItems" />
-              </td>
-              <td>
-                <span v-if="isShowMode">{{ bucketFilterValue }}</span>
-                <VsCodeTextField v-else v-model="bucketFilterValue" :disabled="bucketFilterType === ''"
                   placeholder="filter value" />
               </td>
             </tr>

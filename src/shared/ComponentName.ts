@@ -22,6 +22,7 @@ export type ComponentName =
   | "WriteHttpEventToClipboardParamsPanel"
   | "DBFormView"
   | "ERDiagramSettingsPanel"
+  | "CfnDiagramSettingsPanel"
   | "RecordRuleEditor"
   | "NotebookCellMetadataPanel"
   | "SubscriptionSettingPanel"
