@@ -2,8 +2,8 @@ import {
   AwsDriver,
   generateDiagram,
   generateDrawioApplicationDiagram,
-  generateDrawioArchitectureDiagram,
   generateDrawioCfnDependencyGraph,
+  generateDrawioMultiAzDeploymentDataPaths,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
@@ -157,8 +157,8 @@ export class CfnDiagramSettingsPanel extends BasePanel {
           if (mode === "ApplicationDiagram") {
             return generateDrawioApplicationDiagram(drawioParams);
           }
-          if (mode === "ArchitectureDiagram") {
-            return generateDrawioArchitectureDiagram(drawioParams);
+          if (mode === "MultiAzDeploymentDataPaths") {
+            return generateDrawioMultiAzDeploymentDataPaths(drawioParams);
           }
           return generateDrawioCfnDependencyGraph(drawioParams);
         }

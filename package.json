@@ -662,14 +662,34 @@
           "group": "inline"
         },
         {
+          "command": "database-notebook.start-mcp-server",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /stopped/",
+          "group": "mcpServer@1"
+        },
+        {
           "command": "database-notebook.stop-mcp-server",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /running/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.stop-mcp-server",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /running/",
+          "group": "mcpServer@2"
+        },
+        {
+          "command": "database-notebook.show-mcp-connection-info",
           "when": "view == database-notebook-mcpserver && viewItem =~ /running/",
           "group": "inline"
         },
         {
           "command": "database-notebook.show-mcp-connection-info",
           "when": "view == database-notebook-mcpserver && viewItem =~ /running/",
-          "group": "inline"
+          "group": "mcpServer@3"
+        },
+        {
+          "command": "database-notebook.regenerate-mcp-token",
+          "when": "view == database-notebook-mcpserver && viewItem =~ /mcpServer/",
+          "group": "mcpServer@4"
         },
         {
           "command": "database-notebook.tool-activity.clear-history",
@@ -2749,7 +2769,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-1.2.6.tgz",
+    "@l-v-yonsama/multi-platform-database-drivers": "^1.3.0",
     "@l-v-yonsama/rdh": "^0.3.0",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",

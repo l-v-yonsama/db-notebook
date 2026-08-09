@@ -25,6 +25,8 @@ It also provides a CSV and Har file preview feature.
   - See practical SQL examples using shared variables (LIKE, IN, exact match):
     [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
 - ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
+- Generate Mermaid or editable draw.io diagrams from CloudFormation stacks
+  - [CloudFormation Diagram Guide](/docs/examples/cloudFormationDiagram.md)
 - Count all tables in the schema
 - Provide IntelliSense with database resource names and comments
 - Intuitive visualization of result sets

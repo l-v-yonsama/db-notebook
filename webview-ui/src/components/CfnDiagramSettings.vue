@@ -23,12 +23,18 @@ const stackGroups = computed(() => {
   return [...groups.values()];
 });
 
-type Mode = "ApplicationDiagram" | "CfnDependencyGraph" | "ArchitectureDiagram";
+type Mode = "ApplicationDiagram" | "MultiAzDeploymentDataPaths" | "CfnDependencyGraph";
 const mode = ref<Mode>("ApplicationDiagram");
 const modeItems: { label: string; value: Mode }[] = [
   { label: "ApplicationDiagram (runtime application flow)", value: "ApplicationDiagram" },
-  { label: "CfnDependencyGraph (any resource, every real dependency)", value: "CfnDependencyGraph" },
-  { label: "ArchitectureDiagram (VPC/Subnet network layout)", value: "ArchitectureDiagram" },
+  {
+    label: "CfnDependencyGraph (any resource, every real dependency)",
+    value: "CfnDependencyGraph",
+  },
+  {
+    label: "MultiAzDeploymentDataPaths (Multi-AZ placement and data paths)",
+    value: "MultiAzDeploymentDataPaths",
+  },
 ];
 
 type Viewpoint =
@@ -64,9 +70,14 @@ const outputFormatItems: { label: string; value: OutputFormat; icon: string }[] 
 ];
 const includeLegend = ref(true);
 
-// viewpoint/auxiliaryTreatment only affect CfnDependencyGraph. ApplicationDiagram selects
-// runtime relationships and ArchitectureDiagram draws its fixed VPC/AZ/Subnet layout.
-const viewpointControlsApply = () => mode.value === "CfnDependencyGraph";
+// viewpoint/auxiliaryTreatment only affect the Mermaid dependency graph. The draw.io
+// dependency graph always includes every CloudFormation resource.
+const viewpointControlsApply = () =>
+  mode.value === "CfnDependencyGraph" && outputFormat.value === "Mermaid";
+const viewpointControlsHint = () =>
+  mode.value === "CfnDependencyGraph"
+    ? "draw.io dependency graphs always include every CloudFormation resource."
+    : "Not used by this diagram mode.";
 
 const selectAllStacks = () => {
   selectedStackNames.value = stackItems.value.map((item) => item.name);
@@ -168,13 +179,13 @@ defineExpose({
         <div class="field">
           <label>Viewpoint</label>
           <VsCodeDropdown v-model="viewpoint" :items="viewpointItems" :disabled="!viewpointControlsApply()" />
-          <p v-if="!viewpointControlsApply()" class="hint">Not used by this diagram mode.</p>
+          <p v-if="!viewpointControlsApply()" class="hint">{{ viewpointControlsHint() }}</p>
         </div>
         <div class="field">
           <label>Auxiliary resource treatment</label>
           <VsCodeDropdown v-model="auxiliaryTreatment" :items="auxiliaryTreatmentItems"
             :disabled="!viewpointControlsApply()" />
-          <p v-if="!viewpointControlsApply()" class="hint">Not used by this diagram mode.</p>
+          <p v-if="!viewpointControlsApply()" class="hint">{{ viewpointControlsHint() }}</p>
         </div>
         <div class="field">
           <label>Output format</label>

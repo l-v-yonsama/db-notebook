@@ -78,6 +78,9 @@ export abstract class BaseElementSetting {
   getResourceFilters(): ElementSetting {
     return { visible: false };
   }
+  getAwsResourceNameFilter(): ElementSetting {
+    return { visible: false };
+  }
   getSchemaResourceFilter(): ElementSetting {
     return { visible: false };
   }
