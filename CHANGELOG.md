@@ -2,6 +2,26 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [1.5.0] - 2026-08-10
+
+### Added
+
+- CloudFormation diagram generation: a new settings panel generates a draw.io architecture diagram from a CloudFormation template/stack, with viewpoint controls including a new "MultiAzDeploymentDataPaths" mode. See [CloudFormation diagram guide](/docs/examples/cloudFormationDiagram.md).
+- Drawio-based ER diagram generation, selectable as an output format in ER Diagram Settings alongside the existing options.
+- SSM Parameter Store and Secrets Manager resource scanning in the resource tree. Scans list metadata only (name/type/rotation status) and never fetch the actual value; a dedicated "Copy real value" action (Scan Panel button and tree context menu) does a single on-demand fetch and writes straight to the clipboard, and no AI-facing tool can retrieve a real value. SQS queues that are a DLQ target are now flagged with a distinct icon.
+- AWS session token support for Explicit-in-property AWS connections, stored via SecretStorage like password/clientSecret. SQS and SES, previously unreachable from the UI despite full driver support, are now selectable service types.
+- MCP server setup support for Codex (OpenAI's CLI-based coding agent), alongside the existing Claude Code/Claude Desktop/Cursor setup flows. See updated [MCP Server Usage Guide](/docs/examples/mcpServerUsageGuide.md).
+
+### Changed
+
+- Connection settings form: AWS connections now filter scanned resources by resource name instead of the previous group/bucket filters.
+- `@l-v-yonsama/multi-platform-database-drivers` dependency updated to the published `^1.3.0` (previously a local tarball reference).
+
+### Fixed
+
+- Connection settings form now re-fetches the saved connection (with decrypted secrets) after save instead of reusing the just-submitted, now-stripped payload, so password/clientSecret/sessionToken show masked instead of blank.
+- Text input fields' max length raised from 128 to 4096 characters, since AWS session tokens routinely exceed 128 characters and were being silently truncated.
+
 ## [1.4.0] - 2026-08-04
 
 ### Added
