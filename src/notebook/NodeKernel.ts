@@ -6,7 +6,6 @@ import { Entry } from "har-format";
 import * as iconv from "iconv-lite";
 import * as os from "os";
 import * as path from "path";
-import * as ts from "typescript";
 import { URL } from "url";
 import { NotebookCell, workspace } from "vscode";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -260,6 +259,9 @@ export class NodeKernel {
     let script = await this.createScript(cell);
 
     if (cell.document.languageId === "typescript") {
+      // Loaded lazily (rather than a top-level import) so that a missing/broken
+      // "typescript" package only breaks TS cell execution, not extension activation.
+      const ts = require("typescript") as typeof import("typescript");
       const { outputText, diagnostics } = ts.transpileModule(script, {
         compilerOptions: {
           module: ts.ModuleKind.CommonJS,
