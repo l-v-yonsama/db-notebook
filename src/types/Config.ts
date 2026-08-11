@@ -117,9 +117,14 @@ export type ResultsetConfigType = {
  * Database Execution
  * Corresponds to: database.*
  * ========================================================= */
+export type ResourceTreeAutoExpandTo = "none" | "database" | "schema" | "table";
+
 export type DatabaseConfigType = {
   /** Default LIMIT applied to SQL queries */
   limitRows: number;
+
+  /** Deepest resource level shown automatically after loading resources */
+  resourceTreeAutoExpandTo: ResourceTreeAutoExpandTo;
 };
 
 /* =========================================================

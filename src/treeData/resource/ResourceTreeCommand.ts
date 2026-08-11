@@ -89,10 +89,12 @@ import { ScanPanel } from "../../panels/ScanPanel";
 import { SubscriptionSettingPanel } from "../../panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "../../panels/ViewConditionPanel";
 import { CellMeta } from "../../types/Notebook";
+import { ResourceTreeAutoExpandTo } from "../../types/Config";
 import { MdhViewParams } from "../../types/views";
 import { showWindowErrorMessage } from "../../utilities/alertUtil";
 import { copyAwsSecretValueToClipboard } from "../../utilities/awsSecretValueUtil";
 import { copyToClipboard } from "../../utilities/clipboardUtil";
+import { getDatabaseConfig } from "../../utilities/configUtil";
 import { workflow } from "../../utilities/driverResolver";
 import { createErDiagram, createSimpleERDiagramParams } from "../../utilities/erDiagramGenerator";
 import { log } from "../../utilities/logger";
@@ -111,6 +113,38 @@ type ResourceTreeParams = {
 export const registerResourceTreeCommand = (params: ResourceTreeParams) => {
   registerConnectionSettingCommand(params);
   registerDbResourceCommand(params);
+};
+
+const RESOURCE_TREE_EXPAND_LEVELS = {
+  database: 1,
+  schema: 2,
+  table: 3,
+} as const;
+
+const resolveResourceTreeExpandLevel = (
+  value: ResourceTreeAutoExpandTo
+): 1 | 2 | 3 | undefined => {
+  if (value === "none") {
+    return undefined;
+  }
+  return RESOURCE_TREE_EXPAND_LEVELS[value];
+};
+
+const revealConnectionAfterResourceLoad = async (
+  dbResourceTreeView: TreeView<TreeItem>,
+  conRes: DbConnection
+): Promise<void> => {
+  const { resourceTreeAutoExpandTo } = getDatabaseConfig();
+  const expand = resolveResourceTreeExpandLevel(resourceTreeAutoExpandTo);
+  if (expand === undefined) {
+    return;
+  }
+
+  await dbResourceTreeView.reveal(conRes, {
+    select: false,
+    focus: false,
+    expand,
+  });
 };
 
 const registerConnectionSettingCommand = (params: ResourceTreeParams) => {
@@ -232,7 +266,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     }
     dbResourceTree.changeConnectionTreeData(conRes);
     if (loaded) {
-      await dbResourceTreeView.reveal(conRes, { select: false, focus: false, expand: 2 });
+      await revealConnectionAfterResourceLoad(dbResourceTreeView, conRes);
     }
   });
 
@@ -281,7 +315,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     }
     dbResourceTree.changeConnectionTreeData(conRes);
     if (loaded) {
-      await dbResourceTreeView.reveal(conRes, { select: false, focus: false, expand: 2 });
+      await revealConnectionAfterResourceLoad(dbResourceTreeView, conRes);
     }
   });
 

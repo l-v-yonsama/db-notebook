@@ -6,10 +6,27 @@ import {
   McpServerConfigType,
   NodeConfigType,
   OutputConfigType,
+  ResourceTreeAutoExpandTo,
   ResultsetConfigType,
   ShellConfigType,
   SQLFormatterConfigType,
 } from "../types/Config";
+
+const RESOURCE_TREE_AUTO_EXPAND_TO_VALUES: ResourceTreeAutoExpandTo[] = [
+  "none",
+  "database",
+  "schema",
+  "table",
+];
+
+const DEFAULT_RESOURCE_TREE_AUTO_EXPAND_TO: ResourceTreeAutoExpandTo = "schema";
+
+const normalizeResourceTreeAutoExpandTo = (value: unknown): ResourceTreeAutoExpandTo => {
+  if (RESOURCE_TREE_AUTO_EXPAND_TO_VALUES.includes(value as ResourceTreeAutoExpandTo)) {
+    return value as ResourceTreeAutoExpandTo;
+  }
+  return DEFAULT_RESOURCE_TREE_AUTO_EXPAND_TO;
+};
 
 export const getFormatterConfig = (): SQLFormatterConfigType => {
   const settings = workspace.getConfiguration("sql-formatter", null);
@@ -77,6 +94,12 @@ export const getDatabaseConfig = (): DatabaseConfigType => {
 
   return {
     limitRows: settings.get("Default limit rows", 100),
+    resourceTreeAutoExpandTo: normalizeResourceTreeAutoExpandTo(
+      settings.get<ResourceTreeAutoExpandTo>(
+        "resourceTreeAutoExpandTo",
+        DEFAULT_RESOURCE_TREE_AUTO_EXPAND_TO
+      )
+    ),
   };
 };
 
