@@ -10,6 +10,7 @@ It also provides a CSV and Har file preview feature.
 
 - Mix SQL, JavaScript/TypeScript (Node.js), shell/batch script, Redis/Memcached command, and Markdown cells in a single notebook file
   - Shell script cells (`shellscript`: bash/sh/zsh) run and capture stdout/stderr like any other cell; Windows batch cells (`bat`) are also supported but experimental (not verified end-to-end on Windows)
+  - Shell script and batch cells can read shared variables from preceding cells as `DB_NOTEBOOK_VAR_<name>` environment variables (`$DB_NOTEBOOK_VAR_name` / `%DB_NOTEBOOK_VAR_name%`): [Use shared variables in shellscript/bat cells](/docs/examples/databaseNotebookVariableSharing.md#7-use-shared-variables-in-shellscript--bat-cells)
   - Redis/Memcached command cells (`redis`/`memcached`) run one raw command per cell (e.g. `GET mykey`, `HGETALL myhash`) against a saved connection and return a tabular (RDH) result, the same as SQL cells, instead of plain text
   - Share variables between cells, including passing a SQL cell's result set into a later JavaScript cell for further processing
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)

@@ -496,7 +496,7 @@ describe("MainController.execute -> run() dispatch", () => {
 
     await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
 
-    expect(shellKernelRunMock).toHaveBeenCalledWith(cell);
+    expect(shellKernelRunMock).toHaveBeenCalledWith(cell, nodeKernelFake.getStoredVariables());
   });
 
   it("batセルもshellKernel.runへ委譲する", async () => {
@@ -513,7 +513,7 @@ describe("MainController.execute -> run() dispatch", () => {
 
     await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
 
-    expect(shellKernelRunMock).toHaveBeenCalledWith(cell);
+    expect(shellKernelRunMock).toHaveBeenCalledWith(cell, nodeKernelFake.getStoredVariables());
   });
 
   it("publishParams付きセルはmqttKernel.runへ委譲する", async () => {

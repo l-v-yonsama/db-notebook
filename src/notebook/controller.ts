@@ -793,7 +793,7 @@ export class MainController {
       return await jsonKernelRun(cell, noteSession.kernel);
     } else if (isShellCell(cell)) {
       noteSession.shellKernel = await ShellKernel.create();
-      const r = await noteSession.shellKernel.run(cell);
+      const r = await noteSession.shellKernel.run(cell, noteSession.kernel.getStoredVariables());
       noteSession.shellKernel = undefined;
       return r;
     }

@@ -133,7 +133,89 @@ WHERE ENAME IN ( :ename_list );
 
 ---
 
-## 7. Summary
+## 7. Use shared variables in shellscript / bat cells
+
+Shared variables defined in a preceding cell (JSON, JavaScript, TypeScript, SQL, ...)
+are also exposed as **environment variables** to `shellscript` and `bat` cells, named:
+
+```text
+DB_NOTEBOOK_VAR_<variable name>
+```
+
+```json
+{
+  "environment": "staging",
+  "retryCount": 3,
+  "dryRun": true,
+  "ids": [10, 20, 30],
+  "options": {
+    "output": "result.csv"
+  }
+}
+```
+
+```bash
+echo "$DB_NOTEBOOK_VAR_environment"
+echo "$DB_NOTEBOOK_VAR_retryCount"
+
+if [ "$DB_NOTEBOOK_VAR_dryRun" = "true" ]; then
+  echo "Dry-run mode"
+fi
+
+# Arrays and objects are passed as JSON strings; parse them with jq if needed.
+printf '%s\n' "$DB_NOTEBOOK_VAR_ids" | jq -r '.[]'
+```
+
+On a `bat` cell (Windows), reference the same values with `%NAME%` syntax:
+
+```bat
+echo %DB_NOTEBOOK_VAR_environment%
+```
+
+### Value conversion rules
+
+| Variable type | Environment variable content | Example |
+| --- | --- | --- |
+| string | as-is | `staging` |
+| number | `String(value)` | `3` |
+| boolean | `String(value)` | `true` |
+| `null` | the string `"null"` | `null` |
+| array | `JSON.stringify(value)` | `[10,20,30]` |
+| object | `JSON.stringify(value)` | `{"output":"result.csv"}` |
+
+Strings, numbers, and booleans are exposed as plain, unquoted text, so beginners
+can use them directly (`if [ "$DB_NOTEBOOK_VAR_dryRun" = "true" ]; then ...`)
+without needing to parse JSON. Arrays and objects are exposed as JSON strings,
+so only scripts that actually need them have to parse them (e.g. with `jq`).
+
+### Limitations
+
+- The variable name must match `^[A-Za-z_][A-Za-z0-9_]*$` (letters, digits,
+  underscore; cannot start with a digit). A name that doesn't match this
+  pattern makes the cell fail with an error naming the offending variable —
+  invalid names are **not** silently renamed, since e.g. `user-name` and
+  `user_name` could otherwise collide.
+- Values that cannot be represented this way — `undefined`, functions,
+  symbols, strings containing a NUL character, or objects/arrays that
+  `JSON.stringify()` cannot serialize (e.g. circular references) — also make
+  the cell fail with an error naming the offending variable. The value itself
+  is never included in the error message or logs.
+- Variable names starting with `_` (internal bookkeeping such as `_skipSql`)
+  are not exposed to the shell.
+- This is **one-way**: a shellscript/bat cell cannot write values back into
+  the notebook's shared variables (no `export`, `VAR=value`, `cd`, function,
+  alias, or shell option is carried over to later cells either).
+- The shared variables available to a cell follow the existing sharing scope:
+  cells executed together (e.g. "Run All") or pre-execution cells configured
+  for the target cell. Running an unrelated cell earlier and then running this
+  cell alone in a separate request does not carry variables over.
+- Very large values (e.g. a big SQL result set saved into a shared variable)
+  can hit OS-level environment variable size limits; if the shell process
+  fails to start for that reason, the error message calls this out.
+
+---
+
+## 8. Summary
 
 - Variables are defined in **JSON cells**
 - SQL cells reference them using `:variable_name`
@@ -143,6 +225,8 @@ WHERE ENAME IN ( :ename_list );
   - List match (`IN (:list)`)
 - Use `%` either in SQL or in variable values depending on portability needs
 - `IN (:list)` improves readability and safety for multi-value conditions
+- `shellscript`/`bat` cells can read the same shared variables as
+  `DB_NOTEBOOK_VAR_<name>` environment variables (see section 7)
 
 This approach provides flexible and predictable SQL execution  
 when using **Variable sharing between notebook cells**.
