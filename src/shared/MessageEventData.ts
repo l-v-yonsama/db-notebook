@@ -101,6 +101,12 @@ export type RdhTabItem = {
   title: string;
   refreshable: boolean;
   list: ResultSetData[];
+  /**
+   * Pre-formatted environment label (e.g. "PRODUCTION") for the connection the result came
+   * from, resolved host-side (the webview has no StateStorage access). Undefined when the
+   * connection has no `environment` set -- never guessed.
+   */
+  environment?: string;
 };
 
 export type HttpResponseTabItem = {

@@ -11,6 +11,7 @@ import {
   PreparedToolInvocation,
 } from "vscode";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
+import { formatConnectionEnvironmentLabel } from "../../utilities/connectionEnvironmentDisplay";
 import { getDatabaseConfig } from "../../utilities/configUtil";
 import { flowTransaction } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
@@ -65,12 +66,14 @@ export class RunTransactionTool implements LanguageModelTool<RunTransactionToolI
     }
 
     const numbered = statements.map((s, i) => `${i + 1}. \`\`\`sql\n${s}\n\`\`\``).join("\n");
+    const envLabel = formatConnectionEnvironmentLabel(resolution.setting.environment);
+    const envLine = envLabel ? `**Environment:** ${envLabel}\n\n` : "";
     return {
       invocationMessage,
       confirmationMessages: {
         title: `Run ${statements.length}-statement transaction on "${connectionName}"?`,
         message: new MarkdownString(
-          `This runs all statements below as one transaction against **${connectionName}**.\n\n` +
+          `${envLine}This runs all statements below as one transaction against **${connectionName}**.\n\n` +
             `**Transaction mode:** \`${transactionControlType}\` -- ${TRANSACTION_CONTROL_TYPE_DESCRIPTIONS[transactionControlType]}\n\n${numbered}`
         ),
       },

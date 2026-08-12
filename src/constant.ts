@@ -98,12 +98,15 @@ export const OPEN_LOG_PARSE_RESULT_VIEWER = `${EXTENSION_NAME}.open-log-parse-re
 // LOG
 //---------------------------------------------------
 export const OPEN_OUTPUT_CHANNEL= `${EXTENSION_NAME}.open-output-channel`;
+export const SHOW_GETTING_STARTED = `${EXTENSION_NAME}.show-getting-started`;
 
 //---------------------------------------------------
 // NOTE BOOK
 //---------------------------------------------------
 export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;
 export const CREATE_NOTEBOOK_FROM_SQL = `${EXTENSION_NAME}.create-dbn-from-sql`;
+export const CREATE_SQLITE_DEMO = `${EXTENSION_NAME}.create-sqlite-demo`;
+export const RESET_SQLITE_DEMO = `${EXTENSION_NAME}.reset-sqlite-demo`;
 export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
 
 // JS cell IntelliSense: URI scheme for the in-memory (prelude + cell body) document

@@ -21,6 +21,7 @@ import { hideStatusMessage, showStatusMessage } from "../statusBar";
 import { DiffMdhViewTabParam, MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { copyToClipboard } from "../utilities/clipboardUtil";
+import { formatConnectionEnvironmentLabel } from "../utilities/connectionEnvironmentDisplay";
 import { getRdhViewConfig } from "../utilities/configUtil";
 import { workflow } from "../utilities/driverResolver";
 import { createBookFromList } from "../utilities/excelGenerator";
@@ -247,11 +248,16 @@ export class MdhViewProvider extends BaseViewProvider {
     const refreshable = list.every(
       (it) => (it.meta.type === "select" || it.meta.type === "show") && it.sqlStatement
     );
+    const connectionName = list[0]?.meta?.connectionName;
+    const environment = connectionName
+      ? this.stateStorage.getEnvironmentByConnectionName(connectionName)
+      : undefined;
     const item: RdhTabItem = {
       tabId,
       title,
       list,
       refreshable,
+      environment: formatConnectionEnvironmentLabel(environment),
     };
     return item;
   }

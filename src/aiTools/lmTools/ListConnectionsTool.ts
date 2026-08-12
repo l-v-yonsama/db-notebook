@@ -13,6 +13,7 @@ import {
   LanguageModelToolResult,
 } from "vscode";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
+import { formatConnectionEnvironmentLabel } from "../../utilities/connectionEnvironmentDisplay";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
 
@@ -60,7 +61,8 @@ export function formatConnectionListForModel(connections: ConnectionListItem[]):
     ? "No connections are currently available to AI tools. The user needs to enable at least one connection for AI access in Database Notebook's connection settings."
     : connections
         .map((c) => {
-          const attrs = [c.dbType, c.environment ? `env: ${c.environment}` : undefined, c.detail]
+          const envLabel = formatConnectionEnvironmentLabel(c.environment);
+          const attrs = [c.dbType, envLabel ? `env: ${envLabel}` : undefined, c.detail]
             .filter((it) => !!it)
             .join(", ");
           const suffix = c.comment ? ` — ${c.comment}` : "";

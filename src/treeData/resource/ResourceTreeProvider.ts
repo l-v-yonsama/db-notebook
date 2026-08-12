@@ -1,7 +1,6 @@
 import {
   AwsDatabase,
   AwsServiceType,
-  ConnectionEnvironment,
   DbCfnStack,
   DbColumn,
   DbConnection,
@@ -37,6 +36,10 @@ import {
   isTextLike,
 } from "@l-v-yonsama/rdh";
 import * as vscode from "vscode";
+import {
+  CONNECTION_ENVIRONMENT_BADGE,
+  formatConnectionEnvironmentCapitalized,
+} from "../../utilities/connectionEnvironmentDisplay";
 import { getIconPath } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
@@ -182,18 +185,11 @@ export class ResourceTreeProvider
     if (!conRes?.environment) {
       return undefined;
     }
-    const map: Record<ConnectionEnvironment, { badge: string; color?: string }> = {
-      local: { badge: "L" },
-      development: { badge: "D", color: "charts.blue" },
-      test: { badge: "T", color: "charts.purple" },
-      staging: { badge: "S", color: "charts.orange" },
-      production: { badge: "P", color: "charts.red" },
-    };
-    const entry = map[conRes.environment];
+    const entry = CONNECTION_ENVIRONMENT_BADGE[conRes.environment];
     return {
       badge: entry.badge,
       color: entry.color ? new vscode.ThemeColor(entry.color) : undefined,
-      tooltip: `Environment: ${conRes.environment[0].toUpperCase()}${conRes.environment.slice(1)}`,
+      tooltip: `Environment: ${formatConnectionEnvironmentCapitalized(conRes.environment)}`,
     };
   }
 
@@ -301,9 +297,7 @@ export class ConnectionListItem extends vscode.TreeItem {
       tooltip.appendMarkdown(`\\\nDatabase: ${encodeHtmlWeak(conRes.database)}`);
     }
     if (conRes.environment) {
-      tooltip.appendMarkdown(
-        `\\\nEnvironment: ${conRes.environment[0].toUpperCase()}${conRes.environment.slice(1)}`
-      );
+      tooltip.appendMarkdown(`\\\nEnvironment: ${formatConnectionEnvironmentCapitalized(conRes.environment)}`);
     }
     if (conRes.comment) {
       tooltip.appendMarkdown(`\\\n${encodeHtmlWeak(conRes.comment)}`);

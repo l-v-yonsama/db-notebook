@@ -48,9 +48,11 @@ import {
   CELL_TOOLBAR_LM,
   CREATE_NEW_NOTEBOOK,
   CREATE_NOTEBOOK_FROM_SQL,
+  CREATE_SQLITE_DEMO,
   EXPORT_IN_HTML,
   NOTEBOOK_TYPE,
   OPEN_MDH_VIEWER,
+  RESET_SQLITE_DEMO,
   SHOW_NOTEBOOK_ALL_RDH,
   SHOW_NOTEBOOK_ALL_VARIABLES,
   SPECIFY_CONNECTION_TO_ALL_CELLS,
@@ -85,6 +87,7 @@ import { StateStorage } from "../utilities/StateStorage";
 import { MainController, resetCellContext } from "./controller";
 import { activateIntellisense } from "./intellisense";
 import { DBNotebookSerializer } from "./serializer";
+import { createSqliteDemo, resetSqliteDemo, SqliteDemoOptions } from "./sqliteDemo";
 
 const PREFIX = "[notebook/activator]";
 
@@ -144,6 +147,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       );
 
       window.showNotebookDocument(newNotebook);
+    });
+    registerDisposableCommand(CREATE_SQLITE_DEMO, async (options?: SqliteDemoOptions) => {
+      await createSqliteDemo(context, stateStorage, options);
+    });
+    registerDisposableCommand(RESET_SQLITE_DEMO, async (options?: SqliteDemoOptions) => {
+      await resetSqliteDemo(context, stateStorage, options);
     });
   }
 

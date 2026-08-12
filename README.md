@@ -1,12 +1,33 @@
 # Database Notebook
 
-Database Notebook is a Visual Studio Code extension that lets you manage SQL, JavaScript/TypeScript, and Markdown cells together in a single notebook file, with variables shared between cells — alongside a database manager that gives you access to various databases through the same Notebook interface.
-
-It also provides a CSV and Har file preview feature.
+[日本語](README.ja.md)
 
 ![logo](./media/logo128.png)
 
-## Features
+Database Notebook brings SQL, JavaScript/TypeScript, Markdown, and query results together in one notebook file, so you can turn ad-hoc investigations across databases, logs, and cloud resources into something you can save, share, and re-run.
+
+## What it's for
+
+- **Investigate incidents across databases, logs, and cloud resources** — Query production and staging databases, inspect CloudWatch logs, and scan AWS resources (S3, SQS, DynamoDB, Secrets Manager, SSM) — all from the same notebook, so the whole investigation stays in one reusable file.
+- **Keep SQL, JavaScript, Markdown, and results in one reusable file** — Mix SQL, JavaScript/TypeScript, shell, and Markdown cells with variables shared between them, then export the results as HTML or Excel. See [Database Notebook file examples](/docs/examples/databaseNotebook.md).
+- **Reuse your saved connections from GitHub Copilot Chat / MCP clients** — The same connections you set up in the DB Explorer are available as AI tools in Copilot Chat (Agent mode), and via a standalone MCP server for other MCP clients (Claude Code, Claude Desktop, Cursor, ...). See [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md).
+
+## Quickstart (3–5 min)
+
+No external database needed — this uses a small local SQLite file.
+
+1. Install the extension.
+2. Open the Command Palette and run **`Database Notebook: Create SQLite Demo`**. This creates a small local SQLite database, a connection pointing at it, and a ready-to-run `.dbn` notebook.
+3. Run the notebook with **Run All**.
+4. Check the query result and the chart it generates.
+5. Save the result as an HTML or Excel file from the result panel's toolbar.
+6. When you're ready, create your own connection from the DB Explorer side panel and point your notebooks at it.
+
+## Supported databases & resources
+
+MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT
+
+## Detailed features
 
 - Mix SQL, JavaScript/TypeScript (Node.js), shell/batch script, Redis/Memcached command, and Markdown cells in a single notebook file
   - Shell script cells (`shellscript`: bash/sh/zsh) run and capture stdout/stderr like any other cell; Windows batch cells (`bat`) are also supported but experimental (not verified end-to-end on Windows)
@@ -15,8 +36,7 @@ It also provides a CSV and Har file preview feature.
   - Share variables between cells, including passing a SQL cell's result set into a later JavaScript cell for further processing
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
   - See Redis/Memcached command cell examples: [Database Notebook Redis/Memcached command cell examples](/docs/examples/databaseNotebookRedisAndMemcached.md)
-- Access various databases through Notebooks, Sidebars, and panel UIs
-  - MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT
+- Access databases through Notebooks, Sidebars, and panel UIs
 - Execute SQL mode
   - Execute query (Default)
   - Execute explain plan (Generates a query plan).
@@ -25,7 +45,7 @@ It also provides a CSV and Har file preview feature.
 - Variable sharing between notebook cells
   - See practical SQL examples using shared variables (LIKE, IN, exact match):
     [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
-- ER diagram creation in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)
+- Generate ER diagrams in [mermaid format](https://mermaid.js.org/syntax/entityRelationshipDiagram.html) or as an editable draw.io diagram
 - Generate Mermaid or editable draw.io diagrams from CloudFormation stacks
   - [CloudFormation Diagram Guide](/docs/examples/cloudFormationDiagram.md)
 - Count all tables in the schema
@@ -42,20 +62,12 @@ It also provides a CSV and Har file preview feature.
 - File preview
   - CSV file preview
   - Har file preview
-- Evaluate SQL statements with AI
-- Generate SQL queries with AI
-- Use Database Notebook's connections as AI tools in GitHub Copilot Chat (Agent mode)
-  - List/test connections, inspect schema, run queries & transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create/edit `.dbn` notebooks — all reusing the credentials you've already saved
-  - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)
-- Run a standalone MCP server so supported external MCP clients (Claude Code, Claude Desktop, Cursor, ...) can use the same connections outside VS Code
-  - [MCP Server Usage Guide](/docs/examples/mcpServerUsageGuide.md)
-  - The local MCP server has been verified with ChatGPT **Work** and Codex. ChatGPT's regular **Chat** mode does not expose these tools in the tested setup; see the usage guide for client-specific limitations.
 - MQTT Client
   - Intuitive publish/subscribe interface
   - Query subscribed payloads using SQLite directly from the notebook
 - Parse SQL log
 
-## Screenshots
+### Screenshots
 
 - Setup connection settings, access to Mysql through the Side-panel
 
@@ -65,20 +77,24 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/02_notebook.gif)
 
+- Variable sharing between notebook cells
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/03_variable_sharing.gif)
+
+- Export notebook as an HTML file
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/16_html_report.gif)
+
+- ER diagram creation
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/04_er_diagram.gif)
+
 - Execute SQL mode
 
   - Execute query (Default)
   - Execute explain plan (Generates a query plan).
   - Execute explain analyze (Displays actual
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/13_sql_mode.gif)
-
-- Variable sharing between notebook cells
-
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/03_variable_sharing.gif)
-
-- ER diagram creation in mermaid format
-
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/04_er_diagram.gif)
 
 - Format SQL statement
 
@@ -88,21 +104,9 @@ It also provides a CSV and Har file preview feature.
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/15_count_for_all_tables.gif)
 
-- Export notebook as an HTML file
-
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/16_html_report.gif)
-
 - Create DB Notebook from an sql file
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/17_sql_to_dbn.gif)
-
-- Evaluate SQL statements with AI
-
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/19_lm.gif)
-
-- Generate SQL queries with AI
-
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/20_chat2query.gif)
 
 - Access to Aws( DynamoDB ) through the Notebook
 
@@ -119,21 +123,21 @@ It also provides a CSV and Har file preview feature.
 
 <div>
 
-### Difference display using comparison key (Primary or Unique key)
+#### Difference display using comparison key (Primary or Unique key)
 
 - Create and execute SQL statements to undo changes
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/05_diff.gif)
 
-### Label display using code label resolver ( `Create a new blank Code label resolver` )
+#### Label display using code label resolver ( `Create a new blank Code label resolver` )
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/06_label_display.gif)
 
-### Verify records comply with a rule ( `Create a new blank DB record rule` )
+#### Verify records comply with a rule ( `Create a new blank DB record rule` )
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/07_record_rule.gif)
 
-### Generate descriptive statistics
+#### Generate descriptive statistics
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/14_describe.gif)
 
@@ -147,11 +151,11 @@ It also provides a CSV and Har file preview feature.
 
 <div>
 
-### Access to the Keycloak from the side panel to display changes in user information.
+#### Access to the Keycloak from the side panel to display changes in user information.
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/08_keycloak.gif)
 
-### Expand and display JSON items in columns.
+#### Expand and display JSON items in columns.
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/09_json_expansion.gif)
 
@@ -165,13 +169,13 @@ It also provides a CSV and Har file preview feature.
 
 <div>
 
-### Csv file viewer
+#### Csv file viewer
 
 - After previewing the CSV file, descriptive statistics were displayed according to its content.
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/10_csv_viewer.gif)
 
-### Har file viewer
+#### Har file viewer
 
 - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/11_har_viewer.gif)
 
@@ -185,15 +189,24 @@ The Log Parse feature analyzes application logs and extracts structured SQL exec
 
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
 
-## Tips
+## AI / MCP
 
-1. Instead of using VS Code’s built-in `Copy Cell` or `+ Code` / `Add Code Cell`, I recommend using `Duplicate Cell with Metadata`.
-This action copies not only the cell content, but also all associated metadata—such as database connection settings and ResultSet decoration options—so you can add a new cell without reconfiguring these settings.
-   - ![](./docs/images/tips/00_duplicate_cell.png)
-1. You can specify a default connection definition each time you add a new SQL cell to the notebook
-   - ![](./docs/images/tips/01_default_connection.png)
+- Evaluate SQL statements with AI
 
-## Examples
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/19_lm.gif)
+
+- Generate SQL queries with AI
+
+  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/20_chat2query.gif)
+
+- Use Database Notebook's connections as AI tools in GitHub Copilot Chat (Agent mode)
+  - List/test connections, inspect schema, run queries & transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create/edit `.dbn` notebooks — all reusing the credentials you've already saved
+  - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)
+- Run a standalone MCP server so supported external MCP clients (Claude Code, Claude Desktop, Cursor, ...) can use the same connections outside VS Code
+  - [MCP Server Usage Guide](/docs/examples/mcpServerUsageGuide.md)
+  - The local MCP server has been verified with ChatGPT **Work** and Codex. ChatGPT's regular **Chat** mode does not expose these tools in the tested setup; see the usage guide for client-specific limitations.
+
+## Reference & samples
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
@@ -204,6 +217,14 @@ This action copies not only the cell content, but also all associated metadata�
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
 - [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
 - [Using Database Notebook's AI Tools via a Standalone MCP Server](/docs/examples/mcpServerUsageGuide.md)
+
+### Tips
+
+1. Instead of using VS Code's built-in `Copy Cell` or `+ Code` / `Add Code Cell`, I recommend using `Duplicate Cell with Metadata`.
+   This action copies not only the cell content, but also all associated metadata—such as database connection settings and ResultSet decoration options—so you can add a new cell without reconfiguring these settings.
+   - ![](./docs/images/tips/00_duplicate_cell.png)
+1. You can specify a default connection definition each time you add a new SQL cell to the notebook
+   - ![](./docs/images/tips/01_default_connection.png)
 
 ## Keyboard shortcuts
 
@@ -221,7 +242,7 @@ You can open this editor by going to the menu under Code > Settings > Keyboard S
 
 ## Recommended Extensions
 
-The ER diagram is output in mermaid format.
+When you generate an ER diagram in Mermaid format (the alternative is an editable draw.io diagram), it's rendered inside a preview notebook.
 It is recommended to use the "[Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid)" extension together to visualize it.
 
 ## 🎁 Donate

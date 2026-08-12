@@ -32,6 +32,7 @@ import {
   SET_SUBSCRIPTION_PAYLOADS_VIEWER,
   SHOW_CONNECTION_SETTING,
   SHOW_CSV,
+  SHOW_GETTING_STARTED,
   SHOW_HAR,
   SHOW_LOG,
   SHOW_RESOURCE_PROPERTIES,
@@ -106,6 +107,12 @@ export async function activate(context: ExtensionContext) {
   {
     registerDisposableCommand(OPEN_OUTPUT_CHANNEL, async () => {
       show();
+    });
+    registerDisposableCommand(SHOW_GETTING_STARTED, async () => {
+      await commands.executeCommand(
+        "workbench.action.openWalkthrough",
+        "HirotakaYoshioka.database-notebook#dbNotebookGettingStarted"
+      );
     });
   }
 
