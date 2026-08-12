@@ -1,9 +1,12 @@
-import { AllSubDbResource, DbResource } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  AllSubDbResource,
+  DbResource,
+  ERDiagramSettingParams,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { DBRestoreInputParams, DBRestoreSettingsUIParams } from "../shared/DBRestoreParams";
-import { ERDiagramSettingParams } from "../shared/ERDiagram";
 import { DBRestoreSettingsPanelEventData } from "../shared/MessageEventData";
 import { DockerContainerSummary } from "../types/Docker";
 import { showWindowErrorMessage } from "../utilities/alertUtil";

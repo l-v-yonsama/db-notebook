@@ -19,6 +19,8 @@ import {
   ResourceType,
   SchemaAndTableName,
   createColumnNames,
+  createErDiagram,
+  createSimpleERDiagramParams,
   resolveLastOrderByColumn,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
@@ -96,7 +98,6 @@ import { copyAwsSecretValueToClipboard } from "../../utilities/awsSecretValueUti
 import { copyToClipboard } from "../../utilities/clipboardUtil";
 import { getDatabaseConfig } from "../../utilities/configUtil";
 import { workflow } from "../../utilities/driverResolver";
-import { createErDiagram, createSimpleERDiagramParams } from "../../utilities/erDiagramGenerator";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
 import { ToolsViewParams } from "../../views/ToolsViewProvider";
@@ -589,7 +590,7 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
 
   // CloudFormation diagram - opens CfnDiagramSettingsPanel rather than
   // generating straight away. generateDiagram() ended up with enough
-  // parameters (which stacks and diagram mode, including MultiAzDeploymentDataPaths,
+  // parameters (which stacks and diagram mode, including MultiAzDeploymentTrafficPathsAndProtection,
   // viewpoint, auxiliaryTreatment) that a single inline button press can't
   // reasonably choose them all well - same shape as CREATE_ER_DIAGRAM_WITH_SETTINGS
   // below. The panel always lists every stack under the connection; only the

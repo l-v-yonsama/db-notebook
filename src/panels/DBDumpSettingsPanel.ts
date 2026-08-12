@@ -3,6 +3,7 @@ import {
   DbDatabase,
   DbResource,
   DBType,
+  ERDiagramSettingParams,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import dayjs from "dayjs";
@@ -14,7 +15,6 @@ import {
   DBDumpOptionParams,
   DBDumpSettingsUIParams,
 } from "../shared/DBDumpParams";
-import { ERDiagramSettingParams } from "../shared/ERDiagram";
 import { DBDumpSettingsPanelEventData } from "../shared/MessageEventData";
 import { DockerContainerSummary } from "../types/Docker";
 import { showWindowErrorMessage } from "../utilities/alertUtil";

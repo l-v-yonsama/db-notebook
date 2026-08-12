@@ -13,7 +13,7 @@ editable draw.io format.
 - 4. [Select a diagram mode](#4-select-a-diagram-mode)
   - 4.1. [ApplicationDiagram](#41-applicationdiagram)
   - 4.2. [CfnDependencyGraph](#42-cfndependencygraph)
-  - 4.3. [MultiAzDeploymentDataPaths](#43-multiazdeploymentdatapaths)
+  - 4.3. [MultiAzDeploymentTrafficPathsAndProtection](#43-multiazdeploymenttrafficpathsandprotection)
 - 5. [Dependency graph options](#5-dependency-graph-options)
 - 6. [Select an output format](#6-select-an-output-format)
   - 6.1. [Mermaid preview notebook](#61-mermaid-preview-notebook)
@@ -70,7 +70,7 @@ The three modes answer different questions. `ApplicationDiagram` is the default.
 | ---------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `ApplicationDiagram`         | Understanding an application's runtime flow | Ingress, compute, messaging, and data relationships recognized from the templates        |
 | `CfnDependencyGraph`         | Auditing or investigating an IaC definition | CloudFormation dependencies such as `Ref`, `Fn::GetAtt`, `Fn::Sub`, and `DependsOn`      |
-| `MultiAzDeploymentDataPaths` | Understanding placement and data paths      | VPC, Availability Zone, and subnet placement plus template-evidenced communication paths |
+| `MultiAzDeploymentTrafficPathsAndProtection` | Understanding placement and data paths      | VPC, Availability Zone, and subnet placement plus template-evidenced communication paths |
 
 ### 4.1. ApplicationDiagram
 
@@ -92,7 +92,7 @@ For Mermaid output, the **Viewpoint** and **Auxiliary resource treatment** setti
 [section 5](#5-dependency-graph-options) apply only to this mode. A draw.io dependency graph
 always includes every CloudFormation resource and ignores those two settings.
 
-### 4.3. MultiAzDeploymentDataPaths
+### 4.3. MultiAzDeploymentTrafficPathsAndProtection
 
 Use this mode for templates containing network infrastructure. It arranges supported resources
 around their VPC, Availability Zone, and subnet hierarchy, then adds ingress, egress, event, and
@@ -154,6 +154,15 @@ diagram.
 When Draw.io Integration is installed, Database Notebook opens the file directly in its VS Code
 editor. Without that extension, the `.drawio` file is still created and its path is shown, so it
 can be opened later with diagrams.net or another compatible editor.
+
+Node placement and connector routing are computed automatically (via
+[ELK](https://www.npmjs.com/package/elkjs)) instead of a fixed layout, so generation is
+asynchronous and can take noticeably longer for a large template or many selected stacks. If
+layout does not finish within a few seconds, it falls back to a simpler grid placement
+automatically — every resource and relationship still appears, only the arrangement looks less
+polished. `Multi-AZ Deployment, Traffic Paths & Protection`'s VPC/Availability Zone/Subnet nesting
+is never rearranged by this automatic layout; only the resources placed *inside* a subnet are
+auto-arranged.
 
 ## 7. Generate the diagram
 

@@ -1,9 +1,9 @@
 import {
   AwsDriver,
   generateDiagram,
-  generateDrawioApplicationDiagram,
-  generateDrawioCfnDependencyGraph,
-  generateDrawioMultiAzDeploymentDataPaths,
+  generateDrawioApplicationDiagramAsync,
+  generateDrawioCfnDependencyGraphAsync,
+  generateDrawioMultiAzDeploymentTrafficPathsAndProtectionAsync,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Uri, ViewColumn, WebviewPanel, window } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
@@ -155,12 +155,12 @@ export class CfnDiagramSettingsPanel extends BasePanel {
         if (outputFormat === "Drawio") {
           const drawioParams = { mode, viewpoint, auxiliaryTreatment, list, options: { includeLegend } };
           if (mode === "ApplicationDiagram") {
-            return generateDrawioApplicationDiagram(drawioParams);
+            return await generateDrawioApplicationDiagramAsync(drawioParams);
           }
-          if (mode === "MultiAzDeploymentDataPaths") {
-            return generateDrawioMultiAzDeploymentDataPaths(drawioParams);
+          if (mode === "MultiAzDeploymentTrafficPathsAndProtection") {
+            return await generateDrawioMultiAzDeploymentTrafficPathsAndProtectionAsync(drawioParams);
           }
-          return generateDrawioCfnDependencyGraph(drawioParams);
+          return await generateDrawioCfnDependencyGraphAsync(drawioParams);
         }
         const diagram = generateDiagram({ mode, viewpoint, auxiliaryTreatment, list, options: { includeLegend } });
         const heading = `## CloudFormation diagram: ${stackNames.join(", ")} (${mode})\n\n`;

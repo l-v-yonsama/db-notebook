@@ -9,17 +9,20 @@ import {
   commands,
   window
 } from "vscode";
+import {
+  createDrawioErDiagramAsync,
+  createERDiagramParams,
+  createErDiagram,
+  ERDiagramSettingParams,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { CREATE_NEW_NOTEBOOK } from "../constant";
 import { ActionCommand, WriteToClipboardParams } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
-import { ERDiagramSettingParams } from "../shared/ERDiagram";
 import {
   ERDiagramSettingsInputParams,
   ERDiagramSettingsPanelEventData,
 } from "../shared/MessageEventData";
 import { copyToClipboard } from "../utilities/clipboardUtil";
-import { createERDiagramParams, createErDiagram } from "../utilities/erDiagramGenerator";
-import { createDrawioErDiagram } from "../utilities/erDiagramDrawioGenerator";
 import { upsertERDiagramPreviewDrawio } from "../utilities/cfnDiagramPreviewNotebook";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
@@ -128,7 +131,7 @@ export class ERDiagramSettingsPanel extends BasePanel {
     }
     const erParams = createERDiagramParams(this.variables.tables, options);
     if (options.outputFormat === "Drawio") {
-      await upsertERDiagramPreviewDrawio(createDrawioErDiagram(erParams));
+      await upsertERDiagramPreviewDrawio(await createDrawioErDiagramAsync(erParams));
     } else {
       const content = createErDiagram(erParams);
       const cell = new NotebookCellData(NotebookCellKind.Markup, content, "markdown");

@@ -2,6 +2,25 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [1.5.1] - 2026-08-12
+
+### Changed
+
+- ER diagram generation moved from this extension into `@l-v-yonsama/multi-platform-database-drivers`
+  (its public API now covers both the Mermaid and draw.io output this extension already exposed);
+  callers within this extension were switched over accordingly.
+- CloudFormation and ER draw.io generation now use automatic layout
+  ([ELK](https://www.npmjs.com/package/elkjs)) instead of a fixed grid/staircase layout, reducing
+  overlapping nodes and crossing connectors on larger diagrams. Generation is now asynchronous and
+  can take noticeably longer for a large diagram; if layout does not finish in time it falls back
+  to a simpler grid placement automatically, with every resource and relationship still shown. See
+  the [CloudFormation diagram guide](/docs/examples/cloudFormationDiagram.md)'s updated section 6.2
+  for the user-facing summary.
+- The CloudFormation diagram mode formerly named `MultiAzDeploymentDataPaths` in this extension's
+  own UI/docs is now consistently named `MultiAzDeploymentTrafficPathsAndProtection`, matching the
+  name `db-drivers` already used - this extension's code and docs had not been updated to follow
+  that rename until now. The mode's behavior is unchanged.
+
 ## [1.5.0] - 2026-08-10
 
 ### Added

@@ -12,7 +12,7 @@ import { StateStorage } from "../../utilities/StateStorage";
 /**
  * Phase 1 + 2 scope: all 6 connection/schema/query tools (everything except the
  * notebook-authoring tools, `createDbNotebook`/`editDbNotebook`, which stay
- * Copilot-only for now -- see `misc/mcp-server-implementation-plan-2026-07-23.md`).
+ * Copilot-only for now).
  * `description`s below are copied verbatim from `package.json`'s
  * `contributes.languageModelTools` (the Copilot Chat versions of these same tools) so
  * both surfaces stay in sync and describe identical behavior.

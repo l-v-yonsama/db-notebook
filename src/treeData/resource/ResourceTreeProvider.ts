@@ -81,9 +81,8 @@ const DB_TYPE_DISPLAY_NAMES: Record<DBType, string> = {
 
 const toDbTypeDisplayName = (dbType: DBType): string => DB_TYPE_DISPLAY_NAMES[dbType] ?? dbType;
 
-// Vendor logos for the DBTypes where a safely-licensed brand mark is available
-// (see misc/resource-tree-icons-investigation-2026-08-02.md, Tier A). Oracle/SQL
-// Server/AWS/Memcached deliberately stay on generic codicons for now.
+// Vendor logos for the DBTypes where a safely-licensed brand mark is available.
+// Oracle/SQL Server/AWS/Memcached deliberately stay on generic codicons for now.
 const VENDOR_ICONS = {
   mysql: "db-vendor-mysql.svg",
   postgresql: "db-vendor-postgresql.svg",

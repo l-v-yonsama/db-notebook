@@ -10,7 +10,7 @@ export type CfnDiagramOutputFormat = "Mermaid" | "Drawio";
  * role for ERDiagramSettingsPanel. */
 export type CfnDiagramGenerateParams = {
   stackNames: string[];
-  mode: "ApplicationDiagram" | "MultiAzDeploymentDataPaths" | "CfnDependencyGraph";
+  mode: "ApplicationDiagram" | "MultiAzDeploymentTrafficPathsAndProtection" | "CfnDependencyGraph";
   viewpoint: DiagramViewpoint;
   auxiliaryTreatment: AuxiliaryResourceTreatment;
   outputFormat: CfnDiagramOutputFormat;

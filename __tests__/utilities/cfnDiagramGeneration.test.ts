@@ -1,6 +1,7 @@
 import {
   generateDiagram,
-  generateDrawioMultiAzDeploymentDataPaths,
+  generateDrawioMultiAzDeploymentTrafficPathsAndProtection,
+  generateDrawioMultiAzDeploymentTrafficPathsAndProtectionAsync,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { describe, expect, it } from "vitest";
 
@@ -12,7 +13,7 @@ const templateSource = `Resources:
 `;
 
 const params = {
-  mode: "MultiAzDeploymentDataPaths" as const,
+  mode: "MultiAzDeploymentTrafficPathsAndProtection" as const,
   list: [
     {
       fileName: "sample-stack",
@@ -38,10 +39,20 @@ describe("CloudFormation diagram driver integration", () => {
     expect(diagram).toContain("VPC 10.0.0.0/16");
   });
 
-  it("generates draw.io with the diagram and template source pages", () => {
-    const drawio = generateDrawioMultiAzDeploymentDataPaths(params);
+  it("generates draw.io with the diagram and template source pages (legacy sync API)", () => {
+    const drawio = generateDrawioMultiAzDeploymentTrafficPathsAndProtection(params);
 
-    expect(drawio).toContain('<diagram id="multi-az-data-paths"');
+    expect(drawio).toContain('<diagram id="multi-az-traffic-paths-protection"');
+    expect(drawio).toContain('name="Template: sample-stack"');
+    expect(drawio).toContain("AWS::EC2::VPC");
+  });
+
+  // CfnDiagramSettingsPanel.ts actually calls the *Async (ELK auto-layout) variant - this is the
+  // one that matters for what a user sees in db-notebook.
+  it("generates draw.io with the diagram and template source pages (auto-layout async API)", async () => {
+    const drawio = await generateDrawioMultiAzDeploymentTrafficPathsAndProtectionAsync(params);
+
+    expect(drawio).toContain('<diagram id="multi-az-traffic-paths-protection"');
     expect(drawio).toContain('name="Template: sample-stack"');
     expect(drawio).toContain("AWS::EC2::VPC");
   });

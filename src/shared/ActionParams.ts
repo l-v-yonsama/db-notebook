@@ -1,13 +1,13 @@
 import type {
   ConnectionSetting,
   CsvParseOptions,
+  ERDiagramSettingParams,
   LogParseParams,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { CellMeta } from "../types/Notebook";
 import type { CfnDiagramGenerateParams } from "./CfnDiagram";
 import type { CodeResolverParams } from "./CodeResolverParams";
-import type { ERDiagramSettingParams } from "./ERDiagram";
 import type { ModeType } from "./ModeType";
 import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
 

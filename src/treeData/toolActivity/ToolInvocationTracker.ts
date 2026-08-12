@@ -4,10 +4,10 @@ import { getErrorMessage } from "../../utilities/errorUtil";
 
 /**
  * In-memory record of tool invocations, independent of the "vscode" module by
- * design (see Phase 1 of misc/mcp-server-lmtools-tree-view-plan-2026-07-31.md) so
- * it can be unit-tested without the __tests__/mocks/vscode.ts shim. Deliberately
- * not persisted to context.globalState -- this is a volatile "what's happening /
- * what just happened" activity feed, not a durable user asset like SQL history.
+ * design so it can be unit-tested without the __tests__/mocks/vscode.ts shim.
+ * Deliberately not persisted to context.globalState -- this is a volatile
+ * "what's happening / what just happened" activity feed, not a durable user
+ * asset like SQL history.
  */
 
 export type ToolSource = "lmTools" | "mcpServer";

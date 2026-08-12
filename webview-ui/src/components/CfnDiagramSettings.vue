@@ -23,7 +23,7 @@ const stackGroups = computed(() => {
   return [...groups.values()];
 });
 
-type Mode = "ApplicationDiagram" | "MultiAzDeploymentDataPaths" | "CfnDependencyGraph";
+type Mode = "ApplicationDiagram" | "MultiAzDeploymentTrafficPathsAndProtection" | "CfnDependencyGraph";
 const mode = ref<Mode>("ApplicationDiagram");
 const modeItems: { label: string; value: Mode }[] = [
   { label: "ApplicationDiagram (runtime application flow)", value: "ApplicationDiagram" },
@@ -32,8 +32,8 @@ const modeItems: { label: string; value: Mode }[] = [
     value: "CfnDependencyGraph",
   },
   {
-    label: "MultiAzDeploymentDataPaths (Multi-AZ placement and data paths)",
-    value: "MultiAzDeploymentDataPaths",
+    label: "MultiAzDeploymentTrafficPathsAndProtection (Multi-AZ placement, traffic paths & protection)",
+    value: "MultiAzDeploymentTrafficPathsAndProtection",
   },
 ];
 
