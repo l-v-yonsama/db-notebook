@@ -1,14 +1,13 @@
 {
-  "extends": "@vue/tsconfig/tsconfig.web.json",
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
   "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
   "compilerOptions": {
-    "baseUrl": ".",
-    "lib": ["ES2017"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2017", "DOM", "DOM.Iterable"],
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "ignoreDeprecations": "5.0",
-    "verbatimModuleSyntax": true
+    }
   },
 
   "references": [

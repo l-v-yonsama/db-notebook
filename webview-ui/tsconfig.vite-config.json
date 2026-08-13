@@ -1,10 +1,13 @@
 {
-  "extends": "@vue/tsconfig/tsconfig.node.json",
+  "extends": "@vue/tsconfig/tsconfig.json",
   "include": ["vite.config.*"],
   "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "composite": true,
-    "types": ["node"],
-    "ignoreDeprecations": "5.0",
-    "verbatimModuleSyntax": true
+    // @vue/tsconfig's base sets noEmit: true, but a composite project used as a
+    // "references" target must be able to emit (its .tsbuildinfo, at least).
+    "noEmit": false,
+    "types": ["node"]
   }
 }

@@ -29,7 +29,9 @@ const linesToParse = ref('-1');
 const configFileItems = ref([] as DropdownItem[]);
 const lineItems = ref([] as DropdownItem[]);
 
-const formatterSqlLanguage = ref('' as (InitializePayload["formatterSqlLanguage"] | ''));
+const formatterSqlLanguage = ref(
+  '' as (Exclude<InitializePayload["formatterSqlLanguage"], undefined> | '')
+);
 const formatterSqlLanguageItems = ref([] as DropdownItem[]);
 
 const initilizing = ref(true);

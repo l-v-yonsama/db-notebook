@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
-import { defineExpose, nextTick, reactive, ref } from "vue";
+import { nextTick, reactive, ref } from "vue";
 import type { DBFormEventData, ModeType } from "../utilities/vscode";
 import ConnectionSettingVue from "./form/ConnectionSetting.vue";
 import ResourceProperties from "./form/ResourceProperties.vue";
@@ -73,7 +73,7 @@ defineExpose({
 </script>
 
 <template>
-  <ConnectionSettingVue v-if="visible.connectionSetting" :ref="setConnectionSettingRef" :mode="mode" :item="settingItem"
+  <ConnectionSettingVue v-if="visible.connectionSetting" :ref="setConnectionSettingRef" :mode="mode" :item="settingItem!"
     :prohibitedNames="prohibitedNames"></ConnectionSettingVue>
   <ResourceProperties v-if="visible.resourceProperties" :values="resourcePropertiesValues"></ResourceProperties>
 </template>
