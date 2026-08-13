@@ -4,31 +4,22 @@ import {
   RDSBaseDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
-  CancellationTokenSource,
   commands,
   ExtensionContext,
   NotebookCellData,
   NotebookCellKind,
-  NotebookData,
   Uri,
   ViewColumn,
-  window,
-  workspace,
 } from "vscode";
 import { REFRESH_RESOURCES } from "../constant";
 import { CellMeta } from "../types/Notebook";
 import { findOpenNotebookDocument } from "../aiTools/lmTools/notebookResolver";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { flowTransaction } from "../utilities/driverResolver";
-import {
-  createDirectory,
-  deleteResource,
-  existsUri,
-  writeBytesToResource,
-} from "../utilities/fsUtil";
+import { createDirectory, deleteResource, existsUri } from "../utilities/fsUtil";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
-import { DBNotebookSerializer } from "./serializer";
+import { openNotebookFile, writeNotebookFile } from "./notebookFileUtil";
 
 const PREFIX = "[notebook/sqliteDemo]";
 
@@ -252,12 +243,8 @@ export type SqliteDemoOptions = {
   openBeside?: boolean;
 };
 
-async function openNotebook(uri: Uri, options?: SqliteDemoOptions): Promise<void> {
-  const document = await workspace.openNotebookDocument(uri);
-  await window.showNotebookDocument(
-    document,
-    options?.openBeside ? { viewColumn: ViewColumn.Beside } : undefined
-  );
+function toViewColumnOption(options?: SqliteDemoOptions): { viewColumn?: ViewColumn } | undefined {
+  return options?.openBeside ? { viewColumn: ViewColumn.Beside } : undefined;
 }
 
 /**
@@ -307,20 +294,10 @@ async function buildAndOpenSqliteDemo(
     await commands.executeCommand(REFRESH_RESOURCES);
   }
 
-  const notebookData = new NotebookData(buildDemoNotebookCells(SQLITE_DEMO_CONNECTION_NAME));
-  const tokenSource = new CancellationTokenSource();
-  try {
-    const bytes = await new DBNotebookSerializer().serializeNotebook(
-      notebookData,
-      tokenSource.token
-    );
-    await writeBytesToResource(notebookUri, bytes);
-  } finally {
-    tokenSource.dispose();
-  }
+  await writeNotebookFile(buildDemoNotebookCells(SQLITE_DEMO_CONNECTION_NAME), notebookUri);
 
   log(`${PREFIX} created SQLite demo at [${demoDirUri.fsPath}]`);
-  await openNotebook(notebookUri, options);
+  await openNotebookFile(notebookUri, toViewColumnOption(options));
 }
 
 /**
@@ -340,7 +317,7 @@ export async function createSqliteDemo(
 
   if (await existsUri(location.notebookUri)) {
     log(`${PREFIX} demo notebook already exists, reopening [${location.notebookUri.fsPath}]`);
-    await openNotebook(location.notebookUri, options);
+    await openNotebookFile(location.notebookUri, toViewColumnOption(options));
     return;
   }
 
