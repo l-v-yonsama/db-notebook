@@ -24,6 +24,10 @@ import {
 } from "../constant";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 import { CellMeta } from "../types/Notebook";
+import {
+  formatConnectionEnvironmentLabel,
+  isHighAttentionEnvironment,
+} from "../utilities/connectionEnvironmentDisplay";
 import { existsFileOnWorkspace } from "../utilities/fsUtil";
 import {
   hasConnectionCell,
@@ -159,6 +163,15 @@ export class ConnectionSettingProvider implements NotebookCellStatusBarItemProvi
     if (connectionName) {
       if (this.stateStorage.hasConnectionSettingByName(connectionName)) {
         tooltip = "$(debug-disconnect) Use " + abbr(connectionName, 16);
+        const setting = this.stateStorage
+          .getPasswordlessConnectionSettingList()
+          .find((it) => it.name === connectionName);
+        const envLabel = formatConnectionEnvironmentLabel(setting?.environment);
+        if (envLabel) {
+          tooltip += isHighAttentionEnvironment(setting?.environment)
+            ? ` / $(warning) ${envLabel}`
+            : ` / ${envLabel}`;
+        }
         setupDbResource(connectionName);
       } else {
         tooltip = "$(error) Missing connection " + abbr(connectionName, 16);

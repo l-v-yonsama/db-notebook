@@ -9,6 +9,7 @@ import {
   window,
   workspace,
 } from "vscode";
+import { openNotebookFile } from "../notebook/notebookFileUtil";
 import { DBNotebookSerializer } from "../notebook/serializer";
 import { showWindowErrorMessage } from "./alertUtil";
 import { readResource, writeBytesToResource, writeToResource } from "./fsUtil";
@@ -80,8 +81,7 @@ export async function upsertCfnDiagramPreviewNotebook(
   const bytes = await serializer.serializeNotebook(notebookData, token);
   await writeBytesToResource(uri, bytes);
 
-  const doc = await workspace.openNotebookDocument(uri);
-  await window.showNotebookDocument(doc, { viewColumn: ViewColumn.Two });
+  await openNotebookFile(uri, { viewColumn: ViewColumn.Two });
 }
 
 async function readFileIfExists(uri: Uri): Promise<Uint8Array | undefined> {

@@ -387,14 +387,17 @@ export class DiffMdhViewProvider extends BaseViewProvider {
     const baseList = tabItem.list.map((it) => it.rdh1);
     const conNames = [...new Set(baseList.map((it) => it.meta.connectionName + ""))];
 
-    contents.push(`const startTime = new Date().getTime();`);
+    contents.push(`const startTime: number = new Date().getTime();`);
     contents.push(`let totalAffectedRows = 0;`);
-    contents.push(
-      `const rdb = new ResultSetDataBuilder([{name:'affectedRows',type:'numeric'},{name:'sql',type:'text',width:500,align:'left'}]);`
-    );
+    contents.push(`const rdb = new ResultSetDataBuilder([`);
+    contents.push(`  { name: 'affectedRows', comment: '', type: 'numeric' },`);
+    contents.push(`  { name: 'sql', comment: '', type: 'text', width: 500, align: 'left' },`);
+    contents.push(`]);`);
     contents.push(``);
-    contents.push(`const requestSql = async (driver, sql) => {`);
-    contents.push(`  const r = await driver.requestSql({ sql });`);
+    contents.push(`// Undo statements run against whichever driver each connection resolves to`);
+    contents.push(`// (RDS-family or AWS), so this stays untyped rather than picking one family.`);
+    contents.push(`const requestSql = async (driver: any, sql: string): Promise<void> => {`);
+    contents.push(`  const r: ResultSetData = await driver.requestSql({ sql });`);
     contents.push(`  const affectedRows = r?.summary?.affectedRows ?? 0;`);
     contents.push(`  totalAffectedRows += affectedRows;`);
     contents.push(`  rdb.addRow({ affectedRows, sql });`);
@@ -448,18 +451,16 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       contents.push(`console.log('result${i + 1}', JSON.stringify(result${i + 1}, null, 2));`);
     }
     contents.push(``);
-    contents.push(`const elapsedTimeMilli = new Date().getTime() - startTime;`);
+    contents.push(`const elapsedTimeMilli: number = new Date().getTime() - startTime;`);
     contents.push(`rdb.setSummary({`);
     contents.push(`  elapsedTimeMilli,`);
     contents.push(`  affectedRows: totalAffectedRows`);
     contents.push(`});`);
     contents.push(`writeResultSetData('Undo changes results', rdb.build());`);
 
-    const cell = new NotebookCellData(NotebookCellKind.Code, contents.join("\n"), "javascript");
+    const cell = new NotebookCellData(NotebookCellKind.Code, contents.join("\n"), "typescript");
 
     commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
-
-    //   let totalAffectedRows
   }
 
   private async output(data: OutputParams) {

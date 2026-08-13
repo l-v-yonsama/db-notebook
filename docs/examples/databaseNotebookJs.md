@@ -26,6 +26,23 @@ Every JS cell has the globals below available automatically — no `require`/`im
 
 > **`variables` vs `variablesCell`**: `variables` is an in-memory store scoped to the current kernel session — fast, but gone on notebook reload/kernel restart, and never written back into the `.dbn` file. `variablesCell` instead rewrites a JSON cell's actual saved text, so the value is visible in the editor and survives reopening the notebook. Use `variables` to pass values between cells during a run; use `variablesCell` when you want that value to persist in the notebook itself (e.g. caching a freshly-fetched access token for next time).
 
+> **Typing `variables.get()` in a TypeScript cell**: `variables.get<T>(key, optionalDefaultValue?)` is generic — without a type argument it stays `unknown`, same as in a JS cell. Give it one to get real completions on the result:
+>
+> ```ts
+> // SavedCellResult mirrors what a SQL cell's "Saving execution results in shared
+> // variables" writes -- see the Multi-language flow example linked above. TMetadata
+> // narrows just the cell-specific `metadata` field; here it's a SQL cell's `rdh`.
+> const { success, metadata } = variables.get<SavedCellResult<{ rdh: ResultSetData }>>(
+>   "ageStats",
+>   { success: false } // only needs to be a *partial* T -- a typo'd key is still caught
+> );
+> if (success && metadata) {
+>   metadata.rdh.rows; // <- completes
+> }
+> ```
+>
+> For a plain JSON-cell variable (not a saved cell result — see [1.1](#11-bind-parameters-in-query)), just parameterize with the value's own shape instead, e.g. `variables.get<{ age_list: number[] }>("filters")`.
+
 A few of these have no worked example elsewhere on this page:
 
 ```js

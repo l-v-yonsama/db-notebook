@@ -4,7 +4,14 @@ import { RecordRule } from "../shared/RecordRule";
 import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { readFileOnWorkspace } from "./fsUtil";
 
-import { stringConditionToJsonCondition } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  AwsServiceType,
+  ConnectionSetting,
+  DBType,
+  isPartiQLType,
+  isRDSType,
+  stringConditionToJsonCondition,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData } from "@l-v-yonsama/rdh";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 
@@ -71,14 +78,60 @@ export const isMqttCell = (cell: NotebookCell): boolean => {
   return !!meta.publishParams;
 };
 
+// Single source of truth for "which cells use a connection, and which
+// connections are valid for them". Add one entry here when a new
+// connection-backed cell kind is introduced -- every command that needs to
+// map a cell to its compatible connections (or vice versa) reads from this
+// table, so there's nowhere else left to forget to update.
+export type ConnectionCellKind = {
+  name: string;
+  matchesCell: (cell: NotebookCell) => boolean;
+  matchesConnection: (setting: ConnectionSetting) => boolean;
+};
+
+export const CONNECTION_CELL_KINDS: ConnectionCellKind[] = [
+  {
+    name: "SQL",
+    matchesCell: isSqlCell,
+    matchesConnection: (s) => isRDSType(s.dbType) || isPartiQLType(s.dbType, s.awsSetting),
+  },
+  {
+    name: "CloudWatch Logs",
+    matchesCell: isCwqlCell,
+    matchesConnection: (s) =>
+      s.dbType === DBType.Aws && !!s.awsSetting?.services.includes(AwsServiceType.Cloudwatch),
+  },
+  {
+    name: "Redis",
+    matchesCell: isRedisCell,
+    matchesConnection: (s) => s.dbType === DBType.Redis,
+  },
+  {
+    name: "Memcached",
+    matchesCell: isMemcachedCell,
+    matchesConnection: (s) => s.dbType === DBType.Memcache,
+  },
+  {
+    name: "MQTT",
+    matchesCell: isMqttCell,
+    matchesConnection: (s) => s.dbType === DBType.Mqtt,
+  },
+];
+
+export const getConnectionCellKind = (cell: NotebookCell): ConnectionCellKind | undefined => {
+  return CONNECTION_CELL_KINDS.find((it) => it.matchesCell(cell));
+};
+
 export const hasConnectionCell = (cell: NotebookCell): boolean => {
-  return (
-    isSqlCell(cell) ||
-    isCwqlCell(cell) ||
-    isMemcachedCell(cell) ||
-    isRedisCell(cell) ||
-    isMqttCell(cell)
-  );
+  return getConnectionCellKind(cell) !== undefined;
+};
+
+export const getCompatibleConnectionSettings = (
+  cell: NotebookCell,
+  settings: ConnectionSetting[]
+): ConnectionSetting[] => {
+  const kind = getConnectionCellKind(cell);
+  return kind ? settings.filter(kind.matchesConnection) : [];
 };
 
 export const hasAnyRdhOutputCell = (cell: NotebookCell): boolean => {

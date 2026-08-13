@@ -7,15 +7,12 @@ import {
   LanguageModelToolInvocationOptions,
   LanguageModelToolResult,
   NotebookCellKind,
-  NotebookData,
   Uri,
-  window,
-  workspace,
 } from "vscode";
-import { DBNotebookSerializer } from "../../notebook/serializer";
+import { openNotebookFile, writeNotebookFile } from "../../notebook/notebookFileUtil";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
 import { getErrorMessage } from "../../utilities/errorUtil";
-import { createDirectory, existsUri, writeBytesToResource } from "../../utilities/fsUtil";
+import { createDirectory, existsUri } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
 import { CellInput, buildNotebookCells } from "./notebookCellBuilder";
@@ -35,7 +32,7 @@ export class CreateNotebookTool implements LanguageModelTool<CreateNotebookToolI
 
   async invoke(
     options: LanguageModelToolInvocationOptions<CreateNotebookToolInput>,
-    token: CancellationToken
+    _token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { notebookPath, connectionName, sqlText, cells } = options.input;
     log(
@@ -46,7 +43,7 @@ export class CreateNotebookTool implements LanguageModelTool<CreateNotebookToolI
 
     const text = await trackInvocation("lmTools", "CreateNotebookTool", options.input, async () => {
       try {
-        const result = await createNotebook(this.stateStorage, options.input, token);
+        const result = await createNotebook(this.stateStorage, options.input);
         const lines = [result.ok ? `✅ ${result.message}` : `❌ ${result.message}`];
         if (!result.ok && result.availableConnectionNames?.length) {
           lines.push(`Available connections: ${result.availableConnectionNames.join(", ")}`);
@@ -70,8 +67,7 @@ type CreateNotebookResult =
 
 async function createNotebook(
   stateStorage: StateStorage,
-  input: CreateNotebookToolInput,
-  token: CancellationToken
+  input: CreateNotebookToolInput
 ): Promise<CreateNotebookResult> {
   const { notebookPath, connectionName, sqlText, cells } = input;
 
@@ -122,13 +118,8 @@ async function createNotebook(
   }
 
   await createDirectory(Uri.file(path.dirname(uri.fsPath)));
-
-  const notebookData = new NotebookData(buildResult.cells);
-  const bytes = await new DBNotebookSerializer().serializeNotebook(notebookData, token);
-  await writeBytesToResource(uri, bytes);
-
-  const document = await workspace.openNotebookDocument(uri);
-  await window.showNotebookDocument(document);
+  await writeNotebookFile(buildResult.cells, uri);
+  await openNotebookFile(uri);
 
   const cellSummary = buildResult.cells
     .map((c) => (c.kind === NotebookCellKind.Markup ? "markdown" : c.languageId))

@@ -39,6 +39,7 @@ import {
   COPY_AWS_SECRET_VALUE,
   COPY_COLUMN_NAMES,
   COPY_RESOURCE_NAME,
+  CONNECTION_SETTING_FORM_VIEWID,
   COUNT_FOR_ALL_TABLES,
   CREATE_CFN_DIAGRAM,
   CREATE_CONNECTION_SETTING,
@@ -151,7 +152,11 @@ const revealConnectionAfterResourceLoad = async (
 const registerConnectionSettingCommand = (params: ResourceTreeParams) => {
   const { context, stateStorage, dbResourceTree, connectionSettingViewProvider } = params;
 
-  commands.registerCommand(CREATE_CONNECTION_SETTING, () => {
+  commands.registerCommand(CREATE_CONNECTION_SETTING, async () => {
+    // This can be invoked from outside the DB Notebook sidebar (Command Palette, the Getting
+    // Started walkthrough, ...), where the connection form's own view may not be visible yet.
+    // Reveal it first so the now-open form is actually where the user is looking.
+    await commands.executeCommand(`${CONNECTION_SETTING_FORM_VIEWID}.focus`);
     connectionSettingViewProvider.setForm("create");
   });
   commands.registerCommand(SHOW_CONNECTION_SETTING, async (conRes: DbConnection) => {

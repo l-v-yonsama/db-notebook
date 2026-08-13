@@ -2,6 +2,7 @@ import {
   Auth0Database,
   AwsDatabase,
   AwsServiceType,
+  ConnectionEnvironment,
   ConnectionSetting,
   DBType,
   DbCfnStack,
@@ -413,6 +414,10 @@ export class StateStorage {
     return this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
   }
 
+  getPasswordlessConnectionSettingByName(name: string): ConnectionSetting | undefined {
+    return this.getPasswordlessConnectionSettingList().find((it) => it.name === name);
+  }
+
   async getConnectionSettingByName(name: string): Promise<ConnectionSetting | undefined> {
     // log(`${PREFIX} getConnectionSettingByName(${name})`);
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
@@ -461,9 +466,11 @@ export class StateStorage {
   }
 
   getDBTypeByConnectionName(name: string): DBType | undefined {
-    const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
-    const setting = list.find((it) => it.name === name);
-    return setting?.dbType;
+    return this.getPasswordlessConnectionSettingByName(name)?.dbType;
+  }
+
+  getEnvironmentByConnectionName(name: string): ConnectionEnvironment | undefined {
+    return this.getPasswordlessConnectionSettingByName(name)?.environment;
   }
 
   getDBProductByConnectionName(name: string): string | undefined {

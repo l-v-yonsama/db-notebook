@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { WRITE_TO_CLIP_BOARD_DETAIL_ITEMS } from "@/constants";
-import type { DropdownItem, SecondaryItem } from "@/types/Components";
+import type { DropdownItem, SecondaryItem, TabItemLike } from "@/types/Components";
 import type {
   CloseTabActionCommand,
   CompareParams,
@@ -86,6 +86,14 @@ const describable = ref(false);
 function getActiveTabItem(): RdhTabItem | undefined {
   const tabId = activeTabId.value.substring(4); // 'tab-'
   return tabItems.value.find((it) => it.tabId === tabId) as RdhTabItem;
+}
+
+// Prefixes the tab title with the source connection's environment (e.g. "[PRODUCTION] "),
+// pre-formatted host-side (see MdhViewProvider.createTabItem) since the webview has no
+// access to StateStorage. Omitted entirely when the connection has no environment set.
+function formatTabTitle(tabItem: TabItemLike): string {
+  const environment = (tabItem as RdhTabItem).environment;
+  return environment ? `[${environment}] ${tabItem.title}` : `${tabItem.title}`;
 }
 
 const showTab = async (tabId: string, innerIndex?: number) => {
@@ -404,8 +412,8 @@ defineExpose({
       <CompareKeySettings v-if="contentMode == 'keys'" :rdhList="activeTabRdhList" @cancel="contentMode = 'tab'"
         @save="saveCompareKeys" />
       <VsCodeTabPanels v-if="contentMode == 'tab'" :tab-items="tabItems" :active-tab-id="activeTabId"
-        view-padding="4px" @clickTab="showTab" @closeTab="(tabId: string) => removeTabItem(tabId, true)"
-        v-slot="{ active }">
+        :title-formatter="formatTabTitle" view-padding="4px" @clickTab="showTab"
+        @closeTab="(tabId: string) => removeTabItem(tabId, true)" v-slot="{ active }">
         <section :style="{ width: `${splitterWidth}px` }">
           <div v-if="activeInnerRdh && active" class="spPaneWrapper">
             <RDHViewer :rdh="activeInnerRdh" :config="viewConfig" :width="splitterWidth" :height="splitterHeight"

@@ -15,6 +15,7 @@ import {
   PreparedToolInvocation,
 } from "vscode";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
+import { formatConnectionEnvironmentLabel } from "../../utilities/connectionEnvironmentDisplay";
 import { getDatabaseConfig } from "../../utilities/configUtil";
 import { workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
@@ -65,13 +66,15 @@ export class RunQueryTool implements LanguageModelTool<RunQueryToolInput> {
     const reason = alwaysConfirm
       ? `Database Notebook cannot enforce read-only isolation for ${resolution.setting.dbType} connections, so every query on this connection needs confirmation.`
       : "This looks like a write/DDL statement.";
+    const envLabel = formatConnectionEnvironmentLabel(resolution.setting.environment);
+    const envLine = envLabel ? `**Environment:** ${envLabel}\n\n` : "";
 
     return {
       invocationMessage,
       confirmationMessages: {
         title: `Run SQL on "${connectionName}"?`,
         message: new MarkdownString(
-          `${reason} Review it before running against **${connectionName}**:\n\n\`\`\`sql\n${sql}\n\`\`\``
+          `${envLine}${reason} Review it before running against **${connectionName}**:\n\n\`\`\`sql\n${sql}\n\`\`\``
         ),
       },
     };

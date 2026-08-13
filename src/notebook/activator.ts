@@ -1,8 +1,6 @@
 import {
   DBType,
   formatQuery,
-  isPartiQLType,
-  isRDSType,
   MqttQoS,
   ResourceType,
   separateMultipleQueries,
@@ -48,9 +46,11 @@ import {
   CELL_TOOLBAR_LM,
   CREATE_NEW_NOTEBOOK,
   CREATE_NOTEBOOK_FROM_SQL,
+  CREATE_SQLITE_DEMO,
   EXPORT_IN_HTML,
   NOTEBOOK_TYPE,
   OPEN_MDH_VIEWER,
+  RESET_SQLITE_DEMO,
   SHOW_NOTEBOOK_ALL_RDH,
   SHOW_NOTEBOOK_ALL_VARIABLES,
   SPECIFY_CONNECTION_TO_ALL_CELLS,
@@ -70,14 +70,14 @@ import { readResource } from "../utilities/fsUtil";
 import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
 import { log } from "../utilities/logger";
 import {
+  getCompatibleConnectionSettings,
   getSelectedCells,
   getToolbarButtonClickedNotebookEditor,
   hasAnyRdhOutputCell,
+  hasConnectionCell,
   isCwqlCell,
   isJsonValueCell,
-  isMemcachedCell,
   isMqttCell,
-  isRedisCell,
   isSqlCell,
 } from "../utilities/notebookUtil";
 import { rrmListToRdhList } from "../utilities/rrmUtil";
@@ -85,6 +85,7 @@ import { StateStorage } from "../utilities/StateStorage";
 import { MainController, resetCellContext } from "./controller";
 import { activateIntellisense } from "./intellisense";
 import { DBNotebookSerializer } from "./serializer";
+import { createSqliteDemo, resetSqliteDemo, SqliteDemoOptions } from "./sqliteDemo";
 
 const PREFIX = "[notebook/activator]";
 
@@ -145,6 +146,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       window.showNotebookDocument(newNotebook);
     });
+    registerDisposableCommand(CREATE_SQLITE_DEMO, async (options?: SqliteDemoOptions) => {
+      await createSqliteDemo(context, stateStorage, options);
+    });
+    registerDisposableCommand(RESET_SQLITE_DEMO, async (options?: SqliteDemoOptions) => {
+      await resetSqliteDemo(context, stateStorage, options);
+    });
   }
 
   // Notebook toolbar commands
@@ -194,28 +201,23 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         if (!cells) {
           return;
         }
-        if (cells.every((it) => !isSqlCell(it))) {
+        // Every cell kind that carries a connection (sql/cwql/redis/memcached/mqtt)
+        // is targeted here -- no per-kind filtering. Picking a connection whose
+        // type doesn't suit a given cell just fails that cell at run time, same
+        // as picking the wrong one manually for a single cell today.
+        const targetCells = cells.filter((it) => hasConnectionCell(it));
+        if (targetCells.length === 0) {
           return;
         }
         const conSettings = await stateStorage.getConnectionSettingList();
-        const items = conSettings
-          .filter(
-            (it) =>
-              it.dbType === DBType.Mqtt ||
-              isRDSType(it.dbType) ||
-              isPartiQLType(it.dbType, it.awsSetting)
-          )
-          .map((it) => ({
-            label: it.name,
-            description: it.dbType,
-          }));
+        const items = conSettings.map((it) => ({
+          label: it.name,
+          description: it.dbType,
+        }));
         items.push({ label: "<None>", description: "(set as unspecified)" as DBType });
         const result = await window.showQuickPick(items);
         if (result) {
-          for (const cell of cells) {
-            if (!isSqlCell(cell)) {
-              continue;
-            }
+          for (const cell of targetCells) {
             if (cell.metadata?.connectionName === result.label) {
               continue;
             }
@@ -330,26 +332,10 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       }
 
       const conSettings = await stateStorage.getConnectionSettingList();
-      const items = conSettings
-        .filter((it) => {
-          if (isMqttCell(targetCells[0])) {
-            return it.dbType === DBType.Mqtt;
-          } else if (isMemcachedCell(targetCells[0])) {
-            return it.dbType === DBType.Memcache;
-          } else if (isRedisCell(targetCells[0])) {
-            return it.dbType === DBType.Redis;
-          } else {
-            return (
-              it.dbType === DBType.Mqtt ||
-              isRDSType(it.dbType) ||
-              isPartiQLType(it.dbType, it.awsSetting)
-            );
-          }
-        })
-        .map((it) => ({
-          label: it.name,
-          description: it.dbType,
-        }));
+      const items = getCompatibleConnectionSettings(targetCells[0], conSettings).map((it) => ({
+        label: it.name,
+        description: it.dbType,
+      }));
       items.push({ label: "<None>", description: "(set as unspecified)" as DBType });
       const result = await window.showQuickPick(items);
       if (result) {
