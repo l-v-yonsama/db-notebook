@@ -1,7 +1,7 @@
 {
   "name": "database-notebook",
   "displayName": "Database notebook",
-  "description": "JavaScript, SQL, and Markdown can be centrally managed within a single notebook file. Includes a database manager supporting MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Use your saved connections as AI tools in GitHub Copilot Chat (Agent mode) -- list/test connections, inspect schemas, run queries and transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create or edit .dbn notebooks directly from chat. Features intuitive MQTT publish/subscribe tools and the ability to query payloads with SQLite.",
+  "description": "Turn ad-hoc investigations across databases, logs, and cloud resources into something you can save, share, and re-run. Manage SQL, JavaScript/TypeScript, and Markdown together in one notebook file, with a database manager for MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Reuse the same saved connections as AI tools in GitHub Copilot Chat (Agent mode) or via a standalone MCP server. Try it in minutes with the built-in SQLite demo -- no external database required.",
   "version": "1.5.1",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
@@ -196,6 +196,79 @@
         ]
       }
     ],
+    "walkthroughs": [
+      {
+        "id": "dbNotebookGettingStarted",
+        "title": "Get Started with Database Notebook",
+        "description": "Go from install to your first result in a few minutes — no external database required.",
+        "icon": "media/logo128.png",
+        "steps": [
+          {
+            "id": "welcome",
+            "title": "Welcome to Database Notebook",
+            "description": "Database Notebook brings SQL, JavaScript/TypeScript, Markdown, and query results together in one notebook file, so you can turn ad-hoc investigations across databases, logs, and cloud resources into something you can save, share, and re-run.\n\nThis walkthrough gets you to your first result in a few minutes.",
+            "media": {
+              "markdown": "media/walkthrough/overview.md"
+            }
+          },
+          {
+            "id": "createDemo",
+            "title": "Create the SQLite demo",
+            "description": "Create a small local SQLite database, a connection pointing at it, and a ready-to-run notebook — all in one step. It opens beside this walkthrough so you can follow along.\n\n[Create SQLite Demo](command:database-notebook.create-sqlite-demo?%5B%7B%22openBeside%22%3Atrue%7D%5D)\n\nAlready created it before? That command just reopens the existing one. To start over with a fresh copy instead, run [Reset SQLite Demo](command:database-notebook.reset-sqlite-demo?%5B%7B%22openBeside%22%3Atrue%7D%5D).",
+            "media": {
+              "markdown": "media/walkthrough/create-demo.md"
+            },
+            "completionEvents": [
+              "onCommand:database-notebook.create-sqlite-demo",
+              "onCommand:database-notebook.reset-sqlite-demo"
+            ]
+          },
+          {
+            "id": "runCell",
+            "title": "Run the notebook",
+            "description": "Click **Run All** ▶▶ — at the very top of the notebook, not the ▶ on an individual cell — to run it from top to bottom.\n\nRunning cells one at a time also works, but some cells depend on an earlier cell's result from that same run, so Run All is the safest way to see everything work on the first try.",
+            "media": {
+              "markdown": "media/walkthrough/run-cell.md"
+            },
+            "completionEvents": [
+              "onCommand:notebook.execute",
+              "onCommand:notebook.cell.execute"
+            ]
+          },
+          {
+            "id": "viewResults",
+            "title": "View the result",
+            "description": "The chart cell's chart opens automatically in the panel at the bottom.\n\nTo see every cell's result table in that same panel — sortable, filterable, and ready to export — click **Open ResultSets** ($(table)) in the notebook's toolbar (top of the notebook).",
+            "media": {
+              "markdown": "media/walkthrough/view-results.md"
+            },
+            "completionEvents": [
+              "onView:database-notebook.view.bottom.charts",
+              "onView:database-notebook.view.bottom.mdh"
+            ]
+          },
+          {
+            "id": "exportResult",
+            "title": "Export the result",
+            "description": "With the ResultSets tab still open at the bottom, use its own toolbar to save the result as an HTML or Excel file.",
+            "media": {
+              "markdown": "media/walkthrough/export.md"
+            }
+          },
+          {
+            "id": "ownConnection",
+            "title": "Connect your own database",
+            "description": "When you're ready, create a connection to your own database. This switches to the DB Notebook view in the side bar and opens the connection form there.\n\n[Create Connection](command:database-notebook.create-connection-setting)",
+            "media": {
+              "markdown": "media/walkthrough/own-connection.md"
+            },
+            "completionEvents": [
+              "onCommand:database-notebook.create-connection-setting"
+            ]
+          }
+        ]
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -348,6 +421,10 @@
       "file/newFile": [
         {
           "command": "database-notebook.create-blank-notebook",
+          "group": "notebook"
+        },
+        {
+          "command": "database-notebook.create-sqlite-demo",
           "group": "notebook"
         },
         {
@@ -926,6 +1003,25 @@
         "title": "Create a new blank Database Notebook",
         "shortTitle": "Database Notebook",
         "category": "Database Notebook"
+      },
+      {
+        "command": "database-notebook.create-sqlite-demo",
+        "title": "Create SQLite Demo",
+        "shortTitle": "SQLite Demo",
+        "category": "Database Notebook",
+        "icon": "$(database)"
+      },
+      {
+        "command": "database-notebook.reset-sqlite-demo",
+        "title": "Reset SQLite Demo",
+        "category": "Database Notebook",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "database-notebook.show-getting-started",
+        "title": "Show Getting Started",
+        "category": "Database Notebook",
+        "icon": "$(rocket)"
       },
       {
         "command": "database-notebook.create-er-diagram",
@@ -1572,6 +1668,30 @@
           "maximum": 1000000,
           "default": 100,
           "description": "Default LIMIT applied to SQL queries when no explicit limit is specified."
+        },
+        "database.resourceTreeAutoExpandTo": {
+          "scope": "resource",
+          "type": "string",
+          "enum": [
+            "none",
+            "database",
+            "schema",
+            "table"
+          ],
+          "enumItemLabels": [
+            "Do not auto-expand",
+            "Database / Service",
+            "Schema / Resource",
+            "Table / Child Resource"
+          ],
+          "enumDescriptions": [
+            "Do not reveal or expand the resource tree automatically after loading resources.",
+            "Show database or service nodes.",
+            "Show schema or resource nodes.",
+            "Show table or child resource nodes."
+          ],
+          "default": "schema",
+          "description": "Controls how far the DB Explorer resource tree is automatically expanded after loading resources."
         },
         "mcpServer.autoStart": {
           "scope": "resource",
@@ -2768,7 +2888,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^1.3.0",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers/l-v-yonsama-multi-platform-database-drivers-1.3.0.tgz",
     "@l-v-yonsama/rdh": "^0.3.0",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",
