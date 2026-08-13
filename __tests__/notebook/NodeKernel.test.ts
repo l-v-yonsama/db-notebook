@@ -78,4 +78,36 @@ describe("NodeKernel / typescript cells", () => {
     expect(result.status).toBe("error");
     expect(result.stderr.length).toBeGreaterThan(0);
   }, 15000);
+
+  it("async/awaitを含むTSセルが実行できる", async () => {
+    const kernel = await NodeKernel.create([]);
+    const result = await kernel.run(
+      makeCell(
+        "async function wait(ms: number): Promise<number> { return Promise.resolve(ms); } const v = await wait(1); variablesCell.replaceAllAtFirst({ v });",
+        "typescript"
+      )
+    );
+
+    expect(result.stderr).not.toMatch(/ReferenceError/);
+    expect(result.status).toBe("executed");
+    expect(result.metadata?.updateJSONCellValues).toEqual([
+      { cellIndex: 0, replaceAll: true, data: { v: 1 } },
+    ]);
+  }, 15000);
+
+  it("rdh(ResultSetDataBuilder)をグローバル注入経由で使うTSセルが実行できる", async () => {
+    const kernel = await NodeKernel.create([]);
+    const result = await kernel.run(
+      makeCell(
+        "const rs = ResultSetDataBuilder.createEmpty().build(); const rowCount: number = rs.rows.length; variablesCell.replaceAllAtFirst({ rowCount });",
+        "typescript"
+      )
+    );
+
+    expect(result.stderr).not.toMatch(/ReferenceError/);
+    expect(result.status).toBe("executed");
+    expect(result.metadata?.updateJSONCellValues).toEqual([
+      { cellIndex: 0, replaceAll: true, data: { rowCount: 0 } },
+    ]);
+  }, 15000);
 });
