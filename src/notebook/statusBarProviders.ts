@@ -1,11 +1,13 @@
 import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr } from "@l-v-yonsama/rdh";
 import {
+  ExtensionContext,
   NotebookCell,
   NotebookCellKind,
   NotebookCellStatusBarAlignment,
   NotebookCellStatusBarItem,
   NotebookCellStatusBarItemProvider,
+  notebooks,
 } from "vscode";
 import {
   CELL_MARK_CELL_AS_MQTT,
@@ -21,6 +23,7 @@ import {
   CELL_SPECIFY_MQTT_QOS_TO_USE,
   CELL_SPECIFY_MQTT_RETAIN_TO_USE,
   CELL_SPECIFY_MQTT_TOPIC_TO_USE,
+  NOTEBOOK_TYPE,
 } from "../constant";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 import { CellMeta } from "../types/Notebook";
@@ -437,4 +440,83 @@ export class PreExecutionProvider implements NotebookCellStatusBarItemProvider {
     item.tooltip = tooltip;
     return item;
   }
+}
+
+/**
+ * Registers every notebook cell status bar item provider for the Database Notebook
+ * and adds their disposables to `context.subscriptions`. Registration order is kept
+ * identical to the previous inline registration in MainController's constructor.
+ */
+export function registerNotebookStatusBarProviders(
+  context: ExtensionContext,
+  stateStorage: StateStorage
+): void {
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new MarkCellAsSkipProvider())
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new PreExecutionProvider())
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new ConnectionSettingProvider(stateStorage)
+    )
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new MarkCellAsMqttProvider(stateStorage)
+    )
+  );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new MqttTopicProvider())
+  );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new MqttQosProvider(stateStorage)
+    )
+  );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new MqttRetainProvider())
+  );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new MqttSubscribeExpandJsonColumnProvider(stateStorage)
+    )
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new LogGroupSettingProvider(stateStorage)
+    )
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new LogGroupQueryTimeSettingProvider(stateStorage)
+    )
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new CellMetadataProvider(stateStorage)
+    )
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RdhProvider())
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new HttpResponseProvider())
+  );
 }

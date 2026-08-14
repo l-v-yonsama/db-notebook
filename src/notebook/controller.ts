@@ -60,21 +60,7 @@ import { NodeKernel } from "./NodeKernel";
 import { RedisKernel } from "./RedisKernel";
 import { ShellKernel } from "./ShellKernel";
 import { SqlKernel } from "./sqlKernel";
-import {
-  CellMetadataProvider,
-  ConnectionSettingProvider,
-  HttpResponseProvider,
-  LogGroupQueryTimeSettingProvider,
-  LogGroupSettingProvider,
-  MarkCellAsMqttProvider,
-  MarkCellAsSkipProvider,
-  MqttQosProvider,
-  MqttRetainProvider,
-  MqttSubscribeExpandJsonColumnProvider,
-  MqttTopicProvider,
-  PreExecutionProvider,
-  RdhProvider,
-} from "./statusBarProviders";
+import { registerNotebookStatusBarProviders } from "./statusBarProviders";
 
 const PREFIX = "[notebook/Controller]";
 
@@ -184,77 +170,7 @@ export class MainController {
     //---------------------------
     // STATUS BAR ITEM PROVIDERS
     //---------------------------
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new MarkCellAsSkipProvider()
-      )
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new PreExecutionProvider())
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new ConnectionSettingProvider(stateStorage)
-      )
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new MarkCellAsMqttProvider(stateStorage)
-      )
-    );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new MqttTopicProvider())
-    );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new MqttQosProvider(stateStorage)
-      )
-    );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new MqttRetainProvider())
-    );
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new MqttSubscribeExpandJsonColumnProvider(stateStorage)
-      )
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new LogGroupSettingProvider(stateStorage)
-      )
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new LogGroupQueryTimeSettingProvider(stateStorage)
-      )
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(
-        NOTEBOOK_TYPE,
-        new CellMetadataProvider(stateStorage)
-      )
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RdhProvider())
-    );
-
-    context.subscriptions.push(
-      notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new HttpResponseProvider())
-    );
+    registerNotebookStatusBarProviders(context, stateStorage);
   }
 
   setSqlMode(sqlMode: SQLMode): void {
