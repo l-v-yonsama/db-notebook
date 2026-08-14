@@ -72,7 +72,7 @@ const initialize = (v: ERDiagramSettingsPanelEventData["value"]["initialize"]): 
     allTableItems.value.push({
       name: table.name,
       comment: table.comment ?? "",
-      selected: v.params.selectedTable?.name === table.name,
+      selected: (v.params.selectedTableNames ?? []).includes(table.name),
       referencedFrom: getReferenceTableNames(table.foreignKeys?.referencedFrom),
       referenceTo: getReferenceTableNames(table.foreignKeys?.referenceTo),
       isAll: true,

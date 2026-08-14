@@ -20,6 +20,7 @@ import {
   SchemaAndTableName,
   createColumnNames,
   createErDiagram,
+  createFullSchemaERDiagramParams,
   createSimpleERDiagramParams,
   resolveLastOrderByColumn,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -645,36 +646,51 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   );
 
   // ER diagram
-  commands.registerCommand(CREATE_ER_DIAGRAM, async (tableRes: DbTable) => {
+  // Both commands accept either a table row (part-of-schema diagram seeded from that one
+  // table's relations) or a schema row (whole-schema diagram, every table). Same shape as
+  // CREATE_CFN_DIAGRAM's AwsDatabase/DbCfnStack dispatch above - the resource actually
+  // right-clicked decides scope, not a boolean flag.
+  commands.registerCommand(CREATE_ER_DIAGRAM, async (res: DbTable | DbSchema) => {
     try {
-      const { conName, schemaName } = tableRes.meta;
-      const dbs = stateStorage.getResourceByName(conName);
-      let schema: DbSchema | undefined = undefined;
-      if (dbs && dbs[0] instanceof RdsDatabase) {
-        schema = (dbs[0] as RdsDatabase).getSchema({ name: schemaName });
+      let content: string;
+      if (res.resourceType === ResourceType.Schema) {
+        content = createErDiagram(createFullSchemaERDiagramParams(res as DbSchema));
+      } else {
+        const tableRes = res as DbTable;
+        const { conName, schemaName } = tableRes.meta;
+        const dbs = stateStorage.getResourceByName(conName);
+        let schema: DbSchema | undefined = undefined;
+        if (dbs && dbs[0] instanceof RdsDatabase) {
+          schema = (dbs[0] as RdsDatabase).getSchema({ name: schemaName });
+        }
+        content = createErDiagram(createSimpleERDiagramParams(schema, tableRes));
       }
-      const params = createSimpleERDiagramParams(schema, tableRes);
-      const content = createErDiagram(params);
       const cell = new NotebookCellData(NotebookCellKind.Markup, content, "markdown");
       commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
     } catch (e) {
       showWindowErrorMessage(e);
     }
   });
-  commands.registerCommand(CREATE_ER_DIAGRAM_WITH_SETTINGS, async (tableRes: DbTable) => {
+  commands.registerCommand(CREATE_ER_DIAGRAM_WITH_SETTINGS, async (res: DbTable | DbSchema) => {
     try {
-      const { conName, schemaName } = tableRes.meta;
-      const rdb = stateStorage.getFirstRdsDatabaseByName(conName);
-      const schema = rdb?.getSchema({ name: schemaName });
-      let title = tableRes.comment ?? "";
-      if (!title) {
-        title = tableRes.name;
+      if (res.resourceType === ResourceType.Schema) {
+        const schemaRes = res as DbSchema;
+        ERDiagramSettingsPanel.render(context.extensionUri, {
+          title: schemaRes.comment || schemaRes.name,
+          tables: schemaRes.children,
+          selectedTableNames: schemaRes.children.map((it) => it.name),
+        });
+      } else {
+        const tableRes = res as DbTable;
+        const { conName, schemaName } = tableRes.meta;
+        const rdb = stateStorage.getFirstRdsDatabaseByName(conName);
+        const schema = rdb?.getSchema({ name: schemaName });
+        ERDiagramSettingsPanel.render(context.extensionUri, {
+          title: tableRes.comment || tableRes.name,
+          tables: schema?.children ?? [],
+          selectedTableNames: [tableRes.name],
+        });
       }
-      ERDiagramSettingsPanel.render(context.extensionUri, {
-        title,
-        tables: schema?.children ?? [],
-        selectedTable: tableRes,
-      });
     } catch (e) {
       showWindowErrorMessage(e);
     }

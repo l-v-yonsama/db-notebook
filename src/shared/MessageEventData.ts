@@ -573,7 +573,9 @@ export type Chat2QueryPanelEventData = BaseMessageEventData<
 export type ERDiagramSettingsInputParams = {
   title: string;
   tables: DbTable[];
-  selectedTable?: DbTable;
+  /** Names of tables pre-checked when the panel opens - one name from a table-row entry point,
+   * every table's name from a schema-row entry point. */
+  selectedTableNames?: string[];
 };
 
 export type ERDiagramSettingsPanelEventData = BaseMessageEventData<

@@ -605,6 +605,21 @@
         },
         {
           "command": "database-notebook.create-er-diagram",
+          "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.create-er-diagram",
+          "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
+          "group": "er-diagram@5"
+        },
+        {
+          "command": "database-notebook.create-er-diagram-with-settings",
+          "when": "view == database-notebook-connections && viewItem =~ /^Schema.*/",
+          "group": "er-diagram@5"
+        },
+        {
+          "command": "database-notebook.create-er-diagram",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "inline"
         },
