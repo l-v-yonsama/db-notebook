@@ -495,7 +495,7 @@ defineExpose({
                   </div>
                 </template>
 
-                <template v-if="currentSqlExtractionFlow" class="sql-extraction-flow">
+                <template v-if="currentSqlExtractionFlow">
                   <label for="currentSqlExtractionFlow" class="condition-label">SQL extraction flow</label>
                   <div id="currentSqlExtractionFlow" class="sql-extraction-flow" v-text="currentSqlExtractionFlow">
                   </div>

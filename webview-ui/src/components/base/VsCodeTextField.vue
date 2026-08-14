@@ -2,6 +2,7 @@
   <vscode-text-field class="child" :class="{ transparent, verr: isError }" :value="modelValue" @input="handleOnInput"
     @focus="handleOnFocus" @mouseout="handleOnMouseOut" :type="type" :placeholder="placeholderText" :disabled="disabled"
     :maxlength="maxlength" :min="min" :max="max" :size="size" :readonly="readonly" :title="title">
+    <!-- eslint-disable-next-line vue/no-deprecated-slot-attribute -- native web component slot, not a Vue component slot -->
     <span v-if="isError" slot="end" class="codicon codicon-error"></span>
   </vscode-text-field>
 </template>

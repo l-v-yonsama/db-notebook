@@ -70,7 +70,7 @@ const searchAgain = (): void => {
 };
 
 const kill = () => {
-  if (clickedCellParams === undefined || clickedCellParams.value === undefined) {
+  if (clickedCellParams.value === undefined) {
     return;
   }
   const { rowValues } = clickedCellParams.value;

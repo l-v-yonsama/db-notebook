@@ -43,6 +43,7 @@ const nameErrorMessage = computed((): string => {
   if (input.includes(" ")) {
     return "Topic name must not contain spaces!";
   }
+  // eslint-disable-next-line no-control-regex -- intentional: rejects control characters in topic name
   if (/[\u0000-\u001F\u007F]/.test(input)) {
     return "Topic name must not contain control characters!";
   }

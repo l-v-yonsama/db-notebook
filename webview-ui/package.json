@@ -6,7 +6,8 @@
     "start": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview --port 5050",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint src --ext .ts,.vue"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.4.0",
@@ -31,14 +32,19 @@
     "@types/node": "^18.19.130",
     "@types/splitpanes": "^2.2.1",
     "@types/vscode-webview": "^1.57.0",
+    "@typescript-eslint/eslint-plugin": "^8.67.0",
+    "@typescript-eslint/parser": "^8.67.0",
     "@vitejs/plugin-vue": "^5.2.4",
     "@vue/tsconfig": "^0.9.1",
     "css-declaration-sorter": "^7.0.3",
+    "eslint": "^8.57.1",
+    "eslint-plugin-vue": "^9.33.0",
     "postcss": "^8.4.27",
     "sass": "^1.64.2",
     "terser": "^5.31.2",
     "typescript": "~6.0.3",
     "vite": "^5.4.21",
+    "vue-eslint-parser": "^9.4.3",
     "vue-tsc": "^3.3.9"
   },
   "overrides": {

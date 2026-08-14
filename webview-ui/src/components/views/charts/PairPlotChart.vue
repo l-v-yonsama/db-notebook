@@ -79,7 +79,7 @@ defineExpose({ saveAsPng });
   }">
     <p v-if="showTitle" class="title">{{ title }}</p>
     <div class="legends" v-if="pairPlotChartParams.hueLegends.length > 0">
-      <div class="legend" v-for="(hueLegend, idx) of pairPlotChartParams.hueLegends" :key="hueLegend.title"
+      <div class="legend" v-for="hueLegend of pairPlotChartParams.hueLegends" :key="hueLegend.title"
         :style="{ 'border-color': `${hueLegend.color}`, 'color': `${hueLegend.color}` }">
         {{ hueLegend.pointSymbol }}: {{ hueLegend.title }}
       </div>
@@ -88,7 +88,7 @@ defineExpose({ saveAsPng });
       <tbody>
         <tr>
           <th class="rl">&nbsp;</th>
-          <th v-for="(matrix, ri) in pairPlotChartParams.matrix[0]" :key="matrix.colName">
+          <th v-for="matrix in pairPlotChartParams.matrix[0]" :key="matrix.colName">
             {{ matrix.colName }}
           </th>
         </tr>
