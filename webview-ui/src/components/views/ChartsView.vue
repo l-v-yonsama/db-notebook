@@ -173,7 +173,8 @@ const recieveMessage = (data: ChartsViewEventData) => {
 };
 
 const replaceSafeFileName = (name: string): string => {
-  return name.replace(/[<>#%\{\}\|\\\^~\[\]`;\?:@=& 　]/gi, "_").trim();
+  // eslint-disable-next-line no-irregular-whitespace -- intentional: also strips full-width space
+  return name.replace(/[<>#%{}|\\^~[\]`;?:@=& 　]/gi, "_").trim();
 };
 
 const saveAsPng = async () => {

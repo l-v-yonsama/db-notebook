@@ -415,7 +415,7 @@ defineExpose({
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(detail, idx2) of editorItem.details">
+              <tr v-for="(detail, idx2) of editorItem.details" :key="idx2">
                 <td class="no" style="text-align: right">{{ idx2 + 1 }}</td>
                 <td class="code">
                   <VsCodeTextField v-model="editorItem.details[idx2].code" :maxlength="256" :transparent="true"

@@ -44,7 +44,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(condition, idx) of conditionList">
+          <tr v-for="(condition, idx) of conditionList" :key="idx">
             <td class="no">{{ idx + 1 }}</td>
             <td class="col">
               <VsCodeDropdown
@@ -116,7 +116,7 @@
           </tr>
         </tbody>
       </table>
-      <template v-for="(_, idx) of nestedList">
+      <template v-for="(_, idx) of nestedList" :key="idx">
         <TopLevelCondition
           v-model="nestedList[idx]"
           :columnItems="columnItems"
