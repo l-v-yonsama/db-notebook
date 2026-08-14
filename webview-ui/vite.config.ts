@@ -11,9 +11,17 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern",
+      },
+    },
+  },
   build: {
     minify: "terser",
     outDir: "build",
+    chunkSizeWarningLimit: 750,
     rollupOptions: {
       output: {
         entryFileNames: `assets/[name].js`,
