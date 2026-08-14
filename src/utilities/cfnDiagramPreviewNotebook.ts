@@ -65,7 +65,9 @@ export async function upsertCfnDiagramPreviewNotebook(
   if (existingBytes) {
     notebookData = await serializer.deserializeNotebook(existingBytes, token);
     const hadPreviewCells = notebookData.cells[0]?.metadata?.cfnDiagramPreview === "diagram";
-    while (notebookData.cells[0]?.metadata?.cfnDiagramPreview) notebookData.cells.shift();
+    while (notebookData.cells[0]?.metadata?.cfnDiagramPreview) {
+      notebookData.cells.shift();
+    }
     if (hadPreviewCells) {
       notebookData.cells.unshift(newCell, ...templateCells);
     } else if (notebookData.cells[0]?.kind === NotebookCellKind.Markup) {
@@ -112,12 +114,9 @@ async function upsertDrawioPreview(drawioContent: string, fileName: string): Pro
   const uri = Uri.joinPath(wsFolder.uri, fileName);
   await writeToResource(uri, drawioContent);
   try {
-    await commands.executeCommand(
-      "vscode.openWith",
-      uri,
-      "hediet.vscode-drawio-text",
-      { viewColumn: ViewColumn.Two }
-    );
+    await commands.executeCommand("vscode.openWith", uri, "hediet.vscode-drawio-text", {
+      viewColumn: ViewColumn.Two,
+    });
   } catch {
     await window.showInformationMessage(
       `Draw.io file created, but the Draw.io editor could not be opened: ${uri.fsPath}`
