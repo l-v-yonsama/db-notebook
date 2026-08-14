@@ -235,7 +235,7 @@ defineExpose({
               <div>
                 <label>
                   <input type="checkbox" v-model="executeRestoreInDockerContainer"
-                    @change="($e: any) => handleChange()" />
+                    @change="handleChange()" />
                   Run restore inside Docker container
                 </label>
                 <br>
@@ -250,13 +250,13 @@ defineExpose({
               <div>
                 <label for="userName">User name:</label>
                 <VsCodeTextField id="userName" v-model="userName" :maxlength="128" :transparent="true"
-                  :change-on-mouseout="true" title="Output file name prefix" @change="($e: any) => handleChange()">
+                  :change-on-mouseout="true" title="Output file name prefix" @change="handleChange()">
                 </VsCodeTextField>
               </div>
               <div>
                 <label for="password">Password:</label>
                 <VsCodeTextField id="password" v-model="password" :maxlength="128" :transparent="true"
-                  :change-on-mouseout="true" title="Input password" @change="($e: any) => handleChange()">
+                  :change-on-mouseout="true" title="Input password" @change="handleChange()">
                 </VsCodeTextField>
               </div>
               <div>
@@ -296,7 +296,7 @@ defineExpose({
               </legend>
               <div>
                 <label>
-                  <input type="checkbox" v-model="showProgress" @change="($e: any) => handleChange()" />
+                  <input type="checkbox" v-model="showProgress" @change="handleChange()" />
                   Show restore progress (requires pv)
                 </label>
                 <br>
@@ -305,7 +305,7 @@ defineExpose({
               </div>
               <div>
                 <label>
-                  <input type="checkbox" v-model="verbose" @change="($e: any) => handleChange()" />
+                  <input type="checkbox" v-model="verbose" @change="handleChange()" />
                   Verbose output (debug / large logs)
                 </label>
                 <br>
@@ -315,7 +315,7 @@ defineExpose({
               <!-- SQLite 専用 -->
               <div v-if="dbType === 'SQLite'" style="margin-top: 10px;">
                 <label>
-                  <input type="checkbox" v-model="deleteExistingSqliteDb" @change="($e: any) => handleChange()" />
+                  <input type="checkbox" v-model="deleteExistingSqliteDb" @change="handleChange()" />
                   Delete existing SQLite database before restore
                 </label>
                 <br />

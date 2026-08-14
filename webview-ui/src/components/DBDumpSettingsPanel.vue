@@ -263,7 +263,7 @@ defineExpose({
               </legend>
               <div>
                 <label>
-                  <input type="checkbox" v-model="executeDumpInDockerContainer" @change="($e: any) => handleChange()" />
+                  <input type="checkbox" v-model="executeDumpInDockerContainer" @change="handleChange()" />
                   Execute dump command inside the Docker container
                 </label>
                 <br>
@@ -278,18 +278,18 @@ defineExpose({
               <div>
                 <label for="targetScope">Target scope:</label>
                 <VsCodeRadioGroupVue id="targetScope" v-model="targetScope" :items="targetScopeItems"
-                  @change="($e: any) => handleChange()" style="display: inline-block; margin-left: 20px;" />
+                  @change="handleChange()" style="display: inline-block; margin-left: 20px;" />
               </div>
               <div>
                 <label for="userName">User name:</label>
                 <VsCodeTextField id="userName" v-model="userName" :maxlength="128" :transparent="true"
-                  :change-on-mouseout="true" title="Output file name prefix" @change="($e: any) => handleChange()">
+                  :change-on-mouseout="true" title="Output file name prefix" @change="handleChange()">
                 </VsCodeTextField>
               </div>
               <div>
                 <label for="password">Password:</label>
                 <VsCodeTextField id="password" v-model="password" :maxlength="128" :transparent="true"
-                  :change-on-mouseout="true" title="Output file name prefix" @change="($e: any) => handleChange()">
+                  :change-on-mouseout="true" title="Output file name prefix" @change="handleChange()">
                 </VsCodeTextField>
               </div>
               <div>
@@ -316,7 +316,7 @@ defineExpose({
                 <div>
                   <label for="fileNamePrefix">Output file name prefix:</label>
                   <VsCodeTextField id="fileNamePrefix" v-model="fileNamePrefix" :maxlength="128" :transparent="true"
-                    :change-on-mouseout="true" title="Output file name prefix" @change="($e: any) => handleChange()">
+                    :change-on-mouseout="true" title="Output file name prefix" @change="handleChange()">
                   </VsCodeTextField>
                 </div>
                 <div>
@@ -336,7 +336,7 @@ defineExpose({
                 <div v-for="opt in options" :key="opt.id" class="option-item">
                   <!-- checkbox -->
                   <label>
-                    <input type="checkbox" v-model="opt.enabled" @change="($e: any) => handleChange()" />
+                    <input type="checkbox" v-model="opt.enabled" @change="handleChange()" />
                     {{ opt.description }}
                   </label>
 
@@ -345,12 +345,12 @@ defineExpose({
                     <!-- string -->
                     <VsCodeTextField v-if="opt.argType === 'string'" v-model="opt.param as string | number"
                       :change-on-mouseout="true" :placeholder="opt.option" :transparent="true"
-                      @change="($e: any) => handleChange()" />
+                      @change="handleChange()" />
 
                     <!-- number -->
                     <VsCodeTextField v-else-if="opt.argType === 'number'" type="number"
                       v-model.number="opt.param as string | number" :change-on-mouseout="true" :transparent="true"
-                      @change="($e: any) => handleChange()" />
+                      @change="handleChange()" />
 
                     <!-- enum -->
                     <VsCodeDropdown v-else-if="opt.argType === 'enum'" v-model="opt.param as string"
@@ -375,7 +375,7 @@ defineExpose({
           <div class="scroll-wrapper">
             <div v-for="opt in schemaItems" :key="opt.value" class="schema-item">
               <label>
-                <input type="checkbox" v-model="opt.selected" @change="($e: any) => handleChange()" />
+                <input type="checkbox" v-model="opt.selected" @change="handleChange()" />
                 {{ opt.label }}
               </label>
             </div>
@@ -386,7 +386,7 @@ defineExpose({
           <div class="scroll-wrapper" style="max-height: 350px;">
             <div v-for="opt in tableItems" :key="opt.value" class="table-item">
               <label>
-                <input type="checkbox" v-model="opt.selected" @change="($e: any) => handleChange()" />
+                <input type="checkbox" v-model="opt.selected" @change="handleChange()" />
                 {{ opt.label }}
               </label>
             </div>

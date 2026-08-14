@@ -6,18 +6,19 @@ import type {
   TopLevelCondition,
 } from "@/utilities/vscode";
 import type { DbColumn } from "@l-v-yonsama/multi-platform-database-drivers";
+import { isRecord } from "@l-v-yonsama/rdh";
 
-export function isTopLevelCondition(params: any): params is TopLevelCondition {
+export function isTopLevelCondition(params: unknown): params is TopLevelCondition {
   return isAllConditions(params) || isAnyConditions(params);
 }
-export function isAllConditions(params: any): params is AllConditions {
-  return params["all"] !== undefined && params["all"].length !== undefined;
+export function isAllConditions(params: unknown): params is AllConditions {
+  return isRecord(params) && Array.isArray(params.all);
 }
-export function isAnyConditions(params: any): params is AnyConditions {
-  return params["any"] !== undefined && params["any"].length !== undefined;
+export function isAnyConditions(params: unknown): params is AnyConditions {
+  return isRecord(params) && Array.isArray(params.any);
 }
-export function isConditionProperties(params: any): params is ConditionProperties {
-  return params["fact"] !== undefined && params["operator"] !== undefined;
+export function isConditionProperties(params: unknown): params is ConditionProperties {
+  return isRecord(params) && params.fact !== undefined && params.operator !== undefined;
 }
 
 export const OPERATORS: DropdownItem[] = [

@@ -353,7 +353,7 @@ defineExpose({
                 <div>
                   <label for="commentType">Explanation:</label>
                   <VsCodeRadioGroupVue id="commentType" v-model="commentType" :items="commentTypeItems"
-                    @change="($e: any) => handleCommentTypeOnChange()"
+                    @change="handleCommentTypeOnChange()"
                     style="display: inline-block; margin-left: 20px;" />
                 </div>
 

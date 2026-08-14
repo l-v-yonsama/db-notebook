@@ -512,7 +512,7 @@ defineExpose({
                 <fa icon="search" />Search
               </VsCodeButton>
               <SecondarySelectionAction :items="compareDetailItems" :disabled="!comparable" title="Compare"
-                @onSelect="(v: any) => compare()" />
+                @onSelect="compare()" />
             </div>
           </div>
           <div class="spPaneWrapper">
