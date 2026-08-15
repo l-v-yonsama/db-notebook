@@ -14,7 +14,7 @@ import type {
 } from "../shared/ExtChartJs";
 import { ChartsViewParams } from "../types/views";
 import { createColors } from "./chartColorUtil";
-import { createHistogramParams, createScatterParams } from "./chartUtil";
+import { createHistogramParams, createScatterParams } from "./chartParamBuilders";
 
 const pointStyleSymbols: string[] = ["●", "■", "▲", "◆", "＋", "−", "×", "＊"];
 
