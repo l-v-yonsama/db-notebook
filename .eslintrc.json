@@ -31,8 +31,15 @@
       },
       {
         "selector": "import",
-        "modifiers": ["namespace"],
         "format": ["camelCase", "PascalCase"]
+      },
+      {
+        "selector": "typeProperty",
+        "filter": {
+          "regex": "^[a-z]+(?:-[a-z]+)+$",
+          "match": true
+        },
+        "format": null
       }
     ],
     "curly": "warn",
@@ -40,5 +47,13 @@
     "no-throw-literal": "warn",
     "semi": "warn"
   },
+  "overrides": [
+    {
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "@typescript-eslint/naming-convention": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["webview-ui/**"]
 }
