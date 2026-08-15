@@ -2,7 +2,6 @@ import { prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr, escapeHtml, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
 import { promises as fs } from "fs";
-import { Response } from "har-format";
 import * as path from "path";
 import {
   NotebookCell,
@@ -24,6 +23,8 @@ import { writeToResourceOnStorage } from "./fsUtil";
 // Re-exported so existing `import { createHtmlFromHarItem } from "./htmlGenerator"` call
 // sites keep working after the HAR report logic moved to html/harHtmlGenerator.ts.
 export { createHtmlFromHarItem } from "./html/harHtmlGenerator";
+export type { MarkdownValues } from "./html/common";
+import { createAxiosTocInfoHtml, MarkdownValues } from "./html/common";
 import { createResponseBodyMarkdown } from "./httpUtil";
 import { logError } from "./logger";
 import { isMarkupCell, isMemcachedCell, isRedisCell } from "./notebookUtil";
@@ -32,8 +33,6 @@ const PREFIX = "[utilities/htmlGenerator]";
 type CreateHtmlOptionsParams = {
   isCellOrigin: boolean;
 };
-
-export type MarkdownValues = { [key: string]: { lang: string; s: string } };
 
 // highlight.js doesn't recognize some of our VS Code-specific cell languageIds
 // -- map them to the closest hljs-supported language so the HTML export gets
@@ -698,38 +697,6 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
   });
 
   return s;
-};
-
-// Exported for reuse by html/harHtmlGenerator.ts (HAR entries render the same
-// status/method/URL summary in their TOC and per-entry heading).
-export const createAxiosTocInfoHtml = (
-  response: Response,
-  method: string,
-  url: string,
-  entryTime?: number
-): string => {
-  const statusPrefix = Math.floor(response.status / 100);
-  let title = `<span class="tag ${statusPrefix <= 3 ? "is-success" : "is-danger"} is-light">${
-    response.status
-  } ${response.statusText}`;
-  if (statusPrefix <= 3) {
-    title += "😀";
-  } else {
-    title += "😱";
-  }
-  title += "</span>";
-
-  if (method) {
-    title += ` <span class="tag is-light is-info">${method}</span>`;
-  }
-  if (response.content.mimeType) {
-    title += ` <span class="tag is-light is-link">${response.content.mimeType}</span>`;
-  }
-
-  if (entryTime !== undefined) {
-    title += ` <span class="tag is-light is-warning">Time:${prettyTime(entryTime)}</span>`;
-  }
-  return title + `<span class="url">${url}</span>`;
 };
 
 const createDiffTitle = (item: DiffTabInnerItem) => {

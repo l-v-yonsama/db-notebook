@@ -14,7 +14,7 @@ import { HarFileTabItem } from "../../shared/MessageEventData";
 import { getOutputConfig, getToStringParamByConfig } from "../configUtil";
 import { writeToResourceOnStorage } from "../fsUtil";
 import { logError } from "../logger";
-import { createAxiosTocInfoHtml, MarkdownValues } from "../htmlGenerator";
+import { createAxiosTocInfoHtml, MarkdownValues } from "./common";
 
 const PREFIX = "[utilities/html/harHtmlGenerator]";
 
