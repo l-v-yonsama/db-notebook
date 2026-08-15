@@ -38,6 +38,10 @@ vsc-extension-quickstart.md
 
 # Ignore unused nested archives from sql.js distribution
 node_modules/sql.js/dist/*.zip
+node_modules/sql.js/dist/sql-asm*.js
+node_modules/sql.js/dist/sql-wasm-browser*
+node_modules/sql.js/dist/sql-wasm-debug*
+node_modules/sql.js/dist/worker.*
 
 misc/**
 docs/images/**

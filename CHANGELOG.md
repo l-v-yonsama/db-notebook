@@ -2,6 +2,15 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [2.0.2] - 2026-08-15
+
+### Fixed
+
+- Updated `@l-v-yonsama/multi-platform-database-drivers` to 2.0.1, which pins `sql.js` to the
+  Marketplace-accepted 1.14.1 release after 1.14.2 was suspected of triggering a virus-scan false
+  positive.
+- Reduced the packaged `sql.js` distribution to the two runtime files used by the SQLite driver.
+
 ## [2.0.1] - 2026-08-15
 
 ### Fixed
