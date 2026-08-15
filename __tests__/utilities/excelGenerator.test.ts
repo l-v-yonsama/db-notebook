@@ -1,5 +1,7 @@
+import type { ExtractedSqlResult } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   createRdhKey,
+  DiffResult,
   GeneralColumnType,
   ResultSetData,
   ResultSetDataBuilder,
@@ -11,8 +13,10 @@ import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   BookCreateOption,
+  createBookFromDiffList,
   createBookFromList,
   createBookFromRdh,
+  createLogAnalysisWorkbook,
 } from "../../src/utilities/excelGenerator";
 
 const tmpFiles: string[] = [];
@@ -201,5 +205,221 @@ describe("createQueryResultSheetの戻り値(plusNo)の伝播 (via createBookFro
     // rdh1: baseRowNo=3, title(1) + header(2) + rows(2) = plusNo 5 -> next base = 3 + 5 + 2 = 10
     expect(sheet.getCell(3, 2).value).toBe("■ first");
     expect(sheet.getCell(10, 2).value).toBe("■ second");
+  });
+});
+
+describe("createBookFromDiffList", () => {
+  it("TOC・before/afterシート・Undo Changes・Record Rulesシートを生成する", async () => {
+    const rdh1 = makeRdh({
+      tableName: "users",
+      comment: "user table",
+      keys: [
+        { name: "id", type: GeneralColumnType.INTEGER, comment: "identifier" },
+        { name: "name", type: GeneralColumnType.VARCHAR, comment: "user name" },
+      ],
+      rows: [
+        { id: 1, name: "Alice" },
+        { id: 2, name: "Bob" },
+      ],
+      sqlStatement: "SELECT * FROM users",
+      ruleViolationSummary: { rule1: 1 },
+    });
+    const rdh2 = makeRdh({
+      tableName: "users",
+      comment: "user table",
+      keys: [
+        { name: "id", type: GeneralColumnType.INTEGER, comment: "identifier" },
+        { name: "name", type: GeneralColumnType.VARCHAR, comment: "user name" },
+      ],
+      rows: [
+        { id: 1, name: "Alicia" },
+        { id: 3, name: "Carol" },
+      ],
+    });
+    const diffResult: DiffResult = {
+      ok: true,
+      message: "",
+      inserted: 1,
+      deleted: 1,
+      updated: 1,
+      updatedColumns: 1,
+    };
+
+    const targetPath = tmpXlsxPath();
+    const options: BookCreateOption = {
+      rdh: { outputAllOnOneSheet: false },
+      diff: { displayOnlyChanged: false },
+      rule: { withRecordRule: true },
+    };
+    const err = await createBookFromDiffList(
+      [
+        {
+          title: "users diff",
+          rdh1,
+          rdh2,
+          diffResult,
+          undoChangeStatements: ["UPDATE users SET name='Alice' WHERE id=1"],
+        },
+      ],
+      targetPath,
+      options
+    );
+    expect(err).toBe("");
+
+    const workbook = await readWorkbook(targetPath);
+    const sheetNames = workbook.worksheets.map((s) => s.name);
+    // RECORD_RULES is intentionally not asserted here: it's only created when a row
+    // actually has a rule-engine "Rul" annotation attached (requires rdh.meta.tableRule
+    // wired up by the rule engine, which is out of scope for this smoke test), so
+    // options.rule.withRecordRule:true above just exercises the "no violations" branch.
+    expect(sheetNames).toEqual(
+      expect.arrayContaining(["TOC", "before", "after", "UNDO_CHANGES"])
+    );
+
+    const before = workbook.getWorksheet("before")!;
+    expect(before.getCell("A1").value).toBe("■ users diff (user table)");
+    // row 2 is a blank spacer row (title row + 1); the SQL label/content follow at row 3
+    expect(before.getCell("A3").value).toBe("SQL");
+    expect(before.getCell("B3").value).toBe("SELECT * FROM users");
+  });
+
+  it("undoChangeStatementsやwithRecordRuleが無ければ該当シートを作らない", async () => {
+    const rdh1 = makeRdh({
+      tableName: "orders",
+      keys: [{ name: "id", type: GeneralColumnType.INTEGER }],
+      rows: [{ id: 1 }],
+    });
+    const rdh2 = makeRdh({
+      tableName: "orders",
+      keys: [{ name: "id", type: GeneralColumnType.INTEGER }],
+      rows: [{ id: 1 }],
+    });
+    const diffResult: DiffResult = {
+      ok: true,
+      message: "",
+      inserted: 0,
+      deleted: 0,
+      updated: 0,
+      updatedColumns: 0,
+    };
+
+    const targetPath = tmpXlsxPath();
+    const err = await createBookFromDiffList(
+      [{ title: "orders diff", rdh1, rdh2, diffResult }],
+      targetPath
+    );
+    expect(err).toBe("");
+
+    const workbook = await readWorkbook(targetPath);
+    const sheetNames = workbook.worksheets.map((s) => s.name);
+    expect(sheetNames).toEqual(expect.arrayContaining(["before", "after"]));
+    expect(sheetNames).not.toContain("UNDO_CHANGES");
+    expect(sheetNames).not.toContain("RECORD_RULES");
+  });
+});
+
+describe("createLogAnalysisWorkbook", () => {
+  it("RawLogs・ParsedEvents・ExtractedSQLsシートを生成する", async () => {
+    const rawLogs = makeRdh({
+      tableName: "rawlogs",
+      keys: [{ name: "line", type: GeneralColumnType.TEXT }],
+      rows: [{ line: "2024-01-01 INFO hello" }],
+    });
+    const logEvents = makeRdh({
+      tableName: "events",
+      keys: [
+        { name: "lineNo", type: GeneralColumnType.INTEGER },
+        { name: "timestamp", type: GeneralColumnType.TEXT },
+        { name: "eventType", type: GeneralColumnType.TEXT },
+        { name: "message", type: GeneralColumnType.TEXT },
+      ],
+      rows: [{ lineNo: 1, timestamp: "2024-01-01", eventType: "INFO", message: "hello" }],
+    });
+    const sqlEvents = makeRdh({
+      tableName: "sqls",
+      keys: [
+        { name: "startLine", type: GeneralColumnType.INTEGER },
+        { name: "content", type: GeneralColumnType.TEXT },
+      ],
+      rows: [{ startLine: 1, content: "SELECT 1" }],
+    });
+
+    const extractedResult = {
+      ok: true,
+      stage: "sqlExecutions",
+      logEvents: [],
+      sqlExecutions: [],
+      inputSummary: {},
+      outputSummary: {
+        totalSqlExecutions: 1,
+        totalEvents: 1,
+        eventTypeCounts: { INFO: 1 },
+        sqlExecutionTypeCounts: { select: 1 },
+      },
+      errorRate: 0,
+      elapsedTimeMilli: { split: 1, classification: 2, sqlExecutions: 3, total: 6 },
+    } as unknown as ExtractedSqlResult;
+
+    const targetPath = tmpXlsxPath();
+    const err = await createLogAnalysisWorkbook({
+      totalLogLines: 100,
+      linesToParse: 100,
+      rawLogs,
+      logEvents,
+      sqlEvents,
+      extractedResult,
+      targetExcelPath: targetPath,
+    });
+    expect(err).toBe("");
+
+    const workbook = await readWorkbook(targetPath);
+    const sheetNames = workbook.worksheets.map((s) => s.name);
+    expect(sheetNames).toEqual(
+      expect.arrayContaining(["TOC", "RawLogs", "ParsedEvents", "ExtractedSQLs"])
+    );
+  });
+
+  it("sqlEventsが無ければExtractedSQLsシートを作らない", async () => {
+    const rawLogs = makeRdh({
+      tableName: "rawlogs",
+      keys: [{ name: "line", type: GeneralColumnType.TEXT }],
+      rows: [{ line: "hello" }],
+    });
+    const logEvents = makeRdh({
+      tableName: "events",
+      keys: [{ name: "lineNo", type: GeneralColumnType.INTEGER }],
+      rows: [{ lineNo: 1 }],
+    });
+
+    const extractedResult = {
+      ok: true,
+      stage: "classification",
+      logEvents: [],
+      sqlExecutions: [],
+      inputSummary: {},
+      outputSummary: {
+        totalSqlExecutions: 0,
+        totalEvents: 1,
+        eventTypeCounts: { INFO: 1 },
+        sqlExecutionTypeCounts: {},
+      },
+      elapsedTimeMilli: { split: 1, total: 1 },
+    } as unknown as ExtractedSqlResult;
+
+    const targetPath = tmpXlsxPath();
+    const err = await createLogAnalysisWorkbook({
+      totalLogLines: 1,
+      linesToParse: 1,
+      rawLogs,
+      logEvents,
+      extractedResult,
+      targetExcelPath: targetPath,
+    });
+    expect(err).toBe("");
+
+    const workbook = await readWorkbook(targetPath);
+    const sheetNames = workbook.worksheets.map((s) => s.name);
+    expect(sheetNames).toEqual(expect.arrayContaining(["RawLogs", "ParsedEvents"]));
+    expect(sheetNames).not.toContain("ExtractedSQLs");
   });
 });
