@@ -2,6 +2,14 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [2.0.1] - 2026-08-15
+
+### Fixed
+
+- Excluded unused nested ZIP archives bundled with `sql.js` from the VSIX package to avoid a
+  Marketplace virus-scan false positive.
+- Excluded local Claude settings from the published extension package.
+
 ## [2.0.0] - 2026-08-15
 
 ### Breaking Changes

@@ -3,6 +3,7 @@
 
 # Ignore extension configs
 .vscode/**
+**/.claude/**
 
 # Ignore test files
 .vscode-test/**
@@ -34,6 +35,9 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+
+# Ignore unused nested archives from sql.js distribution
+node_modules/sql.js/dist/*.zip
 
 misc/**
 docs/images/**
