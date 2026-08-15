@@ -1,6 +1,7 @@
 {
   "name": "database-notebook-webview",
   "version": "0.0.1",
+  "packageManager": "npm@10.9.4",
   "private": true,
   "scripts": {
     "start": "vite",
@@ -29,7 +30,7 @@
   "devDependencies": {
     "@l-v-yonsama/multi-platform-database-drivers": "^2.0.1",
     "@types/chart.js": "^2.9.41",
-    "@types/node": "^18.19.130",
+    "@types/node": "22.18.10",
     "@types/splitpanes": "^2.2.1",
     "@types/vscode-webview": "^1.57.0",
     "@typescript-eslint/eslint-plugin": "^8.67.0",
@@ -51,7 +52,7 @@
     "@types/readable-stream": "4.0.19"
   },
   "volta": {
-    "node": "18.20.8",
-    "npm": "9.3.1"
+    "node": "22.21.1",
+    "npm": "10.9.4"
   }
 }

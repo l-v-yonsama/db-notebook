@@ -3,6 +3,7 @@
   "displayName": "Database notebook",
   "description": "Turn ad-hoc investigations across databases, logs, and cloud resources into something you can save, share, and re-run. Manage SQL, JavaScript/TypeScript, and Markdown together in one notebook file, with a database manager for MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Reuse the same saved connections as AI tools in GitHub Copilot Chat (Agent mode) or via a standalone MCP server. Try it in minutes with the built-in SQLite demo -- no external database required.",
   "version": "2.0.2",
+  "packageManager": "npm@10.9.4",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
   "icon": "media/logo128.png",
@@ -2888,7 +2889,7 @@
     "@types/humanize-duration": "^3.27.2",
     "@types/iconv-lite": "^0.0.1",
     "@types/jmespath": "^0.15.1",
-    "@types/node": "^18.19.130",
+    "@types/node": "22.18.10",
     "@types/prismjs": "^1.26.6",
     "@types/qs": "^6.9.9",
     "@types/throttle-debounce": "^5.0.0",
@@ -2933,7 +2934,7 @@
     "zod-to-json-schema": "3.24.1"
   },
   "volta": {
-    "node": "18.20.8",
-    "npm": "9.3.1"
+    "node": "22.21.1",
+    "npm": "10.9.4"
   }
 }
