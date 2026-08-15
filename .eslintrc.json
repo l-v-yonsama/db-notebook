@@ -28,6 +28,11 @@
       {
         "selector": ["objectLiteralProperty", "enumMember"],
         "format": null
+      },
+      {
+        "selector": "import",
+        "modifiers": ["namespace"],
+        "format": ["camelCase", "PascalCase"]
       }
     ],
     "curly": "warn",
