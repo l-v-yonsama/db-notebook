@@ -2,6 +2,42 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [2.0.0] - 2026-08-15
+
+### Breaking Changes
+
+- Updated the extension to the major-version release of
+  `@l-v-yonsama/multi-platform-database-drivers` 2.0.0 and migrated diagram generation to its new
+  APIs. Integrations that depend on the previous driver API must be updated together with this
+  release.
+- Migrated the extension host to TypeScript 6 with NodeNext module resolution and the webview build
+  to TypeScript 6 with Bundler module resolution.
+
+### Added
+
+- ER diagram settings now support selecting multiple tables and configuring the generated diagram
+  in one operation.
+- Shell notebook cells can now use variables shared by other notebook cells.
+- Added configurable automatic expansion of scanned resources in the resource tree.
+- Expanded the getting-started experience with a SQLite demo, environment information, and a
+  rewritten README walkthrough.
+
+### Changed
+
+- Replaced local tarball references with the published `@l-v-yonsama/rdh` 1.0.0 and
+  `@l-v-yonsama/multi-platform-database-drivers` 2.0.0 packages in both the extension host and
+  webview projects.
+- Split the notebook controller, HTML generators, chart utilities, and Excel workbook generation
+  into smaller responsibility-focused modules to improve maintainability.
+- Added an ESLint baseline for the Vue webview and aligned import/type-property naming rules with
+  the TypeScript 6 module model.
+
+### Fixed
+
+- Removed import cycles introduced while splitting chart and HTML generation modules.
+- Suppressed obsolete Sass API warnings and adjusted the webview chunk-size warning threshold for
+  the current production bundle.
+
 ## [1.5.1] - 2026-08-12
 
 ### Changed
