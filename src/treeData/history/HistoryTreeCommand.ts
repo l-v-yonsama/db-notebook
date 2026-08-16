@@ -29,14 +29,18 @@ import {
   REFRESH_SQL_HISTORIES,
   SORT_SQL_HISTORIES_BY_DURATION,
   SORT_SQL_HISTORIES_BY_RECENT,
+  START_PERFORMANCE_TUNING_FROM_HISTORY,
 } from "../../constant";
 
 import {
+  PerformanceTuningContext,
   RDSBaseDriver,
+  SelectedStatementStatistics,
   normalizeQuery,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, resolveCodeLabel } from "@l-v-yonsama/rdh";
+import { PerformanceTuningPreviewPanel } from "../../panels/PerformanceTuningPreviewPanel";
 import { CellMeta } from "../../types/Notebook";
 import { SQLHistory } from "../../types/SQLHistory";
 import { MdhViewParams } from "../../types/views";
@@ -358,6 +362,87 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
         errorMessage: message,
       });
       historyTreeProvider.refresh(true);
+    }
+  });
+
+  registerDisposableCommand(START_PERFORMANCE_TUNING_FROM_HISTORY, async (history: SQLHistory) => {
+    const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
+    if (!connectionSetting) {
+      showWindowErrorMessage("Missing connection " + history.connectionName);
+      return;
+    }
+
+    const driver = await createRDSDriver<RDSBaseDriver>(connectionSetting, true);
+    if (!driver.supportsGetPerformanceTuningContext()) {
+      showWindowErrorMessage(
+        `Performance tuning is not supported for ${connectionSetting.dbType}.`
+      );
+      return;
+    }
+
+    // Prefer the per-history "USE <database>" override, falling back to the
+    // connection's own default database. If neither is known, databaseName
+    // can't be determined safely - fail closed rather than guessing which
+    // database the plan/statistics should be collected against.
+    const databaseName = history.meta?.useDatabase ?? connectionSetting.database;
+    if (!databaseName) {
+      showWindowErrorMessage(
+        "Could not determine the target database for this SQL history entry."
+      );
+      return;
+    }
+
+    const statistics: SelectedStatementStatistics | undefined = history.performance
+      ? {
+          executionCount: history.performance.sampleCount,
+          totalElapsedTimeMs: history.performance.totalElapsedTimeMilli,
+          averageElapsedTimeMs:
+            history.performance.totalElapsedTimeMilli / history.performance.sampleCount,
+          maxElapsedTimeMs: history.performance.maxElapsedTimeMilli,
+          lastExecutedAt: history.executedAt
+            ? new Date(history.executedAt).toISOString()
+            : undefined,
+          source: "sqlHistory",
+        }
+      : undefined;
+
+    const { ok, message, result } = await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+        title: "Collecting performance tuning context...",
+      },
+      async (progress, token) => {
+        const controller = new AbortController();
+        token.onCancellationRequested(() => controller.abort());
+
+        return workflow<RDSBaseDriver, PerformanceTuningContext>(
+          connectionSetting,
+          (driver) =>
+            driver
+              .getPerformanceTuningContext(
+                {
+                  databaseName,
+                  statement: { sql: history.sqlDoc, source: "sqlHistory", statistics },
+                  plan: { mode: "estimate" },
+                },
+                { signal: controller.signal }
+              )
+              .then((r) => {
+                if (!r.ok || !r.result) {
+                  throw new Error(r.message);
+                }
+                return r.result;
+              }),
+          true
+        );
+      }
+    );
+
+    if (ok && result) {
+      PerformanceTuningPreviewPanel.render(context.extensionUri, result);
+    } else {
+      showWindowErrorMessage(`Failed to collect performance tuning context: ${message}`);
     }
   });
 };

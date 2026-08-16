@@ -8,6 +8,7 @@ import type {
   ExtractedSqlResult,
   LogParseParams,
   MqttQoS,
+  PerformanceTuningContext,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type {
@@ -59,6 +60,7 @@ export type MessageEventData =
   | PublishEditorPanelEventData
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
+  | PerformanceTuningPreviewPanelEventData
   | RecordRuleEditorEventData
   | ScanPanelEventData
   | SubscriptionSettingPanelEventData
@@ -485,6 +487,25 @@ export type VariablesPanelEventData = BaseMessageEventData<
   {
     initialize?: {
       variables: ResultSetData;
+    };
+  }
+>;
+
+export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand,
+  "PerformanceTuningPreviewPanel",
+  {
+    initialize?: {
+      context: PerformanceTuningContext;
+      // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
+      // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
+      sqlHtml: string;
+      jsonHtml: string;
+      // Computed on the extension side (Buffer.byteLength) rather than
+      // re-serialized/measured in the webview, so the displayed number
+      // always matches what RDSBaseDriver.enforcePayloadBudget() itself saw.
+      payloadBytes: number;
+      maxPayloadBytes: number;
     };
   }
 >;

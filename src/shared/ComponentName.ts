@@ -28,4 +28,5 @@ export type ComponentName =
   | "SubscriptionSettingPanel"
   | "CodeResolverEditor"
   | "ToolsView"
-  | "SubscriptionPayloadsView";
+  | "SubscriptionPayloadsView"
+  | "PerformanceTuningPreviewPanel";
