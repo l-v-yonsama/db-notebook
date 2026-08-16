@@ -4,9 +4,13 @@ import { StateStorage } from "../../utilities/StateStorage";
 
 import { abbr } from "@l-v-yonsama/rdh";
 import { SQLHistory } from "../../types/SQLHistory";
+import { formatDuration } from "../toolActivity/ToolActivityTreeProvider";
+import { averageElapsedTimeMilli } from "../../utilities/sqlHistoryUtil";
 import { log } from "../../utilities/logger";
 
 const PREFIX = "[HistoryTreeProvider]";
+
+export type SQLHistorySortOrder = "recent" | "duration";
 
 export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> {
   private _onDidChangeTreeData: vscode.EventEmitter<SQLHistory | undefined | void> =
@@ -15,6 +19,7 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
     this._onDidChangeTreeData.event;
   private historyResList: SQLHistory[] = [];
   private filterConnectionName: string | undefined;
+  private sortOrder: SQLHistorySortOrder = "recent";
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -27,12 +32,16 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
   }
   getChildren(element?: SQLHistory | undefined): vscode.ProviderResult<SQLHistory[]> {
     try {
-      if (this.filterConnectionName) {
-        return Promise.resolve(
-          this.historyResList.filter((it) => it.connectionName === this.filterConnectionName)
+      let list = this.filterConnectionName
+        ? this.historyResList.filter((it) => it.connectionName === this.filterConnectionName)
+        : [...this.historyResList];
+      if (this.sortOrder === "duration") {
+        list = list.sort(
+          (a, b) =>
+            (b.performance?.lastElapsedTimeMilli ?? 0) - (a.performance?.lastElapsedTimeMilli ?? 0)
         );
       }
-      return Promise.resolve(this.historyResList);
+      return Promise.resolve(list);
     } catch (e) {
       console.error(PREFIX, e);
       return Promise.resolve([]);
@@ -49,6 +58,15 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
 
   setConnectionFilter(connectionName: string | undefined): void {
     this.filterConnectionName = connectionName;
+    this._onDidChangeTreeData.fire();
+  }
+
+  getSortOrder(): SQLHistorySortOrder {
+    return this.sortOrder;
+  }
+
+  setSortOrder(sortOrder: SQLHistorySortOrder): void {
+    this.sortOrder = sortOrder;
     this._onDidChangeTreeData.fire();
   }
 
@@ -100,9 +118,28 @@ export class SQLHistoryItem extends vscode.TreeItem {
       }
     }
 
+    if (resource.performance && resource.performance.sampleCount > 0) {
+      const { lastElapsedTimeMilli, sampleCount } = resource.performance;
+      descriptionParts.push(
+        sampleCount > 1
+          ? `${formatDuration(lastElapsedTimeMilli)} (avg ${formatDuration(
+              Math.round(averageElapsedTimeMilli(resource.performance))
+            )} x${sampleCount})`
+          : formatDuration(lastElapsedTimeMilli)
+      );
+    }
+
+    if (resource.lastErrorAt) {
+      descriptionParts.push(
+        `Last retry failed ${dayjs(resource.lastErrorAt).format("MM/DD HH:mm")}`
+      );
+    }
+
     this.description = descriptionParts.join(" ・ ");
 
-    if (resource.status === "error") {
+    if (resource.lastErrorAt) {
+      this.iconPath = new vscode.ThemeIcon("warning", new vscode.ThemeColor("charts.yellow"));
+    } else if (resource.status === "error") {
       this.iconPath = new vscode.ThemeIcon("error", new vscode.ThemeColor("charts.red"));
     } else if (resource.status === "success") {
       this.iconPath = new vscode.ThemeIcon("pass");
@@ -111,6 +148,21 @@ export class SQLHistoryItem extends vscode.TreeItem {
     let tooltipMarkdown = "```sql\n" + resource.sqlDoc + "\n```";
     if (resource.status === "error" && resource.errorMessage) {
       tooltipMarkdown += "\n\n---\n**Error**\n```\n" + resource.errorMessage + "\n```";
+    }
+    if (resource.lastErrorAt) {
+      tooltipMarkdown +=
+        "\n\n---\n**Last retry failed**\n```\n" +
+        (resource.lastErrorMessage || "Unknown error") +
+        "\n```";
+    }
+    if (resource.performance && resource.performance.sampleCount > 0) {
+      const { sampleCount, totalElapsedTimeMilli, maxElapsedTimeMilli, lastElapsedTimeMilli } =
+        resource.performance;
+      tooltipMarkdown += `\n\n---\nRan ${sampleCount} times ・ last ${formatDuration(
+        lastElapsedTimeMilli
+      )} ・ total ${formatDuration(totalElapsedTimeMilli)} ・ avg ${formatDuration(
+        Math.round(averageElapsedTimeMilli(resource.performance))
+      )} ・ max ${formatDuration(maxElapsedTimeMilli)}`;
     }
     tooltipMarkdown +=
       "\n\n---\n💡 Tip: Cmd/Ctrl+Click to select multiple entries, then right-click for bulk actions.";

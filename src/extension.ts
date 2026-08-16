@@ -21,6 +21,7 @@ import {
   BOTTOM_TOPIC_PAYLOADS_VIEWID,
   CLOSE_SUBSCRIPTION_PAYLOADS_VIEWER,
   EXTENSION_NAME,
+  HISTORY_VIEW_ID,
   OPEN_CHARTS_VIEWER,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DIFF_MDH_VIEWER,
@@ -135,7 +136,7 @@ export async function activate(context: ExtensionContext) {
 
   window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
   context.subscriptions.push(window.registerFileDecorationProvider(dbResourceTree));
-  const historyTreeView = window.createTreeView("database-notebook-histories", {
+  const historyTreeView = window.createTreeView(HISTORY_VIEW_ID, {
     treeDataProvider: historyTreeProvider,
     canSelectMany: true,
   });
@@ -144,6 +145,11 @@ export async function activate(context: ExtensionContext) {
     const filter = historyTreeProvider.getConnectionFilter();
     historyTreeView.description = filter ? `Filtered by: ${filter}` : undefined;
     commands.executeCommand("setContext", "databaseNotebook.sqlHistoryFiltered", !!filter);
+    commands.executeCommand(
+      "setContext",
+      "databaseNotebook.sqlHistorySortByDuration",
+      historyTreeProvider.getSortOrder() === "duration"
+    );
   });
 
   registerToolActivityTreeCommand(context);

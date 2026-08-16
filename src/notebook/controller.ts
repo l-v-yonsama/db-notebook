@@ -619,11 +619,12 @@ export class MainController {
         noteSession.mqttKernel = undefined;
         return r;
       }
+      const sqlMode = this.sqlMode ?? "Query";
       noteSession.sqlKernel = new SqlKernel(this.stateStorage);
       const r = await noteSession.sqlKernel.run(
         cell,
         noteSession.kernel.getStoredVariables(),
-        this.sqlMode ?? "Query"
+        sqlMode
       );
       this.sqlMode = undefined;
       noteSession.sqlKernel = undefined;
@@ -657,9 +658,12 @@ export class MainController {
         }
       }
 
-      const resultRdhForHistory =
-        r.metadata?.rdh ?? r.metadata?.explainRdh ?? r.metadata?.analyzedRdh;
-      if (metadata.connectionName && (resultRdhForHistory || r.status === "error")) {
+      const resultRdhForHistory = r.metadata?.rdh;
+      if (
+        sqlMode === "Query" &&
+        metadata.connectionName &&
+        (resultRdhForHistory || r.status === "error")
+      ) {
         await this.stateStorage.addSQLHistory({
           connectionName: metadata.connectionName,
           sqlDoc: cell.document.getText(),

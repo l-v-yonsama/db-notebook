@@ -76,6 +76,10 @@ export const OPEN_SQL_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openA
 export const APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.histories.appendToActiveNotebook`;
 export const FILTER_SQL_HISTORIES_BY_CONNECTION = `${EXTENSION_NAME}.histories.filterByConnection`;
 export const CLEAR_SQL_HISTORIES_CONNECTION_FILTER = `${EXTENSION_NAME}.histories.clearConnectionFilter`;
+export const FOCUS_SQL_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFilter`;
+export const SORT_SQL_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
+export const SORT_SQL_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
+export const HISTORY_VIEW_ID = `${EXTENSION_NAME}-histories`;
 
 //---------------------------------------------------
 // OPEN VIEWERS

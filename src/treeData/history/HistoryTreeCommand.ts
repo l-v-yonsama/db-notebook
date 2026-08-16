@@ -20,11 +20,15 @@ import {
   DELETE_SQL_HISTORY,
   EXECUTE_SQL_HISTORY,
   FILTER_SQL_HISTORIES_BY_CONNECTION,
+  FOCUS_SQL_HISTORIES_FILTER,
+  HISTORY_VIEW_ID,
   NOTEBOOK_TYPE,
   OPEN_MDH_VIEWER,
   OPEN_SQL_HISTORIES_AS_NOTEBOOK,
   OPEN_SQL_HISTORY,
   REFRESH_SQL_HISTORIES,
+  SORT_SQL_HISTORIES_BY_DURATION,
+  SORT_SQL_HISTORIES_BY_RECENT,
 } from "../../constant";
 
 import {
@@ -212,14 +216,23 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     historyTreeProvider.setConnectionFilter(undefined);
   });
 
-  registerDisposableCommand(EXECUTE_SQL_HISTORY, async (history: SQLHistory) => {
-    if (history.status === "error") {
-      showWindowErrorMessage(
-        "This SQL previously failed and cannot be re-executed from history. Open it in a notebook to fix and run it."
-      );
-      return;
-    }
+  // Query-content search reuses VS Code's built-in tree find/filter widget,
+  // the same way database-notebook.focus-filter does for the connections
+  // view: focus the view, then let "list.find" take over.
+  registerDisposableCommand(FOCUS_SQL_HISTORIES_FILTER, async () => {
+    await commands.executeCommand(`${HISTORY_VIEW_ID}.focus`);
+    await commands.executeCommand("list.find");
+  });
 
+  registerDisposableCommand(SORT_SQL_HISTORIES_BY_DURATION, () => {
+    historyTreeProvider.setSortOrder("duration");
+  });
+
+  registerDisposableCommand(SORT_SQL_HISTORIES_BY_RECENT, () => {
+    historyTreeProvider.setSortOrder("recent");
+  });
+
+  registerDisposableCommand(EXECUTE_SQL_HISTORY, async (history: SQLHistory) => {
     const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
     if (!connectionSetting) {
       showWindowErrorMessage("Missing connection " + history.connectionName);
@@ -318,8 +331,33 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
         list: [result],
       };
       commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+
+      await stateStorage.addSQLHistory({
+        connectionName: history.connectionName,
+        sqlDoc: history.sqlDoc,
+        variables: history.variables,
+        meta: result.meta,
+        summary: result.summary,
+        ruleFile: history.ruleFile,
+        codeResolverFile: history.codeResolverFile,
+        executedAt: Date.now(),
+        status: "success",
+      });
+      historyTreeProvider.refresh(true);
     } else {
       showWindowErrorMessage(`Execute query Error: ${message}`);
+
+      await stateStorage.addSQLHistory({
+        connectionName: history.connectionName,
+        sqlDoc: history.sqlDoc,
+        variables: history.variables,
+        ruleFile: history.ruleFile,
+        codeResolverFile: history.codeResolverFile,
+        executedAt: Date.now(),
+        status: "error",
+        errorMessage: message,
+      });
+      historyTreeProvider.refresh(true);
     }
   });
 };

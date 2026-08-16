@@ -31,6 +31,13 @@ import { EXTENSION_NAME } from "../constant";
 import { showStatusMessage } from "../statusBar";
 import { SQLHistory } from "../types/SQLHistory";
 import { workflow } from "./driverResolver";
+import {
+  createInitialSQLHistoryPerformance,
+  isSQLHistoryTarget,
+  mergeSQLHistoryPerformance,
+  migrateStoredSQLHistory,
+  StoredSQLHistory,
+} from "./sqlHistoryUtil";
 import { log } from "./logger";
 
 const uid = new ShortUniqueId();
@@ -349,23 +356,62 @@ export class StateStorage {
   }
 
   async getSQLHistoryList(): Promise<SQLHistory[]> {
-    return this.context.globalState.get<SQLHistory[]>(SQL_HISTORY_STORAGE_KEY, []);
+    const storedList = this.context.globalState.get<StoredSQLHistory[]>(
+      SQL_HISTORY_STORAGE_KEY,
+      []
+    );
+    const list = storedList.flatMap((stored) => {
+      const migrated = migrateStoredSQLHistory(stored);
+      return migrated ? [migrated] : [];
+    });
+
+    // 読み込み時に旧sqlModeを除去し、performanceを補完する。Explain系の
+    // 旧エントリもここで除外するため、再実行を待たず一度だけ移行できる。
+    if (JSON.stringify(storedList) !== JSON.stringify(list)) {
+      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+    }
+    return list;
   }
 
-  async addSQLHistory(history: Omit<SQLHistory, "id">): Promise<boolean> {
+  async addSQLHistory(
+    history: Omit<SQLHistory, "id" | "performance" | "lastErrorMessage" | "lastErrorAt">
+  ): Promise<boolean> {
+    // 呼び出し元の実行モードだけに依存せず、保存境界でもraw EXPLAINを拒否する。
+    if (!isSQLHistoryTarget(history)) {
+      return false;
+    }
     const list = await this.getSQLHistoryList();
 
     const newTrimedSql = history.sqlDoc.trim();
     const sameHistoryIndex = list.findIndex(
       (it) => it.sqlDoc.trim() === newTrimedSql && it.connectionName === history.connectionName
     );
-    if (sameHistoryIndex >= 0) {
-      list.splice(sameHistoryIndex, 1, { ...history, id: uid.randomUUID(8) });
-      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
-      return false;
+
+    // Re-running the same SQL+connection moves it to the front (LRU), so a
+    // frequently re-measured query survives the cap below instead of being
+    // evicted by unrelated one-off queries while sitting at its old position.
+    const isNew = sameHistoryIndex < 0;
+    const performance = isNew
+      ? createInitialSQLHistoryPerformance(history.summary?.elapsedTimeMilli)
+      : mergeSQLHistoryPerformance(list[sameHistoryIndex], history.summary?.elapsedTimeMilli);
+    const previous = isNew ? undefined : list[sameHistoryIndex];
+    if (previous) {
+      list.splice(sameHistoryIndex, 1);
     }
 
-    list.unshift({ ...history, id: uid.randomUUID(8) });
+    if (history.status === "error" && previous?.status === "success") {
+      // 失敗した再実行は、直前の成功結果・bind・集計を壊さない。
+      // 失敗情報だけを別フィールドに残し、次の再試行も可能にする。
+      list.unshift({
+        ...previous,
+        id: uid.randomUUID(8),
+        lastErrorMessage: history.errorMessage || "Unknown error",
+        lastErrorAt: history.executedAt ?? Date.now(),
+        performance,
+      });
+    } else {
+      list.unshift({ ...history, id: uid.randomUUID(8), performance });
+    }
 
     const maxHistory = 50;
     // 5: 5, 5-5=0
@@ -374,7 +420,7 @@ export class StateStorage {
       list.splice(maxHistory, list.length - maxHistory);
     }
     await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
-    return true;
+    return isNew;
   }
 
   async deleteSQLHistoryByID(id: string): Promise<boolean> {

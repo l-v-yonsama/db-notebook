@@ -57,8 +57,42 @@ describe("MainController.execute -> _doExecution", () => {
     expect(stateStorage.addSQLHistory).toHaveBeenCalledWith(
       expect.objectContaining({ connectionName: "conn1" })
     );
+    expect(stateStorage.addSQLHistory).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sqlMode: expect.anything() })
+    );
     expect(commands.executeCommand).toHaveBeenCalledWith(REFRESH_SQL_HISTORIES);
   });
+
+  it.each(["Explain", "ExplainAnalyze"] as const)(
+    "%s実行はSQL Historyへ追加しない",
+    async (sqlMode) => {
+      const { controller, controllerObj, stateStorage } = setupController();
+      (stateStorage.getDBTypeByConnectionName as Mock).mockReturnValue(DBType.Postgres);
+
+      const planRdh = ResultSetDataBuilder.createEmpty().build();
+      planRdh.meta.type = sqlMode === "Explain" ? "explain" : "analyze";
+      sqlKernelRunMock.mockResolvedValue({
+        stdout: "",
+        stderr: "",
+        skipped: false,
+        status: "executed",
+        metadata: sqlMode === "Explain" ? { explainRdh: planRdh } : { analyzedRdh: planRdh },
+      } as RunResult);
+
+      const cell = makeCell({
+        languageId: "sql",
+        metadata: { connectionName: "conn1" },
+        text: "select * from t",
+      });
+      makeNotebook([cell]);
+      controller.setSqlMode(sqlMode);
+
+      await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+      expect(stateStorage.addSQLHistory).not.toHaveBeenCalled();
+      expect(commands.executeCommand).not.toHaveBeenCalledWith(REFRESH_SQL_HISTORIES);
+    }
+  );
 
   it("stderrが返るとstderr出力を積んで失敗として終了する", async () => {
     const { controllerObj } = setupController();

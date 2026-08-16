@@ -725,7 +725,7 @@
         },
         {
           "command": "database-notebook.histories.execute",
-          "when": "view == database-notebook-histories && viewItem == sqlHistorySuccess",
+          "when": "view == database-notebook-histories",
           "group": "inline"
         },
         {
@@ -854,6 +854,21 @@
         {
           "command": "database-notebook.histories.clearConnectionFilter",
           "when": "view == database-notebook-histories && databaseNotebook.sqlHistoryFiltered",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.histories.focusFilter",
+          "when": "view == database-notebook-histories",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.histories.sortByDuration",
+          "when": "view == database-notebook-histories && !databaseNotebook.sqlHistorySortByDuration",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.histories.sortByRecent",
+          "when": "view == database-notebook-histories && databaseNotebook.sqlHistorySortByDuration",
           "group": "navigation"
         },
         {
@@ -1457,6 +1472,24 @@
         "title": "Clear SQL history connection filter",
         "shortTitle": "Clear filter",
         "icon": "$(filter-filled)"
+      },
+      {
+        "command": "database-notebook.histories.focusFilter",
+        "title": "Filter SQL histories",
+        "shortTitle": "Filter",
+        "icon": "$(search)"
+      },
+      {
+        "command": "database-notebook.histories.sortByDuration",
+        "title": "Sort SQL histories by duration",
+        "shortTitle": "Sort by duration",
+        "icon": "$(clock)"
+      },
+      {
+        "command": "database-notebook.histories.sortByRecent",
+        "title": "Sort SQL histories by recent",
+        "shortTitle": "Sort by recent",
+        "icon": "$(list-ordered)"
       },
       {
         "command": "database-notebook.open-mdh-viewer",
