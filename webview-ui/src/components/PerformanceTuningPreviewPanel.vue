@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import type { PerformanceTuningPreviewPanelEventData } from "@/utilities/vscode";
+import type { PerformanceTuningDiagnosticGroupViewModel, PerformanceTuningPreviewPanelEventData } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { computed, ref } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
+import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 
 const context = ref<PerformanceTuningContext | undefined>(undefined);
+const diagnosticGroups = ref<PerformanceTuningDiagnosticGroupViewModel[]>([]);
 const sqlHtml = ref("");
 const jsonHtml = ref("");
 const payloadBytes = ref(0);
@@ -21,11 +23,28 @@ const payloadExceeded = computed(
   () => maxPayloadBytes.value > 0 && payloadBytes.value > maxPayloadBytes.value
 );
 
+// buildPerformanceTuningDiagnosticGroups() (extension-side) already sorts
+// information before warnings and never mixes severities within one group -
+// this just splits that single ordered list into the two display sections
+// §6.1 puts in different places. Neither list is re-sorted or re-derived
+// here (§7: grouping/copy stays entirely in that one pure function).
+const infoGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "info"));
+const issueGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "warning"));
+
+// §6.4: "partial なのに画面上に理由が1件も表示されない状態を禁止する" - status
+// is derived driver-side from unavailableSections/diagnostics together
+// (db-drivers §2.2), so whenever it's 'partial', issueGroups is guaranteed
+// non-empty by construction (every unavailableSections entry and every
+// affectsCompleteness diagnostic becomes a warning-severity group). Nothing
+// extra to compute here; this comment just records the invariant this
+// template relies on.
+
 const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initialize"]): void => {
   if (v === undefined) {
     return;
   }
   context.value = v.context;
+  diagnosticGroups.value = v.diagnosticGroups;
   sqlHtml.value = v.sqlHtml;
   jsonHtml.value = v.jsonHtml;
   payloadBytes.value = v.payloadBytes;
@@ -55,6 +74,7 @@ defineExpose({
 
 <template>
   <section class="PerformanceTuningPreviewPanel" v-if="context">
+    <!-- 1. Database / Status / Payload size (§6.1) -->
     <div class="header">
       <div class="row">
         <span class="label">Database</span>
@@ -64,6 +84,11 @@ defineExpose({
       <div class="row">
         <span class="label">Status</span>
         <span class="badge" :class="context.collection.status">{{ context.collection.status }}</span>
+        <!-- complete badge stays green even with informational notes present
+             (§6.4) - this is a supplementary count, not a new status value. -->
+        <span v-if="context.collection.status === 'complete' && infoGroups.length > 0" class="notes-hint">
+          {{ infoGroups.length }} {{ infoGroups.length === 1 ? "note" : "notes" }}
+        </span>
       </div>
       <div class="row">
         <span class="label">Payload size</span>
@@ -72,6 +97,8 @@ defineExpose({
           <span v-if="payloadExceeded">(exceeds limit)</span>
         </span>
       </div>
+
+      <!-- 2. SQL (§6.1) -->
       <div class="row sql">
         <span class="label">SQL</span>
         <div class="code-panel">
@@ -79,43 +106,36 @@ defineExpose({
           <CopyToClipboardButton class="copy-btn" :content="context.statement.sql" title="Copy SQL" />
         </div>
       </div>
-
-      <div v-if="context.collection.warnings.length > 0" class="warnings">
-        <span class="label">Warnings</span>
-        <ul>
-          <li v-for="(w, i) in context.collection.warnings" :key="i">{{ w }}</li>
-        </ul>
-      </div>
-
-      <div v-if="context.collection.unavailableSections.length > 0" class="unavailable">
-        <span class="label">Unavailable sections</span>
-        <table>
-          <thead>
-            <tr>
-              <th>Section</th>
-              <th>Table</th>
-              <th>Reason</th>
-              <th>Required permissions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(s, i) in context.collection.unavailableSections" :key="i">
-              <td>{{ s.section }}</td>
-              <td>{{ [s.schemaName, s.tableName].filter(Boolean).join(".") }}</td>
-              <td>{{ s.reason }}</td>
-              <td>{{ s.requiredPermissions?.join(", ") ?? "" }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
 
-    <div class="jsonToolbar">
-      <span class="label">Full context (JSON, no masking applied)</span>
-    </div>
-    <div class="code-panel json-panel">
-      <div class="json-block" v-html="jsonHtml"></div>
-      <CopyToClipboardButton class="copy-btn" :content="contextJson" title="Copy JSON" />
+    <div class="scrollArea">
+      <!-- 3. Collection issues: warning-severity diagnostics + unavailable
+           sections, already merged into one list extension-side (§6.1/§6.3). -->
+      <div v-if="issueGroups.length > 0" class="section">
+        <h3 class="section-title">Collection issues</h3>
+        <DiagnosticGroupCard v-for="g in issueGroups" :key="g.key" :group="g" />
+      </div>
+
+      <!-- 4. Information / plan notes: informational, never warning-colored
+           (§6.1/§6.2). -->
+      <div v-if="infoGroups.length > 0" class="section">
+        <h3 class="section-title">Information</h3>
+        <DiagnosticGroupCard v-for="g in infoGroups" :key="g.key" :group="g" />
+      </div>
+
+      <!-- 5. Full context JSON, as "Advanced details" - collapsed by default
+           (§6.5). -->
+      <details class="section advanced-details">
+        <summary class="section-title">Advanced details: Full context JSON</summary>
+        <p class="advanced-note">
+          This preview includes SQL, table definitions, and predicates exactly as collected. Review the content
+          before sending it to an AI service.
+        </p>
+        <div class="code-panel json-panel">
+          <div class="json-block" v-html="jsonHtml"></div>
+          <CopyToClipboardButton class="copy-btn" :content="contextJson" title="Copy JSON" />
+        </div>
+      </details>
     </div>
 
     <div class="footer">
@@ -220,43 +240,56 @@ defineExpose({
   color: black;
 }
 
+.notes-hint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
 .exceeded {
   color: var(--vscode-errorForeground);
   font-weight: 600;
 }
 
-.warnings ul {
-  margin: 2px 0 8px 0;
-}
-
-.unavailable table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 4px 0 8px 0;
-  font-size: 0.9em;
-}
-
-.unavailable th,
-.unavailable td {
-  border: 1px solid var(--vscode-editorWidget-border, #444);
-  padding: 2px 6px;
-  text-align: left;
-}
-
-.jsonToolbar {
+/* The scrollable body between the fixed header and footer - Collection
+   issues / Information / Advanced details can all be long, so only this
+   area scrolls, keeping Database/Status/SQL always visible. */
+.scrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   margin-top: 4px;
-  flex: 0 0 auto;
+}
+
+.section {
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 1em;
+  margin: 0 0 4px 0;
+}
+
+.advanced-details > .section-title {
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground);
+}
+
+.advanced-note {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+  margin: 4px 0 8px 0;
 }
 
 .json-panel {
-  flex: 1 1 auto;
-  min-height: 0;
+  min-height: 200px;
+  max-height: 60vh;
   overflow: hidden;
   border-radius: 3px;
 }
 
 .json-block {
   height: 100%;
+  max-height: 60vh;
   overflow: auto;
 }
 

@@ -491,12 +491,50 @@ export type VariablesPanelEventData = BaseMessageEventData<
   }
 >;
 
+// Beginner-facing view of one group of same-cause PerformanceTuningDiagnostic
+// entries (or, for the warning severity, of UnavailableSection entries) -
+// built once, extension-side, by buildPerformanceTuningDiagnosticGroups()
+// (src/utilities/performanceTuningDiagnosticFormatter.ts) so the Vue
+// component never hand-rolls per-code copy or grouping itself
+// (misc/design/performance-tuning-diagnostics-display-plan.ja.md §1.4/§7).
+// Declared here (not in that utility file) since both the extension host
+// (which builds it) and the webview (which only renders it) need the shape.
+export type PerformanceTuningDiagnosticDetailViewModel = {
+  nodeId?: string;
+  operation?: string;
+  objectName?: string;
+  schemaName?: string;
+  tableName?: string;
+  // Always present, even when every other field above is - a detail row
+  // with no node/object identity must still show *something* (§6.2: "object
+  // 名が取得できない場合もnode IDとoperationは必ず表示する" generalizes to
+  // "never a blank row").
+  technicalMessage: string;
+};
+
+export type PerformanceTuningDiagnosticGroupViewModel = {
+  key: string;
+  severity: "info" | "warning";
+  title: string;
+  summary: string;
+  suggestedAction?: string;
+  details: PerformanceTuningDiagnosticDetailViewModel[];
+};
+
 export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand,
   "PerformanceTuningPreviewPanel",
   {
     initialize?: {
       context: PerformanceTuningContext;
+      // Grouped/summarized once, extension-side, from
+      // context.collection.diagnostics + .unavailableSections - see
+      // PerformanceTuningDiagnosticGroupViewModel above. Ordered
+      // information-first, in the same provenance order collection.diagnostics
+      // itself has (plan-level, then per-table); the Vue component splits by
+      // severity for the Information vs. Collection issues sections but does
+      // not itself re-sort or re-derive anything.
+      diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
       // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
       // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
       sqlHtml: string;

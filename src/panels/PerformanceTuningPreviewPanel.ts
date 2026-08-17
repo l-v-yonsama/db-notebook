@@ -7,13 +7,19 @@ import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { PerformanceTuningPreviewPanelEventData } from "../shared/MessageEventData";
 import { createCodeHtmlString } from "../utilities/highlighter";
+import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
 import { BasePanel } from "./BasePanel";
 
 // Read-only "what would be sent" preview for getPerformanceTuningContext()'s
-// result (推奨着手順 step 9a). No literal masking (matches the design's
-// §9.2 policy) and no "send" action - AI submission is step 10, not built
-// yet, so this panel only lets the user review the SQL, payload size,
-// collection status/warnings and the raw JSON before that exists.
+// result (推奨着手順 step 9a; diagnostic display per
+// misc/design/performance-tuning-diagnostics-display-plan.ja.md step 6). No
+// literal masking (matches the design's §9.2 policy) and no "send" action -
+// AI submission is step 10, not built yet, so this panel only lets the user
+// review the SQL, payload size, collection status/diagnostics and the raw
+// JSON before that exists. Diagnostic grouping/copy is computed once here
+// (buildPerformanceTuningDiagnosticGroups()) rather than in the Vue
+// component, so it stays unit-testable with the rest of this extension's
+// vitest suite instead of needing a separate webview-ui test setup.
 export class PerformanceTuningPreviewPanel extends BasePanel {
   public static currentPanel: PerformanceTuningPreviewPanel | undefined;
 
@@ -69,12 +75,18 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       createCodeHtmlString({ code: contextJson, lang: "json" }),
     ]);
 
+    const diagnosticGroups = buildPerformanceTuningDiagnosticGroups(
+      context.collection.diagnostics,
+      context.collection.unavailableSections
+    );
+
     const msg: PerformanceTuningPreviewPanelEventData = {
       command: "initialize",
       componentName: "PerformanceTuningPreviewPanel",
       value: {
         initialize: {
           context,
+          diagnosticGroups,
           sqlHtml,
           jsonHtml,
           payloadBytes,
