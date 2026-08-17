@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { buildPerformanceTuningDiagnosticGroups } from "../../src/utilities/performanceTuningDiagnosticFormatter";
 
 // The exact pg_stat_statements/pg_stat_statements_info scenario from
-// misc/design/performance-tuning-diagnostics-display-plan.ja.md §0/§1.1.
+// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4.
 const n3n4Diagnostics: PerformanceTuningDiagnostic[] = [
   {
     code: "NON_TABLE_PLAN_SOURCE",

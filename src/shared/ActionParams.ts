@@ -9,6 +9,7 @@ import type { CellMeta } from "../types/Notebook";
 import type { CfnDiagramGenerateParams } from "./CfnDiagram";
 import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ModeType } from "./ModeType";
+import type { QueryStatisticsSearchParams } from "./QueryStatisticsParams";
 import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
 
 export type TabIdParam = {
@@ -91,7 +92,9 @@ export type ActionCommand =
   | SubscribeActionCommand
   | UnsubscribeActionCommand
   | ExecuteActionCommand
-  | KillActionCommand;
+  | KillActionCommand
+  | SearchQueryStatisticsActionCommand
+  | PreviewPerformanceTuningActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -113,6 +116,30 @@ export type ShowMessageActionCommand = BaseActionCommand<
 >;
 
 export type KillActionCommand = BaseActionCommand<"kill", { sessionOrPid: number | undefined }>;
+
+// Query Statistics mode only (ToolsView.vue). Sent by the explicit
+// Search/Refresh action (or Enter), never on every keystroke - the webview
+// owns the form fields; the extension host is the source of truth for
+// clamping/defaulting them (misc/design/performance-tuning-context-implementation-plan.ja.md
+// §10 Phase 5: "入力変更だけでは検索せず...最終的なclampは引き続きDriverの責務とする").
+export type SearchQueryStatisticsActionCommand = BaseActionCommand<
+  "searchQueryStatistics",
+  Partial<QueryStatisticsSearchParams>
+>;
+
+// Starts a performance tuning context preview from a selected Query
+// Statistics row. Deliberately carries only `resultVersion` + `rowIndex`,
+// never the row's own values - ToolsViewProvider re-resolves
+// `rdh.rows[rowIndex].values` itself from the version it still holds, so a
+// compromised/buggy webview can't substitute arbitrary SQL/statistics into
+// the collected context (§10 Phase 5 "行選択とworkload変換"). `binds` is the
+// user's optional representative bind values for a placeholder-only SQL
+// (JSON array of string/number/boolean/null, validated on both ends) and is
+// never persisted past this one collection attempt.
+export type PreviewPerformanceTuningActionCommand = BaseActionCommand<
+  "previewPerformanceTuning",
+  { resultVersion: number; rowIndex: number; binds: unknown[] }
+>;
 
 export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
 export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;

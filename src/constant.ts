@@ -33,6 +33,7 @@ export const SPECIFY_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.specify-defau
 export const CLEAR_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.clear-default-connection-for-sql-cell`;
 export const GET_LOCKS = `${EXTENSION_NAME}.get-locks`;
 export const GET_SESSIONS = `${EXTENSION_NAME}.get-sessions`;
+export const SHOW_QUERY_STATISTICS = `${EXTENSION_NAME}.show-query-statistics`;
 export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;
 export const VIEW_DATA = `${EXTENSION_NAME}.view-data`;
 export const VIEW_TOP_ROWS = `${EXTENSION_NAME}.view-top-rows`;

@@ -4,9 +4,9 @@ import type { PerformanceTuningDiagnosticGroupViewModel } from "@/utilities/vsco
 // Renders one already-grouped/summarized PerformanceTuningDiagnostic (or
 // UnavailableSection) group, built extension-side by
 // buildPerformanceTuningDiagnosticGroups() - see
-// misc/design/performance-tuning-diagnostics-display-plan.ja.md §6. This
+// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5. This
 // component only lays the view model out; it never derives copy or decides
-// grouping itself (§1.4/§7).
+// grouping itself (§4.4).
 const props = defineProps<{
   group: PerformanceTuningDiagnosticGroupViewModel;
 }>();
@@ -33,7 +33,7 @@ const tableRefOf = (schemaName: string | undefined, tableName: string | undefine
     </div>
 
     <!-- Always present, even for a single-detail group - node ID/operation/
-         object name must stay reachable per §6.2, and collapsed-by-default
+         object name must stay reachable per §4.4, and collapsed-by-default
          keeps the beginner-facing summary above the fold. -->
     <details class="technical-details">
       <summary>Technical details ({{ props.group.details.length }})</summary>
@@ -70,7 +70,7 @@ const tableRefOf = (schemaName: string | undefined, tableName: string | undefine
   background: var(--vscode-editorWidget-background, transparent);
 }
 
-/* Info is deliberately neutral/blue, never the warning color (§6.2) - a
+/* Info is deliberately neutral/blue, never the warning color (§4.4) - a
    non-table plan source or a factual plan observation is not an issue. */
 .DiagnosticGroupCard.info {
   border-left-color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);

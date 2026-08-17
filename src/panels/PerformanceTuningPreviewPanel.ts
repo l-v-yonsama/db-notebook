@@ -12,7 +12,7 @@ import { BasePanel } from "./BasePanel";
 
 // Read-only "what would be sent" preview for getPerformanceTuningContext()'s
 // result (推奨着手順 step 9a; diagnostic display per
-// misc/design/performance-tuning-diagnostics-display-plan.ja.md step 6). No
+// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5). No
 // literal masking (matches the design's §9.2 policy) and no "send" action -
 // AI submission is step 10, not built yet, so this panel only lets the user
 // review the SQL, payload size, collection status/diagnostics and the raw
@@ -22,6 +22,14 @@ import { BasePanel } from "./BasePanel";
 // vitest suite instead of needing a separate webview-ui test setup.
 export class PerformanceTuningPreviewPanel extends BasePanel {
   public static currentPanel: PerformanceTuningPreviewPanel | undefined;
+
+  // The singleton panel can be re-render()ed with a new context before a
+  // prior renderSub() call's async syntax highlighting finishes (e.g. Query
+  // Statistics' 9b lets a user trigger back-to-back previews from different
+  // rows). Guards against the slower, older call posting its result after
+  // the newer one already has (§10 Phase 5 "PerformanceTuningPreviewPanel...
+  // にもrenderGenerationを持たせる").
+  private renderGeneration = 0;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     super(panel, extensionUri);
@@ -64,6 +72,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   }
 
   private async renderSub(context: PerformanceTuningContext): Promise<void> {
+    const myGeneration = ++this.renderGeneration;
+
     // Computed here (not in the webview) so the number shown always matches
     // what RDSBaseDriver.enforcePayloadBudget() itself measured the result
     // against.
@@ -74,6 +84,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       createCodeHtmlString({ code: context.statement.sql, lang: "sql" }),
       createCodeHtmlString({ code: contextJson, lang: "json" }),
     ]);
+
+    if (myGeneration !== this.renderGeneration) {
+      // A newer render() call started (and possibly already finished) while
+      // this one was highlighting - never let the older result win.
+      return;
+    }
 
     const diagnosticGroups = buildPerformanceTuningDiagnosticGroups(
       context.collection.diagnostics,

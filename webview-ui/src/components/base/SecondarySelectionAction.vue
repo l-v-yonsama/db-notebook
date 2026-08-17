@@ -3,12 +3,16 @@
     <div class="monaco-dropdown">
       <div class="dropdown-label">
         <a
-          class="action-label codicon"
-          :class="{ 'codicon-chevron-down': isChevron, 'codicon-ellipsis': isMore, disabled }"
+          class="action-label"
+          :class="{ 'has-label': !!label, disabled }"
           role="button"
           :title="title"
+          :aria-label="label ? undefined : title"
           @click="toggle"
-        ></a>
+        >
+          <span v-if="label" class="label-text">{{ label }}</span>
+          <span class="codicon" :class="{ 'codicon-chevron-down': isChevron, 'codicon-ellipsis': isMore }"></span>
+        </a>
       </div>
     </div>
     <section class="dropdown-list" v-click-outside-element="close" v-if="visibleContent">
@@ -31,6 +35,12 @@ const props = defineProps<{
   title: string;
   items: SecondaryItem[];
   disabled?: boolean;
+  // Optional visible text before the chevron/ellipsis icon (e.g. "Export").
+  // Without it this renders exactly as before - a bare icon whose accessible
+  // name comes from `title` - so every existing call site (a small "more
+  // options" chevron placed next to its own separate primary button) is
+  // unaffected.
+  label?: string;
 }>();
 
 const isChevron = computed(() => props.title != "more");
@@ -44,6 +54,9 @@ const visibleContent = ref(false);
 let beforeOpened = new Date().getTime();
 
 const toggle = () => {
+  if (props.disabled) {
+    return;
+  }
   visibleContent.value = !visibleContent.value;
   beforeOpened = new Date().getTime();
 };
@@ -80,10 +93,34 @@ a {
 }
 .dropdown-label {
   cursor: pointer;
+}
+.action-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 
-  &[disabled="true"] {
+  &.disabled {
     cursor: not-allowed;
+    opacity: 0.5;
   }
+}
+// Only the labeled form (e.g. "Export ▾") gets button-like chrome - the
+// bare-icon form used everywhere else keeps its original unboxed look.
+.action-label.has-label {
+  padding: var(--button-padding-vertical) var(--button-padding-horizontal);
+  color: var(--input-foreground);
+  background: var(--input-background);
+  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  border-radius: 2px;
+
+  &:not(.disabled):hover {
+    background: var(--vscode-toolbar-hoverBackground);
+  }
+}
+.label-text {
+  font-family: var(--font-family);
+  font-size: var(--type-ramp-base-font-size);
+  line-height: var(--type-ramp-base-line-height);
 }
 .dropdown-list {
   position: absolute;

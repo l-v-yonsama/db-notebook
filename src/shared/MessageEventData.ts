@@ -34,6 +34,7 @@ import type { DBRestoreInputParams, DBRestoreSettingsUIParams } from "./DBRestor
 import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
+import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 
@@ -496,7 +497,7 @@ export type VariablesPanelEventData = BaseMessageEventData<
 // built once, extension-side, by buildPerformanceTuningDiagnosticGroups()
 // (src/utilities/performanceTuningDiagnosticFormatter.ts) so the Vue
 // component never hand-rolls per-code copy or grouping itself
-// (misc/design/performance-tuning-diagnostics-display-plan.ja.md §1.4/§7).
+// (misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5).
 // Declared here (not in that utility file) since both the extension host
 // (which builds it) and the webview (which only renders it) need the shape.
 export type PerformanceTuningDiagnosticDetailViewModel = {
@@ -506,7 +507,7 @@ export type PerformanceTuningDiagnosticDetailViewModel = {
   schemaName?: string;
   tableName?: string;
   // Always present, even when every other field above is - a detail row
-  // with no node/object identity must still show *something* (§6.2: "object
+  // with no node/object identity must still show *something* (§4.4: "object
   // 名が取得できない場合もnode IDとoperationは必ず表示する" generalizes to
   // "never a blank row").
   technicalMessage: string;
@@ -713,10 +714,15 @@ export type ToolsViewEventData = BaseMessageEventData<
   BaseMessageEventDataCommand | "refresh",
   "ToolsView",
   {
-    refresh: {
-      mode: "sessions" | "locks";
-      rdh?: ResultSetData;
-    };
+    // sessions/locks keep their original minimal shape (RDH is the only
+    // state, and search happens over the base DbResource that opened them).
+    // queryStatistics carries QueryStatisticsViewState in full on every
+    // update - including a preview-status-only change - so the webview
+    // never has to reconcile a partial patch against state it already holds
+    // (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5).
+    refresh:
+      | { mode: "sessions" | "locks"; rdh?: ResultSetData }
+      | ({ mode: "queryStatistics" } & QueryStatisticsViewState);
   }
 >;
 

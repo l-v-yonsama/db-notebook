@@ -327,6 +327,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
     let description = resource.comment || "";
     let scannable = false;
     let showSessions = false;
+    let showQueryStatistics = false;
     let exportable = false;
     let canViewLastRows = false;
     let tooltip: string | vscode.MarkdownString | undefined;
@@ -371,6 +372,14 @@ export class DBDatabaseItem extends vscode.TreeItem {
             dbType === DBType.Oracle
           ) {
             showSessions = true;
+            // Same static vendor set as getStatementStatistics() support
+            // today (kept as its own flag rather than reusing showSessions,
+            // since the two capabilities are unrelated and could diverge -
+            // this is just where they currently happen to agree). The
+            // runtime double-check (supportsGetStatementStatistics()) still
+            // happens when the Query Statistics view actually opens
+            // (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5).
+            showQueryStatistics = true;
           }
           exportable =
             dbType === DBType.MySQL ||
@@ -680,6 +689,9 @@ export class DBDatabaseItem extends vscode.TreeItem {
     contextValue += ",properties";
     if (showSessions) {
       contextValue += ",showSessions";
+    }
+    if (showQueryStatistics) {
+      contextValue += ",showQueryStatistics";
     }
     if (exportable) {
       contextValue += ",exportable";

@@ -584,6 +584,16 @@
           "group": "db-resourc@2"
         },
         {
+          "command": "database-notebook.show-query-statistics",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showQueryStatistics.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.show-query-statistics",
+          "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,showQueryStatistics.*/",
+          "group": "db-resourc@3"
+        },
+        {
           "command": "database-notebook.dump-database",
           "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,exportable.*/",
           "group": "io@6"
@@ -1265,6 +1275,11 @@
         "command": "database-notebook.get-sessions",
         "title": "Show sessions",
         "icon": "$(info)"
+      },
+      {
+        "command": "database-notebook.show-query-statistics",
+        "title": "Show query statistics",
+        "icon": "$(graph-line)"
       },
       {
         "command": "database-notebook.count-for-all-tables",

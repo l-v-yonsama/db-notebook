@@ -33,14 +33,12 @@ import {
 } from "../../constant";
 
 import {
-  PerformanceTuningContext,
   RDSBaseDriver,
   SelectedStatementStatistics,
   normalizeQuery,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, resolveCodeLabel } from "@l-v-yonsama/rdh";
-import { PerformanceTuningPreviewPanel } from "../../panels/PerformanceTuningPreviewPanel";
 import { CellMeta } from "../../types/Notebook";
 import { SQLHistory } from "../../types/SQLHistory";
 import { MdhViewParams } from "../../types/views";
@@ -49,6 +47,7 @@ import { createRDSDriver, workflow } from "../../utilities/driverResolver";
 import { existsFileOnWorkspace } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { readCodeResolverFile, readRuleFile } from "../../utilities/notebookUtil";
+import { startPerformanceTuningPreview } from "../../utilities/performanceTuningPreview";
 import { HistoryTreeProvider } from "./HistoryTreeProvider";
 
 type HistoryTreeParams = {
@@ -372,14 +371,6 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       return;
     }
 
-    const driver = await createRDSDriver<RDSBaseDriver>(connectionSetting, true);
-    if (!driver.supportsGetPerformanceTuningContext()) {
-      showWindowErrorMessage(
-        `Performance tuning is not supported for ${connectionSetting.dbType}.`
-      );
-      return;
-    }
-
     // Prefer the per-history "USE <database>" override, falling back to the
     // connection's own default database. If neither is known, databaseName
     // can't be determined safely - fail closed rather than guessing which
@@ -406,43 +397,23 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
         }
       : undefined;
 
-    const { ok, message, result } = await window.withProgress(
-      {
-        location: ProgressLocation.Notification,
-        cancellable: true,
-        title: "Collecting performance tuning context...",
-      },
-      async (progress, token) => {
-        const controller = new AbortController();
-        token.onCancellationRequested(() => controller.abort());
+    // Shared with Query Statistics (9b) - see startPerformanceTuningPreview()'s
+    // own doc comment (§10 Phase 5 "Preview接続の共通化と競合防止").
+    const { status, message, technicalMessage } = await startPerformanceTuningPreview({
+      extensionUri: context.extensionUri,
+      connectionSetting,
+      databaseName,
+      statement: { sql: history.sqlDoc, source: "sqlHistory", statistics },
+      plan: { mode: "estimate" },
+    });
 
-        return workflow<RDSBaseDriver, PerformanceTuningContext>(
-          connectionSetting,
-          (driver) =>
-            driver
-              .getPerformanceTuningContext(
-                {
-                  databaseName,
-                  statement: { sql: history.sqlDoc, source: "sqlHistory", statistics },
-                  plan: { mode: "estimate" },
-                },
-                { signal: controller.signal }
-              )
-              .then((r) => {
-                if (!r.ok || !r.result) {
-                  throw new Error(r.message);
-                }
-                return r.result;
-              }),
-          true
-        );
-      }
-    );
-
-    if (ok && result) {
-      PerformanceTuningPreviewPanel.render(context.extensionUri, result);
-    } else {
-      showWindowErrorMessage(`Failed to collect performance tuning context: ${message}`);
+    if (status === "failed") {
+      showWindowErrorMessage(
+        [message, technicalMessage].filter(Boolean).join(" ") ||
+          "Failed to collect performance tuning context."
+      );
     }
+    // "cancelled" mirrors standard VS Code progress-cancellation UX - the
+    // user asked to stop, so no further notification is shown.
   });
 };

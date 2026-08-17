@@ -12,21 +12,21 @@ import type {
 // Turns getPerformanceTuningContext()'s raw, per-node
 // PerformanceTuningDiagnostic[] and UnavailableSection[] into a small number
 // of beginner-facing groups for the preview panel - see
-// misc/design/performance-tuning-diagnostics-display-plan.ja.md §1.4/§6/§7.
+// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5.
 // The driver only promises a stable `code` (or, for UnavailableSection, a
 // stable `section`) plus honest technical fields; every beginner-facing
 // sentence below is owned entirely by this file, keyed off those stable
 // values - never by pattern-matching the driver's own English `message`/
-// `reason` text (§1.4: "Driverは安定したcodeと技術情報を返し、UIがcodeに応じ
+// `reason` text (§4.4: "Driverは安定したcodeと技術情報を返し、UIがcodeに応じ
 // て初心者向け文面を組み立てる"). An unrecognized code/section still produces
 // a group (falling back to the driver's own message/reason as the summary),
 // so a UI built against an older version of this file never silently drops
-// information a newer db-drivers started sending (§7).
+// information a newer db-drivers started sending (§4.4).
 //
 // Grouping never drops a diagnostic or unavailableSection - every input
 // entry appears in exactly one output group's `details[]`, deduplicated
 // only in the sense that same-cause entries share one summary/title rather
-// than repeating it per node (§6.2: "同じnodeをdeduplicateしても、異なる
+// than repeating it per node (§4.4: "同じnodeをdeduplicateしても、異なる
 // nodeのdetailをまとめて消さない").
 
 const SEVERITY_ORDER: Record<"info" | "warning", number> = { info: 0, warning: 1 };
@@ -198,7 +198,7 @@ function titleAndSummaryForDiagnosticGroup(
       };
     default:
       // Unrecognized code (a newer db-drivers than this file knows about) -
-      // never drop it (§7): fall back to the driver's own technical message
+      // never drop it (§4.4): fall back to the driver's own technical message
       // verbatim rather than inventing a beginner sentence for a code this
       // file has no copy for.
       return { title: humanizeUnknownCode(code), summary: first.message };
@@ -243,11 +243,11 @@ function buildDiagnosticGroups(diagnostics: PerformanceTuningDiagnostic[]): Perf
 
 // UnavailableSection has no stable `code` the way PerformanceTuningDiagnostic
 // does - only a stable `section` plus a free-text `reason` this file
-// deliberately never parses for meaning (§1.4). `section` is still enough to
+// deliberately never parses for meaning (§4.4). `section` is still enough to
 // give a real title + a generically-true impact sentence per section kind;
 // `reason` (and requiredPermissions, when present) becomes the per-detail
 // technical message and, when available, the suggested action - never the
-// beginner-facing summary line itself (§6.3: "DBのraw error全文は通常表示へ
+// beginner-facing summary line itself (§4.4: "DBのraw error全文は通常表示へ
 // 直接出さず").
 function buildUnavailableSectionGroups(sections: UnavailableSection[]): PerformanceTuningDiagnosticGroupViewModel[] {
   const membersByKey = new Map<string, UnavailableSection[]>();
@@ -284,7 +284,7 @@ function buildUnavailableSectionGroups(sections: UnavailableSection[]): Performa
   return groups;
 }
 
-// Public entry point (diagnostics-display design doc §7). Returns
+// Public entry point (implementation plan §4.4 / §10 Phase 5). Returns
 // information-severity groups before warning-severity ones, and is stable
 // (never reorders/drops an input entry) - see the module doc comment above
 // for why grouping is code/section-specific rather than uniform.

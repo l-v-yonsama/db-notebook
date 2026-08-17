@@ -69,6 +69,7 @@ import {
   SHOW_CONNECTION_SETTING,
   SHOW_DYNAMO_QUERY_PANEL,
   SHOW_PUBLISH_EDITOR_PANEL,
+  SHOW_QUERY_STATISTICS,
   SHOW_RESOURCE_PROPERTIES,
   SHOW_SCAN_PANEL,
   SPECIFY_DEFAULT_CON_FOR_SQL_CELL,
@@ -449,6 +450,20 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     commands.registerCommand(GET_SESSIONS, async (dbRes: DbDatabase) => {
       const { conName } = dbRes.meta;
       const commandParam: ToolsViewParams = { viewMode: "sessions", conName, res: dbRes };
+      commands.executeCommand(OPEN_TOOLS_VIEWER, commandParam);
+    })
+  );
+
+  // The "showQueryStatistics" contextValue (ResourceTreeProvider.ts) already
+  // restricts this menu entry to the 4 RDS vendors with static
+  // getStatementStatistics() support, same as GET_SESSIONS/GET_LOCKS above -
+  // but that's only the menu-visibility signal. ToolsViewProvider still
+  // calls supportsGetStatementStatistics() itself before searching (§10
+  // Phase 5: "menu条件だけを信頼せず、Provider側でも...必ず確認する").
+  context.subscriptions.push(
+    commands.registerCommand(SHOW_QUERY_STATISTICS, async (dbRes: RdsDatabase) => {
+      const { conName } = dbRes.meta;
+      const commandParam: ToolsViewParams = { viewMode: "queryStatistics", conName, res: dbRes };
       commands.executeCommand(OPEN_TOOLS_VIEWER, commandParam);
     })
   );
