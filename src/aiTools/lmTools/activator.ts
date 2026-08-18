@@ -2,6 +2,7 @@ import { ExtensionContext, lm } from "vscode";
 import { StateStorage } from "../../utilities/StateStorage";
 import { CreateNotebookTool } from "./CreateNotebookTool";
 import { EditNotebookTool } from "./EditNotebookTool";
+import { GetPerformanceTuningContextTool } from "./GetPerformanceTuningContextTool";
 import { GetSchemaTool } from "./GetSchemaTool";
 import { ListConnectionsTool } from "./ListConnectionsTool";
 import { RunQueryTool } from "./RunQueryTool";
@@ -18,6 +19,12 @@ export function activateLmTools(context: ExtensionContext, stateStorage: StateSt
   );
   context.subscriptions.push(
     lm.registerTool("database-notebook_getSchema", new GetSchemaTool(stateStorage))
+  );
+  context.subscriptions.push(
+    lm.registerTool(
+      "database-notebook_getPerformanceTuningContext",
+      new GetPerformanceTuningContextTool(stateStorage)
+    )
   );
   context.subscriptions.push(
     lm.registerTool("database-notebook_runQuery", new RunQueryTool(stateStorage))

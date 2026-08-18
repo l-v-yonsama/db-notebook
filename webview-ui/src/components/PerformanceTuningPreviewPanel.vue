@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import type { PerformanceTuningDiagnosticGroupViewModel, PerformanceTuningPreviewPanelEventData } from "@/utilities/vscode";
+import type {
+  PerformanceTuningAiAnalysisViewState,
+  PerformanceTuningDiagnosticGroupViewModel,
+  PerformanceTuningPreviewPanelEventData,
+} from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { computed, ref } from "vue";
@@ -13,6 +17,12 @@ const sqlHtml = ref("");
 const jsonHtml = ref("");
 const payloadBytes = ref(0);
 const maxPayloadBytes = ref(0);
+
+// Step 10 "Analyze with AI" (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
+// §6.1). Reset to idle on every new "initialize" (a fresh preview
+// invalidates whatever analysis was shown for the previous one - mirrors
+// PerformanceTuningPreviewPanel.ts's own renderGeneration-based reset).
+const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
 
 // Only used for the "Copy JSON" button (needs plain text, not the
 // highlighted HTML) - kept in sync with what the extension side rendered
@@ -49,6 +59,7 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   jsonHtml.value = v.jsonHtml;
   payloadBytes.value = v.payloadBytes;
   maxPayloadBytes.value = v.maxPayloadBytes;
+  analysis.value = { status: "idle" };
 };
 
 const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
@@ -56,6 +67,11 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
   switch (command) {
     case "initialize":
       initialize(value.initialize);
+      break;
+    case "analysis-update":
+      if (value.analysis) {
+        analysis.value = value.analysis;
+      }
       break;
   }
 };
@@ -65,6 +81,50 @@ const close = (): void => {
     command: "cancel",
     params: {},
   });
+};
+
+const analyzeWithAi = (): void => {
+  vscode.postCommand({
+    command: "analyzePerformanceTuningWithAi",
+    params: {},
+  });
+};
+
+const saveAiAnalysisAsNotebook = (): void => {
+  vscode.postCommand({
+    command: "saveAiAnalysisAsNotebook",
+    params: {},
+  });
+};
+
+const isAnalyzing = computed(() => analysis.value.status === "running");
+const analysisJson = computed(() =>
+  analysis.value.result ? JSON.stringify(analysis.value.result, null, 2) : ""
+);
+
+const evidenceLabel = (
+  evidence:
+    | NonNullable<PerformanceTuningAiAnalysisViewState["result"]>["findings"][number]["evidence"]
+    | undefined
+): string => {
+  if (!evidence) {
+    return "";
+  }
+  const parts: string[] = [];
+  const tableRef = [evidence.schemaName, evidence.tableName].filter(Boolean).join(".");
+  if (tableRef) {
+    parts.push(`Table: ${tableRef}`);
+  }
+  if (evidence.indexName) {
+    parts.push(`Index: ${evidence.indexName}`);
+  }
+  if (evidence.planNodeId) {
+    parts.push(`Plan node: ${evidence.planNodeId}`);
+  }
+  if (evidence.diagnosticCode) {
+    parts.push(`Diagnostic: ${evidence.diagnosticCode}`);
+  }
+  return parts.join(" / ");
 };
 
 defineExpose({
@@ -109,6 +169,82 @@ defineExpose({
     </div>
 
     <div class="scrollArea">
+      <!-- 0. AI Analysis (Step 10, design doc §6.1) -->
+      <div class="section ai-analysis" v-if="analysis.status !== 'idle'">
+        <div class="section-title-row">
+          <h3 class="section-title">AI Analysis</h3>
+          <CopyToClipboardButton v-if="analysisJson" class="copy-analysis-btn" :content="analysisJson" title="Copy AI analysis JSON" />
+        </div>
+
+        <p v-if="analysis.status === 'running'" class="analysis-status">Analyzing with AI…</p>
+
+        <div v-else-if="analysis.status === 'error'" class="analysis-error">
+          <p>{{ analysis.errorMessage }}</p>
+          <details v-if="analysis.rawResponseText" class="advanced-details">
+            <summary>Raw AI response</summary>
+            <pre class="raw-response">{{ analysis.rawResponseText }}</pre>
+          </details>
+        </div>
+
+        <div v-else-if="analysis.status === 'success' && analysis.result">
+          <p class="analysis-summary">{{ analysis.result.summary }}</p>
+
+          <div v-if="analysis.result.findings.length > 0" class="analysis-subsection">
+            <h4>Findings</h4>
+            <div
+              v-for="(f, i) in analysis.result.findings"
+              :key="`finding-${i}`"
+              class="ai-card"
+              :class="f.severity"
+            >
+              <p class="ai-card-title">{{ f.title }}</p>
+              <p class="ai-card-detail">{{ f.detail }}</p>
+              <p v-if="evidenceLabel(f.evidence)" class="ai-card-evidence">{{ evidenceLabel(f.evidence) }}</p>
+            </div>
+          </div>
+
+          <div v-if="analysis.result.recommendations.length > 0" class="analysis-subsection">
+            <h4>Recommendations</h4>
+            <div
+              v-for="(r, i) in analysis.result.recommendations"
+              :key="`recommendation-${i}`"
+              class="ai-card"
+              :class="r.riskLevel ? `risk-${r.riskLevel}` : ''"
+            >
+              <p class="ai-card-title">{{ r.title }}</p>
+              <p class="ai-card-detail">{{ r.detail }}</p>
+              <p class="ai-card-rationale"><span class="label-inline">Rationale:</span> {{ r.rationale }}</p>
+              <pre v-if="r.suggestedSql" class="ai-card-sql">{{ r.suggestedSql }}</pre>
+              <p v-if="evidenceLabel(r.evidence)" class="ai-card-evidence">{{ evidenceLabel(r.evidence) }}</p>
+            </div>
+          </div>
+
+          <p class="analysis-note">
+            Recommendations are AI-generated suggestions based on this one context snapshot. They are not applied
+            automatically - review and run them yourself.
+          </p>
+
+          <div class="row">
+            <span class="label">Confidence</span>
+            <span class="badge" :class="`confidence-${analysis.result.confidence}`">{{ analysis.result.confidence }}</span>
+          </div>
+
+          <div v-if="analysis.result.missingContext.length > 0" class="analysis-subsection">
+            <h4>Missing context</h4>
+            <ul>
+              <li v-for="(m, i) in analysis.result.missingContext" :key="`missing-${i}`">{{ m }}</li>
+            </ul>
+          </div>
+
+          <div class="analysis-actions">
+            <VsCodeButton appearance="secondary" @click="saveAiAnalysisAsNotebook">Save as Notebook</VsCodeButton>
+            <span v-if="analysis.savedNotebookRelativePath" class="saved-hint">
+              Saved to {{ analysis.savedNotebookRelativePath }}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <!-- 3. Collection issues: warning-severity diagnostics + unavailable
            sections, already merged into one list extension-side (§6.1/§6.3). -->
       <div v-if="issueGroups.length > 0" class="section">
@@ -139,6 +275,9 @@ defineExpose({
     </div>
 
     <div class="footer">
+      <VsCodeButton appearance="primary" :disabled="isAnalyzing" @click="analyzeWithAi">
+        {{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
+      </VsCodeButton>
       <VsCodeButton appearance="secondary" @click="close">Close</VsCodeButton>
     </div>
   </section>
@@ -302,5 +441,134 @@ defineExpose({
   margin-top: 8px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+/* --- AI Analysis (Step 10) --- */
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.section-title-row .section-title {
+  margin: 0;
+}
+
+.analysis-status {
+  color: var(--vscode-descriptionForeground);
+}
+
+.analysis-error {
+  color: var(--vscode-errorForeground);
+}
+
+.raw-response {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85em;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.analysis-summary {
+  margin: 0 0 8px 0;
+}
+
+.analysis-subsection {
+  margin: 8px 0;
+}
+
+.analysis-subsection h4 {
+  margin: 0 0 4px 0;
+  font-size: 0.95em;
+}
+
+.analysis-note {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  margin: 4px 0 8px 0;
+}
+
+.ai-card {
+  border-left: 3px solid var(--vscode-editorWidget-border, #444);
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  border-radius: 2px;
+  background: var(--vscode-editorWidget-background, transparent);
+}
+
+.ai-card.info,
+.ai-card.low {
+  border-left-color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+}
+
+.ai-card.warning,
+.ai-card.risk-medium {
+  border-left-color: var(--vscode-editorWarning-foreground, #ff9800);
+}
+
+.ai-card.critical,
+.ai-card.risk-high {
+  border-left-color: var(--vscode-errorForeground, #f44336);
+}
+
+.ai-card-title {
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+
+.ai-card-detail,
+.ai-card-rationale {
+  margin: 0 0 2px 0;
+}
+
+.label-inline {
+  font-weight: 600;
+}
+
+.ai-card-sql {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85em;
+  margin: 4px 0;
+  padding: 4px 6px;
+  background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
+  border-radius: 2px;
+}
+
+.ai-card-evidence {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  margin: 2px 0 0 0;
+}
+
+.badge.confidence-high {
+  background: var(--vscode-testing-iconPassed, #2e7d32);
+  color: white;
+}
+
+.badge.confidence-medium {
+  background: var(--vscode-editorWarning-foreground, #ff9800);
+  color: black;
+}
+
+.badge.confidence-low {
+  background: var(--vscode-errorForeground, #f44336);
+  color: white;
+}
+
+.analysis-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.saved-hint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
 }
 </style>

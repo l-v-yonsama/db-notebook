@@ -34,6 +34,7 @@ import type { DBRestoreInputParams, DBRestoreSettingsUIParams } from "./DBRestor
 import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
+import type { PerformanceTuningAiAnalysisResult } from "./PerformanceTuningAiAnalysis";
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
@@ -522,8 +523,26 @@ export type PerformanceTuningDiagnosticGroupViewModel = {
   details: PerformanceTuningDiagnosticDetailViewModel[];
 };
 
+// Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
+// §6/§11). A tagged status rather than separate optional fields, so the Vue
+// component can switch on one value instead of juggling
+// result/errorMessage/rawResponseText independently going stale relative to
+// each other. `savedNotebookRelativePath` is set independently of `status`
+// (via a later "analysis-update" post after a successful save) since saving
+// happens after a successful analysis without discarding the shown result.
+export type PerformanceTuningAiAnalysisViewState = {
+  status: "idle" | "running" | "success" | "error";
+  result?: PerformanceTuningAiAnalysisResult;
+  errorMessage?: string;
+  // Only set when status is "error" and the failure was a JSON.parse()
+  // failure on the model's own reply - kept so a malformed response is never
+  // silently discarded, only ever shown collapsed (§11).
+  rawResponseText?: string;
+  savedNotebookRelativePath?: string;
+};
+
 export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand,
+  BaseMessageEventDataCommand | "analysis-update",
   "PerformanceTuningPreviewPanel",
   {
     initialize?: {
@@ -546,6 +565,7 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       payloadBytes: number;
       maxPayloadBytes: number;
     };
+    analysis?: PerformanceTuningAiAnalysisViewState;
   }
 >;
 

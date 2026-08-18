@@ -95,7 +95,9 @@ export type ActionCommand =
   | KillActionCommand
   | SearchQueryStatisticsActionCommand
   | SelectQueryStatisticsRowActionCommand
-  | PreviewPerformanceTuningActionCommand;
+  | PreviewPerformanceTuningActionCommand
+  | AnalyzePerformanceTuningWithAiActionCommand
+  | SaveAiAnalysisAsNotebookActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -154,6 +156,21 @@ export type PreviewPerformanceTuningActionCommand = BaseActionCommand<
   "previewPerformanceTuning",
   { resultVersion: number; rowIndex: number; values: unknown[]; markers: unknown[] }
 >;
+
+// Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
+// §6.1). No params - PerformanceTuningPreviewPanel already holds the
+// PerformanceTuningContext it rendered as instance state (the same context
+// PreviewPerformanceTuningActionCommand's caller already had `driver.
+// getPerformanceTuningContext()` build), so there's nothing for the webview
+// to send beyond "the user pressed the button now".
+export type AnalyzePerformanceTuningWithAiActionCommand = BaseActionCommand<
+  "analyzePerformanceTuningWithAi"
+>;
+
+// Saves the most recent successful AI analysis (held as Panel instance
+// state, same reasoning as above) as a new Notebook under
+// reports/performance-tuning/ (§8). No params for the same reason.
+export type SaveAiAnalysisAsNotebookActionCommand = BaseActionCommand<"saveAiAnalysisAsNotebook">;
 
 export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
 export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;

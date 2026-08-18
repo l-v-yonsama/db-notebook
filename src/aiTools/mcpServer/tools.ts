@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { getPerformanceTuningContextText } from "../../aiTools/lmTools/GetPerformanceTuningContextTool";
 import { getSchemaText } from "../../aiTools/lmTools/GetSchemaTool";
 import { listConnectionsText } from "../../aiTools/lmTools/ListConnectionsTool";
 import { runQueryText } from "../../aiTools/lmTools/RunQueryTool";
@@ -10,9 +11,11 @@ import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTrack
 import { StateStorage } from "../../utilities/StateStorage";
 
 /**
- * Phase 1 + 2 scope: all 6 connection/schema/query tools (everything except the
+ * Phase 1 + 2 scope: all read/connection/schema/query tools (everything except the
  * notebook-authoring tools, `createDbNotebook`/`editDbNotebook`, which stay
- * Copilot-only for now).
+ * Copilot-only for now). `getPerformanceTuningContext` (Step 10,
+ * misc/design/performance-tuning-structured-ai-analysis-plan.ja.md §9) joined this set
+ * later, on the same reasoning: it's read-only and doesn't author a Notebook.
  * `description`s below are copied verbatim from `package.json`'s
  * `contributes.languageModelTools` (the Copilot Chat versions of these same tools) so
  * both surfaces stay in sync and describe identical behavior.
@@ -98,6 +101,38 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
           resourceName,
           realmName,
         })
+      );
+      return { content: [{ type: "text", text }] };
+    }
+  );
+
+  server.registerTool(
+    "getPerformanceTuningContext",
+    {
+      description:
+        "Returns a structured, vendor-neutral snapshot of everything needed to reason about why a single SQL statement (MySQL/PostgreSQL/SQL Server/Oracle only) may be slow: the estimated execution plan, the definitions/indexes/constraints of the tables it touches, optimizer statistics, physical health metrics (bloat/fragmentation/stale-statistics style signals), and structured collection diagnostics noting anything that could not be collected and why. This is read-only and observational -- it never executes the SQL (always an estimated plan, never ANALYZE) and never returns AI judgement of its own; reason about the returned JSON yourself. The SQL, table/index definitions, and predicates are included exactly as read from the database, not masked or redacted, and may contain literal values -- treat the response accordingly. Use this when the user asks why a query is slow, wants to tune performance, or asks about a query's execution plan/statistics/indexes together rather than one at a time (use getDbSchema instead for just table structure). If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+      inputSchema: {
+        connectionName: z
+          .string()
+          .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
+        sql: z.string().describe("The SQL statement to analyze. It is never executed."),
+        databaseName: z
+          .string()
+          .optional()
+          .describe("Optional: the database/catalog to analyze against. Omit to use the connection's configured default database."),
+        schemaName: z
+          .string()
+          .optional()
+          .describe("Optional: the schema to resolve tables in, for vendors where this differs from databaseName (e.g. PostgreSQL). Omit to let the driver resolve it."),
+      },
+      annotations: {
+        readOnlyHint: true,
+      },
+    },
+    async ({ connectionName, sql, databaseName, schemaName }) => {
+      const input = { connectionName, sql, databaseName, schemaName };
+      const text = await trackInvocation("mcpServer", "getPerformanceTuningContext", input, () =>
+        getPerformanceTuningContextText(stateStorage, input)
       );
       return { content: [{ type: "text", text }] };
     }

@@ -1,0 +1,74 @@
+// Step 10 ("構造化 AI 分析") of the Performance Tuning Context feature - see
+// misc/design/performance-tuning-structured-ai-analysis-plan.ja.md §5. This
+// is the *only* place AI reasoning about a PerformanceTuningContext gets a
+// type: db-drivers reports observed facts only (see that package's
+// PerformanceTuningContext.ts doc comment), and every other AI-facing path
+// in this extension (SQL annotation, schema prompts, RunQueryTool) already
+// returns free-text/markdown rather than a schema like this - this feature
+// is deliberately the structured one, per the design's decision to make Step
+// 10's response verifiable against the Full Context JSON rather than a plain
+// chat reply.
+
+/**
+ * Points a finding/recommendation back at the specific piece of
+ * PerformanceTuningContext it's about, so a reader can cross-check the AI's
+ * claim against the Full Context JSON instead of taking it on faith. Every
+ * field is optional and independent - the model fills in whichever it can
+ * identify, none are required (§16.3: left fully optional pending real-world
+ * observation of how well models populate this).
+ */
+export type PerformanceTuningAiEvidenceRef = {
+  schemaName?: string;
+  tableName?: string;
+  indexName?: string;
+  // Matches PlanTableMapping.planNodeId / PerformanceTuningDiagnosticNode.id
+  // in db-drivers' PerformanceTuningContext.ts - kept as a plain string here
+  // (not re-imported as a value) since this file is shared with webview-ui,
+  // which never imports the driver package as a value (see
+  // StatementStatisticsSortKey's local-mirror precedent, implementation plan
+  // doc §"実装中に発見したbundlingの落とし穴").
+  planNodeId?: string;
+  // Matches PerformanceTuningDiagnosticCode, same plain-string reasoning.
+  diagnosticCode?: string;
+};
+
+export type PerformanceTuningAiFindingSeverity = "info" | "warning" | "critical";
+
+export type PerformanceTuningAiFinding = {
+  title: string;
+  detail: string;
+  severity: PerformanceTuningAiFindingSeverity;
+  evidence?: PerformanceTuningAiEvidenceRef;
+};
+
+export type PerformanceTuningAiRiskLevel = "low" | "medium" | "high";
+
+export type PerformanceTuningAiRecommendation = {
+  title: string;
+  detail: string;
+  rationale: string;
+  riskLevel?: PerformanceTuningAiRiskLevel;
+  // Illustrative only (e.g. a candidate CREATE INDEX statement) - never
+  // executed automatically by this feature (§1 of the design doc).
+  suggestedSql?: string;
+  evidence?: PerformanceTuningAiEvidenceRef;
+};
+
+export type PerformanceTuningAiConfidence = "low" | "medium" | "high";
+
+export type PerformanceTuningAiAnalysisResult = {
+  formatVersion: 1;
+  summary: string;
+  findings: PerformanceTuningAiFinding[];
+  recommendations: PerformanceTuningAiRecommendation[];
+  confidence: PerformanceTuningAiConfidence;
+  missingContext: string[];
+  model: {
+    id: string;
+    vendor: string;
+    family: string;
+    version: string;
+    name?: string;
+  };
+  generatedAt: string; // ISO8601, set by the extension host, not the model
+};

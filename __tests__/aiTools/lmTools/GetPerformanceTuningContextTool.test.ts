@@ -1,0 +1,81 @@
+import { describe, expect, it, vi } from "vitest";
+import type { StateStorage } from "../../../src/utilities/StateStorage";
+import {
+  formatPerformanceTuningContextResultForModel,
+  getPerformanceTuningContextText,
+} from "../../../src/aiTools/lmTools/GetPerformanceTuningContextTool";
+
+type ConnectionFixture = { dbType?: string; database?: string };
+
+const makeStateStorage = (
+  opts: {
+    connections?: Record<string, ConnectionFixture>;
+    mcpEnabled?: string[];
+  } = {}
+): StateStorage => {
+  const connections = opts.connections ?? {};
+  const mcpEnabled = new Set(opts.mcpEnabled ?? Object.keys(connections));
+  return {
+    getConnectionSettingByName: vi.fn(async (name: string) => connections[name]),
+    getConnectionSettingNames: vi.fn(() => Object.keys(connections)),
+    isMcpEnabledForConnection: vi.fn((name: string) => mcpEnabled.has(name)),
+  } as unknown as StateStorage;
+};
+
+describe("formatPerformanceTuningContextResultForModel", () => {
+  it("returns the context JSON verbatim on success", () => {
+    const context = { formatVersion: 1, database: { vendor: "postgresql", databaseName: "app" } } as any;
+    const text = formatPerformanceTuningContextResultForModel({ ok: true, context });
+    expect(JSON.parse(text)).toEqual(context);
+  });
+
+  it("prefixes an error result with ❌ and lists available connections when given", () => {
+    const text = formatPerformanceTuningContextResultForModel({
+      ok: false,
+      message: "No connection named \"typo\" was found.",
+      availableConnectionNames: ["localMySQL", "prodPg"],
+    });
+    expect(text).toContain("❌ No connection named \"typo\" was found.");
+    expect(text).toContain("Available connections: localMySQL, prodPg");
+  });
+
+  it("omits the available-connections line when none were given", () => {
+    const text = formatPerformanceTuningContextResultForModel({ ok: false, message: "boom" });
+    expect(text).toBe("❌ boom");
+  });
+});
+
+describe("getPerformanceTuningContextText", () => {
+  it("rejects an empty sql before touching the connection", async () => {
+    const stateStorage = makeStateStorage({ connections: { localMySQL: {} } });
+    const text = await getPerformanceTuningContextText(stateStorage, {
+      connectionName: "localMySQL",
+      sql: "   ",
+    });
+    expect(text).toBe("❌ sql must not be empty.");
+    expect(stateStorage.getConnectionSettingByName).not.toHaveBeenCalled();
+  });
+
+  it("reports an unknown/not-mcp-enabled connection the same way other AI tools do", async () => {
+    const stateStorage = makeStateStorage({ connections: {}, mcpEnabled: [] });
+    const text = await getPerformanceTuningContextText(stateStorage, {
+      connectionName: "doesNotExist",
+      sql: "SELECT 1",
+    });
+    expect(text).toContain("❌");
+    expect(text).toContain("doesNotExist");
+  });
+
+  it("requires an explicit databaseName when the connection has no default database configured", async () => {
+    const stateStorage = makeStateStorage({
+      connections: { localMySQL: { dbType: "mysql" } },
+    });
+    const text = await getPerformanceTuningContextText(stateStorage, {
+      connectionName: "localMySQL",
+      sql: "SELECT 1",
+    });
+    expect(text).toContain("❌");
+    expect(text).toContain("no default database configured");
+    expect(text).toContain("databaseName must be provided explicitly");
+  });
+});
