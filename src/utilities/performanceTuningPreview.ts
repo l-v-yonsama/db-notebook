@@ -21,7 +21,23 @@ export type StartPerformanceTuningPreviewParams = {
   plan: {
     mode: "estimate";
     binds?: unknown[];
+    // SQL Server-only today (named parameter substitution in SHOWPLAN - see
+    // db-drivers' PerformanceTuningContext.ts). Same non-persistence rule as
+    // `binds` itself: call-scoped only, never stored/logged/echoed back.
+    bindMarkers?: string[];
   };
+  // Explicit fallback for tables the vendor plan itself couldn't resolve -
+  // sanctioned specifically for MySQL's EXPLAIN FORMAT=JSON reporting an
+  // aliased table's *alias* (not its real name) as `table_name` (§6.5/§7.7
+  // of performance-tuning-query-statistics-parameter-input-plan.ja.md).
+  // Additive only: RDSBaseDriver.getPerformanceTuningContext() unions this
+  // in alongside whatever the plan resolved, never replaces it.
+  targetTables?: Array<{ schemaName?: string; tableName: string }>;
+  // Corrects a plan-resolved table name that's actually an alias (same
+  // MySQL EXPLAIN gap as targetTables above, but this *replaces* the
+  // wrong name instead of adding a second entry - §6.6/§7.7). Keyed by the
+  // lowercased alias (or bare table name for an unaliased reference).
+  tableAliasMap?: Record<string, { schemaName?: string; tableName: string }>;
 };
 
 export type StartPerformanceTuningPreviewResult = {
@@ -46,7 +62,8 @@ export type StartPerformanceTuningPreviewResult = {
 export async function startPerformanceTuningPreview(
   params: StartPerformanceTuningPreviewParams
 ): Promise<StartPerformanceTuningPreviewResult> {
-  const { extensionUri, connectionSetting, databaseName, statement, plan } = params;
+  const { extensionUri, connectionSetting, databaseName, statement, plan, targetTables, tableAliasMap } =
+    params;
 
   // Defense in depth: the webview and ToolsViewProvider already validate
   // Query Statistics' representative bind values before reaching here, and
@@ -88,7 +105,7 @@ export async function startPerformanceTuningPreview(
         (driver) =>
           driver
             .getPerformanceTuningContext(
-              { databaseName, statement, plan },
+              { databaseName, statement, plan, targetTables, tableAliasMap },
               { signal: controller.signal }
             )
             .then((r) => {

@@ -1,8 +1,21 @@
 import type { SelectedStatementStatistics } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { QueryStatisticsPlanInput } from "./queryStatisticsPlanSql";
+
+export type MappedStatementStatisticsRow = {
+  sql: string;
+  statistics: SelectedStatementStatistics;
+  // Feeds selectPlanSql() (misc/design/performance-tuning-query-statistics-
+  // parameter-input-plan.ja.md §7.2). `sql`/`normalizedSql` are always
+  // `query` itself; `representative*` is only ever populated for MySQL rows
+  // that have QUERY_SAMPLE_TEXT (§3.1/§6.4 of the same doc) and stays
+  // undefined for every other Vendor/row shape, which selectPlanSql()
+  // already treats as "not usable, fall through to normalizedSql".
+  planInput: QueryStatisticsPlanInput;
+};
 
 // Converts one row's values from getStatementStatistics()'s common 15-column
-// RDH into the { sql, statistics } snapshot getPerformanceTuningContext()
-// needs, without any Vendor-specific branching in the UI
+// RDH into the { sql, statistics, planInput } snapshot getPerformanceTuningContext()
+// and selectPlanSql() need, without any Vendor-specific branching in the UI
 // (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5
 // "行選択とworkload変換"). A pure function so it stays unit-testable outside
 // of ToolsViewProvider's VS Code-coupled state.
@@ -15,7 +28,7 @@ import type { SelectedStatementStatistics } from "@l-v-yonsama/multi-platform-da
 // ("Vendorが返さない項目はundefinedのままにする").
 export function mapStatementStatisticsRow(
   values: { [key: string]: any } | undefined | null
-): { sql: string; statistics: SelectedStatementStatistics } | undefined {
+): MappedStatementStatisticsRow | undefined {
   if (!values) {
     return undefined;
   }
@@ -41,7 +54,20 @@ export function mapStatementStatisticsRow(
     source: toNonEmptyString(values["source"]),
   };
 
-  return { sql, statistics };
+  const representativeSql = toNonEmptyString(values["query_sample_text"]);
+  const planInput: QueryStatisticsPlanInput = {
+    sql,
+    normalizedSql: sql,
+    representativeSql,
+    representativeSqlSeenAt: toIsoDateString(values["query_sample_seen_at"]),
+    // A constant label, not a DB column: MySQL is the only Vendor with a
+    // distinct "representative sample" concept today, so this is only ever
+    // set alongside representativeSql itself (§3.1: "Representative query").
+    representativeSqlSource: representativeSql ? "MySQL performance_schema sample" : undefined,
+    representativeSqlMayBeTruncated: toOptionalBoolean(values["query_sample_text_may_be_truncated"]),
+  };
+
+  return { sql, statistics, planInput };
 }
 
 function toFiniteNumber(v: unknown): number | undefined {
@@ -71,4 +97,31 @@ function toIsoDateString(v: unknown): string | undefined {
   }
   const d = v instanceof Date ? v : new Date(v as string | number);
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+// query_sample_text_may_be_truncated is a computed boolean SQL expression
+// (`LENGTH(...) >= @@GLOBAL...`), which mysql2 returns as a plain 0/1
+// number rather than a JS boolean - not something the shared toBoolean()
+// helper accepts, so this covers number/boolean/Buffer/string itself.
+function toOptionalBoolean(v: unknown): boolean | undefined {
+  if (v === null || v === undefined) {
+    return undefined;
+  }
+  if (typeof v === "boolean") {
+    return v;
+  }
+  if (typeof v === "number") {
+    return v !== 0;
+  }
+  if (Buffer.isBuffer(v)) {
+    return v.at(0) === 1;
+  }
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (trimmed === "") {
+      return undefined;
+    }
+    return trimmed === "1" || trimmed.toLowerCase() === "true";
+  }
+  return undefined;
 }

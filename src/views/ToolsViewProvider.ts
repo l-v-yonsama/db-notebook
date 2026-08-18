@@ -1,9 +1,12 @@
 import {
   ConnectionSetting,
   DbResource,
+  EstimatedBindParameter,
   RDSBaseDriver,
   RdsDatabase,
   normalizeStatementStatisticsParams,
+  resolveTableAliasMap,
+  resolveTargetTables,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
@@ -16,6 +19,7 @@ import {
   OutputParams,
   PreviewPerformanceTuningActionCommand,
   SearchQueryStatisticsActionCommand,
+  SelectQueryStatisticsRowActionCommand,
 } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { ToolsViewEventData } from "../shared/MessageEventData";
@@ -30,7 +34,11 @@ import { workflow } from "../utilities/driverResolver";
 import { createBookFromList } from "../utilities/excelGenerator";
 import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
 import { startPerformanceTuningPreview } from "../utilities/performanceTuningPreview";
-import { mapStatementStatisticsRow } from "../utilities/queryStatisticsRowMapper";
+import { selectPlanSql } from "../utilities/queryStatisticsPlanSql";
+import {
+  MappedStatementStatisticsRow,
+  mapStatementStatisticsRow,
+} from "../utilities/queryStatisticsRowMapper";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";
@@ -85,6 +93,13 @@ export class ToolsViewProvider extends BaseViewProvider {
   private previewStatus: QueryStatisticsPreviewStatus = "idle";
   private previewMessage: string | undefined;
   private previewTechnicalMessage: string | undefined;
+  // Which row (if any) selectQueryStatisticsRow last resolved, and its Bind
+  // Parameters estimate - re-derived from `rdh`/`res`, never trusted from
+  // the webview (misc/design/performance-tuning-query-statistics-parameter-
+  // input-plan.ja.md §7.1/§7.5). Cleared by setRdh()/clear() below so a
+  // stale selection from a since-replaced result never lingers.
+  private selectedRowIndex: number | undefined;
+  private estimatedBindParameters: EstimatedBindParameter[] | undefined;
   // Bumped every time `rdh` is replaced (including back to `undefined`) so a
   // row-selection round trip from the webview (resultVersion + rowIndex) can
   // be rejected once it no longer matches what the webview was shown
@@ -134,6 +149,9 @@ export class ToolsViewProvider extends BaseViewProvider {
         break;
       case "searchQueryStatistics":
         await this.updateQueryStatisticsSearch(params);
+        break;
+      case "selectQueryStatisticsRow":
+        this.selectQueryStatisticsRow(params);
         break;
       case "previewPerformanceTuning":
         await this.previewPerformanceTuning(params);
@@ -337,6 +355,65 @@ export class ToolsViewProvider extends BaseViewProvider {
     await this.searchAndRefresh();
   }
 
+  // Re-resolves rowIndex against the RdsDatabase resource / RDH this
+  // Provider still holds and picks the plan SQL + its Bind Parameters
+  // estimate for it (selectPlanSql(), §7.1/§7.2) - used by both
+  // selectQueryStatisticsRow (to populate the UI) and previewPerformanceTuning
+  // (to build the actual plan.binds/bindMarkers/targetTables), so both
+  // always agree on which SQL, markers, and target tables a given row
+  // means. Pure/cheap (no DB call), so recomputing it at preview time
+  // rather than caching selectQueryStatisticsRow's result costs nothing and
+  // can never go stale.
+  //
+  // targetTables/tableAliasMap (§6.5/§6.6/§7.7) are resolved here too, right
+  // alongside `sql`, even though they're only ever consumed by
+  // previewPerformanceTuning below - selectQueryStatisticsRow computes and
+  // discards them, which is fine since resolveTargetTables() and
+  // resolveTableAliasMap() are both pure SQL-text parses, not a DB call.
+  private resolveQueryStatisticsPlanForRow(
+    rowIndex: number
+  ):
+    | {
+        sql: string;
+        estimatedBindParameters: EstimatedBindParameter[];
+        targetTables: Array<{ schemaName?: string; tableName: string }>;
+        tableAliasMap: Record<string, { schemaName?: string; tableName: string }>;
+        statistics: MappedStatementStatisticsRow["statistics"];
+      }
+    | undefined {
+    if (this.rdh === undefined || this.settings === undefined || !(this.res instanceof RdsDatabase)) {
+      return undefined;
+    }
+    const row = this.rdh.rows[rowIndex];
+    if (row === undefined) {
+      return undefined;
+    }
+    const mapped = mapStatementStatisticsRow(row.values);
+    if (!mapped) {
+      return undefined;
+    }
+    const { sql, estimatedBindParameters } = selectPlanSql({
+      input: mapped.planInput,
+      dbType: this.settings.dbType,
+      databaseResource: this.res,
+    });
+    const targetTables = resolveTargetTables({ dbType: this.settings.dbType, sql });
+    const tableAliasMap = resolveTableAliasMap({ dbType: this.settings.dbType, sql });
+    return { sql, estimatedBindParameters, targetTables, tableAliasMap, statistics: mapped.statistics };
+  }
+
+  private selectQueryStatisticsRow(params: SelectQueryStatisticsRowActionCommand["params"]) {
+    if (this.viewMode !== "queryStatistics" || params.resultVersion !== this.resultVersion) {
+      // A stale selection against a result the user has since replaced -
+      // never resolve a row index against the wrong list.
+      return;
+    }
+    const resolved = this.resolveQueryStatisticsPlanForRow(params.rowIndex);
+    this.selectedRowIndex = resolved ? params.rowIndex : undefined;
+    this.estimatedBindParameters = resolved?.estimatedBindParameters ?? [];
+    this.postQueryStatisticsState();
+  }
+
   private async previewPerformanceTuning(
     params: PreviewPerformanceTuningActionCommand["params"]
   ) {
@@ -353,19 +430,15 @@ export class ToolsViewProvider extends BaseViewProvider {
       // never resolve a row index against the wrong list.
       return;
     }
-    const row = this.rdh.rows[params.rowIndex];
-    if (row === undefined) {
-      return;
-    }
-    const mapped = mapStatementStatisticsRow(row.values);
-    if (!mapped) {
+    const resolved = this.resolveQueryStatisticsPlanForRow(params.rowIndex);
+    if (!resolved) {
       this.previewStatus = "error";
       this.previewMessage = "Could not determine the SQL text for the selected row.";
       this.previewTechnicalMessage = undefined;
       this.postQueryStatisticsState();
       return;
     }
-    const validatedBinds = validatePlanBindsInput(params.binds);
+    const validatedBinds = validatePlanBindsInput(params.values);
     if (!validatedBinds.ok) {
       this.previewStatus = "error";
       this.previewMessage = validatedBinds.message;
@@ -373,6 +446,18 @@ export class ToolsViewProvider extends BaseViewProvider {
       this.postQueryStatisticsState();
       return;
     }
+    // markers is host-authored text (selectQueryStatisticsRow's own
+    // estimatedBindParameters[].marker, or a row the user added via "Add
+    // parameter" using the same Vendor-convention generator) echoed back by
+    // the webview alongside the user's values - only used paired 1:1 with
+    // binds, so a length mismatch (a stale/buggy webview payload) just
+    // drops it back to the driver's own legacy positional substitution
+    // rather than being treated as a hard error.
+    const markers = Array.isArray(params.markers)
+      ? params.markers.filter((m): m is string => typeof m === "string")
+      : [];
+    const bindMarkers =
+      markers.length === validatedBinds.binds.length && markers.length > 0 ? markers : undefined;
 
     const { settings, queryStatisticsDatabase } = this;
     if (settings === undefined) {
@@ -390,14 +475,24 @@ export class ToolsViewProvider extends BaseViewProvider {
       connectionSetting: settings,
       databaseName: queryStatisticsDatabase.databaseName,
       statement: {
-        sql: mapped.sql,
+        sql: resolved.sql,
         source: "statementStatistics",
-        statistics: mapped.statistics,
+        statistics: resolved.statistics,
       },
       plan: {
         mode: "estimate",
         binds: validatedBinds.binds.length > 0 ? validatedBinds.binds : undefined,
+        bindMarkers,
       },
+      // MySQL's aliased-table EXPLAIN gap (§6.5/§6.6/§7.7): tableAliasMap
+      // corrects a plan-resolved alias (e.g. `o`) to its real table name
+      // before it's used for anything; targetTables additively adds a
+      // table the plan didn't resolve at all. Complementary, not
+      // redundant - see RDSBaseDriver.getPerformanceTuningContext()'s own
+      // comment on why both are kept.
+      targetTables: resolved.targetTables.length > 0 ? resolved.targetTables : undefined,
+      tableAliasMap:
+        Object.keys(resolved.tableAliasMap).length > 0 ? resolved.tableAliasMap : undefined,
     });
 
     if (this.viewMode !== "queryStatistics" || this.resultVersion !== myResultVersion) {
@@ -441,6 +536,8 @@ export class ToolsViewProvider extends BaseViewProvider {
           search: this.search,
           database: this.queryStatisticsDatabase,
           rdh: this.rdh,
+          selectedRowIndex: this.selectedRowIndex,
+          estimatedBindParameters: this.estimatedBindParameters,
         },
       },
     });
@@ -449,6 +546,10 @@ export class ToolsViewProvider extends BaseViewProvider {
   private setRdh(rdh: ResultSetData | undefined) {
     this.rdh = rdh;
     this.resultVersion++;
+    // A row selected against the previous result no longer means anything
+    // once the result itself has been replaced.
+    this.selectedRowIndex = undefined;
+    this.estimatedBindParameters = undefined;
   }
 
   private async output(data: OutputParams) {
@@ -535,5 +636,7 @@ export class ToolsViewProvider extends BaseViewProvider {
     this.previewTechnicalMessage = undefined;
     this.resultVersion = 0;
     this.requestGeneration++;
+    this.selectedRowIndex = undefined;
+    this.estimatedBindParameters = undefined;
   }
 }

@@ -3,10 +3,12 @@
 // `?`, Oracle `:1`, SQL Server parameter references - the exact syntax/count
 // is never inferred here, see
 // misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5
-// "正規化SQLと代表bind値"). Shared between the webview (immediate form
-// feedback) and the extension host (the actual trust boundary right before
-// `plan.binds` reaches `getPerformanceTuningContext()`) so both sides apply
-// the exact same rule rather than two hand-written copies drifting apart.
+// "正規化SQLと代表bind値"). Values now always arrive as strings from
+// BindParametersEditor.vue's per-row inputs (misc/design/performance-tuning-
+// query-statistics-parameter-input-plan.ja.md §7.4/§7.6 removed the free-text
+// JSON textarea this used to validate as its main caller), but this stays
+// the one shared scalar-array check ToolsViewProvider runs right before
+// `plan.binds` reaches `getPerformanceTuningContext()`.
 export type PlanBindValue = string | number | boolean | null;
 
 export type PlanBindsValidationResult =
@@ -34,22 +36,4 @@ export function validatePlanBindsInput(raw: unknown): PlanBindsValidationResult 
     };
   }
   return { ok: true, binds };
-}
-
-// Parses the webview's free-text "Plan parameters (optional)" field (an
-// editable JSON array) and validates it in one step. Empty input is valid -
-// it means "no representative values", not "invalid JSON" - matching §10
-// Phase 5's "初期値は空配列で、自動推測しない".
-export function parsePlanBindsText(text: string): PlanBindsValidationResult {
-  const trimmed = text.trim();
-  if (trimmed === "") {
-    return { ok: true, binds: [] };
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return { ok: false, message: 'Bind values must be valid JSON, e.g. [1, "active"].' };
-  }
-  return validatePlanBindsInput(parsed);
 }

@@ -1,5 +1,20 @@
-import type { StatementStatisticsSortKey } from "@l-v-yonsama/multi-platform-database-drivers";
+import type {
+  EstimatedBindParameter,
+  EstimatedBindParameterLocation,
+  StatementStatisticsSortKey,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
+
+// One Bind Parameters input row (misc/design/performance-tuning-query-
+// statistics-parameter-input-plan.ja.md §5.2). Adds Vue row-key `id` and the
+// user's own input `value` on top of db-drivers' estimate; `location` is
+// widened to optional because a row the user added via "Add parameter" has
+// no real position in the SQL text to report (§7.3's Add helper).
+export type BindParameterRow = Omit<EstimatedBindParameter, "location"> & {
+  id: string;
+  value: string;
+  location?: EstimatedBindParameterLocation;
+};
 
 // Search conditions for the Query Statistics Tools View mode (§10 Phase 5 of
 // misc/design/performance-tuning-context-implementation-plan.ja.md). A
@@ -45,4 +60,15 @@ export type QueryStatisticsViewState = {
   search: QueryStatisticsSearchParams;
   database: { connectionName: string; databaseName: string; vendor: string };
   rdh?: ResultSetData;
+  // Set once a row has been selected (ToolsViewProvider re-resolves it from
+  // resultVersion + rowIndex, never trusts a webview-supplied SQL/estimate -
+  // §7.1). `selectedRowIndex` is how the webview tells "a new row was
+  // selected" (and must re-init its Bind Parameters rows) apart from "the
+  // same row, only previewStatus changed" (§7.5). An empty
+  // `estimatedBindParameters` array (as opposed to it being absent) means
+  // the selected row's SQL has no placeholders - the Bind Parameters
+  // fieldset stays hidden entirely (§4: "SQLにplaceholderが無い場合、
+  // fieldset自体を表示しない").
+  selectedRowIndex?: number;
+  estimatedBindParameters?: EstimatedBindParameter[];
 };

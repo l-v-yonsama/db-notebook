@@ -36,6 +36,8 @@ import {
   RDSBaseDriver,
   SelectedStatementStatistics,
   normalizeQuery,
+  resolveTableAliasMap,
+  resolveTargetTables,
   runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, resolveCodeLabel } from "@l-v-yonsama/rdh";
@@ -399,12 +401,26 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
 
     // Shared with Query Statistics (9b) - see startPerformanceTuningPreview()'s
     // own doc comment (§10 Phase 5 "Preview接続の共通化と競合防止").
+    // targetTables/tableAliasMap (§6.5/§6.6/§7.7 of performance-tuning-
+    // query-statistics-parameter-input-plan.ja.md): same MySQL aliased-table
+    // EXPLAIN gap Query Statistics has, and history.sqlDoc is just as
+    // likely to alias its FROM/JOIN tables as a Query Statistics row's SQL is.
+    const targetTables = resolveTargetTables({
+      dbType: connectionSetting.dbType,
+      sql: history.sqlDoc,
+    });
+    const tableAliasMap = resolveTableAliasMap({
+      dbType: connectionSetting.dbType,
+      sql: history.sqlDoc,
+    });
     const { status, message, technicalMessage } = await startPerformanceTuningPreview({
       extensionUri: context.extensionUri,
       connectionSetting,
       databaseName,
       statement: { sql: history.sqlDoc, source: "sqlHistory", statistics },
       plan: { mode: "estimate" },
+      targetTables: targetTables.length > 0 ? targetTables : undefined,
+      tableAliasMap: Object.keys(tableAliasMap).length > 0 ? tableAliasMap : undefined,
     });
 
     if (status === "failed") {

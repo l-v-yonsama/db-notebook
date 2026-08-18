@@ -38,7 +38,46 @@ describe("mapStatementStatisticsRow", () => {
         lastExecutedAt: "2026-08-17T00:00:00.000Z",
         source: "pg_stat_statements",
       },
+      planInput: {
+        sql: "SELECT * FROM orders WHERE id = $1",
+        normalizedSql: "SELECT * FROM orders WHERE id = $1",
+      },
     });
+  });
+
+  it("maps MySQL's optional sample columns into planInput.representative*", () => {
+    const result = mapStatementStatisticsRow({
+      query: "SELECT * FROM orders WHERE id = ?",
+      query_sample_text: "SELECT * FROM orders WHERE id = 42",
+      query_sample_seen_at: "2026-08-17T00:00:00.000Z",
+      query_sample_text_may_be_truncated: 0,
+    });
+
+    expect(result?.planInput).toEqual({
+      sql: "SELECT * FROM orders WHERE id = ?",
+      normalizedSql: "SELECT * FROM orders WHERE id = ?",
+      representativeSql: "SELECT * FROM orders WHERE id = 42",
+      representativeSqlSeenAt: "2026-08-17T00:00:00.000Z",
+      representativeSqlSource: "MySQL performance_schema sample",
+      representativeSqlMayBeTruncated: false,
+    });
+  });
+
+  it("treats query_sample_text_may_be_truncated as a 0/1 number, not just a JS boolean", () => {
+    const result = mapStatementStatisticsRow({
+      query: "SELECT 1",
+      query_sample_text: "SELECT 1",
+      query_sample_text_may_be_truncated: 1,
+    });
+    expect(result?.planInput.representativeSqlMayBeTruncated).toBe(true);
+  });
+
+  it("leaves planInput.representative* undefined for Vendors without sample columns", () => {
+    const result = mapStatementStatisticsRow({ query: "SELECT 1" });
+    expect(result?.planInput.representativeSql).toBeUndefined();
+    expect(result?.planInput.representativeSqlSeenAt).toBeUndefined();
+    expect(result?.planInput.representativeSqlSource).toBeUndefined();
+    expect(result?.planInput.representativeSqlMayBeTruncated).toBeUndefined();
   });
 
   it("returns undefined when the query column is missing, empty, or not a string", () => {

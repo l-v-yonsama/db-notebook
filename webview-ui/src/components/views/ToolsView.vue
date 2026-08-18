@@ -2,9 +2,10 @@
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { StatementStatisticsSortKey } from "@/types/lib/StatementStatisticsSortKey";
 import type { CellFocusParams } from "@/types/RdhEvents";
+import { estimatesToRows } from "@/utilities/bindParameterRows";
 import {
-  parsePlanBindsText,
   vscode,
+  type BindParameterRow,
   type QueryStatisticsPreviewStatus,
   type QueryStatisticsSearchParams,
   type QueryStatisticsSearchStatus,
@@ -12,10 +13,10 @@ import {
 } from "@/utilities/vscode";
 import { toNum, type ResultSetData } from "@l-v-yonsama/rdh";
 import { nextTick, onMounted, ref } from "vue";
+import BindParametersEditor from "../BindParametersEditor.vue";
 import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
-import VsCodeTextArea from "../base/VsCodeTextArea.vue";
 import VsCodeTextField from "../base/VsCodeTextField.vue";
 import RDHViewer from "../RDHViewer.vue";
 
@@ -58,12 +59,21 @@ const sortByItems: DropdownItem[] = [
   { value: StatementStatisticsSortKey.ExecutionCount, label: "Execution count" },
 ];
 
-// The user's optional representative bind values for a placeholder-only SQL
-// (§10 Phase 5 "正規化SQLと代表bind値"). Free text here, parsed/validated
-// only when Preview is actually clicked - never auto-inferred, never sent
-// anywhere but the one collection attempt it's used for.
-const bindsText = ref("");
-const bindsError = ref<string | undefined>(undefined);
+// The user's Bind Parameters input rows for the selected row's placeholder
+// SQL (misc/design/performance-tuning-query-statistics-parameter-input-plan.ja.md
+// §4/§7.5). Initialized from ToolsViewProvider's estimate whenever
+// `selectedRowIndex` actually changes (a new row, or resultVersion reset -
+// see refresh() below), never auto-persisted, never sent anywhere but the
+// one collection attempt it's used for.
+const bindParameterRows = ref<BindParameterRow[]>([]);
+// Tracks the *previous* broadcast's selectedRowIndex/previewStatus purely
+// to detect the two transitions that must reset bindParameterRows (a new
+// row selected; a preview just succeeded/was cancelled) without resetting
+// it on every unrelated state broadcast (e.g. a previewStatus: "collecting"
+// update for the row already selected) - §7.5's "同じ行のPreview失敗時は
+// 入力値を保持し...別行選択...Preview成功・cancelledで入力値を破棄する".
+const trackedSelectedRowIndex = ref<number | undefined>(undefined);
+const trackedPreviewStatus = ref<QueryStatisticsPreviewStatus>("idle");
 
 window.addEventListener("resize", () => resetSectionHeight());
 
@@ -84,8 +94,8 @@ onMounted(() => {
 
 const clearSelection = () => {
   clickedCellParams.value = undefined;
-  bindsText.value = "";
-  bindsError.value = undefined;
+  bindParameterRows.value = [];
+  trackedSelectedRowIndex.value = undefined;
 };
 
 const refresh = async (v: ToolsViewEventData["value"]["refresh"]) => {
@@ -117,7 +127,29 @@ const refresh = async (v: ToolsViewEventData["value"]["refresh"]) => {
       rdh.value = undefined;
       await nextTick();
       rdh.value = v.rdh;
+    } else {
+      // A new row was selected (selectQueryStatisticsRow's response) -
+      // (re)initialize the Bind Parameters table from the fresh estimate,
+      // but only then, not on every unrelated broadcast for the row
+      // already selected (misc/design/performance-tuning-query-statistics-
+      // parameter-input-plan.ja.md §7.5).
+      if (v.selectedRowIndex !== trackedSelectedRowIndex.value) {
+        trackedSelectedRowIndex.value = v.selectedRowIndex;
+        bindParameterRows.value = estimatesToRows(v.estimatedBindParameters ?? []);
+      }
+      // A collection just finished successfully or was cancelled - discard
+      // the values the user typed and start the same row's table fresh
+      // again (§7.5: "Preview成功・cancelledで入力値を破棄する"). An error
+      // is deliberately excluded so the user can fix and retry without
+      // retyping everything.
+      if (
+        trackedPreviewStatus.value === "collecting" &&
+        (v.previewStatus === "idle" || v.previewStatus === "cancelled")
+      ) {
+        bindParameterRows.value = estimatesToRows(v.estimatedBindParameters ?? []);
+      }
     }
+    trackedPreviewStatus.value = v.previewStatus;
     return;
   }
 
@@ -239,18 +271,13 @@ const previewPerformanceTuning = (): void => {
   if (!canPreview() || clickedCellParams.value === undefined) {
     return;
   }
-  const parsed = parsePlanBindsText(bindsText.value);
-  if (!parsed.ok) {
-    bindsError.value = parsed.message;
-    return;
-  }
-  bindsError.value = undefined;
   vscode.postCommand({
     command: "previewPerformanceTuning",
     params: {
       resultVersion: resultVersion.value,
       rowIndex: clickedCellParams.value.rowPos,
-      binds: parsed.binds,
+      values: bindParameterRows.value.map((row) => row.value),
+      markers: bindParameterRows.value.map((row) => row.marker),
     },
   });
 };
@@ -269,7 +296,12 @@ const recieveMessage = (data: ToolsViewEventData) => {
 
 const onClickCell = (params: CellFocusParams): void => {
   clickedCellParams.value = params;
-  bindsError.value = undefined;
+  if (mode.value === "queryStatistics") {
+    vscode.postCommand({
+      command: "selectQueryStatisticsRow",
+      params: { resultVersion: resultVersion.value, rowIndex: params.rowPos },
+    });
+  }
 };
 
 defineExpose({
@@ -285,7 +317,8 @@ defineExpose({
         <VsCodeDropdown :items="sortByItems" v-model="sortByInput" />
         <label>Limit</label>
         <VsCodeTextField type="number" :min="1" :max="1000" :size="4" v-model="limitInput" style="width: 100px" />
-        <VsCodeButton @click="searchQueryStatisticsAgain" title="Search with the conditions above">
+        <VsCodeButton @click="searchQueryStatisticsAgain" title="Search with the conditions above"
+          :disabled="previewStatus === 'collecting'">
           <fa icon="search" />Search
         </VsCodeButton>
       </div>
@@ -330,12 +363,9 @@ defineExpose({
         @onClickCell="onClickCell" />
 
       <div v-if="mode === 'queryStatistics' && clickedCellParams" class="qs-selection">
-        <div class="row">
-          <span class="label">Plan parameters (optional)</span>
-          <VsCodeTextArea v-model="bindsText" placeholder='JSON array, e.g. [1, "active"]' :rows="2" />
-        </div>
-        <div v-if="bindsError" class="status-banner error">{{ bindsError }}</div>
-        <div v-else-if="previewStatus === 'collecting'" class="status-banner loading">
+        <BindParametersEditor v-if="bindParameterRows.length > 0" v-model="bindParameterRows"
+          :db-type="database?.vendor ?? ''" :disabled="previewStatus === 'collecting'" />
+        <div v-if="previewStatus === 'collecting'" class="status-banner loading">
           <fa icon="spinner" spin />&nbsp;Collecting performance tuning context...
         </div>
         <div v-else-if="previewStatus === 'cancelled'" class="status-banner">Collection cancelled.</div>
@@ -407,11 +437,6 @@ div.scroll-wrapper {
 .qs-selection {
   padding: 4px;
   border-top: calc(var(--border-width) * 1px) solid var(--dropdown-border);
-
-  textarea,
-  vscode-text-area {
-    width: 100%;
-  }
 }
 
 // .export-menu itself needs no rules here - SecondarySelectionAction.vue
