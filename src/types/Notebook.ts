@@ -44,6 +44,13 @@ export type CellMeta = {
   markAsRunInOrderAtJsonCell?: boolean;
   connectionName?: string;
   showComment?: boolean;
+  // Short, user-set label for a non-markup cell whose content isn't
+  // self-describing (typically a JSON code cell) - shown in the notebook's
+  // TOC/HTML report in place of the generic language+status tags. Distinct
+  // from `showComment` above (an unrelated result-display toggle). Not
+  // language-restricted at the type level, but only offered for JSON cells
+  // today (CellLabelProvider in statusBarProviders.ts).
+  cellLabel?: string;
   ruleFile?: string;
   codeResolverFile?: string;
   sharedVariableName?: string;

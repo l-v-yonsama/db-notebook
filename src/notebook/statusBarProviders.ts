@@ -17,6 +17,7 @@ import {
   CELL_OPEN_MDH,
   CELL_SHOW_METADATA_SETTINGS,
   CELL_SPECIFY_CONNECTION_TO_USE,
+  CELL_SPECIFY_LABEL,
   CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
   CELL_SPECIFY_LOG_GROUP_TO_USE,
   CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN,
@@ -442,6 +443,30 @@ export class PreExecutionProvider implements NotebookCellStatusBarItemProvider {
   }
 }
 
+// Lets the user set/edit/clear a short label on a JSON code cell, shown in
+// the notebook's TOC and HTML report (getTocInfoHtml() in htmlGenerator.ts)
+// in place of a generic "json"+"Not executed" tag pair that carries no
+// information about what the cell actually contains. Gated on
+// isJsonValueCell() (not isJsonOrPlaintextCell()) so MQTT publish cells -
+// which are also json-language but already show their own topic/QoS/retain
+// status items - don't also get this one.
+export class CellLabelProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isJsonValueCell(cell)) {
+      return undefined;
+    }
+
+    const { cellLabel }: CellMeta = cell.metadata;
+    const text = cellLabel ? `$(tag) ${abbr(cellLabel, 24)}` : "$(tag) Add label";
+    const item = new NotebookCellStatusBarItem(text, NotebookCellStatusBarAlignment.Left);
+    item.command = CELL_SPECIFY_LABEL;
+    item.tooltip = cellLabel
+      ? `Cell label (shown in TOC / HTML report): ${cellLabel}`
+      : "Add a label for this cell, shown in the notebook's TOC / HTML report";
+    return item;
+  }
+}
+
 /**
  * Registers every notebook cell status bar item provider for the Database Notebook
  * and adds their disposables to `context.subscriptions`. Registration order is kept
@@ -457,6 +482,10 @@ export function registerNotebookStatusBarProviders(
 
   context.subscriptions.push(
     notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new PreExecutionProvider())
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new CellLabelProvider())
   );
 
   context.subscriptions.push(

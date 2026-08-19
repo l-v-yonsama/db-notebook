@@ -52,4 +52,32 @@ describe("buildAiAnalysisPrompt", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext());
     expect(assistant.toLowerCase()).toContain("do not suggest that you or the user should run any sql automatically");
   });
+
+  it("adds a translate instruction naming the language when translateResponse and language are both given", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext(), {
+      translateResponse: true,
+      language: "ja",
+    });
+    expect(assistant).toContain("following language: ja");
+    expect(assistant).toContain('Do not translate JSON field names, the fixed English values of "severity"');
+    expect(assistant).toContain("suggestedSql");
+    expect(assistant).toContain("evidence identifier");
+  });
+
+  it("does not add a translate instruction when translateResponse is false", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext(), { translateResponse: false, language: "ja" });
+    expect(assistant).not.toContain("following language");
+  });
+
+  it("does not add a translate instruction when translateResponse is true but language is missing", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext(), { translateResponse: true });
+    expect(assistant).not.toContain("following language");
+  });
+
+  it("omitting options entirely behaves exactly like translateResponse: false (no instruction, prompt unchanged)", () => {
+    const withNoOptions = buildAiAnalysisPrompt(buildContext());
+    const withExplicitFalse = buildAiAnalysisPrompt(buildContext(), {});
+    expect(withNoOptions.assistant).toBe(withExplicitFalse.assistant);
+    expect(withNoOptions.assistant).not.toContain("following language");
+  });
 });

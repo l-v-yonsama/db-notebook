@@ -25,6 +25,7 @@ import {
   faSpinner,
   faTimes,
   faTrash,
+  faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import VirtualList from "@virtual-list/vue";
@@ -59,6 +60,7 @@ library.add(faSearch);
 library.add(faSpinner);
 library.add(faTrash);
 library.add(faTimes);
+library.add(faWandMagicSparkles);
 
 const app = createApp(App);
 app.component("Splitpanes", Splitpanes);

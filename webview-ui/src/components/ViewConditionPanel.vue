@@ -280,23 +280,26 @@ defineExpose({
 
 <template>
   <section class="view-conditional-root">
-    <PanelActionToolbar @cancel="cancel">
-      <template v-if="visibleSettingsMode">
-        <VsCodeButton @click="openInNotebook(true)" appearance="secondary" title="Open in notebook"
-          style="margin-right: 5px">
-          <fa icon="book" />Open in notebook
-        </VsCodeButton>
-        <SecondarySelectionAction :items="moreDetailItems" title="more" @onSelect="selectedMoreOptions" />
-
-        <VsCodeButton v-if="supportEditMode" @click="ok(true, false)" appearance="secondary"
-          title="Search for records to edit" style="margin-right: 5px">
-          <fa icon="pencil" />Search &amp; Edit
-        </VsCodeButton>
+    <PanelActionToolbar @cancel="cancel" cancel-label="" cancel-title="Close">
+      <template v-if="visibleSettingsMode" #left>
         <VsCodeButton @click="ok(false, false)" title="Search">
           <fa icon="check" />Search
         </VsCodeButton>
+        <VsCodeButton v-if="supportEditMode" @click="ok(true, false)" appearance="secondary"
+          title="Search for records to edit">
+          <fa icon="pencil" />Search &amp; Edit
+        </VsCodeButton>
       </template>
-      <template v-else>
+      <template v-if="visibleSettingsMode" #default>
+        <!-- "Display in new/active notebook" already covers the plain
+             "Open in notebook" action (new notebook, same as the dropdown's
+             first item), so that standalone button and the separate "more"
+             overflow it used to sit next to were consolidated into this one
+             labeled dropdown - matches ToolsView.vue's "Export ▾" pattern. -->
+        <SecondarySelectionAction label="Open in Notebook" :items="moreDetailItems" title="Open in notebook"
+          @onSelect="selectedMoreOptions" />
+      </template>
+      <template v-else #default>
         <VsCodeButton @click="saveValues()" title="Save changes to table">
           <fa icon="save" />Save changes
         </VsCodeButton>

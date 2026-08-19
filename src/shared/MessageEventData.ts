@@ -523,6 +523,19 @@ export type PerformanceTuningDiagnosticGroupViewModel = {
   details: PerformanceTuningDiagnosticDetailViewModel[];
 };
 
+// Built once, extension-side, by buildPlanTableMappingRows()
+// (src/utilities/performanceTuningPlanFormatter.ts) from
+// PerformanceTuningContext.planTableMappings - see that file's top comment
+// for why the tree (normalizedPlan) and this flat per-table array get two
+// different renderers. Declared here for the same reason as the diagnostic
+// view models above - both the extension host and the webview need the shape.
+export type PlanTableMappingRowViewModel = {
+  table: string;
+  index?: string;
+  estimatedRows?: number;
+  columnsUsed?: string;
+};
+
 // Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
 // §6/§11). A tagged status rather than separate optional fields, so the Vue
 // component can switch on one value instead of juggling
@@ -555,6 +568,13 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       // severity for the Information vs. Collection issues sections but does
       // not itself re-sort or re-derive anything.
       diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
+      // Execution plan display (2026-08-19 follow-up). planTreeText is
+      // undefined when executionPlan.normalizedPlan itself is absent
+      // (e.g. a Provider that hasn't wired it, or SQLite); an empty
+      // planTableMappingRows array is normal (a plan can legitimately touch
+      // zero tables) and just means that sub-section doesn't render.
+      planTreeText?: string;
+      planTableMappingRows: PlanTableMappingRowViewModel[];
       // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
       // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
       sqlHtml: string;
@@ -564,6 +584,16 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       // always matches what RDSBaseDriver.enforcePayloadBudget() itself saw.
       payloadBytes: number;
       maxPayloadBytes: number;
+      // Analyze with AI's "Language model"/"Translate response" options
+      // (2026-08-19 follow-up) - populated the same way as Chat2QueryPanel's/
+      // LMPromptCreatePanel's own languageModels (lm.selectChatModels({vendor:
+      // "copilot"}) mapped 1:1, no filtering), except defaultLanguageModelId
+      // carries no gpt-4o-family preference (see lmModelSelection.ts) and
+      // translateResponse's default is env.language !== "en", same as those
+      // two panels.
+      languageModels: LabelValueItem[];
+      languageModelId: string;
+      translateResponse: boolean;
     };
     analysis?: PerformanceTuningAiAnalysisViewState;
   }

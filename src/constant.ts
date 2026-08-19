@@ -132,6 +132,11 @@ export const CELL_SHOW_METADATA_SETTINGS = `${EXTENSION_NAME}.cell.show-metadata
 export const CELL_SPECIFY_CONNECTION_TO_USE = `${EXTENSION_NAME}.cell.specify-connection-to-use`;
 export const CELL_SPECIFY_LOG_GROUP_TO_USE = `${EXTENSION_NAME}.cell.specify-log-group-to-use`;
 export const CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE = `${EXTENSION_NAME}.cell.specify-log-group-starttime-offset-to-use`;
+// A short, user-set label shown in the notebook's TOC/HTML report in place
+// of a generic "json"+"Not executed" tag pair for a code cell whose content
+// isn't self-describing (e.g. a raw JSON payload) - see performanceTuningAiNotebook.ts
+// for the first consumer (its Full Context JSON / AI analysis JSON cells).
+export const CELL_SPECIFY_LABEL = `${EXTENSION_NAME}.cell.specify-label`;
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
 export const CELL_OPEN_HTTP_RESPONSE = `${EXTENSION_NAME}.cell.open-http-response`;
 export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;

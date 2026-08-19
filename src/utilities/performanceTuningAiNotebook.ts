@@ -8,6 +8,7 @@ import type {
   PerformanceTuningAiRecommendation,
 } from "../shared/PerformanceTuningAiAnalysis";
 import { createDirectory, existsUri } from "./fsUtil";
+import { buildPlanTableMappingRows, formatPlanTree } from "./performanceTuningPlanFormatter";
 
 // Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
 // §8): always creates a new Notebook under a fixed
@@ -39,8 +40,13 @@ function markupCell(value: string): NotebookCellData {
   return new NotebookCellData(NotebookCellKind.Markup, value, "markdown");
 }
 
-function jsonCodeCell(value: string): NotebookCellData {
-  return new NotebookCellData(NotebookCellKind.Code, value, "json");
+// cellLabel (CellLabelProvider in statusBarProviders.ts) is what keeps these
+// two JSON cells from showing up as an unlabeled "json"+"Not executed" pair
+// in the notebook's TOC/HTML report - see getTocInfoHtml() in htmlGenerator.ts.
+function jsonCodeCell(value: string, cellLabel: string): NotebookCellData {
+  const cell = new NotebookCellData(NotebookCellKind.Code, value, "json");
+  cell.metadata = { cellLabel };
+  return cell;
 }
 
 function evidenceLine(evidence: PerformanceTuningAiEvidenceRef | undefined): string {
@@ -79,7 +85,7 @@ function buildOverviewMarkdown(
   const lines: string[] = [];
   lines.push("# Performance Tuning AI Analysis");
   lines.push("");
-  lines.push("| | |");
+  lines.push("| Item | Detail |");
   lines.push("|---|---|");
   lines.push(
     `| Database | ${context.database.vendor}${
@@ -138,11 +144,11 @@ function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): str
   lines.push("");
   lines.push(analysis.summary);
   lines.push("");
-  lines.push("## Findings");
+  lines.push("### Findings");
   lines.push("");
   lines.push(...findingsTable(analysis.findings));
   lines.push("");
-  lines.push("## Recommendations");
+  lines.push("### Recommendations");
   lines.push("");
   lines.push(...recommendationsTable(analysis.recommendations));
   lines.push("");
@@ -151,7 +157,7 @@ function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): str
       `automatically and must be reviewed and run manually._`
   );
   lines.push("");
-  lines.push("## Missing context");
+  lines.push("### Missing context");
   lines.push("");
   if (analysis.missingContext.length === 0) {
     lines.push("_None reported._");
@@ -163,17 +169,83 @@ function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): str
   return lines.join("\n");
 }
 
+// planTableMappings is a flat array (one row per table/index touched), so
+// unlike the plan tree below it genuinely suits a markdown table - see
+// performanceTuningPlanFormatter.ts's top comment.
+function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRows>): string[] {
+  const lines = ["| Table | Index | Est. rows | Columns used |", "|---|---|---|---|"];
+  for (const row of rows) {
+    lines.push(
+      `| ${escapeMdCell(row.table)} | ${row.index ? escapeMdCell(row.index) : "-"} | ${
+        row.estimatedRows ?? "-"
+      } | ${row.columnsUsed ? escapeMdCell(row.columnsUsed) : "-"} |`
+    );
+  }
+  return lines;
+}
+
+// 2026-08-19 follow-up: executionPlan.normalizedPlan is a tree, so it's
+// rendered as an EXPLAIN-style indented text block (a table would lose the
+// parent-child structure that's the whole point of an execution plan);
+// planTableMappings is genuinely flat, so that one becomes a table. Returns
+// undefined (no cell at all) when there's neither a plan nor any table
+// mappings to show, rather than an empty/near-empty section.
+function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string | undefined {
+  const planTreeText = context.executionPlan.normalizedPlan
+    ? formatPlanTree(context.executionPlan.normalizedPlan)
+    : undefined;
+  const rows = buildPlanTableMappingRows(context.planTableMappings);
+  if (!planTreeText && rows.length === 0) {
+    return undefined;
+  }
+
+  const lines: string[] = ["## Execution plan", ""];
+  if (planTreeText) {
+    lines.push("```text", planTreeText, "```", "");
+  }
+  if (rows.length > 0) {
+    lines.push("### Tables referenced by this plan", "", ...planTableMappingsTable(rows), "");
+  }
+  return lines.join("\n");
+}
+
+// One shared lead-in for both JSON cells below (rather than one per cell) -
+// cellLabel alone (CellLabelProvider) makes the TOC/HTML report readable,
+// but doesn't explain *why* the raw data is there when reading the notebook
+// itself top to bottom.
+function buildJsonAppendixMarkdown(): string {
+  return [
+    "## Appendix: Raw data",
+    "",
+    "The sections below are supplementary reference material, not part of the analysis itself: the exact " +
+      "context sent to the AI (**Full context JSON**) and the AI's raw response (**AI analysis JSON**). They " +
+      "contain the detailed evidence behind the summary above.",
+  ].join("\n");
+}
+
 /** Pure cell-construction step (§8.2) - kept separate from the write/open I/O below for unit testing. */
 export function buildAiAnalysisNotebookCells(
   context: PerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult
 ): NotebookCellData[] {
-  return [
-    markupCell(buildOverviewMarkdown(context, analysis)),
+  const cells: NotebookCellData[] = [markupCell(buildOverviewMarkdown(context, analysis))];
+
+  // Right after the Overview/SQL cell and before the AI Summary - so reading
+  // order matches the Preview Panel's layout (SQL → what the plan actually
+  // does → the AI's interpretation of it → raw JSON appendix). Omitted
+  // entirely (no cell) when there's no plan/table data to show.
+  const executionPlanMarkdown = buildExecutionPlanMarkdown(context);
+  if (executionPlanMarkdown) {
+    cells.push(markupCell(executionPlanMarkdown));
+  }
+
+  cells.push(
     markupCell(buildAnalysisMarkdown(analysis)),
-    jsonCodeCell(JSON.stringify(context, null, 2)),
-    jsonCodeCell(JSON.stringify(analysis, null, 2)),
-  ];
+    markupCell(buildJsonAppendixMarkdown()),
+    jsonCodeCell(JSON.stringify(context, null, 2), "Full context JSON"),
+    jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON")
+  );
+  return cells;
 }
 
 export type SaveAiAnalysisAsNotebookResult =

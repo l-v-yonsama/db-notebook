@@ -5,6 +5,12 @@
       <slot name="left"></slot>
     </div>
     <div class="tool-right">
+      <!-- Close/Cancel always sits last (rightmost) in this group, matching
+           ToolsView.vue's hand-rolled toolbar - see the toolbar UI alignment
+           notes in ViewConditionPanel.vue/ERDiagramSettings.vue/
+           PerformanceTuningPreviewPanel.vue for the panels this was aligned
+           against. -->
+      <slot></slot>
       <VsCodeButton
         appearance="secondary"
         :title="cancelTitle"
@@ -13,7 +19,6 @@
       >
         <fa icon="times" />{{ cancelLabel }}
       </VsCodeButton>
-      <slot></slot>
     </div>
   </div>
 </template>

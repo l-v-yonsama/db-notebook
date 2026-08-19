@@ -55,8 +55,37 @@ export type PerformanceTuningAiPrompt = {
   user: string;
 };
 
-export function buildAiAnalysisPrompt(context: PerformanceTuningContext): PerformanceTuningAiPrompt {
-  const assistant = [ASSISTANT_ANALYSIS_PROMPT, "", RESPONSE_FORMAT_INSTRUCTIONS, ""].join("\n");
+export type BuildAiAnalysisPromptOptions = {
+  // Mirrors Chat2QueryPanel.ts/lmUtil.ts's translateResponse flag, but placed
+  // in the *assistant* prompt (not appended to the user prompt like those
+  // two) and scoped to specific fields - PerformanceTuningAiAnalysisResult is
+  // strict JSON with literal-union enum fields (severity/confidence/
+  // riskLevel) that the Vue panel class-binds on for its color coding; a
+  // blanket "translate your response" instruction risks the model
+  // translating those enum values too and silently breaking that rendering.
+  // `language` is passed in (typically env.language) rather than read from
+  // `vscode` here, so this file stays free of any vscode import and fully
+  // unit-testable.
+  translateResponse?: boolean;
+  language?: string;
+};
+
+export function buildAiAnalysisPrompt(
+  context: PerformanceTuningContext,
+  options: BuildAiAnalysisPromptOptions = {}
+): PerformanceTuningAiPrompt {
+  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT, "", RESPONSE_FORMAT_INSTRUCTIONS];
+  if (options.translateResponse && options.language) {
+    assistantParts.push(
+      "",
+      `Write "summary", each finding's "title" and "detail", each recommendation's "title", "detail", and ` +
+        `"rationale", and each "missingContext" entry in the following language: ${options.language}. Do not ` +
+        `translate JSON field names, the fixed English values of "severity"/"confidence"/"riskLevel", ` +
+        `"suggestedSql" (it is SQL code), or any evidence identifier (schemaName/tableName/indexName/` +
+        `planNodeId/diagnosticCode) - leave those in English/unchanged.`
+    );
+  }
+  const assistant = [...assistantParts, ""].join("\n");
 
   // No summarization/truncation here (§7): RDSBaseDriver.enforcePayloadBudget()
   // has already shaped this JSON to fit maxPayloadBytes, and re-summarizing on

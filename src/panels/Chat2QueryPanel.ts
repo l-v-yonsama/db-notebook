@@ -26,6 +26,7 @@ import { LabelValueItem } from "../shared/LabelValueItem";
 import { Chat2QueryPanelEventData } from "../shared/MessageEventData";
 import { MdhViewParams } from "../types/views";
 import { workflow } from "../utilities/driverResolver";
+import { buildLanguageModelSelection, defaultTranslateResponse } from "../utilities/lmModelSelection";
 import { log, logError } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -54,7 +55,6 @@ export class Chat2QueryPanel extends BasePanel {
   private languageModelId = "";
   private queryContent = "Tell me the best 10 selling products.";
   private generatedQueryText = "";
-  private isEnLanguageUser = env.language === "en";
   private conName = "";
   private dbSchema: DbSchema | undefined;
   private selectedTableNames: string[] = [];
@@ -515,17 +515,14 @@ export class Chat2QueryPanel extends BasePanel {
         "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.";
       window.showErrorMessage(errorMessage);
     } else {
-      languageModels = models.map((model) => ({
-        label: model.name ? model.name : `${model.vendor} (${model.family})`,
-        value: model.id,
-      }));
-
-      this.languageModelId = languageModels[0].value;
-      const gpt4oModel = models.find((model) => model.family.toLocaleLowerCase() === "gpt-4o");
-      if (gpt4oModel) {
-        this.languageModelId = gpt4oModel.id;
-      }
-      this.translateResponse = this.isEnLanguageUser ? false : true;
+      // No model-family preference (e.g. gpt-4o) - just whichever model
+      // Copilot itself returns first. See lmModelSelection.ts for why this
+      // was deliberately made shared/consistent across every panel that
+      // offers a "Language model" picker (2026-08-19).
+      const selection = buildLanguageModelSelection(models);
+      languageModels = selection.languageModels;
+      this.languageModelId = selection.defaultLanguageModelId;
+      this.translateResponse = defaultTranslateResponse(env.language);
       this.withTableDefinition = false;
       this.withSampleData = false;
     }

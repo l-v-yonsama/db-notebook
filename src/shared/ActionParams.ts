@@ -158,13 +158,18 @@ export type PreviewPerformanceTuningActionCommand = BaseActionCommand<
 >;
 
 // Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
-// §6.1). No params - PerformanceTuningPreviewPanel already holds the
+// §6.1). PerformanceTuningPreviewPanel already holds the
 // PerformanceTuningContext it rendered as instance state (the same context
 // PreviewPerformanceTuningActionCommand's caller already had `driver.
-// getPerformanceTuningContext()` build), so there's nothing for the webview
-// to send beyond "the user pressed the button now".
+// getPerformanceTuningContext()` build), so the only things the webview
+// needs to send are the two live AI-options selections it owns (2026-08-19
+// follow-up, model/translate picker) - deliberately not persisted host-side
+// across previews (unlike Chat2QueryPanel.ts's "ok"-on-every-change/instance-
+// state pattern), since this panel already resets all AI state on every new
+// preview anyway.
 export type AnalyzePerformanceTuningWithAiActionCommand = BaseActionCommand<
-  "analyzePerformanceTuningWithAi"
+  "analyzePerformanceTuningWithAi",
+  { languageModelId: string; translateResponse: boolean }
 >;
 
 // Saves the most recent successful AI analysis (held as Panel instance

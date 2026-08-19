@@ -1,22 +1,37 @@
 <script setup lang="ts">
 import type {
+  LabelValueItem,
   PerformanceTuningAiAnalysisViewState,
   PerformanceTuningDiagnosticGroupViewModel,
   PerformanceTuningPreviewPanelEventData,
+  PlanTableMappingRowViewModel,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { computed, ref } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
+import PanelActionToolbar from "./base/PanelActionToolbar.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
+import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
+import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 
 const context = ref<PerformanceTuningContext | undefined>(undefined);
 const diagnosticGroups = ref<PerformanceTuningDiagnosticGroupViewModel[]>([]);
+const planTreeText = ref<string | undefined>(undefined);
+const planTableMappingRows = ref<PlanTableMappingRowViewModel[]>([]);
 const sqlHtml = ref("");
 const jsonHtml = ref("");
 const payloadBytes = ref(0);
 const maxPayloadBytes = ref(0);
+
+// Analyze with AI's "Language model"/"Translate response" options
+// (2026-08-19 follow-up, design doc §0) - shown whenever a context is
+// loaded (not gated on analysis.status), since the choice has to be made
+// *before* clicking Analyze with AI.
+const languageModels = ref<LabelValueItem[]>([]);
+const languageModelId = ref("");
+const translateResponse = ref(false);
 
 // Step 10 "Analyze with AI" (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
 // §6.1). Reset to idle on every new "initialize" (a fresh preview
@@ -55,10 +70,15 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   }
   context.value = v.context;
   diagnosticGroups.value = v.diagnosticGroups;
+  planTreeText.value = v.planTreeText;
+  planTableMappingRows.value = v.planTableMappingRows;
   sqlHtml.value = v.sqlHtml;
   jsonHtml.value = v.jsonHtml;
   payloadBytes.value = v.payloadBytes;
   maxPayloadBytes.value = v.maxPayloadBytes;
+  languageModels.value = v.languageModels;
+  languageModelId.value = v.languageModelId;
+  translateResponse.value = v.translateResponse;
   analysis.value = { status: "idle" };
 };
 
@@ -86,7 +106,7 @@ const close = (): void => {
 const analyzeWithAi = (): void => {
   vscode.postCommand({
     command: "analyzePerformanceTuningWithAi",
-    params: {},
+    params: { languageModelId: languageModelId.value, translateResponse: translateResponse.value },
   });
 };
 
@@ -134,8 +154,30 @@ defineExpose({
 
 <template>
   <section class="PerformanceTuningPreviewPanel" v-if="context">
+    <PanelActionToolbar @cancel="close" cancel-label="" cancel-title="Close">
+      <template #left>
+        <VsCodeButton :disabled="isAnalyzing" title="Analyze this context with AI" @click="analyzeWithAi">
+          <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
+        </VsCodeButton>
+        <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success'" title="Save the AI analysis as a new Notebook under reports/performance-tuning/"
+          @click="saveAiAnalysisAsNotebook">
+          <fa icon="book" />Save as Notebook
+        </VsCodeButton>
+      </template>
+    </PanelActionToolbar>
+
     <!-- 1. Database / Status / Payload size (§6.1) -->
     <div class="header">
+      <!-- Analyze with AI's model/translation options (2026-08-19 follow-up) -
+           always visible (not gated on analysis.status), since the choice
+           has to be made before clicking the button in the toolbar above. -->
+      <div class="row ai-options">
+        <span class="label">AI options</span>
+        <label for="languageModelId" class="label-inline">Language model</label>
+        <VsCodeDropdown id="languageModelId" :items="languageModels" v-model="languageModelId"
+          :disabled="isAnalyzing || languageModels.length === 0" style="width: 220px" />
+        <VsCodeCheckbox v-model="translateResponse" :disabled="isAnalyzing">Translate response</VsCodeCheckbox>
+      </div>
       <div class="row">
         <span class="label">Database</span>
         <span>{{ context.database.vendor }}{{ context.database.version ? ` ${context.database.version}` : "" }} ・
@@ -236,12 +278,9 @@ defineExpose({
             </ul>
           </div>
 
-          <div class="analysis-actions">
-            <VsCodeButton appearance="secondary" @click="saveAiAnalysisAsNotebook">Save as Notebook</VsCodeButton>
-            <span v-if="analysis.savedNotebookRelativePath" class="saved-hint">
-              Saved to {{ analysis.savedNotebookRelativePath }}
-            </span>
-          </div>
+          <p v-if="analysis.savedNotebookRelativePath" class="saved-hint">
+            Saved to {{ analysis.savedNotebookRelativePath }}
+          </p>
         </div>
       </div>
 
@@ -259,7 +298,36 @@ defineExpose({
         <DiagnosticGroupCard v-for="g in infoGroups" :key="g.key" :group="g" />
       </div>
 
-      <!-- 5. Full context JSON, as "Advanced details" - collapsed by default
+      <!-- 5. Execution plan (2026-08-19 follow-up): normalizedPlan is a
+           tree, so it's rendered as an EXPLAIN-style indented text block
+           rather than a table (a table would lose the parent-child
+           structure); planTableMappings is a genuinely flat per-table array,
+           so that one is a small table. Both come pre-formatted from
+           performanceTuningPlanFormatter.ts - this component only renders. -->
+      <div v-if="planTreeText || planTableMappingRows.length > 0" class="section">
+        <h3 class="section-title">Execution plan</h3>
+        <pre v-if="planTreeText" class="plan-tree">{{ planTreeText }}</pre>
+        <table v-if="planTableMappingRows.length > 0" class="plan-table-mappings">
+          <thead>
+            <tr>
+              <th>Table</th>
+              <th>Index</th>
+              <th>Est. rows</th>
+              <th>Columns used</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, i) in planTableMappingRows" :key="`plan-table-${i}`">
+              <td>{{ row.table }}</td>
+              <td>{{ row.index ?? "-" }}</td>
+              <td>{{ row.estimatedRows ?? "-" }}</td>
+              <td>{{ row.columnsUsed ?? "-" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 6. Full context JSON, as "Advanced details" - collapsed by default
            (§6.5). -->
       <details class="section advanced-details">
         <summary class="section-title">Advanced details: Full context JSON</summary>
@@ -273,302 +341,329 @@ defineExpose({
         </div>
       </details>
     </div>
-
-    <div class="footer">
-      <VsCodeButton appearance="primary" :disabled="isAnalyzing" @click="analyzeWithAi">
-        {{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
-      </VsCodeButton>
-      <VsCodeButton appearance="secondary" @click="close">Close</VsCodeButton>
-    </div>
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .PerformanceTuningPreviewPanel {
+  /* Missing width:100% (every sibling panel root - ViewConditionPanel.vue's
+     .view-conditional-root, ToolsView.vue's .root - sets this) meant this
+     <section> shrank to its content's intrinsic width instead of filling
+     the editor pane, which is also why the toolbar's Close button landed far
+     short of the true right edge (nothing for `.tool-left{flex-grow:1}` to
+     push against). */
+  width: 100%;
   display: flex;
   flex-direction: column;
   height: 100vh;
   padding: 8px 12px;
   box-sizing: border-box;
   overflow: hidden;
-}
 
-.header {
-  flex: 0 0 auto;
-}
+  .header {
+    flex: 0 0 auto;
 
-.row {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  margin-bottom: 4px;
-}
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 4px;
 
-.row.sql {
-  align-items: flex-start;
-}
+      &.sql {
+        align-items: flex-start;
 
-.label {
-  font-weight: 600;
-  min-width: 110px;
-  flex: 0 0 auto;
-}
+        .code-panel {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+      }
 
-/* Wraps a code block + its floating copy button. `position: relative` makes
-   it the positioning root for `.copy-btn` - same pattern RDH.vue already
-   uses for its per-cell copy button (`td.vcell { position: relative }` +
-   `.cell-actions { position: absolute }`), rather than putting the button
-   as a flex sibling of the code block: a flex sibling only stays visible if
-   the code block correctly shrinks to the row's available width, and an
-   unbroken long SQL/JSON line can blow that sizing up (the block ends up
-   sized to its content instead of the container, pushing the button
-   off-screen). Taking the button out of flow avoids depending on that.
-   `min-width: 0`/`min-height: 0` on the flex item itself is still needed so
-   it can actually shrink within the row/column instead of growing to fit
-   its (potentially very wide/tall) content. */
-.code-panel {
-  position: relative;
-}
+      /* `align-items: baseline` (the .row default) aligns by text baseline,
+         which looks fine for plain text rows but goes ragged once the row
+         mixes a <label>, a <vscode-dropdown>, and a <vscode-checkbox> - each
+         of those custom elements has its own internal shadow-DOM baseline,
+         so they don't land on a shared line. Vertically centering the row
+         instead is the standard fix for a row of mixed form controls. */
+      &.ai-options {
+        align-items: center;
+      }
+    }
 
-.row.sql .code-panel {
-  flex: 1 1 auto;
-  min-width: 0;
-}
+    .label {
+      font-weight: 600;
+      min-width: 110px;
+      flex: 0 0 auto;
+    }
 
-.sql-block {
-  max-height: 160px;
-  overflow: auto;
-  border-radius: 3px;
-}
+    .sql-block {
+      max-height: 160px;
+      overflow: auto;
+      border-radius: 3px;
+    }
+  }
 
-/* createCodeHtmlString() (Prism, extension-side) renders
-   <pre class="code-highlight"><code>...</code></pre> - v-html content
-   bypasses Vue's `scoped` attribute, so these rules target it via
-   :deep(). Colors/background/padding already come from the global
-   .code-highlight rules in assets/scss/main.scss; only wrapping/sizing
-   is overridden here. The extra right padding keeps code text from
-   running under the floating copy button. */
-.sql-block :deep(pre.code-highlight),
-.json-block :deep(pre.code-highlight) {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  padding-right: 32px;
-}
+  /* Wraps a code block + its floating copy button. `position: relative`
+     makes it the positioning root for `.copy-btn` - same pattern RDH.vue
+     already uses for its per-cell copy button (`td.vcell { position:
+     relative }` + `.cell-actions { position: absolute }`), rather than
+     putting the button as a flex sibling of the code block: a flex sibling
+     only stays visible if the code block correctly shrinks to the row's
+     available width, and an unbroken long SQL/JSON line can blow that
+     sizing up (the block ends up sized to its content instead of the
+     container, pushing the button off-screen). Taking the button out of
+     flow avoids depending on that. `min-width: 0`/`min-height: 0` on the
+     flex item itself is still needed so it can actually shrink within the
+     row/column instead of growing to fit its (potentially very wide/tall)
+     content. */
+  .code-panel {
+    position: relative;
+  }
 
-.copy-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 1;
-}
+  /* createCodeHtmlString() (Prism, extension-side) renders
+     <pre class="code-highlight"><code>...</code></pre> - v-html content
+     bypasses Vue's `scoped` attribute, so these rules target it via
+     :deep(). Colors/background/padding already come from the global
+     .code-highlight rules in assets/scss/main.scss; only wrapping/sizing
+     is overridden here. The extra right padding keeps code text from
+     running under the floating copy button. */
+  .sql-block :deep(pre.code-highlight),
+  .json-block :deep(pre.code-highlight) {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding-right: 32px;
+  }
 
-.badge {
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 0.9em;
-}
+  .copy-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 1;
+  }
 
-.badge.complete {
-  background: var(--vscode-testing-iconPassed, #2e7d32);
-  color: white;
-}
+  .badge {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 
-.badge.partial {
-  background: var(--vscode-editorWarning-foreground, #ff9800);
-  color: black;
-}
+    &.complete {
+      background: var(--vscode-testing-iconPassed, #2e7d32);
+      color: white;
+    }
 
-.notes-hint {
-  color: var(--vscode-descriptionForeground);
-  font-size: 0.9em;
-}
+    &.partial {
+      background: var(--vscode-editorWarning-foreground, #ff9800);
+      color: black;
+    }
 
-.exceeded {
-  color: var(--vscode-errorForeground);
-  font-weight: 600;
-}
+    &.confidence-high {
+      background: var(--vscode-testing-iconPassed, #2e7d32);
+      color: white;
+    }
 
-/* The scrollable body between the fixed header and footer - Collection
-   issues / Information / Advanced details can all be long, so only this
-   area scrolls, keeping Database/Status/SQL always visible. */
-.scrollArea {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  margin-top: 4px;
-}
+    &.confidence-medium {
+      background: var(--vscode-editorWarning-foreground, #ff9800);
+      color: black;
+    }
 
-.section {
-  margin-bottom: 12px;
-}
+    &.confidence-low {
+      background: var(--vscode-errorForeground, #f44336);
+      color: white;
+    }
+  }
 
-.section-title {
-  font-size: 1em;
-  margin: 0 0 4px 0;
-}
+  .notes-hint {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.9em;
+  }
 
-.advanced-details > .section-title {
-  cursor: pointer;
-  color: var(--vscode-textLink-foreground);
-}
+  .exceeded {
+    color: var(--vscode-errorForeground);
+    font-weight: 600;
+  }
 
-.advanced-note {
-  color: var(--vscode-descriptionForeground);
-  font-size: 0.9em;
-  margin: 4px 0 8px 0;
-}
+  /* The scrollable body between the fixed header and footer - Collection
+     issues / Information / Advanced details can all be long, so only this
+     area scrolls, keeping Database/Status/SQL always visible. */
+  .scrollArea {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    margin-top: 4px;
 
-.json-panel {
-  min-height: 200px;
-  max-height: 60vh;
-  overflow: hidden;
-  border-radius: 3px;
-}
+    .section {
+      margin-bottom: 12px;
+    }
 
-.json-block {
-  height: 100%;
-  max-height: 60vh;
-  overflow: auto;
-}
+    .section-title {
+      font-size: 1em;
+      margin: 0 0 4px 0;
+    }
 
-.json-block :deep(pre.code-highlight) {
-  font-size: 0.85em;
-}
+    .advanced-details > .section-title {
+      cursor: pointer;
+      color: var(--vscode-textLink-foreground);
+    }
 
-.footer {
-  flex: 0 0 auto;
-  margin-top: 8px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
+    .advanced-note {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.9em;
+      margin: 4px 0 8px 0;
+    }
 
-/* --- AI Analysis (Step 10) --- */
+    .json-panel {
+      min-height: 200px;
+      max-height: 60vh;
+      overflow: hidden;
+      border-radius: 3px;
+    }
 
-.section-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
+    .json-block {
+      height: 100%;
+      max-height: 60vh;
+      overflow: auto;
 
-.section-title-row .section-title {
-  margin: 0;
-}
+      :deep(pre.code-highlight) {
+        font-size: 0.85em;
+      }
+    }
 
-.analysis-status {
-  color: var(--vscode-descriptionForeground);
-}
+    /* --- Execution plan (2026-08-19 follow-up) --- */
 
-.analysis-error {
-  color: var(--vscode-errorForeground);
-}
+    .plan-tree {
+      margin: 0 0 8px 0;
+      padding: 6px 8px;
+      max-height: 300px;
+      overflow: auto;
+      white-space: pre;
+      font-size: 0.85em;
+      background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
+      border-radius: 3px;
+    }
 
-.raw-response {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 0.85em;
-  max-height: 200px;
-  overflow: auto;
-}
+    /* Same border/padding/font-size as DiagnosticGroupCard.vue's
+       .technical-details table, for visual consistency between the two
+       "small detail table" spots this panel now has. */
+    .plan-table-mappings {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.85em;
 
-.analysis-summary {
-  margin: 0 0 8px 0;
-}
+      th,
+      td {
+        border: 1px solid var(--vscode-editorWidget-border, #444);
+        padding: 2px 6px;
+        text-align: left;
+        vertical-align: top;
+      }
+    }
 
-.analysis-subsection {
-  margin: 8px 0;
-}
+    /* --- AI Analysis (Step 10) --- */
 
-.analysis-subsection h4 {
-  margin: 0 0 4px 0;
-  font-size: 0.95em;
-}
+    .section-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
 
-.analysis-note {
-  color: var(--vscode-descriptionForeground);
-  font-size: 0.85em;
-  margin: 4px 0 8px 0;
-}
+      .section-title {
+        margin: 0;
+      }
+    }
 
-.ai-card {
-  border-left: 3px solid var(--vscode-editorWidget-border, #444);
-  padding: 4px 8px;
-  margin-bottom: 6px;
-  border-radius: 2px;
-  background: var(--vscode-editorWidget-background, transparent);
-}
+    .analysis-status {
+      color: var(--vscode-descriptionForeground);
+    }
 
-.ai-card.info,
-.ai-card.low {
-  border-left-color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
-}
+    .analysis-error {
+      color: var(--vscode-errorForeground);
+    }
 
-.ai-card.warning,
-.ai-card.risk-medium {
-  border-left-color: var(--vscode-editorWarning-foreground, #ff9800);
-}
+    .raw-response {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.85em;
+      max-height: 200px;
+      overflow: auto;
+    }
 
-.ai-card.critical,
-.ai-card.risk-high {
-  border-left-color: var(--vscode-errorForeground, #f44336);
-}
+    .analysis-summary {
+      margin: 0 0 8px 0;
+    }
 
-.ai-card-title {
-  font-weight: 600;
-  margin: 0 0 2px 0;
-}
+    .analysis-subsection {
+      margin: 8px 0;
 
-.ai-card-detail,
-.ai-card-rationale {
-  margin: 0 0 2px 0;
-}
+      h4 {
+        margin: 0 0 4px 0;
+        font-size: 0.95em;
+      }
+    }
 
-.label-inline {
-  font-weight: 600;
-}
+    .analysis-note {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.85em;
+      margin: 4px 0 8px 0;
+    }
 
-.ai-card-sql {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 0.85em;
-  margin: 4px 0;
-  padding: 4px 6px;
-  background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
-  border-radius: 2px;
-}
+    .ai-card {
+      border-left: 3px solid var(--vscode-editorWidget-border, #444);
+      padding: 4px 8px;
+      margin-bottom: 6px;
+      border-radius: 2px;
+      background: var(--vscode-editorWidget-background, transparent);
 
-.ai-card-evidence {
-  color: var(--vscode-descriptionForeground);
-  font-size: 0.85em;
-  margin: 2px 0 0 0;
-}
+      &.info,
+      &.low {
+        border-left-color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+      }
 
-.badge.confidence-high {
-  background: var(--vscode-testing-iconPassed, #2e7d32);
-  color: white;
-}
+      &.warning,
+      &.risk-medium {
+        border-left-color: var(--vscode-editorWarning-foreground, #ff9800);
+      }
 
-.badge.confidence-medium {
-  background: var(--vscode-editorWarning-foreground, #ff9800);
-  color: black;
-}
+      &.critical,
+      &.risk-high {
+        border-left-color: var(--vscode-errorForeground, #f44336);
+      }
+    }
 
-.badge.confidence-low {
-  background: var(--vscode-errorForeground, #f44336);
-  color: white;
-}
+    .ai-card-title {
+      font-weight: 600;
+      margin: 0 0 2px 0;
+    }
 
-.analysis-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
+    .ai-card-detail,
+    .ai-card-rationale {
+      margin: 0 0 2px 0;
+    }
 
-.saved-hint {
-  color: var(--vscode-descriptionForeground);
-  font-size: 0.9em;
+    .label-inline {
+      font-weight: 600;
+    }
+
+    .ai-card-sql {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.85em;
+      margin: 4px 0;
+      padding: 4px 6px;
+      background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
+      border-radius: 2px;
+    }
+
+    .ai-card-evidence {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.85em;
+      margin: 2px 0 0 0;
+    }
+
+    .saved-hint {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.9em;
+      margin: 8px 0 0 0;
+    }
+  }
 }
 </style>

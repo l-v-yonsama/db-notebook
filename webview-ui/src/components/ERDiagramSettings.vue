@@ -214,18 +214,18 @@ defineExpose({
 
 <template>
   <section class="root">
-    <PanelActionToolbar @cancel="cancel">
+    <PanelActionToolbar @cancel="cancel" cancel-label="" cancel-title="Close">
       <template #left>
         <label for="title">Title:</label>
         <VsCodeTextField id="title" v-model="title" style="width: calc(100% - 45px)" />
       </template>
-      <VsCodeButton :disabled="zeroSelection" @click="action('writeToClipboard')" appearance="secondary"
-        title="Write ER diagram to clipboard">
-        <fa icon="clipboard" />Copy to clipboard
-      </VsCodeButton>
       <VsCodeButton :disabled="zeroSelection" @click="action('createERDiagram')"
         title="Generate ER diagram">
         <fa icon="plus" />Generate ER diagram
+      </VsCodeButton>
+      <VsCodeButton :disabled="zeroSelection" @click="action('writeToClipboard')" appearance="secondary"
+        title="Write ER diagram to clipboard">
+        <fa icon="clipboard" />Copy to clipboard
       </VsCodeButton>
     </PanelActionToolbar>
     <div class="output-format">

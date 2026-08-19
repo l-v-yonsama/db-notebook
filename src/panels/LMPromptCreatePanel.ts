@@ -27,6 +27,7 @@ import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { CellMeta } from "../types/Notebook";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { workflow } from "../utilities/driverResolver";
+import { buildLanguageModelSelection, defaultTranslateResponse } from "../utilities/lmModelSelection";
 import { createPrompt } from "../utilities/lmUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -42,7 +43,6 @@ export class LMPromptCreatePanel extends BasePanel {
   private withTableDefinition = false;
   private withRetrievedExecutionPlan = false;
   private languageModelId = "";
-  private isEnLanguageUser = env.language === "en";
 
   protected constructor(panel: WebviewPanel, extensionUri: Uri) {
     super(panel, extensionUri);
@@ -250,10 +250,12 @@ export class LMPromptCreatePanel extends BasePanel {
         "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.";
       window.showErrorMessage(errorMessage);
     } else {
-      languageModels = models.map((model) => ({
-        label: model.name ? model.name : `${model.vendor} (${model.family})`,
-        value: model.id,
-      }));
+      // No model-family preference (e.g. gpt-4o) - just whichever model
+      // Copilot itself returns first. See lmModelSelection.ts for why this
+      // was deliberately made shared/consistent across every panel that
+      // offers a "Language model" picker (2026-08-19).
+      const selection = buildLanguageModelSelection(models);
+      languageModels = selection.languageModels;
 
       const { connectionName, lmPromptCreateConditions }: CellMeta = this.cell.metadata;
       if (!connectionName) {
@@ -265,12 +267,8 @@ export class LMPromptCreatePanel extends BasePanel {
         this.withTableDefinition = lmPromptCreateConditions.withTableDefinition;
         this.withRetrievedExecutionPlan = lmPromptCreateConditions.withRetrievedExecutionPlan;
       } else {
-        this.languageModelId = languageModels[0].value;
-        const gpt4oModel = models.find((model) => model.family.toLocaleLowerCase() === "gpt-4o");
-        if (gpt4oModel) {
-          this.languageModelId = gpt4oModel.id;
-        }
-        this.translateResponse = this.isEnLanguageUser ? false : true;
+        this.languageModelId = selection.defaultLanguageModelId;
+        this.translateResponse = defaultTranslateResponse(env.language);
         this.withTableDefinition = false;
         this.withRetrievedExecutionPlan = false;
       }

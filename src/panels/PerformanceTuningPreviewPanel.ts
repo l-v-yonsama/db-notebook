@@ -4,8 +4,10 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   CancellationTokenSource,
+  env,
   LanguageModelChatMessage,
   lm,
+  ProgressLocation,
   Uri,
   ViewColumn,
   WebviewPanel,
@@ -20,9 +22,11 @@ import {
 import { PerformanceTuningAiAnalysisResult } from "../shared/PerformanceTuningAiAnalysis";
 import { getErrorMessage } from "../utilities/errorUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
+import { buildLanguageModelSelection, defaultTranslateResponse } from "../utilities/lmModelSelection";
+import { saveAiAnalysisAsNotebook } from "../utilities/performanceTuningAiNotebook";
 import { buildAiAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
-import { saveAiAnalysisAsNotebook } from "../utilities/performanceTuningAiNotebook";
+import { buildPlanTableMappingRows, formatPlanTree } from "../utilities/performanceTuningPlanFormatter";
 import { BasePanel } from "./BasePanel";
 
 // "What would be sent" preview for getPerformanceTuningContext()'s result
@@ -115,9 +119,10 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const contextJson = JSON.stringify(context, null, 2);
     const payloadBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
 
-    const [sqlHtml, jsonHtml] = await Promise.all([
+    const [sqlHtml, jsonHtml, models] = await Promise.all([
       createCodeHtmlString({ code: context.statement.sql, lang: "sql" }),
       createCodeHtmlString({ code: contextJson, lang: "json" }),
+      lm.selectChatModels({ vendor: "copilot" }),
     ]);
 
     if (myGeneration !== this.renderGeneration) {
@@ -131,6 +136,21 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       context.collection.unavailableSections
     );
 
+    // Execution plan display (2026-08-19 follow-up, design doc). Two
+    // separate renderers for two separate data shapes - see
+    // performanceTuningPlanFormatter.ts's top comment.
+    const planTreeText = context.executionPlan.normalizedPlan
+      ? formatPlanTree(context.executionPlan.normalizedPlan)
+      : undefined;
+    const planTableMappingRows = buildPlanTableMappingRows(context.planTableMappings);
+
+    // "Language model"/"Translate response" defaults for Analyze with AI
+    // (2026-08-19 follow-up, design doc §0). No gpt-4o-family preference
+    // (deliberately - see lmModelSelection.ts); translateResponse defaults
+    // off only for an English display language, same as Chat2QueryPanel.ts/
+    // LMPromptCreatePanel.ts.
+    const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(models);
+
     const msg: PerformanceTuningPreviewPanelEventData = {
       command: "initialize",
       componentName: "PerformanceTuningPreviewPanel",
@@ -138,10 +158,15 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         initialize: {
           context,
           diagnosticGroups,
+          planTreeText,
+          planTableMappingRows,
           sqlHtml,
           jsonHtml,
           payloadBytes,
           maxPayloadBytes: DEFAULT_MAX_PAYLOAD_BYTES,
+          languageModels,
+          languageModelId: defaultLanguageModelId,
+          translateResponse: defaultTranslateResponse(env.language),
         },
       },
     };
@@ -154,7 +179,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         this.dispose();
         break;
       case "analyzePerformanceTuningWithAi":
-        await this.analyzeWithAi();
+        await this.analyzeWithAi(message.params.languageModelId, message.params.translateResponse);
         break;
       case "saveAiAnalysisAsNotebook":
         await this.saveAnalysisAsNotebook();
@@ -169,111 +194,143 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   // single deterministic request/response, not a conversational tool call),
   // and posts the parsed structured result back. Never throws past this
   // method - every failure path ends in an "error" analysis-update instead.
-  private async analyzeWithAi(): Promise<void> {
+  private async analyzeWithAi(languageModelId: string, translateResponse: boolean): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.context) {
       return;
     }
+    const context = this.context;
 
     await this.postAnalysisUpdate(myGeneration, { status: "running" });
 
-    let model;
-    try {
-      [model] = await lm.selectChatModels({ vendor: "copilot" });
-    } catch (e) {
-      await this.postAnalysisUpdate(myGeneration, {
-        status: "error",
-        errorMessage: `Failed to look up available AI models: ${getErrorMessage(e)}`,
-      });
-      return;
-    }
-    if (!model) {
-      await this.postAnalysisUpdate(myGeneration, {
-        status: "error",
-        errorMessage:
-          "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.",
-      });
-      return;
-    }
+    // Standard VS Code progress + cancel affordance, same convention as
+    // startPerformanceTuningPreview() (this feature's own Step 9a/9b code)
+    // and HistoryTreeCommand.ts's EXECUTE_SQL_HISTORY - not a bespoke
+    // in-panel Cancel button. `cts` (below) is still needed alongside this:
+    // it's what lets renderSub() (a newer preview replacing this one) and
+    // preDispose() (panel closed) cancel an in-flight request from *outside*
+    // this method, which the notification's own token cannot do on its own -
+    // token.onCancellationRequested bridges the two.
+    await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+        title: "Analyzing performance tuning context with AI...",
+      },
+      async (progress, token) => {
+        const cts = new CancellationTokenSource();
+        this.analysisCancellationSource = cts;
+        token.onCancellationRequested(() => cts.cancel());
 
-    const prompt = buildAiAnalysisPrompt(this.context);
-    const messages = [
-      LanguageModelChatMessage.Assistant(prompt.assistant),
-      LanguageModelChatMessage.User(prompt.user),
-    ];
+        progress.report({ message: "Looking up available AI models..." });
 
-    const cts = new CancellationTokenSource();
-    this.analysisCancellationSource = cts;
-
-    let accumulatedResponse = "";
-    try {
-      const chatResponse = await model.sendRequest(messages, {}, cts.token);
-      for await (const fragment of chatResponse.text) {
-        if (cts.token.isCancellationRequested) {
+        let model;
+        try {
+          // By-id resolution against the model the user picked in the
+          // dropdown (2026-08-19 follow-up) - same send-time lookup pattern
+          // Chat2QueryPanel.ts/lmUtil.ts use, instead of the old hardcoded
+          // `{ vendor: "copilot" }` + first-result pick.
+          [model] = await lm.selectChatModels(
+            languageModelId ? { id: languageModelId } : { vendor: "copilot" }
+          );
+        } catch (e) {
           await this.postAnalysisUpdate(myGeneration, {
             status: "error",
-            errorMessage: "The request was cancelled.",
+            errorMessage: `Failed to look up available AI models: ${getErrorMessage(e)}`,
           });
           return;
         }
-        accumulatedResponse += fragment;
+        if (!model) {
+          await this.postAnalysisUpdate(myGeneration, {
+            status: "error",
+            errorMessage:
+              "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.",
+          });
+          return;
+        }
+
+        const prompt = buildAiAnalysisPrompt(context, { translateResponse, language: env.language });
+        const messages = [
+          LanguageModelChatMessage.Assistant(prompt.assistant),
+          LanguageModelChatMessage.User(prompt.user),
+        ];
+
+        progress.report({ message: `Sending context to ${model.family}...` });
+
+        let accumulatedResponse = "";
+        try {
+          const chatResponse = await model.sendRequest(messages, {}, cts.token);
+          for await (const fragment of chatResponse.text) {
+            if (cts.token.isCancellationRequested) {
+              await this.postAnalysisUpdate(myGeneration, {
+                status: "error",
+                errorMessage: "The request was cancelled.",
+              });
+              return;
+            }
+            accumulatedResponse += fragment;
+          }
+        } catch (e) {
+          await this.postAnalysisUpdate(myGeneration, {
+            status: "error",
+            errorMessage: `The AI request failed: ${getErrorMessage(e)}`,
+          });
+          return;
+        } finally {
+          if (this.analysisCancellationSource === cts) {
+            this.analysisCancellationSource = undefined;
+          }
+        }
+
+        progress.report({ message: "Parsing AI response..." });
+
+        // The model is only asked for these five fields (§7) - formatVersion/
+        // model/generatedAt are filled in here, host-side, never trusted from
+        // the model's own reply.
+        let parsed: Partial<
+          Pick<
+            PerformanceTuningAiAnalysisResult,
+            "summary" | "findings" | "recommendations" | "confidence" | "missingContext"
+          >
+        >;
+        try {
+          parsed = JSON.parse(accumulatedResponse);
+        } catch (e) {
+          await this.postAnalysisUpdate(myGeneration, {
+            status: "error",
+            errorMessage: "The AI response could not be parsed as structured JSON.",
+            rawResponseText: accumulatedResponse,
+          });
+          return;
+        }
+
+        const result: PerformanceTuningAiAnalysisResult = {
+          formatVersion: 1,
+          summary: typeof parsed.summary === "string" ? parsed.summary : "",
+          findings: Array.isArray(parsed.findings) ? parsed.findings : [],
+          recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+          confidence:
+            parsed.confidence === "high" || parsed.confidence === "medium" ? parsed.confidence : "low",
+          missingContext: Array.isArray(parsed.missingContext) ? parsed.missingContext : [],
+          model: {
+            id: model.id,
+            vendor: model.vendor,
+            family: model.family,
+            version: model.version,
+            name: model.name,
+          },
+          generatedAt: new Date().toISOString(),
+        };
+
+        if (myGeneration !== this.renderGeneration) {
+          // A newer preview replaced this one while the request was in flight -
+          // don't let a stale result become the one "Save as Notebook" would save.
+          return;
+        }
+        this.lastAnalysis = result;
+        await this.postAnalysisUpdate(myGeneration, { status: "success", result });
       }
-    } catch (e) {
-      await this.postAnalysisUpdate(myGeneration, {
-        status: "error",
-        errorMessage: `The AI request failed: ${getErrorMessage(e)}`,
-      });
-      return;
-    } finally {
-      if (this.analysisCancellationSource === cts) {
-        this.analysisCancellationSource = undefined;
-      }
-    }
-
-    // The model is only asked for these five fields (§7) - formatVersion/
-    // model/generatedAt are filled in here, host-side, never trusted from
-    // the model's own reply.
-    let parsed: Partial<
-      Pick<
-        PerformanceTuningAiAnalysisResult,
-        "summary" | "findings" | "recommendations" | "confidence" | "missingContext"
-      >
-    >;
-    try {
-      parsed = JSON.parse(accumulatedResponse);
-    } catch (e) {
-      await this.postAnalysisUpdate(myGeneration, {
-        status: "error",
-        errorMessage: "The AI response could not be parsed as structured JSON.",
-        rawResponseText: accumulatedResponse,
-      });
-      return;
-    }
-
-    const result: PerformanceTuningAiAnalysisResult = {
-      formatVersion: 1,
-      summary: typeof parsed.summary === "string" ? parsed.summary : "",
-      findings: Array.isArray(parsed.findings) ? parsed.findings : [],
-      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-      confidence: parsed.confidence === "high" || parsed.confidence === "medium" ? parsed.confidence : "low",
-      missingContext: Array.isArray(parsed.missingContext) ? parsed.missingContext : [],
-      model: {
-        id: model.id,
-        vendor: model.vendor,
-        family: model.family,
-        version: model.version,
-        name: model.name,
-      },
-      generatedAt: new Date().toISOString(),
-    };
-
-    if (myGeneration !== this.renderGeneration) {
-      // A newer preview replaced this one while the request was in flight -
-      // don't let a stale result become the one "Save as Notebook" would save.
-      return;
-    }
-    this.lastAnalysis = result;
-    await this.postAnalysisUpdate(myGeneration, { status: "success", result });
+    );
   }
 
   // Step 10 "Save as Notebook" (design doc §8). Always creates a brand new

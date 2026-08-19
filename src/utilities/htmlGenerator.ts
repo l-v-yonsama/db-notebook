@@ -605,7 +605,15 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
   }
   let s = "";
 
-  if (cell.document.languageId) {
+  // A user-set cellLabel (CellLabelProvider in statusBarProviders.ts) takes
+  // priority over the bare language id - it's the whole point of that
+  // status bar item: a raw "json" tag says nothing about what a JSON cell
+  // actually holds (see performanceTuningAiNotebook.ts's Full Context JSON /
+  // AI analysis JSON cells for the motivating case).
+  const { cellLabel } = cell.metadata as CellMeta;
+  if (cellLabel) {
+    s = `<span class="tag is-info is-light">${escapeHtml(cellLabel)}</span>`;
+  } else if (cell.document.languageId) {
     s = `<span class="tag is-info is-light">${cell.document.languageId}</span>`;
   }
 

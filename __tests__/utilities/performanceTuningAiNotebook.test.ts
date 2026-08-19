@@ -84,27 +84,37 @@ describe("buildAiAnalysisNotebookFilename", () => {
 });
 
 describe("buildAiAnalysisNotebookCells", () => {
-  it("builds two markdown cells (overview + analysis) followed by two JSON code cells", () => {
+  it("builds three markdown cells (overview + analysis + JSON appendix intro) followed by two JSON code cells", () => {
     const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
 
-    expect(cells).toHaveLength(4);
+    expect(cells).toHaveLength(5);
     expect(cells[0].kind).toBe(NotebookCellKind.Markup);
     expect(cells[0].languageId).toBe("markdown");
     expect(cells[0].value).toContain("SELECT * FROM orders WHERE tenant_id = 42");
 
     expect(cells[1].kind).toBe(NotebookCellKind.Markup);
     expect(cells[1].languageId).toBe("markdown");
+    expect(cells[1].value).toContain("### Findings");
+    expect(cells[1].value).toContain("### Recommendations");
+    expect(cells[1].value).toContain("### Missing context");
     expect(cells[1].value).toContain("Full table scan");
     expect(cells[1].value).toContain("Add an index on tenant_id");
     expect(cells[1].value).toContain("An ANALYZE plan would confirm the actual row counts.");
 
-    expect(cells[2].kind).toBe(NotebookCellKind.Code);
-    expect(cells[2].languageId).toBe("json");
-    expect(JSON.parse(cells[2].value)).toMatchObject({ database: { databaseName: "app" } });
+    expect(cells[2].kind).toBe(NotebookCellKind.Markup);
+    expect(cells[2].languageId).toBe("markdown");
+    expect(cells[2].value).toContain("Full context JSON");
+    expect(cells[2].value).toContain("AI analysis JSON");
 
     expect(cells[3].kind).toBe(NotebookCellKind.Code);
     expect(cells[3].languageId).toBe("json");
-    expect(JSON.parse(cells[3].value)).toMatchObject({ summary: "The query does a full scan on orders." });
+    expect(JSON.parse(cells[3].value)).toMatchObject({ database: { databaseName: "app" } });
+    expect(cells[3].metadata).toEqual({ cellLabel: "Full context JSON" });
+
+    expect(cells[4].kind).toBe(NotebookCellKind.Code);
+    expect(cells[4].languageId).toBe("json");
+    expect(JSON.parse(cells[4].value)).toMatchObject({ summary: "The query does a full scan on orders." });
+    expect(cells[4].metadata).toEqual({ cellLabel: "AI analysis JSON" });
   });
 
   it("renders 'No findings/recommendations were reported' placeholders instead of empty tables", () => {
@@ -114,6 +124,55 @@ describe("buildAiAnalysisNotebookCells", () => {
     );
     expect(cells[1].value).toContain("No findings were reported");
     expect(cells[1].value).toContain("No recommendations were reported");
+  });
+
+  it("omits the execution plan cell entirely when there is neither a plan nor any table mappings (default fixture)", () => {
+    const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
+    // Same 5-cell shape as the first test above - explicit here so this
+    // invariant has its own name/intent rather than relying on that count.
+    expect(cells.every((c) => !c.value.includes("## Execution plan"))).toBe(true);
+  });
+
+  it("inserts an 'Execution plan' cell right after Overview and before Analysis when a normalizedPlan is present", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        executionPlan: {
+          mode: "estimate",
+          format: "json",
+          normalizedPlan: {
+            id: "n0",
+            depth: 0,
+            operation: "Seq Scan",
+            relation: { tableName: "orders" },
+            estimated: { rows: 50 },
+            children: [],
+          },
+        },
+        planTableMappings: [{ planNodeId: "n0", tableName: "orders", estimatedRows: 50 }],
+      }),
+      buildAnalysis()
+    );
+
+    expect(cells).toHaveLength(6);
+    expect(cells[1].kind).toBe(NotebookCellKind.Markup);
+    expect(cells[1].value).toContain("## Execution plan");
+    expect(cells[1].value).toContain("```text");
+    expect(cells[1].value).toContain("Seq Scan");
+    expect(cells[1].value).toContain("### Tables referenced by this plan");
+    expect(cells[1].value).toContain("| orders |");
+    // Everything else just shifts down by one - Analysis is now cells[2].
+    expect(cells[2].value).toContain("### Findings");
+  });
+
+  it("still adds the execution plan cell for table mappings alone, with no normalizedPlan", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({ planTableMappings: [{ planNodeId: "n0", tableName: "orders" }] }),
+      buildAnalysis()
+    );
+    expect(cells).toHaveLength(6);
+    expect(cells[1].value).toContain("## Execution plan");
+    expect(cells[1].value).not.toContain("```text");
+    expect(cells[1].value).toContain("### Tables referenced by this plan");
   });
 });
 

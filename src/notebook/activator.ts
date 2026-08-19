@@ -35,6 +35,7 @@ import {
   CELL_OPEN_MDH,
   CELL_SHOW_METADATA_SETTINGS,
   CELL_SPECIFY_CONNECTION_TO_USE,
+  CELL_SPECIFY_LABEL,
   CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE,
   CELL_SPECIFY_LOG_GROUP_TO_USE,
   CELL_SPECIFY_MQTT_EXPAND_JSON_COLUMN,
@@ -322,6 +323,36 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       await workspace.applyEdit(edit);
     };
+
+    registerDisposableCommand(CELL_SPECIFY_LABEL, async (cell: NotebookCell) => {
+      const { cellLabel }: CellMeta = cell.metadata;
+      const result = await window.showInputBox({
+        title: "Specify cell label",
+        placeHolder: "e.g. Full context JSON",
+        prompt:
+          "Shown in this notebook's TOC and HTML report in place of a generic language tag. Leave empty to clear.",
+        value: cellLabel ?? "",
+      });
+      if (result === undefined) {
+        // Cancelled (Esc) - distinct from submitting an empty string, which clears the label.
+        return;
+      }
+
+      const metadata: CellMeta = { ...cell.metadata };
+      const trimmed = result.trim();
+      if (trimmed === "") {
+        if (cellLabel === undefined) {
+          return;
+        }
+        delete metadata.cellLabel;
+      } else {
+        if (cellLabel === trimmed) {
+          return;
+        }
+        metadata.cellLabel = trimmed;
+      }
+      await updateCellMetadata(cell, metadata);
+    });
 
     registerDisposableCommand(CELL_SPECIFY_CONNECTION_TO_USE, async (cell?: NotebookCell) => {
       let targetCells: NotebookCell[] = [];
