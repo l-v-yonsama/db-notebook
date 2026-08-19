@@ -94,8 +94,8 @@ export type ActionCommand =
   | ExecuteActionCommand
   | KillActionCommand
   | SearchQueryStatisticsActionCommand
-  | SelectQueryStatisticsRowActionCommand
   | PreviewPerformanceTuningActionCommand
+  | SubmitPerformanceTuningBindParametersActionCommand
   | AnalyzePerformanceTuningWithAiActionCommand
   | SaveAiAnalysisAsNotebookActionCommand;
 
@@ -130,31 +130,32 @@ export type SearchQueryStatisticsActionCommand = BaseActionCommand<
   Partial<QueryStatisticsSearchParams>
 >;
 
-// Sent when the user clicks a Query Statistics row (ToolsView.vue's
-// onClickCell), so ToolsViewProvider can compute that row's Bind Parameters
-// estimate (misc/design/performance-tuning-query-statistics-parameter-input-plan.ja.md
-// §7.1/§7.5). Same resultVersion + rowIndex re-resolution as
-// PreviewPerformanceTuningActionCommand below, for the same reason.
-export type SelectQueryStatisticsRowActionCommand = BaseActionCommand<
-  "selectQueryStatisticsRow",
+// Starts a performance tuning context preview from a selected Query
+// Statistics row. Carries only `resultVersion` + `rowIndex`, never the row's
+// own values - ToolsViewProvider re-resolves `rdh.rows[rowIndex].values`
+// itself from the version it still holds, so a compromised/buggy webview
+// can't substitute arbitrary SQL/statistics into the collected context
+// (§10 Phase 5 "行選択とworkload変換"). No bind values here (2026-08-19
+// follow-up, misc/design/performance-tuning-query-statistics-parameter-
+// input-plan.ja.md's successor design): ToolsViewProvider now re-estimates
+// placeholders itself and, when any are found, hands off to
+// PerformanceTuningBindParametersPanel (openPerformanceTuningPreview()) to
+// collect them - the same panel/flow SQL History uses - rather than
+// collecting them inline in ToolsView.vue first.
+export type PreviewPerformanceTuningActionCommand = BaseActionCommand<
+  "previewPerformanceTuning",
   { resultVersion: number; rowIndex: number }
 >;
 
-// Starts a performance tuning context preview from a selected Query
-// Statistics row. Deliberately carries only `resultVersion` + `rowIndex`,
-// never the row's own values - ToolsViewProvider re-resolves
-// `rdh.rows[rowIndex].values` itself from the version it still holds, so a
-// compromised/buggy webview can't substitute arbitrary SQL/statistics into
-// the collected context (§10 Phase 5 "行選択とworkload変換"). `values` is
-// the user's own input for each Bind Parameters row (always strings - §7.4
-// of the parameter-input-plan doc above), and `markers` is the matching
-// placeholder text ToolsViewProvider itself produced for that row via
-// selectQueryStatisticsRow (echoed back, not re-derived by the webview) -
-// both are same-length, same-order arrays, validated on both ends, and
-// never persisted past this one collection attempt.
-export type PreviewPerformanceTuningActionCommand = BaseActionCommand<
-  "previewPerformanceTuning",
-  { resultVersion: number; rowIndex: number; values: unknown[]; markers: unknown[] }
+// Sent by PerformanceTuningBindParametersPanel.vue's "Preview" button - see
+// src/panels/PerformanceTuningBindParametersPanel.ts. `values` is the user's
+// own input for each Bind Parameters row (always strings), and `markers` is
+// the matching placeholder text the panel was initialized with (echoed back,
+// not re-derived by the webview) - both same-length, same-order arrays,
+// validated host-side, never persisted past this one collection attempt.
+export type SubmitPerformanceTuningBindParametersActionCommand = BaseActionCommand<
+  "submitPerformanceTuningBindParameters",
+  { values: unknown[]; markers: unknown[] }
 >;
 
 // Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md

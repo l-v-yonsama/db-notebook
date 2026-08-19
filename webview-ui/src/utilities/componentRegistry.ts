@@ -25,6 +25,7 @@ import HttpEventPanel from "@/components/HttpEventPanel.vue";
 import LMPromptCreatePanel from "@/components/LMPromptCreatePanel.vue";
 import LogParseSettingPanel from "@/components/LogParseSettingPanel/LogParseSettingPanel.vue";
 import NotebookCellMetadataPanel from "@/components/NotebookCellMetadataPanel.vue";
+import PerformanceTuningBindParametersPanel from "@/components/PerformanceTuningBindParametersPanel.vue";
 import PerformanceTuningPreviewPanel from "@/components/PerformanceTuningPreviewPanel.vue";
 import PublishEditorPanel from "@/components/PublishEditorPanel.vue";
 import ScanPanel from "@/components/ScanPanel.vue";
@@ -72,6 +73,7 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> = {
   CfnDiagramSettingsPanel: CfnDiagramSettings, // CloudFormation構成図生成の設定
   NotebookCellMetadataPanel: NotebookCellMetadataPanel, // ノートブックセルのメタデータ(グラフ設定等)編集
   PerformanceTuningPreviewPanel: PerformanceTuningPreviewPanel, // getPerformanceTuningContext() の送信プレビュー
+  PerformanceTuningBindParametersPanel: PerformanceTuningBindParametersPanel, // Preview前のBind Parameters確認
 
   // ----- Editor -----
   RecordRuleEditor: RecordRuleEditor, // レコード検証ルールの編集

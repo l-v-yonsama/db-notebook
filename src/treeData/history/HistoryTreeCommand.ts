@@ -34,7 +34,9 @@ import {
 
 import {
   RDSBaseDriver,
+  RdsDatabase,
   SelectedStatementStatistics,
+  estimateBindParameters,
   normalizeQuery,
   resolveTableAliasMap,
   resolveTargetTables,
@@ -49,7 +51,7 @@ import { createRDSDriver, workflow } from "../../utilities/driverResolver";
 import { existsFileOnWorkspace } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { readCodeResolverFile, readRuleFile } from "../../utilities/notebookUtil";
-import { startPerformanceTuningPreview } from "../../utilities/performanceTuningPreview";
+import { openPerformanceTuningPreview } from "../../utilities/performanceTuningBindConfirmation";
 import { HistoryTreeProvider } from "./HistoryTreeProvider";
 
 type HistoryTreeParams = {
@@ -399,37 +401,133 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
         }
       : undefined;
 
+    // 2026-08-19 follow-up #2: history.sqlDoc always uses db-notebook's own
+    // canonical, named `:name` bind syntax - never the target vendor's
+    // native placeholder syntax - the same reason EXECUTE_SQL_HISTORY above
+    // (line ~254) always runs it through normalizeQuery() before actually
+    // executing it. Every performance-tuning Provider (e.g.
+    // PostgresPerformanceTuningProvider.collectExecutionPlan()) sends
+    // statement.sql straight to the database with no normalization of its
+    // own, so skipping this step here made any parameterized history entry
+    // fail with a vendor syntax error at the ":" (confirmed via debugger:
+    // "syntax error at or near \":\"" against a Postgres connection).
+    //
+    // Prefer converting *with* history.variables as bindParams (one call
+    // gives both the converted query text and a real, positionally-aligned
+    // binds array to pre-fill the confirm panel with) - this also lets an
+    // IN-clause array value expand to the right number of positions in the
+    // query text itself, which a bindParams-less conversion below can't know
+    // to do. Falls back to a bindParams-less (structural-only) conversion
+    // when history.variables is missing/empty, or doesn't cover every
+    // marker the SQL actually has (normalizeQuery() throws
+    // "Missing bind parameter[s]" in that case) - the confirm panel then
+    // opens with its normal blank fields instead of a pre-fill.
+    const driver = await createRDSDriver(connectionSetting, true);
+    const toPositionedParameter = driver.isPositionedParameterAvailable();
+    const toPositionalCharacter = driver.getPositionalCharacter();
+    let nativeSql: string;
+    let presetBindValues: unknown[] | undefined;
+    if (history.variables && Object.keys(history.variables).length > 0) {
+      try {
+        const converted = normalizeQuery({
+          query: history.sqlDoc,
+          bindParams: history.variables,
+          toPositionedParameter,
+          toPositionalCharacter,
+        });
+        nativeSql = converted.query;
+        presetBindValues = converted.binds;
+      } catch {
+        nativeSql = normalizeQuery({
+          query: history.sqlDoc,
+          toPositionedParameter,
+          toPositionalCharacter,
+        }).query;
+        presetBindValues = undefined;
+      }
+    } else {
+      nativeSql = normalizeQuery({
+        query: history.sqlDoc,
+        toPositionedParameter,
+        toPositionalCharacter,
+      }).query;
+      presetBindValues = undefined;
+    }
+
     // Shared with Query Statistics (9b) - see startPerformanceTuningPreview()'s
     // own doc comment (§10 Phase 5 "Preview接続の共通化と競合防止").
     // targetTables/tableAliasMap (§6.5/§6.6/§7.7 of performance-tuning-
     // query-statistics-parameter-input-plan.ja.md): same MySQL aliased-table
     // EXPLAIN gap Query Statistics has, and history.sqlDoc is just as
-    // likely to alias its FROM/JOIN tables as a Query Statistics row's SQL is.
+    // likely to alias its FROM/JOIN tables as a Query Statistics row's SQL
+    // is. Parsed from nativeSql, not history.sqlDoc: a canonical `:name`
+    // marker isn't valid Postgres/MySQL syntax, so parsing the already-
+    // converted SQL can only help these helpers' AST-based alias resolution,
+    // never hurt it.
     const targetTables = resolveTargetTables({
       dbType: connectionSetting.dbType,
-      sql: history.sqlDoc,
+      sql: nativeSql,
     });
     const tableAliasMap = resolveTableAliasMap({
       dbType: connectionSetting.dbType,
-      sql: history.sqlDoc,
+      sql: nativeSql,
     });
-    const { status, message, technicalMessage } = await startPerformanceTuningPreview({
+
+    // 2026-08-19 follow-up: this handler used to call
+    // startPerformanceTuningPreview() with no bind values at all, regardless
+    // of whether history.sqlDoc had any placeholders - a parameterized
+    // history entry could only ever fail to collect a plan. estimateBindParameters()
+    // needs the connection's resource tree for column-type estimation (the
+    // same reason ToolsViewProvider already requires an RdsDatabase for
+    // Query Statistics); load it the same way LMPromptCreatePanel.ts's
+    // createPrompt() does for the same reason.
+    let databaseResource = stateStorage.getFirstRdsDatabaseByName(history.connectionName);
+    if (databaseResource === undefined) {
+      const { ok, result } = await stateStorage.loadResource(history.connectionName, false, true);
+      databaseResource = ok ? (result?.db.find((d) => d instanceof RdsDatabase) as RdsDatabase) : undefined;
+    }
+
+    // estimateBindParameters() scans for the *target vendor's* native
+    // marker syntax per dbType ($N for Postgres, :name/:N for Oracle, ...) -
+    // not db-notebook's canonical :name convention - so it has to run
+    // against nativeSql (already converted above), not history.sqlDoc.
+    // Running it against the original canonical text (as this used to)
+    // pointed the scanner at the wrong syntax entirely: for any non-
+    // Oracle/SQL Server vendor it silently found no markers at all, which -
+    // combined with the syntax-error bug above - meant the confirm panel
+    // never even opened for a Postgres example that clearly had a
+    // `:channel` marker (confirmed via debugger: estimatedBindParameters
+    // came back `[]`). No `databaseResource ?` guard here either (unlike
+    // before): estimateBindParameters() already degrades gracefully with no
+    // column hints when it's undefined - skipping the scan entirely in that
+    // case used to silently skip the confirm panel too whenever the
+    // resource tree couldn't be loaded.
+    const estimatedBindParameters = estimateBindParameters({
+      dbType: connectionSetting.dbType,
+      sql: nativeSql,
+      databaseResource,
+    });
+
+    const result = await openPerformanceTuningPreview({
       extensionUri: context.extensionUri,
       connectionSetting,
       databaseName,
-      statement: { sql: history.sqlDoc, source: "sqlHistory", statistics },
-      plan: { mode: "estimate" },
+      statement: { sql: nativeSql, source: "sqlHistory", statistics },
       targetTables: targetTables.length > 0 ? targetTables : undefined,
       tableAliasMap: Object.keys(tableAliasMap).length > 0 ? tableAliasMap : undefined,
+      estimatedBindParameters,
+      presetBindValues,
     });
 
-    if (status === "failed") {
+    if (result.status === "failed") {
       showWindowErrorMessage(
-        [message, technicalMessage].filter(Boolean).join(" ") ||
+        [result.message, result.technicalMessage].filter(Boolean).join(" ") ||
           "Failed to collect performance tuning context."
       );
     }
-    // "cancelled" mirrors standard VS Code progress-cancellation UX - the
-    // user asked to stop, so no further notification is shown.
+    // "cancelled" mirrors standard VS Code progress-cancellation UX (the
+    // user asked to stop, so no further notification is shown); "deferred"
+    // means PerformanceTuningBindParametersPanel opened instead and now owns
+    // the rest of this flow - also nothing further to show here.
   });
 };

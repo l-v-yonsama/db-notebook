@@ -60,15 +60,4 @@ export type QueryStatisticsViewState = {
   search: QueryStatisticsSearchParams;
   database: { connectionName: string; databaseName: string; vendor: string };
   rdh?: ResultSetData;
-  // Set once a row has been selected (ToolsViewProvider re-resolves it from
-  // resultVersion + rowIndex, never trusts a webview-supplied SQL/estimate -
-  // §7.1). `selectedRowIndex` is how the webview tells "a new row was
-  // selected" (and must re-init its Bind Parameters rows) apart from "the
-  // same row, only previewStatus changed" (§7.5). An empty
-  // `estimatedBindParameters` array (as opposed to it being absent) means
-  // the selected row's SQL has no placeholders - the Bind Parameters
-  // fieldset stays hidden entirely (§4: "SQLにplaceholderが無い場合、
-  // fieldset自体を表示しない").
-  selectedRowIndex?: number;
-  estimatedBindParameters?: EstimatedBindParameter[];
 };

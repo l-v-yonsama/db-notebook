@@ -29,4 +29,5 @@ export type ComponentName =
   | "CodeResolverEditor"
   | "ToolsView"
   | "SubscriptionPayloadsView"
-  | "PerformanceTuningPreviewPanel";
+  | "PerformanceTuningPreviewPanel"
+  | "PerformanceTuningBindParametersPanel";

@@ -5,6 +5,7 @@ import type {
   DbResource,
   DbSchema,
   DbTable,
+  EstimatedBindParameter,
   ExtractedSqlResult,
   LogParseParams,
   MqttQoS,
@@ -63,6 +64,7 @@ export type MessageEventData =
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | PerformanceTuningPreviewPanelEventData
+  | PerformanceTuningBindParametersPanelEventData
   | RecordRuleEditorEventData
   | ScanPanelEventData
   | SubscriptionSettingPanelEventData
@@ -596,6 +598,39 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       translateResponse: boolean;
     };
     analysis?: PerformanceTuningAiAnalysisViewState;
+  }
+>;
+
+// PerformanceTuningBindParametersPanel.vue (2026-08-19 follow-up) - the
+// shared "confirm bind values" panel both Query Statistics and SQL History
+// route through via openPerformanceTuningPreview() whenever the target SQL
+// has detected placeholders. See src/panels/PerformanceTuningBindParametersPanel.ts.
+export type PerformanceTuningBindParametersPanelEventData = BaseMessageEventData<
+  BaseMessageEventDataCommand | "collection-result",
+  "PerformanceTuningBindParametersPanel",
+  {
+    initialize?: {
+      sqlHtml: string;
+      // Only used for BindParametersEditor.vue's "Add parameter" marker
+      // convention (nextManualMarker() in bindParameterRows.ts) - never a
+      // ConnectionSetting or any other identifying detail.
+      dbType: string;
+      estimatedBindParameters: EstimatedBindParameter[];
+      // Real values to pre-fill each row's input with, parallel to
+      // estimatedBindParameters by `position` (index position - 1) - e.g.
+      // SQL History's last-executed variables. Undefined for Query
+      // Statistics (no such source), which keeps every row starting blank
+      // exactly as before.
+      presetBindValues?: unknown[];
+    };
+    // Posted only on "cancelled"/"failed" - a successful collection instead
+    // opens PerformanceTuningPreviewPanel and disposes this panel, so there
+    // is nothing further for this panel's own webview to render.
+    collectionResult?: {
+      status: "cancelled" | "failed";
+      message?: string;
+      technicalMessage?: string;
+    };
   }
 >;
 

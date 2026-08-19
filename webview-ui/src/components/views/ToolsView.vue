@@ -2,10 +2,8 @@
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import { StatementStatisticsSortKey } from "@/types/lib/StatementStatisticsSortKey";
 import type { CellFocusParams } from "@/types/RdhEvents";
-import { estimatesToRows } from "@/utilities/bindParameterRows";
 import {
   vscode,
-  type BindParameterRow,
   type QueryStatisticsPreviewStatus,
   type QueryStatisticsSearchParams,
   type QueryStatisticsSearchStatus,
@@ -13,7 +11,6 @@ import {
 } from "@/utilities/vscode";
 import { toNum, type ResultSetData } from "@l-v-yonsama/rdh";
 import { nextTick, onMounted, ref } from "vue";
-import BindParametersEditor from "../BindParametersEditor.vue";
 import SecondarySelectionAction from "../base/SecondarySelectionAction.vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
@@ -59,28 +56,12 @@ const sortByItems: DropdownItem[] = [
   { value: StatementStatisticsSortKey.ExecutionCount, label: "Execution count" },
 ];
 
-// The user's Bind Parameters input rows for the selected row's placeholder
-// SQL (misc/design/performance-tuning-query-statistics-parameter-input-plan.ja.md
-// §4/§7.5). Initialized from ToolsViewProvider's estimate whenever
-// `selectedRowIndex` actually changes (a new row, or resultVersion reset -
-// see refresh() below), never auto-persisted, never sent anywhere but the
-// one collection attempt it's used for.
-const bindParameterRows = ref<BindParameterRow[]>([]);
-// Tracks the *previous* broadcast's selectedRowIndex/previewStatus purely
-// to detect the two transitions that must reset bindParameterRows (a new
-// row selected; a preview just succeeded/was cancelled) without resetting
-// it on every unrelated state broadcast (e.g. a previewStatus: "collecting"
-// update for the row already selected) - §7.5's "同じ行のPreview失敗時は
-// 入力値を保持し...別行選択...Preview成功・cancelledで入力値を破棄する".
-const trackedSelectedRowIndex = ref<number | undefined>(undefined);
-const trackedPreviewStatus = ref<QueryStatisticsPreviewStatus>("idle");
-
 window.addEventListener("resize", () => resetSectionHeight());
 
 const resetSectionHeight = () => {
   const sectionWrapper = window.document.querySelector("section.root");
   if (sectionWrapper?.clientHeight) {
-    const minusHeight = mode.value === "queryStatistics" ? 176 : 76;
+    const minusHeight = mode.value === "queryStatistics" ? 116 : 76;
     sectionHeight.value = Math.max(sectionWrapper?.clientHeight - minusHeight, 100);
   }
   if (sectionWrapper?.clientWidth) {
@@ -94,8 +75,6 @@ onMounted(() => {
 
 const clearSelection = () => {
   clickedCellParams.value = undefined;
-  bindParameterRows.value = [];
-  trackedSelectedRowIndex.value = undefined;
 };
 
 const refresh = async (v: ToolsViewEventData["value"]["refresh"]) => {
@@ -115,10 +94,12 @@ const refresh = async (v: ToolsViewEventData["value"]["refresh"]) => {
 
     // A new resultVersion means this is a fresh search cycle (its very
     // first "loading" post already carries the bumped version) - reset the
-    // row selection/bind input/form fields exactly then, never on a
-    // preview-status-only update that leaves resultVersion unchanged
-    // (§10 Phase 5 "refresh / mode変更時はclickedCellParamsとbind入力を必
-    // ずclearする").
+    // row selection exactly then, never on a preview-status-only update
+    // that leaves resultVersion unchanged (§10 Phase 5 "refresh / mode変更
+    // 時はclickedCellParamsを必ずclearする"). Bind Parameters input itself
+    // no longer lives in this component at all (2026-08-19 follow-up) -
+    // PerformanceTuningBindParametersPanel owns that now, opened only when
+    // the target SQL actually has placeholders.
     if (v.resultVersion !== resultVersion.value) {
       resultVersion.value = v.resultVersion;
       clearSelection();
@@ -127,29 +108,7 @@ const refresh = async (v: ToolsViewEventData["value"]["refresh"]) => {
       rdh.value = undefined;
       await nextTick();
       rdh.value = v.rdh;
-    } else {
-      // A new row was selected (selectQueryStatisticsRow's response) -
-      // (re)initialize the Bind Parameters table from the fresh estimate,
-      // but only then, not on every unrelated broadcast for the row
-      // already selected (misc/design/performance-tuning-query-statistics-
-      // parameter-input-plan.ja.md §7.5).
-      if (v.selectedRowIndex !== trackedSelectedRowIndex.value) {
-        trackedSelectedRowIndex.value = v.selectedRowIndex;
-        bindParameterRows.value = estimatesToRows(v.estimatedBindParameters ?? []);
-      }
-      // A collection just finished successfully or was cancelled - discard
-      // the values the user typed and start the same row's table fresh
-      // again (§7.5: "Preview成功・cancelledで入力値を破棄する"). An error
-      // is deliberately excluded so the user can fix and retry without
-      // retyping everything.
-      if (
-        trackedPreviewStatus.value === "collecting" &&
-        (v.previewStatus === "idle" || v.previewStatus === "cancelled")
-      ) {
-        bindParameterRows.value = estimatesToRows(v.estimatedBindParameters ?? []);
-      }
     }
-    trackedPreviewStatus.value = v.previewStatus;
     return;
   }
 
@@ -267,6 +226,9 @@ const canPreview = (): boolean =>
   clickedCellParams.value !== undefined &&
   previewStatus.value !== "collecting";
 
+// No bind values sent here (2026-08-19 follow-up) - ToolsViewProvider
+// re-resolves the row's SQL and its Bind Parameters estimate itself, and
+// hands off to PerformanceTuningBindParametersPanel when any are found.
 const previewPerformanceTuning = (): void => {
   if (!canPreview() || clickedCellParams.value === undefined) {
     return;
@@ -276,8 +238,6 @@ const previewPerformanceTuning = (): void => {
     params: {
       resultVersion: resultVersion.value,
       rowIndex: clickedCellParams.value.rowPos,
-      values: bindParameterRows.value.map((row) => row.value),
-      markers: bindParameterRows.value.map((row) => row.marker),
     },
   });
 };
@@ -296,12 +256,6 @@ const recieveMessage = (data: ToolsViewEventData) => {
 
 const onClickCell = (params: CellFocusParams): void => {
   clickedCellParams.value = params;
-  if (mode.value === "queryStatistics") {
-    vscode.postCommand({
-      command: "selectQueryStatisticsRow",
-      params: { resultVersion: resultVersion.value, rowIndex: params.rowPos },
-    });
-  }
 };
 
 defineExpose({
@@ -363,8 +317,6 @@ defineExpose({
         @onClickCell="onClickCell" />
 
       <div v-if="mode === 'queryStatistics' && clickedCellParams" class="qs-selection">
-        <BindParametersEditor v-if="bindParameterRows.length > 0" v-model="bindParameterRows"
-          :db-type="database?.vendor ?? ''" :disabled="previewStatus === 'collecting'" />
         <div v-if="previewStatus === 'collecting'" class="status-banner loading">
           <fa icon="spinner" spin />&nbsp;Collecting performance tuning context...
         </div>
