@@ -155,11 +155,19 @@ function titleAndSummaryForDiagnosticGroup(
       };
     }
     case "PLAN_OBSERVATION":
+      // 2026-08-20 follow-up: this used to also restate, per group, "this
+      // characteristic alone does not indicate a confirmed performance
+      // problem" - correct, but with several distinct PLAN_OBSERVATION
+      // groups on one plan (one per distinct message text, e.g. "Uses
+      // filesort." / "Uses a temporary table." / "Uses a join buffer (hash
+      // join)."), the identical sentence stacked up several times, making the
+      // Information section a lot taller than its actual content. That
+      // framing sentence now lives once, above every group, in
+      // PerformanceTuningPreviewPanel.vue's Information section header - this
+      // summary only states what was found.
       return {
         title: "Plan observation",
-        summary:
-          `The execution plan reports the following ${pluralize(count, "characteristic", "characteristics")}. ` +
-          `This is not necessarily a performance problem - see the technical details below.`,
+        summary: `The execution plan reports the following ${pluralize(count, "characteristic", "characteristics")}.`,
       };
     case "TABLE_MAPPING_FAILED":
       return {

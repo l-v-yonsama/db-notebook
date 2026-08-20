@@ -3001,7 +3001,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^2.0.1",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers",
     "@l-v-yonsama/rdh": "^1.0.0",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",

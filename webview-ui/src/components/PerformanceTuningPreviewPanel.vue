@@ -7,7 +7,7 @@ import type {
   PlanTableMappingRowViewModel,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
-import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
+import type { CapabilityStatus, PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { computed, ref } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
@@ -38,6 +38,16 @@ const translateResponse = ref(false);
 // invalidates whatever analysis was shown for the previous one - mirrors
 // PerformanceTuningPreviewPanel.ts's own renderGeneration-based reset).
 const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
+
+// "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Whether this connection's
+// Provider even supports analyze mode at all (Postgres/MySQL today, not
+// Oracle/SQL Server - see PerformanceTuningPreviewPanel.ts's own doc
+// comment) - drives the button's disabled state and its tooltip when it
+// is disabled. isRunningActualPlan has no "success" branch of its own: a
+// successful run replaces the whole panel via a fresh "initialize" instead
+// (see initialize() below, which is also what resets this back to false).
+const analyzedExecutionPlan = ref<CapabilityStatus>({ available: false });
+const isRunningActualPlan = ref(false);
 
 // Only used for the "Copy JSON" button (needs plain text, not the
 // highlighted HTML) - kept in sync with what the extension side rendered
@@ -80,6 +90,8 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   languageModelId.value = v.languageModelId;
   translateResponse.value = v.translateResponse;
   analysis.value = { status: "idle" };
+  analyzedExecutionPlan.value = v.analyzedExecutionPlan;
+  isRunningActualPlan.value = false;
 };
 
 const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
@@ -92,6 +104,13 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
       if (value.analysis) {
         analysis.value = value.analysis;
       }
+      break;
+    case "stop-progress":
+      // "Run EXPLAIN ANALYZE" cancelled or failed - a successful run
+      // instead arrives as a fresh "initialize" above, which already
+      // resets this itself. The failure/cancellation reason (if any) was
+      // already shown as a native VS Code notification, extension-side.
+      isRunningActualPlan.value = false;
       break;
   }
 };
@@ -113,6 +132,20 @@ const analyzeWithAi = (): void => {
 const saveAiAnalysisAsNotebook = (): void => {
   vscode.postCommand({
     command: "saveAiAnalysisAsNotebook",
+    params: {},
+  });
+};
+
+// "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). The confirmation itself is
+// entirely host-side (a modal window.showWarningMessage - see
+// PerformanceTuningPreviewPanel.ts's runActualPlan()); this only sets the
+// optimistic "running" state so the button disables itself immediately -
+// stop-progress above resets it again if the user declines that modal or
+// the run fails.
+const runActualPlan = (): void => {
+  isRunningActualPlan.value = true;
+  vscode.postCommand({
+    command: "runActualPlan",
     params: {},
   });
 };
@@ -156,6 +189,25 @@ defineExpose({
   <section class="PerformanceTuningPreviewPanel" v-if="context">
     <PanelActionToolbar @cancel="close" cancel-label="" cancel-title="Close">
       <template #left>
+        <!-- "Run Explain Analyze" (2026-08-20 follow-up) - listed first
+             since it's the button a user reaches for first (real execution
+             plan before asking AI to analyze it), and deliberately a
+             distinct icon/label from "Analyze with AI" below (that one only
+             sends the already-collected context to an AI model; this one
+             executes the SQL for real). Disabled, with the capability
+             message as its tooltip, when this connection's Provider does
+             not support analyze mode at all (Oracle/SQL Server today). Title
+             Case to match "Analyze with AI"/"Save as Notebook" below. -->
+        <VsCodeButton
+          appearance="secondary"
+          :disabled="isRunningActualPlan || !analyzedExecutionPlan.available"
+          :title="analyzedExecutionPlan.available
+            ? 'Run this SQL for real to measure its actual execution plan (real query execution - see the note below)'
+            : (analyzedExecutionPlan.message ?? 'Not available for this database')"
+          @click="runActualPlan"
+        >
+          <fa icon="circle-play" />{{ isRunningActualPlan ? "Running…" : "Run Explain Analyze" }}
+        </VsCodeButton>
         <VsCodeButton :disabled="isAnalyzing" title="Analyze this context with AI" @click="analyzeWithAi">
           <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
         </VsCodeButton>
@@ -165,6 +217,20 @@ defineExpose({
         </VsCodeButton>
       </template>
     </PanelActionToolbar>
+
+    <!-- First layer of the "Run Explain Analyze" two-layer confirmation
+         (2026-08-20 follow-up) - a persistent, always-visible warning next
+         to the button, so the risk is visible *before* a user ever clicks
+         it. The second layer (a blocking modal) is host-side, on click -
+         see PerformanceTuningPreviewPanel.ts's runActualPlan(). Hidden once
+         a run has already succeeded for this context (actualPlanText
+         present) - at that point the risk already materialized and is
+         redundant with the actual plan shown below. -->
+    <p v-if="analyzedExecutionPlan.available && !context.executionPlan.actualPlanText" class="section-note actual-plan-warning">
+      <fa icon="triangle-exclamation" />
+      "Run Explain Analyze" executes the SQL above for real against the database, instead of only
+      estimating its plan.
+    </p>
 
     <!-- 1. Database / Status / Payload size (§6.1) -->
     <div class="header">
@@ -211,14 +277,23 @@ defineExpose({
     </div>
 
     <div class="scrollArea">
-      <!-- 0. AI Analysis (Step 10, design doc §6.1) -->
-      <div class="section ai-analysis" v-if="analysis.status !== 'idle'">
+      <!-- 0. AI Analysis (Step 10, design doc §6.1). Always rendered, even at
+           idle (2026-08-20 follow-up): a first-time user had no on-screen
+           indication of *where* the result would show up until after
+           clicking "Analyze with AI" - this idle-state hint gives that area
+           a visible home from the start, doubling as a hint for the
+           SQL/Information-first, Analyze-with-AI-second workflow. -->
+      <div class="section ai-analysis">
         <div class="section-title-row">
           <h3 class="section-title">AI Analysis</h3>
           <CopyToClipboardButton v-if="analysisJson" class="copy-analysis-btn" :content="analysisJson" title="Copy AI analysis JSON" />
         </div>
 
-        <p v-if="analysis.status === 'running'" class="analysis-status">Analyzing with AI…</p>
+        <p v-if="analysis.status === 'idle'" class="section-note">
+          Review the SQL and details above, then click "Analyze with AI" to see the analysis results here.
+        </p>
+
+        <p v-else-if="analysis.status === 'running'" class="analysis-status">Analyzing with AI…</p>
 
         <div v-else-if="analysis.status === 'error'" class="analysis-error">
           <p>{{ analysis.errorMessage }}</p>
@@ -292,9 +367,20 @@ defineExpose({
       </div>
 
       <!-- 4. Information / plan notes: informational, never warning-colored
-           (§6.1/§6.2). -->
+           (§6.1/§6.2). Shared framing sentence shown once here rather than
+           repeated inside every group's own summary (2026-08-20 follow-up:
+           several PLAN_OBSERVATION groups - one per distinct plan
+           characteristic - used to each carry the identical explanatory
+           sentence, stacking into a lot of repeated vertical space when a
+           plan had several different characteristics; see
+           performanceTuningDiagnosticFormatter.ts's PLAN_OBSERVATION case for
+           the shortened per-group summary this replaces). -->
       <div v-if="infoGroups.length > 0" class="section">
         <h3 class="section-title">Information</h3>
+        <p class="section-note">
+          The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed
+          performance problem — see each item's technical details.
+        </p>
         <DiagnosticGroupCard v-for="g in infoGroups" :key="g.key" :group="g" />
       </div>
 
@@ -305,7 +391,13 @@ defineExpose({
            so that one is a small table. Both come pre-formatted from
            performanceTuningPlanFormatter.ts - this component only renders. -->
       <div v-if="planTreeText || planTableMappingRows.length > 0" class="section">
-        <h3 class="section-title">Execution plan</h3>
+        <h3 class="section-title">
+          Execution plan
+          <span v-if="context.executionPlan.mode === 'analyze'" class="badge analyzed-badge">analyzed</span>
+        </h3>
+        <p v-if="context.executionPlan.executionTimeMs !== undefined" class="section-note">
+          Real execution time: {{ context.executionPlan.executionTimeMs }} ms
+        </p>
         <pre v-if="planTreeText" class="plan-tree">{{ planTreeText }}</pre>
         <table v-if="planTableMappingRows.length > 0" class="plan-table-mappings">
           <thead>
@@ -313,6 +405,8 @@ defineExpose({
               <th>Table</th>
               <th>Index</th>
               <th>Est. rows</th>
+              <th>Actual rows</th>
+              <th>Est./actual ratio</th>
               <th>Columns used</th>
             </tr>
           </thead>
@@ -321,10 +415,22 @@ defineExpose({
               <td>{{ row.table }}</td>
               <td>{{ row.index ?? "-" }}</td>
               <td>{{ row.estimatedRows ?? "-" }}</td>
+              <td>{{ row.actualRows ?? "-" }}</td>
+              <td>{{ row.rowEstimateRatio !== undefined ? `${row.rowEstimateRatio.toFixed(2)}x` : "-" }}</td>
               <td>{{ row.columnsUsed ?? "-" }}</td>
             </tr>
           </tbody>
         </table>
+        <!-- MySQL only today: real EXPLAIN ANALYZE tree text, unparsed - see
+             executionPlan.actualPlanText's own comment in db-drivers'
+             PerformanceTuningContext.ts for why this is a second, separate
+             block instead of being folded into planTreeText above (the
+             normalized plan tree stays estimate-only for MySQL; this is the
+             real timing/rows data instead, in MySQL's own native format). -->
+        <div v-if="context.executionPlan.actualPlanText" class="actual-plan-text-block">
+          <h4>Actual execution plan (EXPLAIN ANALYZE)</h4>
+          <pre class="plan-tree">{{ context.executionPlan.actualPlanText }}</pre>
+        </div>
       </div>
 
       <!-- 6. Full context JSON, as "Advanced details" - collapsed by default
@@ -470,11 +576,27 @@ defineExpose({
       background: var(--vscode-errorForeground, #f44336);
       color: white;
     }
+
+    &.analyzed-badge {
+      background: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+      color: white;
+      font-weight: normal;
+      margin-left: 6px;
+    }
   }
 
   .notes-hint {
     color: var(--vscode-descriptionForeground);
     font-size: 0.9em;
+  }
+
+  /* "Run EXPLAIN ANALYZE" first-layer warning (2026-08-20 follow-up) - sits
+     right under the toolbar, so the risk is visible before the button is
+     ever clicked, not just in its tooltip. */
+  .actual-plan-warning {
+    color: var(--vscode-editorWarning-foreground, #ff9800);
+    font-size: 0.85em;
+    margin: 2px 0 6px 0;
   }
 
   .exceeded {
@@ -509,6 +631,12 @@ defineExpose({
       color: var(--vscode-descriptionForeground);
       font-size: 0.9em;
       margin: 4px 0 8px 0;
+    }
+
+    .section-note {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.9em;
+      margin: 0 0 8px 0;
     }
 
     .json-panel {
@@ -555,6 +683,15 @@ defineExpose({
         padding: 2px 6px;
         text-align: left;
         vertical-align: top;
+      }
+    }
+
+    .actual-plan-text-block {
+      margin-top: 8px;
+
+      h4 {
+        margin: 0 0 4px 0;
+        font-size: 0.95em;
       }
     }
 

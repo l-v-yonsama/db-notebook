@@ -174,6 +174,48 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells[1].value).not.toContain("```text");
     expect(cells[1].value).toContain("### Tables referenced by this plan");
   });
+
+  it("includes Actual rows/ratio columns in the table when an analyze-mode mapping has them", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        planTableMappings: [
+          { planNodeId: "n0", tableName: "orders", estimatedRows: 50, actualRows: 37, rowEstimateRatio: 0.74 },
+        ],
+      }),
+      buildAnalysis()
+    );
+    expect(cells[1].value).toContain("| Table | Index | Est. rows | Actual rows | Est./actual ratio | Columns used |");
+    expect(cells[1].value).toContain("| orders | - | 50 | 37 | 0.74x |");
+  });
+
+  it("adds an 'Actual execution plan (EXPLAIN ANALYZE)' subsection when actualPlanText is present (MySQL)", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        executionPlan: {
+          mode: "analyze",
+          format: "json",
+          actualPlanText: "-> Filter: (status = 'shipped')  (actual time=0.05..1.2 rows=5 loops=1)",
+        },
+        planTableMappings: [{ planNodeId: "n0", tableName: "orders" }],
+      }),
+      buildAnalysis()
+    );
+    expect(cells[1].value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
+    expect(cells[1].value).toContain("actual time=0.05..1.2 rows=5 loops=1");
+  });
+
+  it("adds the execution plan cell for actualPlanText alone, with no normalizedPlan or table mappings", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        executionPlan: { mode: "analyze", format: "json", actualPlanText: "-> Table scan on orders" },
+      }),
+      buildAnalysis()
+    );
+    expect(cells).toHaveLength(6);
+    expect(cells[1].value).toContain("## Execution plan");
+    expect(cells[1].value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
+    expect(cells[1].value).not.toContain("### Tables referenced by this plan");
+  });
 });
 
 describe("saveAiAnalysisAsNotebook", () => {

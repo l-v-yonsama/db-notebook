@@ -1,6 +1,8 @@
 import {
+  CapabilityStatus,
   DEFAULT_MAX_PAYLOAD_BYTES,
   PerformanceTuningContext,
+  RDSBaseDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   CancellationTokenSource,
@@ -20,6 +22,7 @@ import {
   PerformanceTuningPreviewPanelEventData,
 } from "../shared/MessageEventData";
 import { PerformanceTuningAiAnalysisResult } from "../shared/PerformanceTuningAiAnalysis";
+import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
 import { buildLanguageModelSelection, defaultTranslateResponse } from "../utilities/lmModelSelection";
@@ -27,6 +30,9 @@ import { saveAiAnalysisAsNotebook } from "../utilities/performanceTuningAiNotebo
 import { buildAiAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
 import { buildPlanTableMappingRows, formatPlanTree } from "../utilities/performanceTuningPlanFormatter";
+// Type-only: avoids a runtime circular import with performanceTuningPreview.ts,
+// which imports this class (the value) the other way.
+import type { PerformanceTuningPreviewRequest } from "../utilities/performanceTuningPreview";
 import { BasePanel } from "./BasePanel";
 
 // "What would be sent" preview for getPerformanceTuningContext()'s result
@@ -61,6 +67,22 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   private lastAnalysis: PerformanceTuningAiAnalysisResult | undefined;
   private analysisCancellationSource: CancellationTokenSource | undefined;
 
+  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - the original request
+  // (everything getPerformanceTuningContext() needs besides plan.mode
+  // itself) and this connection's static capability to even do it at all,
+  // both set once by render() and reused by runActualPlan() below so the
+  // webview never needs to send either back. Not reset by renderSub() (the
+  // analyze-mode re-run's own render path) since both stay constant across
+  // the estimate/analyze pair for the same preview.
+  private request: PerformanceTuningPreviewRequest | undefined;
+  private analyzedExecutionPlan: CapabilityStatus = { available: false };
+  // AbortController, not a vscode.CancellationTokenSource, since it feeds
+  // getPerformanceTuningContext()'s own `{signal}` option directly - same
+  // bridge (`token.onCancellationRequested(() => controller.abort())`)
+  // startPerformanceTuningPreview() itself already uses for the initial
+  // (estimate-mode) collection.
+  private actualPlanRunController: AbortController | undefined;
+
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     super(panel, extensionUri);
   }
@@ -72,7 +94,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
   }
 
-  public static render(extensionUri: Uri, context: PerformanceTuningContext) {
+  public static render(
+    extensionUri: Uri,
+    context: PerformanceTuningContext,
+    request: PerformanceTuningPreviewRequest,
+    analyzedExecutionPlan: CapabilityStatus
+  ) {
     if (PerformanceTuningPreviewPanel.currentPanel) {
       PerformanceTuningPreviewPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     } else {
@@ -94,6 +121,13 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         extensionUri
       );
     }
+    // Held for "Run EXPLAIN ANALYZE" (runActualPlan() below) - constant
+    // across the initial (estimate-mode) preview and any later analyze-mode
+    // re-run of it, so only the first render() call's values matter; a
+    // later renderSub()-only re-render (the re-run itself) does not touch
+    // either field.
+    PerformanceTuningPreviewPanel.currentPanel.request = request;
+    PerformanceTuningPreviewPanel.currentPanel.analyzedExecutionPlan = analyzedExecutionPlan;
     PerformanceTuningPreviewPanel.currentPanel.renderSub(context);
   }
 
@@ -110,6 +144,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     // analysis text for a SQL statement no longer on screen.
     this.analysisCancellationSource?.cancel();
     this.analysisCancellationSource = undefined;
+    // A new context (a fresh preview, or this same preview's own analyze-mode
+    // re-run replacing itself) invalidates a still-running EXPLAIN ANALYZE
+    // the same way - never let a stale one's result land after this one.
+    this.actualPlanRunController?.abort();
+    this.actualPlanRunController = undefined;
     this.context = context;
     this.lastAnalysis = undefined;
 
@@ -167,6 +206,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           languageModels,
           languageModelId: defaultLanguageModelId,
           translateResponse: defaultTranslateResponse(env.language),
+          analyzedExecutionPlan: this.analyzedExecutionPlan,
         },
       },
     };
@@ -183,6 +223,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         break;
       case "saveAiAnalysisAsNotebook":
         await this.saveAnalysisAsNotebook();
+        break;
+      case "runActualPlan":
+        await this.runActualPlan();
         break;
     }
   }
@@ -360,6 +403,104 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     });
   }
 
+  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Actually executes the
+  // target SQL against the database (server-side, real I/O) to measure its
+  // real execution plan, replacing this panel's whole context with the
+  // analyze-mode result on success - never triggered without the user
+  // explicitly confirming that in the modal warning below, on top of the
+  // static warning text already shown next to the button in the webview
+  // (two-layer confirmation, per the design discussion this follows up on).
+  // v1 is SELECT-only by product decision; db-drivers' own
+  // validatePerformanceTuningContextParams() enforces that fail-closed
+  // regardless (isSingleSelectStatement()), so this method does not
+  // re-check the statement text itself.
+  private async runActualPlan(): Promise<void> {
+    const myGeneration = this.renderGeneration;
+    if (!this.request || !this.analyzedExecutionPlan.available) {
+      return;
+    }
+    const request = this.request;
+
+    const confirmed = await window.showWarningMessage(
+      `This runs the SQL for real against "${request.connectionSetting.name}" to measure its actual execution plan, instead of only estimating it. Continue?`,
+      { modal: true },
+      "Run"
+    );
+    if (confirmed !== "Run") {
+      await this.postStopProgress();
+      return;
+    }
+
+    await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+        title: "Running EXPLAIN ANALYZE...",
+      },
+      async (_progress, token) => {
+        const controller = new AbortController();
+        this.actualPlanRunController = controller;
+        token.onCancellationRequested(() => controller.abort());
+
+        const { ok, message, result } = await workflow<RDSBaseDriver, PerformanceTuningContext>(
+          request.connectionSetting,
+          (driver) =>
+            driver
+              .getPerformanceTuningContext(
+                {
+                  databaseName: request.databaseName,
+                  statement: request.statement,
+                  plan: { ...request.plan, mode: "analyze", allowExecution: true },
+                  targetTables: request.targetTables,
+                  tableAliasMap: request.tableAliasMap,
+                },
+                { signal: controller.signal }
+              )
+              .then((r) => {
+                if (!r.ok || !r.result) {
+                  throw new Error(r.message);
+                }
+                return r.result;
+              }),
+          true
+        );
+
+        if (this.actualPlanRunController === controller) {
+          this.actualPlanRunController = undefined;
+        }
+        if (myGeneration !== this.renderGeneration) {
+          // A newer preview replaced this one while the run was in flight -
+          // never let a stale result land on top of it.
+          return;
+        }
+
+        if (ok && result) {
+          await this.renderSub(result);
+          return;
+        }
+
+        window.showErrorMessage(`Failed to run EXPLAIN ANALYZE.${message ? ` ${message}` : ""}`);
+        await this.postStopProgress();
+      }
+    );
+  }
+
+  // Generic "clear whatever loading indicator you're showing" signal, same
+  // BaseMessageEventDataCommand ScanPanel.ts/DynamoQueryPanel.ts etc. already
+  // use for the identical purpose - the webview's own isRunningActualPlan
+  // resets on this rather than needing a dedicated command/payload just for
+  // "the run didn't succeed" (the error text itself already went to
+  // window.showErrorMessage above, or there is none - a user-declined
+  // confirmation is not an error).
+  private async postStopProgress(): Promise<void> {
+    const msg: PerformanceTuningPreviewPanelEventData = {
+      command: "stop-progress",
+      componentName: "PerformanceTuningPreviewPanel",
+      value: {},
+    };
+    await this.getWebviewPanel().webview.postMessage(msg);
+  }
+
   private async postAnalysisUpdate(
     generation: number,
     analysis: PerformanceTuningAiAnalysisViewState
@@ -379,6 +520,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
   protected preDispose(): void {
     this.analysisCancellationSource?.cancel();
+    this.actualPlanRunController?.abort();
     PerformanceTuningPreviewPanel.currentPanel = undefined;
   }
 }

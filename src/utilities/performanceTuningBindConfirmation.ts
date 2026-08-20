@@ -40,7 +40,7 @@ export async function openPerformanceTuningPreview(
   const { estimatedBindParameters, presetBindValues, ...rest } = params;
 
   if (estimatedBindParameters.length === 0) {
-    return startPerformanceTuningPreview({ ...rest, plan: { mode: "estimate" } });
+    return startPerformanceTuningPreview({ ...rest, plan: {} });
   }
 
   PerformanceTuningBindParametersPanel.render(rest.extensionUri, {

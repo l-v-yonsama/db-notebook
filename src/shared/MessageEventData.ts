@@ -1,4 +1,5 @@
 import type {
+  CapabilityStatus,
   ConnectionSetting,
   DBType,
   DbDynamoTable,
@@ -535,6 +536,10 @@ export type PlanTableMappingRowViewModel = {
   table: string;
   index?: string;
   estimatedRows?: number;
+  // See PlanTableMappingRow's own comment in performanceTuningPlanFormatter.ts -
+  // populated only under analyze mode (Postgres today).
+  actualRows?: number;
+  rowEstimateRatio?: number;
   columnsUsed?: string;
 };
 
@@ -596,6 +601,14 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       languageModels: LabelValueItem[];
       languageModelId: string;
       translateResponse: boolean;
+      // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - whether this
+      // connection's Provider can actually collect an analyze-mode plan at
+      // all (driver.checkPerformanceTuningContextAvailability(), the same
+      // static per-Provider capability check RunActualPlanActionCommand's
+      // handler itself does not need to repeat). false for Oracle/SQL
+      // Server today; `message` (when present) explains why, for the
+      // button's disabled-state tooltip.
+      analyzedExecutionPlan: CapabilityStatus;
     };
     analysis?: PerformanceTuningAiAnalysisViewState;
   }

@@ -146,4 +146,28 @@ describe("buildPlanTableMappingRows", () => {
   it("returns an empty array for an empty input", () => {
     expect(buildPlanTableMappingRows([])).toEqual([]);
   });
+
+  it("carries actualRows/rowEstimateRatio through for an analyze-mode mapping (Postgres today)", () => {
+    const mappings: PlanTableMapping[] = [
+      {
+        planNodeId: "n1",
+        tableName: "orders",
+        estimatedRows: 50,
+        actualRows: 37,
+        rowEstimateRatio: 0.74,
+      },
+    ];
+    expect(buildPlanTableMappingRows(mappings)[0]).toMatchObject({
+      estimatedRows: 50,
+      actualRows: 37,
+      rowEstimateRatio: 0.74,
+    });
+  });
+
+  it("leaves actualRows/rowEstimateRatio undefined for an estimate-mode mapping", () => {
+    const mappings: PlanTableMapping[] = [{ planNodeId: "n1", tableName: "orders", estimatedRows: 50 }];
+    const row = buildPlanTableMappingRows(mappings)[0];
+    expect(row.actualRows).toBeUndefined();
+    expect(row.rowEstimateRatio).toBeUndefined();
+  });
 });

@@ -173,12 +173,16 @@ function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): str
 // unlike the plan tree below it genuinely suits a markdown table - see
 // performanceTuningPlanFormatter.ts's top comment.
 function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRows>): string[] {
-  const lines = ["| Table | Index | Est. rows | Columns used |", "|---|---|---|---|"];
+  const lines = [
+    "| Table | Index | Est. rows | Actual rows | Est./actual ratio | Columns used |",
+    "|---|---|---|---|---|---|",
+  ];
   for (const row of rows) {
+    const ratio = row.rowEstimateRatio !== undefined ? `${row.rowEstimateRatio.toFixed(2)}x` : "-";
     lines.push(
       `| ${escapeMdCell(row.table)} | ${row.index ? escapeMdCell(row.index) : "-"} | ${
         row.estimatedRows ?? "-"
-      } | ${row.columnsUsed ? escapeMdCell(row.columnsUsed) : "-"} |`
+      } | ${row.actualRows ?? "-"} | ${ratio} | ${row.columnsUsed ? escapeMdCell(row.columnsUsed) : "-"} |`
     );
   }
   return lines;
@@ -187,15 +191,21 @@ function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRow
 // 2026-08-19 follow-up: executionPlan.normalizedPlan is a tree, so it's
 // rendered as an EXPLAIN-style indented text block (a table would lose the
 // parent-child structure that's the whole point of an execution plan);
-// planTableMappings is genuinely flat, so that one becomes a table. Returns
-// undefined (no cell at all) when there's neither a plan nor any table
-// mappings to show, rather than an empty/near-empty section.
+// planTableMappings is genuinely flat, so that one becomes a table.
+// 2026-08-20 follow-up: actualPlanText (MySQL-only - see its own comment in
+// db-drivers' PerformanceTuningContext.ts) is a third, independent piece -
+// real EXPLAIN ANALYZE text the normalized plan tree above does not carry
+// for MySQL, so it gets its own fenced block rather than being merged into
+// either of the other two. Returns undefined (no cell at all) only when
+// none of the three has anything to show, rather than an empty/near-empty
+// section.
 function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string | undefined {
   const planTreeText = context.executionPlan.normalizedPlan
     ? formatPlanTree(context.executionPlan.normalizedPlan)
     : undefined;
   const rows = buildPlanTableMappingRows(context.planTableMappings);
-  if (!planTreeText && rows.length === 0) {
+  const actualPlanText = context.executionPlan.actualPlanText;
+  if (!planTreeText && rows.length === 0 && !actualPlanText) {
     return undefined;
   }
 
@@ -205,6 +215,9 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
   }
   if (rows.length > 0) {
     lines.push("### Tables referenced by this plan", "", ...planTableMappingsTable(rows), "");
+  }
+  if (actualPlanText) {
+    lines.push("### Actual execution plan (EXPLAIN ANALYZE)", "", "```text", actualPlanText, "```", "");
   }
   return lines.join("\n");
 }

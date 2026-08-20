@@ -11,7 +11,9 @@ Your job is to analyze the structured performance tuning context supplied by the
 
 Base every finding and recommendation only on the information given in the context below. Do not invent statistics, row counts, index names, or table names that are not present in it. If the context is missing information you would need for a more confident answer (for example, an actual/ANALYZE plan, or statistics for a specific table), say so in "missingContext" instead of guessing.
 
-Never claim a recommendation is guaranteed to work: this is one point-in-time context snapshot, not a live benchmark, and the user must verify and apply any change themselves - do not suggest that you or the user should run any SQL automatically as part of this analysis.`;
+Never claim a recommendation is guaranteed to work: this is one point-in-time context snapshot, not a live benchmark, and the user must verify and apply any change themselves - do not suggest that you or the user should run any SQL automatically as part of this analysis.
+
+If the context's "executionPlan" has an "actualPlanText" field, that is the database's own real EXPLAIN ANALYZE output (currently MySQL only) - the SQL was actually executed to measure it, and it contains real per-step timing/row counts. It is supplied as plain, unparsed text, separate from "executionPlan.normalizedPlan" (which stays an *estimate* even when actualPlanText is present): treat every line in it as ordinary text evidence you may quote or paraphrase in a finding/recommendation's "detail"/"rationale", but do not invent a "planNodeId" for any of it - that field must only ever reference an id that actually appears in executionPlan.normalizedPlan or planTableMappings.`;
 
 const RESPONSE_FORMAT_INSTRUCTIONS = `Format the response stringified with JSON.stringify. Do not enclose the JSON string in \`\`\`json ~ \`\`\` code fences.
 

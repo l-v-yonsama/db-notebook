@@ -140,7 +140,6 @@ export class PerformanceTuningBindParametersPanel extends BasePanel {
     const result = await startPerformanceTuningPreview({
       ...this.params,
       plan: {
-        mode: "estimate",
         binds: validated.binds.length > 0 ? validated.binds : undefined,
         bindMarkers,
       },

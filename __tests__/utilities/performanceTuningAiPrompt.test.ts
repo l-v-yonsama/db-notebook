@@ -53,6 +53,15 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant.toLowerCase()).toContain("do not suggest that you or the user should run any sql automatically");
   });
 
+  it("explains executionPlan.actualPlanText (MySQL's unparsed EXPLAIN ANALYZE text) so it isn't mistaken for the normalized plan", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant).toContain("actualPlanText");
+    expect(assistant.toLowerCase()).toContain("unparsed");
+    // planNodeId evidence only makes sense against the normalized plan tree -
+    // the prompt must not imply actualPlanText's own lines can be cited that way.
+    expect(assistant).toContain("planNodeId");
+  });
+
   it("adds a translate instruction naming the language when translateResponse and language are both given", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext(), {
       translateResponse: true,

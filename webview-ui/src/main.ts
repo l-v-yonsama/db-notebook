@@ -25,6 +25,7 @@ import {
   faSpinner,
   faTimes,
   faTrash,
+  faTriangleExclamation,
   faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
@@ -60,6 +61,7 @@ library.add(faSearch);
 library.add(faSpinner);
 library.add(faTrash);
 library.add(faTimes);
+library.add(faTriangleExclamation);
 library.add(faWandMagicSparkles);
 
 const app = createApp(App);

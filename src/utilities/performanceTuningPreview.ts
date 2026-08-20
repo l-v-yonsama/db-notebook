@@ -1,5 +1,6 @@
 import {
   ConnectionSetting,
+  PerformanceTuningCapabilities,
   PerformanceTuningContext,
   RDSBaseDriver,
   SelectedStatementStatistics,
@@ -9,8 +10,15 @@ import { PerformanceTuningPreviewPanel } from "../panels/PerformanceTuningPrevie
 import { validatePlanBindsInput } from "../shared/PerformanceTuningBinds";
 import { createRDSDriver, workflow } from "./driverResolver";
 
-export type StartPerformanceTuningPreviewParams = {
-  extensionUri: Uri;
+// The parts of a performance-tuning request that stay the same whether the
+// resulting plan is estimated or analyzed - i.e. everything
+// getPerformanceTuningContext() needs *except* `plan.mode`/`allowExecution`
+// themselves. Held by PerformanceTuningPreviewPanel as instance state
+// (2026-08-20 follow-up, "Run EXPLAIN ANALYZE") so a later analyze-mode
+// re-run doesn't need the webview to send any of it back - same "the panel
+// already has what it needs" precedent as AnalyzePerformanceTuningWithAiActionCommand/
+// SaveAiAnalysisAsNotebookActionCommand.
+export type PerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
   databaseName: string;
   statement: {
@@ -19,7 +27,6 @@ export type StartPerformanceTuningPreviewParams = {
     statistics?: SelectedStatementStatistics;
   };
   plan: {
-    mode: "estimate";
     binds?: unknown[];
     // SQL Server-only today (named parameter substitution in SHOWPLAN - see
     // db-drivers' PerformanceTuningContext.ts). Same non-persistence rule as
@@ -38,6 +45,10 @@ export type StartPerformanceTuningPreviewParams = {
   // wrong name instead of adding a second entry - §6.6/§7.7). Keyed by the
   // lowercased alias (or bare table name for an unaliased reference).
   tableAliasMap?: Record<string, { schemaName?: string; tableName: string }>;
+};
+
+export type StartPerformanceTuningPreviewParams = PerformanceTuningPreviewRequest & {
+  extensionUri: Uri;
 };
 
 export type StartPerformanceTuningPreviewResult = {
@@ -62,8 +73,8 @@ export type StartPerformanceTuningPreviewResult = {
 export async function startPerformanceTuningPreview(
   params: StartPerformanceTuningPreviewParams
 ): Promise<StartPerformanceTuningPreviewResult> {
-  const { extensionUri, connectionSetting, databaseName, statement, plan, targetTables, tableAliasMap } =
-    params;
+  const { extensionUri, ...request } = params;
+  const { connectionSetting, databaseName, statement, plan, targetTables, tableAliasMap } = request;
 
   // Defense in depth: the webview and ToolsViewProvider already validate
   // Query Statistics' representative bind values before reaching here, and
@@ -100,27 +111,50 @@ export async function startPerformanceTuningPreview(
         controller.abort();
       });
 
-      return workflow<RDSBaseDriver, PerformanceTuningContext>(
+      return workflow<RDSBaseDriver, { context: PerformanceTuningContext; capabilities: PerformanceTuningCapabilities }>(
         connectionSetting,
-        (driver) =>
-          driver
-            .getPerformanceTuningContext(
-              { databaseName, statement, plan, targetTables, tableAliasMap },
+        async (driver) => {
+          const [contextResult, capabilitiesResult] = await Promise.all([
+            driver.getPerformanceTuningContext(
+              { databaseName, statement, plan: { ...plan, mode: "estimate" }, targetTables, tableAliasMap },
               { signal: controller.signal }
-            )
-            .then((r) => {
-              if (!r.ok || !r.result) {
-                throw new Error(r.message);
-              }
-              return r.result;
-            }),
+            ),
+            // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) needs to know up
+            // front whether this Provider can do it at all, to enable/
+            // disable+tooltip the button - this is a static per-Provider
+            // capability report (no EXPLAIN, no catalog query - see
+            // checkCapabilities()'s own doc comment in db-drivers), so
+            // fetching it alongside the real collection costs nothing extra
+            // worth gating behind a second round trip.
+            driver.checkPerformanceTuningContextAvailability(
+              { databaseName },
+              { signal: controller.signal }
+            ),
+          ]);
+          if (!contextResult.ok || !contextResult.result) {
+            throw new Error(contextResult.message);
+          }
+          // A capabilities failure is not fatal to opening the preview - it
+          // just means the button falls back to "not available" (disabled)
+          // rather than blocking the whole panel on a secondary check.
+          const capabilities: PerformanceTuningCapabilities = capabilitiesResult.ok && capabilitiesResult.result
+            ? capabilitiesResult.result
+            : {
+                executionPlan: { available: false },
+                analyzedExecutionPlan: { available: false, message: capabilitiesResult.message },
+                tableDefinition: { available: false },
+                optimizerStatistics: { available: false },
+                physicalHealth: { available: false },
+              };
+          return { context: contextResult.result, capabilities };
+        },
         true
       );
     }
   );
 
   if (ok && result) {
-    PerformanceTuningPreviewPanel.render(extensionUri, result);
+    PerformanceTuningPreviewPanel.render(extensionUri, result.context, request, result.capabilities.analyzedExecutionPlan);
     return { status: "opened" };
   }
 

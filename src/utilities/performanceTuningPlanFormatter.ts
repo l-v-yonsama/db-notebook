@@ -37,9 +37,9 @@ function formatTableRef(relation: PlanNode["relation"]): string | undefined {
 
 // Postgres's own EXPLAIN cost notation, reused verbatim (instantly familiar
 // to the majority of this project's users) rather than inventing a new one.
-// The same slot doubles for `actual` once analyze mode ships in db-drivers
-// (not implemented in any Provider today, per investigation) - no format
-// change needed then, just a second call with the `actual time=...` variant.
+// The same slot doubles for `actual` under analyze mode (Postgres ships
+// this today; MySQL's real EXPLAIN ANALYZE data is unparsed text instead -
+// see executionPlan.actualPlanText - so PlanNode.actual stays empty there).
 function formatEstimated(estimated: PlanNode["estimated"]): string | undefined {
   if (!estimated) {
     return undefined;
@@ -135,6 +135,14 @@ export type PlanTableMappingRow = {
   table: string;
   index?: string;
   estimatedRows?: number;
+  // Populated only under analyze mode (Postgres today - db-drivers'
+  // PostgresPerformanceTuningProvider issues EXPLAIN (ANALYZE, BUFFERS,
+  // FORMAT JSON); Oracle/SQL Server/MySQL leave these undefined, MySQL
+  // because its real EXPLAIN ANALYZE data lives in
+  // executionPlan.actualPlanText instead, unparsed - see that field's
+  // comment in db-drivers' PerformanceTuningContext.ts).
+  actualRows?: number;
+  rowEstimateRatio?: number;
   columnsUsed?: string;
 };
 
@@ -154,10 +162,9 @@ function combineColumns(mapping: PlanTableMapping): string | undefined {
 /**
  * planTableMappings is already flat (one entry per table/index the plan
  * touches), so unlike the tree above this one genuinely suits a table.
- * `actualRows`/`rowEstimateRatio` are deliberately not included here - both
- * are always empty today (same "analyze mode isn't implemented yet" reason
- * as PlanNode.actual above), so a column that can never have data would just
- * be dead weight until db-drivers ships it.
+ * `actualRows`/`rowEstimateRatio` pass through as-is - undefined for an
+ * estimate-mode mapping (or any vendor that hasn't shipped analyze mode),
+ * a real number once it has (see PlanTableMappingRow's own comment).
  */
 export function buildPlanTableMappingRows(mappings: PlanTableMapping[]): PlanTableMappingRow[] {
   return mappings.map((mapping) => {
@@ -167,6 +174,8 @@ export function buildPlanTableMappingRows(mappings: PlanTableMapping[]): PlanTab
       table,
       index: mapping.indexName,
       estimatedRows: mapping.estimatedRows,
+      actualRows: mapping.actualRows,
+      rowEstimateRatio: mapping.rowEstimateRatio,
       columnsUsed: combineColumns(mapping),
     };
   });

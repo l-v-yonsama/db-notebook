@@ -97,7 +97,8 @@ export type ActionCommand =
   | PreviewPerformanceTuningActionCommand
   | SubmitPerformanceTuningBindParametersActionCommand
   | AnalyzePerformanceTuningWithAiActionCommand
-  | SaveAiAnalysisAsNotebookActionCommand;
+  | SaveAiAnalysisAsNotebookActionCommand
+  | RunActualPlanActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -177,6 +178,15 @@ export type AnalyzePerformanceTuningWithAiActionCommand = BaseActionCommand<
 // state, same reasoning as above) as a new Notebook under
 // reports/performance-tuning/ (§8). No params for the same reason.
 export type SaveAiAnalysisAsNotebookActionCommand = BaseActionCommand<"saveAiAnalysisAsNotebook">;
+
+// "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Actually executes the target
+// SQL against the database to measure its real execution plan - PerformanceTuningPreviewPanel
+// already holds the original request (connectionSetting/databaseName/statement/plan.binds/
+// targetTables/tableAliasMap) as instance state from the initial (estimate-mode) preview, the
+// same way it already holds `context`/`lastAnalysis` for the two commands above, so no params
+// are needed here either. The confirmation gate itself is host-side (window.showWarningMessage,
+// modal) - see PerformanceTuningPreviewPanel.ts's runActualPlan().
+export type RunActualPlanActionCommand = BaseActionCommand<"runActualPlan">;
 
 export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
 export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;
