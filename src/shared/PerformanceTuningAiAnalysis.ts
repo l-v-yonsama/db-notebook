@@ -52,6 +52,17 @@ export type PerformanceTuningAiRecommendation = {
   // executed automatically by this feature (§1 of the design doc).
   suggestedSql?: string;
   evidence?: PerformanceTuningAiEvidenceRef;
+  // Host-computed, NOT AI-authored (2026-08-21 follow-up,
+  // performanceTuningIndexDuplication.ts's findPossibleDuplicateIndex()) -
+  // set by PerformanceTuningPreviewPanel.ts after the model's response is
+  // parsed, by deterministically comparing suggestedSql's CREATE INDEX
+  // column set against the target table's existing indexes. Never trust
+  // this field from the model's own JSON reply; it never appears there.
+  // Deliberate defense-in-depth: the prompt also asks the model to
+  // self-check this, but summary.md documents a real case (PostgreSQL
+  // slow-03) where the model didn't - this backstop doesn't depend on the
+  // model following that instruction.
+  possibleDuplicateOfIndex?: string;
 };
 
 export type PerformanceTuningAiConfidence = "low" | "medium" | "high";

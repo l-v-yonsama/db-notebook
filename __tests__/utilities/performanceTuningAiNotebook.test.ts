@@ -117,6 +117,34 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells[4].metadata).toEqual({ cellLabel: "AI analysis JSON" });
   });
 
+  // 2026-08-21 follow-up (summary.md's Full Context improvement item 4) -
+  // possibleDuplicateOfIndex is host-computed upstream (PerformanceTuningPreviewPanel.ts),
+  // already a plain string on the recommendation by the time this renders.
+  it("renders possibleDuplicateOfIndex in its own recommendations-table column when set, and '-' when absent", () => {
+    const withDuplicate = buildAiAnalysisNotebookCells(
+      buildContext(),
+      buildAnalysis({
+        recommendations: [
+          {
+            title: "Add an index on category",
+            detail: "Create an index on products.category.",
+            rationale: "The predicate filters on category.",
+            riskLevel: "medium",
+            suggestedSql: "CREATE INDEX idx_products_category ON products (category);",
+            possibleDuplicateOfIndex: "idx_products_category",
+          },
+        ],
+      })
+    );
+    expect(withDuplicate[1].value).toContain("Possible duplicate");
+    expect(withDuplicate[1].value).toContain("`idx_products_category`");
+
+    const withoutDuplicate = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
+    // The default fixture's recommendation has no possibleDuplicateOfIndex -
+    // its table row must still render a "-" placeholder cell, not an empty one.
+    expect(withoutDuplicate[1].value).toMatch(/\| Add an index on tenant_id \|.*\| - \|/);
+  });
+
   it("renders 'No findings/recommendations were reported' placeholders instead of empty tables", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext(),

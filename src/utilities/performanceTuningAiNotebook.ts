@@ -127,12 +127,21 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
   if (recommendations.length === 0) {
     return ["_No recommendations were reported._"];
   }
-  const lines = ["| Risk | Title | Detail | Rationale | Suggested SQL | Evidence |", "|---|---|---|---|---|---|"];
+  const lines = [
+    "| Risk | Title | Detail | Rationale | Suggested SQL | Possible duplicate | Evidence |",
+    "|---|---|---|---|---|---|---|",
+  ];
   for (const r of recommendations) {
     lines.push(
       `| ${r.riskLevel ?? "-"} | ${escapeMdCell(r.title)} | ${escapeMdCell(r.detail)} | ${escapeMdCell(
         r.rationale
-      )} | ${r.suggestedSql ? "`" + escapeMdCell(r.suggestedSql) + "`" : "-"} | ${evidenceLine(r.evidence)} |`
+      )} | ${r.suggestedSql ? "`" + escapeMdCell(r.suggestedSql) + "`" : "-"} | ${
+        // Host-computed (findPossibleDuplicateIndex() in
+        // PerformanceTuningPreviewPanel.ts), never AI-authored - see
+        // PerformanceTuningAiRecommendation.possibleDuplicateOfIndex's own
+        // doc comment.
+        r.possibleDuplicateOfIndex ? "`" + escapeMdCell(r.possibleDuplicateOfIndex) + "`" : "-"
+      } | ${evidenceLine(r.evidence)} |`
     );
   }
   return lines;

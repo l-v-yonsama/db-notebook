@@ -62,6 +62,38 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant).toContain("planNodeId");
   });
 
+  // 2026-08-21 follow-up (scripts/performance-lab/aiResults/summary.md's
+  // re-examined improvement proposals, db-drivers repo) - one assertion per
+  // added instruction.
+  it("instructs the model to prefer a sargable SQL rewrite over indexing a function-wrapped predicate column", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant.toLowerCase()).toContain("sargable");
+    expect(assistant).toContain("LOWER(col)");
+  });
+
+  it("instructs the model to self-verify selectivity via filterSelectivity before recommending an index", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant).toContain("filterSelectivity");
+    expect(assistant).toContain("rationale");
+  });
+
+  it("instructs the model to check tables[].definition.indexes for an existing duplicate before finalizing a CREATE INDEX", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant).toContain("tables[].definition.indexes");
+    expect(assistant).toContain("CREATE INDEX");
+  });
+
+  it("instructs the model to place equality-condition columns before range-condition columns in a composite index", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant.toLowerCase()).toContain("equality-condition columns before range-condition columns");
+  });
+
+  it("instructs the model to enumerate all WHERE/JOIN columns and check dominantCostPlanNode rather than anchoring on a nearby diagnostic", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant).toContain("dominantCostPlanNode");
+    expect(assistant).toContain("PLAN_OBSERVATION");
+  });
+
   it("adds a translate instruction naming the language when translateResponse and language are both given", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext(), {
       translateResponse: true,

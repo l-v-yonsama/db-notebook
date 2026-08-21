@@ -29,6 +29,7 @@ import { buildLanguageModelSelection, defaultTranslateResponse } from "../utilit
 import { saveAiAnalysisAsNotebook } from "../utilities/performanceTuningAiNotebook";
 import { buildAiAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
+import { findPossibleDuplicateIndex } from "../utilities/performanceTuningIndexDuplication";
 import { buildPlanTableMappingRows, formatPlanTree } from "../utilities/performanceTuningPlanFormatter";
 // Type-only: avoids a runtime circular import with performanceTuningPreview.ts,
 // which imports this class (the value) the other way.
@@ -351,7 +352,15 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           formatVersion: 1,
           summary: typeof parsed.summary === "string" ? parsed.summary : "",
           findings: Array.isArray(parsed.findings) ? parsed.findings : [],
-          recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+          // possibleDuplicateOfIndex (2026-08-21 follow-up, summary.md's
+          // Full Context improvement item 4) is host-computed here, never
+          // trusted from the model's own JSON - a deterministic backstop
+          // for the model's own duplicate-index self-check (prompt item 3),
+          // independent of whether the model actually followed it.
+          recommendations: (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).map((r) => ({
+            ...r,
+            possibleDuplicateOfIndex: findPossibleDuplicateIndex(r?.suggestedSql, context)?.matchedIndexName,
+          })),
           confidence:
             parsed.confidence === "high" || parsed.confidence === "medium" ? parsed.confidence : "low",
           missingContext: Array.isArray(parsed.missingContext) ? parsed.missingContext : [],

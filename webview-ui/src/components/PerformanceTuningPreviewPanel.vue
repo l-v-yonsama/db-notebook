@@ -332,6 +332,13 @@ defineExpose({
               <p class="ai-card-detail">{{ r.detail }}</p>
               <p class="ai-card-rationale"><span class="label-inline">Rationale:</span> {{ r.rationale }}</p>
               <pre v-if="r.suggestedSql" class="ai-card-sql">{{ r.suggestedSql }}</pre>
+              <!-- possibleDuplicateOfIndex (2026-08-21 follow-up) is
+                   host-computed, never AI-authored - see
+                   PerformanceTuningAiRecommendation's own doc comment. -->
+              <p v-if="r.possibleDuplicateOfIndex" class="ai-card-duplicate-warning">
+                <fa icon="triangle-exclamation" />
+                Possible duplicate of existing index "{{ r.possibleDuplicateOfIndex }}" - verify before running.
+              </p>
               <p v-if="evidenceLabel(r.evidence)" class="ai-card-evidence">{{ evidenceLabel(r.evidence) }}</p>
             </div>
           </div>
@@ -788,6 +795,12 @@ defineExpose({
       padding: 4px 6px;
       background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
       border-radius: 2px;
+    }
+
+    .ai-card-duplicate-warning {
+      color: var(--vscode-editorWarning-foreground, #ff9800);
+      font-size: 0.85em;
+      margin: 4px 0;
     }
 
     .ai-card-evidence {
