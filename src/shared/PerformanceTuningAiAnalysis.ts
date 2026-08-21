@@ -81,5 +81,18 @@ export type PerformanceTuningAiAnalysisResult = {
     version: string;
     name?: string;
   };
+  // The exact prompt text can be reconstructed from the immutable context
+  // saved alongside this result plus these options. Keeping the options with
+  // the result makes a saved Notebook reproducible even when its default
+  // language differs from the machine that later opens it.
+  request?: {
+    promptFormatVersion: 1;
+    translateResponse: boolean;
+    language: string;
+    // Full Context JSON always remains complete in the saved notebook. This
+    // records whether the request itself used the model-limit compact
+    // projection, so the saved AI request messages remain reproducible.
+    contextDetail: "full" | "compact";
+  };
   generatedAt: string; // ISO8601, set by the extension host, not the model
 };

@@ -537,7 +537,7 @@ export type PlanTableMappingRowViewModel = {
   index?: string;
   estimatedRows?: number;
   // See PlanTableMappingRow's own comment in performanceTuningPlanFormatter.ts -
-  // populated only under analyze mode (Postgres today).
+  // populated only when analyze-mode runtime rows can be safely resolved.
   actualRows?: number;
   rowEstimateRatio?: number;
   tableAccessFraction?: number;
@@ -583,6 +583,10 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       // planTableMappingRows array is normal (a plan can legitimately touch
       // zero tables) and just means that sub-section doesn't render.
       planTreeText?: string;
+      // XML runtime artifacts (currently SQL Server's SET STATISTICS XML)
+      // are indented extension-side for display only. The exact raw artifact
+      // remains in context.executionPlan.actualPlan / Full Context JSON.
+      actualPlanDisplayText?: string;
       planTableMappingRows: PlanTableMappingRowViewModel[];
       // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
       // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
@@ -596,6 +600,10 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       // reason sqlHtml/jsonHtml are - a pure string build, ready to copy
       // instantly with no round-trip to the extension host.
       plainTextPrompt: string;
+      // The same external-AI prompt with the current UI language response
+      // instruction. The webview switches between these immediately when
+      // the Translate response checkbox changes, without a host round trip.
+      translatedPlainTextPrompt: string;
       // Computed on the extension side (Buffer.byteLength) rather than
       // re-serialized/measured in the webview, so the displayed number
       // always matches what RDSBaseDriver.enforcePayloadBudget() itself saw.
@@ -615,9 +623,8 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       // connection's Provider can actually collect an analyze-mode plan at
       // all (driver.checkPerformanceTuningContextAvailability(), the same
       // static per-Provider capability check RunActualPlanActionCommand's
-      // handler itself does not need to repeat). false for Oracle/SQL
-      // Server today; `message` (when present) explains why, for the
-      // button's disabled-state tooltip.
+      // handler itself does not need to repeat). `message` (when present)
+      // explains an unavailable capability in the button tooltip.
       analyzedExecutionPlan: CapabilityStatus;
     };
     analysis?: PerformanceTuningAiAnalysisViewState;

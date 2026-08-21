@@ -8,6 +8,7 @@ import type {
   PerformanceTuningAiRecommendation,
 } from "../shared/PerformanceTuningAiAnalysis";
 import { createDirectory, existsUri } from "./fsUtil";
+import { buildAiAnalysisPrompt } from "./performanceTuningAiPrompt";
 import { buildPlanTableMappingRows, formatPlanTree } from "./performanceTuningPlanFormatter";
 
 // Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
@@ -78,6 +79,25 @@ function escapeMdCell(value: string): string {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br/>");
 }
 
+function formatRatio(value: number | undefined): string {
+  if (value === undefined) {
+    return "-";
+  }
+  const text = value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
+    ? value.toPrecision(3)
+    : value.toFixed(2);
+  return `${text}x`;
+}
+
+function formatFractionAsPercent(value: number | undefined): string {
+  if (value === undefined) {
+    return "-";
+  }
+  const percent = value * 100;
+  const text = percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
+  return `${text}%`;
+}
+
 function buildOverviewMarkdown(
   context: PerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult
@@ -98,6 +118,9 @@ function buildOverviewMarkdown(
   lines.push(`| Collection status | ${context.collection.status} |`);
   lines.push(
     `| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`
+  );
+  lines.push(
+    `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full"} |`
   );
   lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
   lines.push(`| Confidence | ${analysis.confidence} |`);
@@ -183,13 +206,13 @@ function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): str
 // performanceTuningPlanFormatter.ts's top comment.
 function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRows>): string[] {
   const lines = [
-    "| Table | Index | Est. rows | Actual rows | Est./actual ratio | Access fraction | Filter pass rate | Columns used |",
+    "| Table | Index | Est. rows | Actual rows | Actual/est. ratio | Access fraction | Filter pass rate | Columns used |",
     "|---|---|---|---|---|---|---|---|",
   ];
   for (const row of rows) {
-    const ratio = row.rowEstimateRatio !== undefined ? `${row.rowEstimateRatio.toFixed(2)}x` : "-";
-    const accessFraction = row.tableAccessFraction !== undefined ? `${(row.tableAccessFraction * 100).toFixed(2)}%` : "-";
-    const filterPassRate = row.predicateFilterSelectivity !== undefined ? `${(row.predicateFilterSelectivity * 100).toFixed(2)}%` : "-";
+    const ratio = formatRatio(row.rowEstimateRatio);
+    const accessFraction = formatFractionAsPercent(row.tableAccessFraction);
+    const filterPassRate = formatFractionAsPercent(row.predicateFilterSelectivity);
     lines.push(
       `| ${escapeMdCell(row.table)} | ${row.index ? escapeMdCell(row.index) : "-"} | ${
         row.estimatedRows ?? "-"
@@ -246,8 +269,34 @@ function buildJsonAppendixMarkdown(): string {
     "",
     "The sections below are supplementary reference material, not part of the analysis itself: the exact " +
       "context sent to the AI (**Full context JSON**) and the AI's raw response (**AI analysis JSON**). They " +
-      "contain the detailed evidence behind the summary above.",
+      "contain the detailed evidence behind the summary above. **AI request messages** records the exact " +
+      "assistant/user prompt and model identity used for this analysis, so the request can be repeated or " +
+      "compared with another model.",
   ].join("\n");
+}
+
+function buildAiRequestMessagesJson(
+  context: PerformanceTuningContext,
+  analysis: PerformanceTuningAiAnalysisResult
+): string {
+  const request = analysis.request;
+  const prompt = buildAiAnalysisPrompt(context, {
+    translateResponse: request?.translateResponse,
+    language: request?.language,
+    contextDetail: request?.contextDetail,
+  });
+  return JSON.stringify(
+    {
+      promptFormatVersion: request?.promptFormatVersion ?? 1,
+      model: analysis.model,
+      messages: [
+        { role: "assistant", content: prompt.assistant },
+        { role: "user", content: prompt.user },
+      ],
+    },
+    null,
+    2
+  );
 }
 
 /** Pure cell-construction step (§8.2) - kept separate from the write/open I/O below for unit testing. */
@@ -270,6 +319,7 @@ export function buildAiAnalysisNotebookCells(
     markupCell(buildAnalysisMarkdown(analysis)),
     markupCell(buildJsonAppendixMarkdown()),
     jsonCodeCell(JSON.stringify(context, null, 2), "Full context JSON"),
+    jsonCodeCell(buildAiRequestMessagesJson(context, analysis), "AI request messages"),
     jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON")
   );
   return cells;

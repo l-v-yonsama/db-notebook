@@ -14,6 +14,7 @@ import {
   ViewColumn,
   WebviewPanel,
   window,
+  type LanguageModelChat,
 } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
@@ -30,11 +31,20 @@ import { saveAiAnalysisAsNotebook } from "../utilities/performanceTuningAiNotebo
 import { buildAiAnalysisPrompt, buildPlainTextAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
 import { findPossibleDuplicateIndex } from "../utilities/performanceTuningIndexDuplication";
-import { buildPlanTableMappingRows, formatPlanTree } from "../utilities/performanceTuningPlanFormatter";
+import {
+  buildPlanTableMappingRows,
+  formatActualPlanForDisplay,
+  formatPlanTree,
+} from "../utilities/performanceTuningPlanFormatter";
 // Type-only: avoids a runtime circular import with performanceTuningPreview.ts,
 // which imports this class (the value) the other way.
 import type { PerformanceTuningPreviewRequest } from "../utilities/performanceTuningPreview";
 import { BasePanel } from "./BasePanel";
+
+// countTokens() is model-specific, but message framing added by the provider
+// is not always visible in that count. Keep a small buffer so a request that
+// is mathematically at the advertised boundary does not still fail at send.
+const AI_INPUT_TOKEN_SAFETY_MARGIN = 128;
 
 // "What would be sent" preview for getPerformanceTuningContext()'s result
 // (推奨着手順 step 9a; diagnostic display per
@@ -48,6 +58,46 @@ import { BasePanel } from "./BasePanel";
 // test setup.
 export class PerformanceTuningPreviewPanel extends BasePanel {
   public static currentPanel: PerformanceTuningPreviewPanel | undefined;
+
+  private async buildMessagesWithinModelInputLimit(
+    model: LanguageModelChat,
+    context: PerformanceTuningContext,
+    translateResponse: boolean,
+    token: CancellationTokenSource["token"],
+  ): Promise<{ messages: LanguageModelChatMessage[]; compact: boolean }> {
+    const maximum = model.maxInputTokens;
+    if (!Number.isFinite(maximum) || maximum <= AI_INPUT_TOKEN_SAFETY_MARGIN) {
+      throw new Error("The selected AI model does not report a usable input-token limit.");
+    }
+
+    let compactTokens: number | undefined;
+    for (const contextDetail of ["full", "compact"] as const) {
+      const prompt = buildAiAnalysisPrompt(context, {
+        translateResponse,
+        language: env.language,
+        contextDetail,
+      });
+      const messages = [
+        LanguageModelChatMessage.Assistant(prompt.assistant),
+        LanguageModelChatMessage.User(prompt.user),
+      ];
+      const inputTokens = (
+        await Promise.all(messages.map((message) => model.countTokens(message, token)))).reduce(
+        (total, count) => total + count,
+        0,
+      );
+      if (inputTokens + AI_INPUT_TOKEN_SAFETY_MARGIN <= maximum) {
+        return { messages, compact: contextDetail === "compact" };
+      }
+      if (contextDetail === "compact") {
+        compactTokens = inputTokens;
+      }
+    }
+
+    throw new Error(
+      `The selected model accepts at most ${maximum} input tokens, but even the compact performance context requires ${compactTokens ?? "more"} tokens.`,
+    );
+  }
 
   // The singleton panel can be re-render()ed with a new context before a
   // prior renderSub() call's async syntax highlighting finishes (e.g. Query
@@ -164,6 +214,10 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     // instantly with no round-trip - it's a pure string build, not an actual
     // vscode.lm call, so there's nothing to await.
     const plainTextPrompt = buildPlainTextAnalysisPrompt(context);
+    const translatedPlainTextPrompt = buildPlainTextAnalysisPrompt(context, {
+      translateResponse: true,
+      language: env.language,
+    });
 
     const [sqlHtml, jsonHtml, models] = await Promise.all([
       createCodeHtmlString({ code: context.statement.sql, lang: "sql" }),
@@ -188,6 +242,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const planTreeText = context.executionPlan.normalizedPlan
       ? formatPlanTree(context.executionPlan.normalizedPlan)
       : undefined;
+    const actualPlanDisplayText = formatActualPlanForDisplay(context.executionPlan.actualPlan);
     const planTableMappingRows = buildPlanTableMappingRows(context.planTableMappings);
 
     // "Language model"/"Translate response" defaults for Analyze with AI
@@ -205,10 +260,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           context,
           diagnosticGroups,
           planTreeText,
+          actualPlanDisplayText,
           planTableMappingRows,
           sqlHtml,
           jsonHtml,
           plainTextPrompt,
+          translatedPlainTextPrompt,
           payloadBytes,
           maxPayloadBytes: DEFAULT_MAX_PAYLOAD_BYTES,
           languageModels,
@@ -300,13 +357,34 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           return;
         }
 
-        const prompt = buildAiAnalysisPrompt(context, { translateResponse, language: env.language });
-        const messages = [
-          LanguageModelChatMessage.Assistant(prompt.assistant),
-          LanguageModelChatMessage.User(prompt.user),
-        ];
+        let messages: LanguageModelChatMessage[];
+        let compact = false;
+        try {
+          progress.report({ message: `Checking input size for ${model.family}...` });
+          const prepared = await this.buildMessagesWithinModelInputLimit(
+            model,
+            context,
+            translateResponse,
+            cts.token,
+          );
+          messages = prepared.messages;
+          compact = prepared.compact;
+        } catch (e) {
+          if (this.analysisCancellationSource === cts) {
+            this.analysisCancellationSource = undefined;
+          }
+          await this.postAnalysisUpdate(myGeneration, {
+            status: "error",
+            errorMessage: `The AI request could not fit this model's input limit: ${getErrorMessage(e)}`,
+          });
+          return;
+        }
 
-        progress.report({ message: `Sending context to ${model.family}...` });
+        progress.report({
+          message: compact
+            ? `Sending compact context to ${model.family}...`
+            : `Sending context to ${model.family}...`,
+        });
 
         let accumulatedResponse = "";
         try {
@@ -378,6 +456,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
             version: model.version,
             name: model.name,
           },
+          request: {
+            promptFormatVersion: 1,
+            translateResponse,
+            language: env.language,
+            contextDetail: compact ? "compact" : "full",
+          },
           generatedAt: new Date().toISOString(),
         };
 
@@ -433,6 +517,13 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   private async runActualPlan(): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.request || !this.analyzedExecutionPlan.available) {
+      return;
+    }
+    const eligibility = this.context?.statement.analyzeEligibility;
+    if (eligibility?.allowed === false) {
+      void window.showErrorMessage(
+        eligibility.reason ?? "Explain Analyze is limited to a single SELECT statement."
+      );
       return;
     }
     const request = this.request;

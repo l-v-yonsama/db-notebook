@@ -2975,6 +2975,7 @@
     "build:webview": "cd webview-ui && npm run build",
     "vscode:prepublish": "npm run build:webview && npm run compile",
     "compile": "tsc -p ./ && node scripts/copy-prelude-asset.js",
+    "performance-lab:claude": "npm run compile && node out/cli/performanceLabClaude.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src __tests__ --ext ts",

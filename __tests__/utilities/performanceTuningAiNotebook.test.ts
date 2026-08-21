@@ -84,10 +84,10 @@ describe("buildAiAnalysisNotebookFilename", () => {
 });
 
 describe("buildAiAnalysisNotebookCells", () => {
-  it("builds three markdown cells (overview + analysis + JSON appendix intro) followed by two JSON code cells", () => {
+  it("builds three markdown cells (overview + analysis + JSON appendix intro) followed by context, request, and response JSON cells", () => {
     const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
 
-    expect(cells).toHaveLength(5);
+    expect(cells).toHaveLength(6);
     expect(cells[0].kind).toBe(NotebookCellKind.Markup);
     expect(cells[0].languageId).toBe("markdown");
     expect(cells[0].value).toContain("SELECT * FROM orders WHERE tenant_id = 42");
@@ -104,6 +104,7 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells[2].kind).toBe(NotebookCellKind.Markup);
     expect(cells[2].languageId).toBe("markdown");
     expect(cells[2].value).toContain("Full context JSON");
+    expect(cells[2].value).toContain("AI request messages");
     expect(cells[2].value).toContain("AI analysis JSON");
 
     expect(cells[3].kind).toBe(NotebookCellKind.Code);
@@ -113,8 +114,28 @@ describe("buildAiAnalysisNotebookCells", () => {
 
     expect(cells[4].kind).toBe(NotebookCellKind.Code);
     expect(cells[4].languageId).toBe("json");
-    expect(JSON.parse(cells[4].value)).toMatchObject({ summary: "The query does a full scan on orders." });
-    expect(cells[4].metadata).toEqual({ cellLabel: "AI analysis JSON" });
+    expect(JSON.parse(cells[4].value)).toMatchObject({
+      model: { id: "gpt-4o" },
+      messages: [
+        { role: "assistant" },
+        { role: "user", content: expect.stringContaining("SELECT * FROM orders") },
+      ],
+    });
+    expect(cells[4].metadata).toEqual({ cellLabel: "AI request messages" });
+
+    expect(cells[5].kind).toBe(NotebookCellKind.Code);
+    expect(cells[5].languageId).toBe("json");
+    expect(JSON.parse(cells[5].value)).toMatchObject({ summary: "The query does a full scan on orders." });
+    expect(cells[5].metadata).toEqual({ cellLabel: "AI analysis JSON" });
+  });
+
+  it("records whether the AI request used full or compact input in the overview", () => {
+    const analysis = buildAnalysis({
+      request: { promptFormatVersion: 1, translateResponse: false, language: "en", contextDetail: "compact" },
+    });
+    expect(buildAiAnalysisNotebookCells(buildContext(), analysis)[0].value).toContain(
+      "Compact (raw vendor artifacts omitted for model limit)"
+    );
   });
 
   // 2026-08-21 follow-up (summary.md's Full Context improvement item 4) -
@@ -154,9 +175,47 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells[1].value).toContain("No recommendations were reported");
   });
 
+  it("rebuilds the saved request with the language option used by the original analysis", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext(),
+      buildAnalysis({
+        request: { promptFormatVersion: 1, translateResponse: true, language: "ja", contextDetail: "full" },
+      })
+    );
+    const request = JSON.parse(cells[4].value);
+    expect(request.messages[0].content).toContain("following language: ja");
+  });
+
+  it("rebuilds the compact request actually sent to a token-limited model while retaining raw XML in Full context JSON", () => {
+    const context = buildContext({
+      executionPlan: {
+        mode: "analyze",
+        format: "json",
+        vendorPlan: { raw: "SHOWPLAN_ALL" },
+        actualPlan: {
+          source: "SET STATISTICS XML",
+          format: "xml",
+          content: "<ShowPlanXML><RelOp ActualRows=\"150\" /></ShowPlanXML>",
+        },
+      },
+    });
+    const cells = buildAiAnalysisNotebookCells(
+      context,
+      buildAnalysis({
+        request: { promptFormatVersion: 1, translateResponse: false, language: "en", contextDetail: "compact" },
+      })
+    );
+    const fullContext = cells[4].value;
+    const request = JSON.parse(cells[5].value);
+    expect(fullContext).toContain("ActualRows");
+    expect(request.messages[1].content).toContain("contentOmittedFromAiInput");
+    expect(request.messages[1].content).not.toContain("ActualRows");
+    expect(request.messages[1].content).not.toContain("SHOWPLAN_ALL");
+  });
+
   it("omits the execution plan cell entirely when there is neither a plan nor any table mappings (default fixture)", () => {
     const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
-    // Same 5-cell shape as the first test above - explicit here so this
+    // Same 6-cell shape as the first test above - explicit here so this
     // invariant has its own name/intent rather than relying on that count.
     expect(cells.every((c) => !c.value.includes("## Execution plan"))).toBe(true);
   });
@@ -181,7 +240,7 @@ describe("buildAiAnalysisNotebookCells", () => {
       buildAnalysis()
     );
 
-    expect(cells).toHaveLength(6);
+    expect(cells).toHaveLength(7);
     expect(cells[1].kind).toBe(NotebookCellKind.Markup);
     expect(cells[1].value).toContain("## Execution plan");
     expect(cells[1].value).toContain("```text");
@@ -197,7 +256,7 @@ describe("buildAiAnalysisNotebookCells", () => {
       buildContext({ planTableMappings: [{ planNodeId: "n0", tableName: "orders" }] }),
       buildAnalysis()
     );
-    expect(cells).toHaveLength(6);
+    expect(cells).toHaveLength(7);
     expect(cells[1].value).toContain("## Execution plan");
     expect(cells[1].value).not.toContain("```text");
     expect(cells[1].value).toContain("### Tables referenced by this plan");
@@ -212,8 +271,20 @@ describe("buildAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis()
     );
-    expect(cells[1].value).toContain("| Table | Index | Est. rows | Actual rows | Est./actual ratio | Access fraction | Filter pass rate | Columns used |");
+    expect(cells[1].value).toContain("| Table | Index | Est. rows | Actual rows | Actual/est. ratio | Access fraction | Filter pass rate | Columns used |");
     expect(cells[1].value).toContain("| orders | - | 50 | 37 | 0.74x | - | - |");
+  });
+
+  it("keeps a very small actual/estimated ratio visible instead of rounding it to 0.00x", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        planTableMappings: [
+          { planNodeId: "n0", tableName: "customers", estimatedRows: 30000, actualRows: 1, rowEstimateRatio: 1 / 30000 },
+        ],
+      }),
+      buildAnalysis()
+    );
+    expect(cells[1].value).toContain("0.0000333x");
   });
 
   it("adds an actual-plan subsection when a MySQL artifact is present", () => {
@@ -247,7 +318,7 @@ describe("buildAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis()
     );
-    expect(cells).toHaveLength(6);
+    expect(cells).toHaveLength(7);
     expect(cells[1].value).toContain("## Execution plan");
     expect(cells[1].value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
     expect(cells[1].value).not.toContain("### Tables referenced by this plan");

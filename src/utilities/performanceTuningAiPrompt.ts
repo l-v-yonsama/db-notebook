@@ -13,7 +13,9 @@ Base every finding and recommendation only on the information given in the conte
 
 Never claim a recommendation is guaranteed to work: this is one point-in-time context snapshot, not a live benchmark, and the user must verify and apply any change themselves - do not suggest that you or the user should run any SQL automatically as part of this analysis.
 
-If the context's "executionPlan" has an "actualPlan" artifact, that is the database's own real runtime-plan evidence - the SQL was actually executed to measure it. Its "source" and "format" identify whether it is database text, XML, or JSON. It is separate from "executionPlan.normalizedPlan", which can remain an *estimate* even when actualPlan is present: treat it as ordinary evidence you may quote or paraphrase in a finding/recommendation's "detail"/"rationale", but do not invent a "planNodeId" from its visual/tree order - that field must only ever reference an id that actually appears in executionPlan.normalizedPlan or planTableMappings.
+If the context's "executionPlan" has an "actualPlan" artifact, that is the database's own real runtime-plan evidence - the SQL was actually executed to measure it. Its "source" and "format" identify whether it is database text, XML, or JSON. It is separate from "executionPlan.normalizedPlan", which can remain an *estimate* even when actualPlan is present: treat it as ordinary evidence you may quote or paraphrase in a finding/recommendation's "detail"/"rationale", but do not invent a "planNodeId" from its visual/tree order - that field must only ever reference an id that actually appears in executionPlan.normalizedPlan or planTableMappings. When "aiInput.omittedFields" is present, raw vendor artifacts were deliberately left out only to fit this model's input limit; this is not missing runtime collection. Use the retained structured metrics (especially planTableMappings' actualRows and selectivity values), and do not invent facts from omitted raw content.
+
+If a "CARDINALITY_MISESTIMATE" diagnostic is present, treat it as factual measured evidence that the optimizer estimate needs separate investigation. Distinguish a statistics/cardinality remedy (including correlated predicate columns) from an access-path/index remedy; evaluate both where supported by the context instead of presenting an index as the only explanation.
 
 An index is not always the right fix. If a WHERE/JOIN/GROUP BY predicate wraps a column in a function (e.g. LOWER(col), DATE(col), CAST(col AS ...)), a plain index on that column cannot be used for it at all (the predicate is not sargable) - in that case, prefer recommending a sargable rewrite of the predicate itself (for example, rewriting a DATE(created_at) = X range check as created_at >= X AND created_at < X + one day) as the primary recommendation, and only add a supporting index once the predicate is sargable. Do not recommend an index on a function-wrapped column (e.g. CREATE INDEX ... (LOWER(col))) without first checking its selectivity per the next paragraph.
 
@@ -100,19 +102,64 @@ export type BuildAiAnalysisPromptOptions = {
   // unit-testable.
   translateResponse?: boolean;
   language?: string;
+  // The model-specific sending path selects compact only after it has
+  // measured the full prompt against LanguageModelChat.maxInputTokens.
+  // Full is deliberately the default so saved Notebooks and manual-copy
+  // prompts retain the complete, reproducible database artifact.
+  contextDetail?: "full" | "compact";
 };
+
+/**
+ * Creates an AI-only projection for a model with a smaller input window.
+ * It never mutates the collected context: Full Context JSON, panel display,
+ * and saved notebooks keep exact artifacts. The omitted SQL Server XML is
+ * safe to remove here because its table-level runtime facts have already
+ * been resolved into planTableMappings by db-drivers; the same conservative
+ * fallback also works for another vendor's oversized artifact by leaving
+ * its source/format visible and explicitly declaring the omission.
+ */
+export function buildCompactAiAnalysisContext(context: PerformanceTuningContext): Record<string, unknown> {
+  const { vendorPlan: _vendorPlan, actualPlan, ...executionPlan } = context.executionPlan;
+  return {
+    ...context,
+    executionPlan: {
+      ...executionPlan,
+      ...(actualPlan
+        ? {
+            actualPlan: {
+              source: actualPlan.source,
+              format: actualPlan.format,
+              contentOmittedFromAiInput: true,
+            },
+          }
+        : {}),
+    },
+    aiInput: {
+      detail: "compact",
+      omittedFields: [
+        ...(actualPlan ? ["executionPlan.actualPlan.content"] : []),
+        "executionPlan.vendorPlan",
+      ],
+      omissionReason: "Raw vendor artifacts were omitted to fit the selected language model's input limit.",
+    },
+  };
+}
 
 // Shared by buildAiAnalysisPrompt() (the "user" half of its {assistant, user}
 // split) and buildPlainTextAnalysisPrompt() (folded into one combined
 // string, since a manual copy/paste has no separate system-message
 // channel) - identical content either way, just assembled differently.
-function buildContextSection(context: PerformanceTuningContext): string {
-  // No summarization/truncation here (§7): RDSBaseDriver.enforcePayloadBudget()
-  // has already shaped this JSON to fit maxPayloadBytes, and re-summarizing on
-  // top of that would discard the very evidence findings/recommendations are
-  // supposed to reference.
-  const contextJson = JSON.stringify(context, null, 2);
+function buildContextSection(context: PerformanceTuningContext, contextForAi: unknown = context): string {
+  const contextJson = JSON.stringify(contextForAi, null, 2);
 
+  const dmlSafety = context.statement.analyzeEligibility?.allowed === false
+    ? [
+        "# DML execution safety",
+        "",
+        "This statement is not eligible for Explain Analyze and its context is estimate-only. Do not recommend running Explain Analyze, collecting an actual plan, or executing this statement. If runtime validation is needed, state that it must use a separately approved staging/test workflow. Any SQL in your response is illustrative only.",
+        "",
+      ]
+    : [];
   return [
     "Analyze the performance of the following SQL statement using the structured context collected below.",
     "",
@@ -124,6 +171,7 @@ function buildContextSection(context: PerformanceTuningContext): string {
     context.statement.sql,
     "```",
     "",
+    ...dmlSafety,
     "# Performance tuning context (JSON)",
     "",
     "```json",
@@ -150,7 +198,8 @@ export function buildAiAnalysisPrompt(
   }
   const assistant = [...assistantParts, ""].join("\n");
 
-  return { assistant, user: buildContextSection(context) };
+  const contextForAi = options.contextDetail === "compact" ? buildCompactAiAnalysisContext(context) : context;
+  return { assistant, user: buildContextSection(context, contextForAi) };
 }
 
 // "Copy Prompt for Other AI" toolbar action (PerformanceTuningPreviewPanel.ts) -
@@ -158,15 +207,21 @@ export function buildAiAnalysisPrompt(
 // external AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...), not a
 // vscode.lm call. See PLAIN_TEXT_RESPONSE_INSTRUCTIONS's own doc comment for
 // why the domain guidance is reused as-is and only the response-format
-// instructions differ. No translateResponse option (unlike
-// buildAiAnalysisPrompt()) - the user is pasting into a live chat they can
-// just ask a follow-up in their own language if wanted, and there is no
-// enum-valued JSON here for a translation instruction to risk corrupting.
-export function buildPlainTextAnalysisPrompt(context: PerformanceTuningContext): string {
+// instructions differ. It accepts the same translate/language selection as
+// the Copilot path, but phrases it for human-readable prose rather than the
+// JSON fields used by buildAiAnalysisPrompt().
+export function buildPlainTextAnalysisPrompt(
+  context: PerformanceTuningContext,
+  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language"> = {}
+): string {
+  const translationInstruction = options.translateResponse && options.language
+    ? `Answer all human-readable prose in the following language: ${options.language}. Do not translate SQL code, database identifiers, or evidence identifiers.`
+    : undefined;
   return [
     ASSISTANT_ANALYSIS_PROMPT,
     "",
     PLAIN_TEXT_RESPONSE_INSTRUCTIONS,
+    ...(translationInstruction ? ["", translationInstruction] : []),
     "",
     buildContextSection(context),
   ].join("\n");

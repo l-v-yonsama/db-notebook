@@ -204,6 +204,16 @@ function titleAndSummaryForDiagnosticGroup(
         title: "Database version unavailable",
         summary: "The database version could not be retrieved. Version-specific analysis may be less precise.",
       };
+    case "CARDINALITY_MISESTIMATE": {
+      const cardinality = first.cardinality;
+      const ratio = cardinality?.actualToEstimatedRatio;
+      return {
+        title: "Actual and estimated row counts differ materially",
+        summary: ratio === undefined
+          ? "Measured row counts differ materially from the optimizer estimate. Review predicate statistics as well as access paths."
+          : `Measured row counts differ by ${ratio.toPrecision(3)}x from the optimizer estimate. Review predicate statistics as well as access paths.`,
+      };
+    }
     default:
       // Unrecognized code (a newer db-drivers than this file knows about) -
       // never drop it (§4.4): fall back to the driver's own technical message

@@ -19,12 +19,14 @@ import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 const context = ref<PerformanceTuningContext | undefined>(undefined);
 const diagnosticGroups = ref<PerformanceTuningDiagnosticGroupViewModel[]>([]);
 const planTreeText = ref<string | undefined>(undefined);
+const actualPlanDisplayText = ref<string | undefined>(undefined);
 const planTableMappingRows = ref<PlanTableMappingRowViewModel[]>([]);
 const sqlHtml = ref("");
 const jsonHtml = ref("");
 // "Copy Prompt for Other AI" (2026-08-21 follow-up) - see
 // MessageEventData.ts's own doc comment on this field.
 const plainTextPrompt = ref("");
+const translatedPlainTextPrompt = ref("");
 const payloadBytes = ref(0);
 const maxPayloadBytes = ref(0);
 
@@ -43,10 +45,9 @@ const translateResponse = ref(false);
 const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
 
 // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Whether this connection's
-// Provider even supports analyze mode at all (Postgres/MySQL today, not
-// Oracle/SQL Server - see PerformanceTuningPreviewPanel.ts's own doc
-// comment) - drives the button's disabled state and its tooltip when it
-// is disabled. isRunningActualPlan has no "success" branch of its own: a
+// Provider even supports analyze mode at all - drives the button's disabled
+// state and its tooltip when it is disabled. isRunningActualPlan has no
+// "success" branch of its own: a
 // successful run replaces the whole panel via a fresh "initialize" instead
 // (see initialize() below, which is also what resets this back to false).
 const analyzedExecutionPlan = ref<CapabilityStatus>({ available: false });
@@ -60,6 +61,50 @@ const contextJson = computed(() => (context.value ? JSON.stringify(context.value
 const payloadExceeded = computed(
   () => maxPayloadBytes.value > 0 && payloadBytes.value > maxPayloadBytes.value
 );
+const copyPromptForOtherAi = computed(() =>
+  translateResponse.value ? translatedPlainTextPrompt.value : plainTextPrompt.value
+);
+const statementAllowsActualPlan = computed(
+  () => context.value?.statement.analyzeEligibility?.allowed ?? true
+);
+const isDmlEstimate = computed(
+  () => context.value?.statement.kind !== undefined && context.value.statement.kind !== "select"
+);
+const actualPlanButtonTitle = computed(() => {
+  if (!statementAllowsActualPlan.value) {
+    return context.value?.statement.analyzeEligibility?.reason ?? "Explain Analyze is limited to a single SELECT statement.";
+  }
+  return analyzedExecutionPlan.value.available
+    ? "Run this SQL for real to measure its actual execution plan (real query execution - see the note below)"
+    : (analyzedExecutionPlan.value.message ?? "Not available for this database");
+});
+
+// Keep meaningful very small runtime ratios visible. A fixed two-decimal
+// display turns a valid nested-loop inner access such as 1 / 30,000 into
+// "0.00x" or "0.00%", which looks like missing/zero evidence instead of a
+// highly selective access.
+const formatRatio = (value: number | undefined): string => {
+  if (value === undefined) {
+    return "-";
+  }
+  const text = value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
+    ? value.toPrecision(3)
+    : value.toFixed(2);
+  return `${text}x`;
+};
+
+const formatFractionAsPercent = (value: number | undefined): string => {
+  if (value === undefined) {
+    return "-";
+  }
+  const percent = value * 100;
+  const text = percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
+  return `${text}%`;
+};
+const formatActualRows = (value: number | undefined): string =>
+  value === undefined && isDmlEstimate.value ? "Not measured (DML)" : (value ?? "-").toString();
+const formatRuntimeMetric = (value: number | undefined, format: (value: number | undefined) => string): string =>
+  value === undefined && isDmlEstimate.value ? "Not measured (DML)" : format(value);
 
 // buildPerformanceTuningDiagnosticGroups() (extension-side) already sorts
 // information before warnings and never mixes severities within one group -
@@ -84,10 +129,12 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   context.value = v.context;
   diagnosticGroups.value = v.diagnosticGroups;
   planTreeText.value = v.planTreeText;
+  actualPlanDisplayText.value = v.actualPlanDisplayText;
   planTableMappingRows.value = v.planTableMappingRows;
   sqlHtml.value = v.sqlHtml;
   jsonHtml.value = v.jsonHtml;
   plainTextPrompt.value = v.plainTextPrompt;
+  translatedPlainTextPrompt.value = v.translatedPlainTextPrompt;
   payloadBytes.value = v.payloadBytes;
   maxPayloadBytes.value = v.maxPayloadBytes;
   languageModels.value = v.languageModels;
@@ -200,14 +247,12 @@ defineExpose({
              sends the already-collected context to an AI model; this one
              executes the SQL for real). Disabled, with the capability
              message as its tooltip, when this connection's Provider does
-             not support analyze mode at all (Oracle/SQL Server today). Title
-             Case to match "Analyze with AI"/"Save as Notebook" below. -->
+             not support analyze mode. Title Case to match "Analyze with AI"/
+             "Save as Notebook" below. -->
         <VsCodeButton
           appearance="secondary"
-          :disabled="isRunningActualPlan || !analyzedExecutionPlan.available"
-          :title="analyzedExecutionPlan.available
-            ? 'Run this SQL for real to measure its actual execution plan (real query execution - see the note below)'
-            : (analyzedExecutionPlan.message ?? 'Not available for this database')"
+          :disabled="isRunningActualPlan || !analyzedExecutionPlan.available || !statementAllowsActualPlan"
+          :title="actualPlanButtonTitle"
           @click="runActualPlan"
         >
           <fa icon="circle-play" />{{ isRunningActualPlan ? "Running…" : "Run Explain Analyze" }}
@@ -224,7 +269,7 @@ defineExpose({
              with AI", just asking for a plain-text answer instead of JSON
              (see performanceTuningAiPrompt.ts's buildPlainTextAnalysisPrompt()) -
              no vscode.lm call happens for this button. -->
-        <CopyToClipboardButton appearance="secondary" :content="plainTextPrompt"
+        <CopyToClipboardButton appearance="secondary" :content="copyPromptForOtherAi"
           title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)">
           <fa icon="comment-dots" />Copy Prompt for Other AI
         </CopyToClipboardButton>
@@ -240,10 +285,13 @@ defineExpose({
          to the button, so the risk is visible *before* a user ever clicks
          it. The second layer (a blocking modal) is host-side, on click -
          see PerformanceTuningPreviewPanel.ts's runActualPlan(). Hidden once
-         a run has already succeeded for this context (actualPlanText
+         a run has already succeeded for this context (actualPlan
          present) - at that point the risk already materialized and is
          redundant with the actual plan shown below. -->
-    <p v-if="analyzedExecutionPlan.available && !context.executionPlan.actualPlanText" class="section-note actual-plan-warning">
+    <p v-if="!statementAllowsActualPlan" class="section-note">
+      This {{ context.statement.kind ?? "non-SELECT" }} statement uses an estimated plan only. Actual runtime metrics are not collected here.
+    </p>
+    <p v-else-if="analyzedExecutionPlan.available && !context.executionPlan.actualPlan" class="section-note actual-plan-warning">
       <fa icon="triangle-exclamation" />
       "Run Explain Analyze" executes the SQL above for real against the database, instead of only
       estimating its plan.
@@ -321,6 +369,7 @@ defineExpose({
         </div>
 
         <div v-else-if="analysis.status === 'success' && analysis.result">
+          <p class="section-note">AI input: {{ analysis.result.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full" }}</p>
           <p class="analysis-summary">{{ analysis.result.summary }}</p>
 
           <div v-if="analysis.result.findings.length > 0" class="analysis-subsection">
@@ -422,7 +471,21 @@ defineExpose({
         <p v-if="context.executionPlan.executionTimeMs !== undefined" class="section-note">
           Real execution time: {{ context.executionPlan.executionTimeMs }} ms
         </p>
-        <pre v-if="planTreeText" class="plan-tree">{{ planTreeText }}</pre>
+        <p v-if="context.executionPlan.actualPlan" class="section-note">
+          Runtime evidence from {{ context.executionPlan.actualPlan.source }} is shown first. The estimated
+          topology is retained below only for structured table/predicate metadata and comparison.
+        </p>
+        <p v-else class="section-note">
+          {{ isDmlEstimate ? "DML statement — estimated plan only; runtime measurements are not collected." : "Estimated plan only — the SQL has not been executed for runtime measurements." }}
+        </p>
+        <div v-if="context.executionPlan.actualPlan" class="actual-plan-text-block">
+          <h4>Actual execution plan ({{ context.executionPlan.actualPlan.source }})</h4>
+          <pre class="plan-tree">{{ actualPlanDisplayText ?? context.executionPlan.actualPlan.content }}</pre>
+        </div>
+        <details v-if="planTreeText" class="advanced-details" :open="!context.executionPlan.actualPlan">
+          <summary>{{ context.executionPlan.actualPlan ? "Estimated plan topology" : "Execution plan topology" }}</summary>
+          <pre class="plan-tree">{{ planTreeText }}</pre>
+        </details>
         <table v-if="planTableMappingRows.length > 0" class="plan-table-mappings">
           <thead>
             <tr>
@@ -430,7 +493,7 @@ defineExpose({
               <th>Index</th>
               <th>Est. rows</th>
               <th>Actual rows</th>
-              <th>Est./actual ratio</th>
+              <th>Actual/est. ratio</th>
               <th>Access fraction</th>
               <th>Filter pass rate</th>
               <th>Columns used</th>
@@ -441,18 +504,14 @@ defineExpose({
               <td>{{ row.table }}</td>
               <td>{{ row.index ?? "-" }}</td>
               <td>{{ row.estimatedRows ?? "-" }}</td>
-              <td>{{ row.actualRows ?? "-" }}</td>
-              <td>{{ row.rowEstimateRatio !== undefined ? `${row.rowEstimateRatio.toFixed(2)}x` : "-" }}</td>
-              <td>{{ row.tableAccessFraction !== undefined ? `${(row.tableAccessFraction * 100).toFixed(2)}%` : "-" }}</td>
-              <td>{{ row.predicateFilterSelectivity !== undefined ? `${(row.predicateFilterSelectivity * 100).toFixed(2)}%` : "-" }}</td>
+              <td>{{ formatActualRows(row.actualRows) }}</td>
+              <td>{{ formatRuntimeMetric(row.rowEstimateRatio, formatRatio) }}</td>
+              <td>{{ formatRuntimeMetric(row.tableAccessFraction, formatFractionAsPercent) }}</td>
+              <td>{{ formatRuntimeMetric(row.predicateFilterSelectivity, formatFractionAsPercent) }}</td>
               <td>{{ row.columnsUsed ?? "-" }}</td>
             </tr>
           </tbody>
         </table>
-        <div v-if="context.executionPlan.actualPlan" class="actual-plan-text-block">
-          <h4>Actual execution plan ({{ context.executionPlan.actualPlan.source }})</h4>
-          <pre class="plan-tree">{{ context.executionPlan.actualPlan.content }}</pre>
-        </div>
       </div>
 
       <!-- 6. Full context JSON, as "Advanced details" - collapsed by default

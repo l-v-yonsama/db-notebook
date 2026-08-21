@@ -2,6 +2,7 @@ import type { PlanNode, PlanTableMapping } from "@l-v-yonsama/multi-platform-dat
 import { describe, expect, it } from "vitest";
 import {
   buildPlanTableMappingRows,
+  formatActualPlanForDisplay,
   formatPlanTree,
 } from "../../src/utilities/performanceTuningPlanFormatter";
 
@@ -173,5 +174,30 @@ describe("buildPlanTableMappingRows", () => {
     const row = buildPlanTableMappingRows(mappings)[0];
     expect(row.actualRows).toBeUndefined();
     expect(row.rowEstimateRatio).toBeUndefined();
+  });
+});
+
+describe("formatActualPlanForDisplay", () => {
+  it("indents a one-line SQL Server STATISTICS XML artifact for the panel without changing text artifacts", () => {
+    expect(
+      formatActualPlanForDisplay({
+        source: "SET STATISTICS XML",
+        format: "xml",
+        content: '<ShowPlanXML><RelOp NodeId="8"><IndexScan><Object Table="[orders]" /></IndexScan></RelOp></ShowPlanXML>',
+      }),
+    ).toBe(
+      [
+        "<ShowPlanXML>",
+        '  <RelOp NodeId="8">',
+        "    <IndexScan>",
+        '      <Object Table="[orders]" />',
+        "    </IndexScan>",
+        "  </RelOp>",
+        "</ShowPlanXML>",
+      ].join("\n"),
+    );
+    expect(
+      formatActualPlanForDisplay({ source: "EXPLAIN ANALYZE", format: "text", content: "-> Table scan" }),
+    ).toBe("-> Table scan");
   });
 });

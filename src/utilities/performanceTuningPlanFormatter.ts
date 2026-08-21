@@ -1,4 +1,5 @@
 import type {
+  ActualPlanArtifact,
   PlanNode,
   PlanTableMapping,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -131,16 +132,54 @@ export function formatPlanTree(plan: PlanNode): string {
   return lines.join("\n");
 }
 
+/**
+ * Makes a database-native XML plan readable without changing the artifact
+ * retained in PerformanceTuningContext (and therefore in Full Context JSON).
+ * SQL Server returns SET STATISTICS XML as one long string; a display-only
+ * indentation pass is enough here and deliberately avoids parsing or
+ * rewriting values embedded in the plan's attributes.
+ */
+export function formatActualPlanForDisplay(actualPlan: ActualPlanArtifact | undefined): string | undefined {
+  if (!actualPlan) {
+    return undefined;
+  }
+  if (actualPlan.format !== "xml") {
+    return actualPlan.content;
+  }
+
+  const compact = actualPlan.content.trim().replace(/>\s+</g, "><");
+  const tokens = compact.match(/<[^>]+>|[^<]+/g);
+  if (!tokens) {
+    return actualPlan.content;
+  }
+  const lines: string[] = [];
+  let depth = 0;
+  for (const token of tokens) {
+    if (!token.trim()) {
+      continue;
+    }
+    if (/^<\//.test(token)) {
+      depth = Math.max(0, depth - 1);
+      lines.push(`${"  ".repeat(depth)}${token}`);
+    } else if (/^<\?/.test(token) || /^<!/.test(token) || /\/>$/.test(token)) {
+      lines.push(`${"  ".repeat(depth)}${token}`);
+    } else if (/^</.test(token)) {
+      lines.push(`${"  ".repeat(depth)}${token}`);
+      depth++;
+    } else {
+      lines.push(`${"  ".repeat(depth)}${token}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 export type PlanTableMappingRow = {
   table: string;
   index?: string;
   estimatedRows?: number;
-  // Populated only under analyze mode (Postgres today - db-drivers'
-  // PostgresPerformanceTuningProvider issues EXPLAIN (ANALYZE, BUFFERS,
-  // FORMAT JSON); Oracle/SQL Server/MySQL leave these undefined, MySQL
-  // because its real EXPLAIN ANALYZE data lives in
-  // executionPlan.actualPlan instead, unparsed - see that field's
-  // comment in db-drivers' PerformanceTuningContext.ts).
+  // Populated under analyze mode only when a vendor's runtime artifact can
+  // be safely matched to the estimate mapping. Postgres carries it directly;
+  // MySQL, Oracle, and SQL Server resolve it from their native artifacts.
   actualRows?: number;
   rowEstimateRatio?: number;
   tableAccessFraction?: number;
@@ -165,8 +204,8 @@ function combineColumns(mapping: PlanTableMapping): string | undefined {
  * planTableMappings is already flat (one entry per table/index the plan
  * touches), so unlike the tree above this one genuinely suits a table.
  * `actualRows`/`rowEstimateRatio` pass through as-is - undefined for an
- * estimate-mode mapping (or any vendor that hasn't shipped analyze mode),
- * a real number once it has (see PlanTableMappingRow's own comment).
+ * estimate-mode mapping or when an analyzed vendor artifact cannot be
+ * safely resolved to the mapping, a real number otherwise.
  */
 export function buildPlanTableMappingRows(mappings: PlanTableMapping[]): PlanTableMappingRow[] {
   return mappings.map((mapping) => {

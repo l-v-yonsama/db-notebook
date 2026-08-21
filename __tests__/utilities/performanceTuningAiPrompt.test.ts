@@ -1,6 +1,10 @@
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { describe, expect, it } from "vitest";
-import { buildAiAnalysisPrompt, buildPlainTextAnalysisPrompt } from "../../src/utilities/performanceTuningAiPrompt";
+import {
+  buildAiAnalysisPrompt,
+  buildCompactAiAnalysisContext,
+  buildPlainTextAnalysisPrompt,
+} from "../../src/utilities/performanceTuningAiPrompt";
 
 function buildContext(overrides: Partial<PerformanceTuningContext> = {}): PerformanceTuningContext {
   return {
@@ -27,6 +31,80 @@ describe("buildAiAnalysisPrompt", () => {
     });
     const { user } = buildAiAnalysisPrompt(context);
     expect(user).toContain(JSON.stringify(context, null, 2));
+  });
+
+  it("builds an AI-only compact context without mutating or discarding the saved runtime artifact", () => {
+    const context = buildContext({
+      executionPlan: {
+        mode: "analyze",
+        format: "json",
+        vendorPlan: { raw: "SHOWPLAN_ALL rows" },
+        actualPlan: {
+          source: "SET STATISTICS XML",
+          format: "xml",
+          content: "<ShowPlanXML><RelOp ActualRows=\"150\" /></ShowPlanXML>",
+        },
+      },
+    });
+
+    const compact = buildCompactAiAnalysisContext(context);
+    expect(compact).toMatchObject({
+      executionPlan: {
+        actualPlan: {
+          source: "SET STATISTICS XML",
+          format: "xml",
+          contentOmittedFromAiInput: true,
+        },
+      },
+      aiInput: {
+        detail: "compact",
+        omittedFields: ["executionPlan.actualPlan.content", "executionPlan.vendorPlan"],
+      },
+    });
+    expect(JSON.stringify(compact)).not.toContain("SHOWPLAN_ALL rows");
+    expect(JSON.stringify(compact)).not.toContain("ActualRows");
+    expect(context.executionPlan.vendorPlan).toEqual({ raw: "SHOWPLAN_ALL rows" });
+    expect(context.executionPlan.actualPlan?.content).toContain("ActualRows");
+
+    const { user } = buildAiAnalysisPrompt(context, { contextDetail: "compact" });
+    expect(user).toContain("contentOmittedFromAiInput");
+    expect(user).not.toContain("SHOWPLAN_ALL rows");
+    expect(user).not.toContain("ActualRows");
+  });
+
+  it("retains structured runtime observations in compact input", () => {
+    const context = buildContext({
+      executionPlan: {
+        mode: "analyze",
+        format: "json",
+        vendorPlan: { raw: "large XML" },
+        actualPlan: { source: "SET STATISTICS XML", format: "xml", content: "large XML" },
+        runtimeObservations: [{
+          kind: "memoryGrant",
+          source: "SQL Server SET STATISTICS XML MemoryGrantInfo",
+          label: "Memory grant",
+          metrics: { GrantedMemory: 2048 },
+        }],
+      },
+    });
+    expect(buildCompactAiAnalysisContext(context)).toMatchObject({
+      executionPlan: { runtimeObservations: [{ metrics: { GrantedMemory: 2048 } }] },
+    });
+  });
+
+  it("adds a DML safety guard instead of asking for Analyze execution", () => {
+    const context = buildContext({
+      statement: {
+        sql: "DELETE FROM orders WHERE created_at < CURRENT_DATE - 90",
+        source: "editor",
+        kind: "delete",
+        analyzeEligibility: { allowed: false, reason: "Explain Analyze is limited to a single SELECT statement." },
+      },
+    });
+    const { user } = buildAiAnalysisPrompt(context);
+    expect(user).toContain("# DML execution safety");
+    expect(user).toContain("Do not recommend running Explain Analyze");
+    expect(user).toContain("separately approved staging/test workflow");
   });
 
   it("does not mask literals in the SQL or context (matches §9.2's no-masking policy)", () => {
@@ -122,6 +200,14 @@ describe("buildAiAnalysisPrompt", () => {
     const withExplicitFalse = buildAiAnalysisPrompt(buildContext(), {});
     expect(withNoOptions.assistant).toBe(withExplicitFalse.assistant);
     expect(withNoOptions.assistant).not.toContain("following language");
+  });
+});
+
+describe("buildPlainTextAnalysisPrompt", () => {
+  it("adds the requested response language for prompts copied to another AI", () => {
+    expect(
+      buildPlainTextAnalysisPrompt(buildContext(), { translateResponse: true, language: "ja" })
+    ).toContain("Answer all human-readable prose in the following language: ja.");
   });
 });
 
