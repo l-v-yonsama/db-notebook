@@ -72,9 +72,10 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant).toContain("LOWER(col)");
   });
 
-  it("instructs the model to self-verify selectivity via filterSelectivity before recommending an index", () => {
+  it("instructs the model to distinguish access fraction from filter pass rate before recommending an index", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext());
-    expect(assistant).toContain("filterSelectivity");
+    expect(assistant).toContain("tableAccessFraction");
+    expect(assistant).toContain("predicateFilterSelectivity");
     expect(assistant).toContain("rationale");
   });
 
@@ -147,7 +148,8 @@ describe("buildPlainTextAnalysisPrompt", () => {
   it("reuses the same domain guidance as buildAiAnalysisPrompt() (sargable rewrites, selectivity, duplicate-index check, column order, dominantCostPlanNode)", () => {
     const prompt = buildPlainTextAnalysisPrompt(buildContext());
     expect(prompt.toLowerCase()).toContain("sargable");
-    expect(prompt).toContain("filterSelectivity");
+    expect(prompt).toContain("tableAccessFraction");
+    expect(prompt).toContain("predicateFilterSelectivity");
     expect(prompt).toContain("tables[].definition.indexes");
     expect(prompt.toLowerCase()).toContain("equality-condition columns before range-condition columns");
     expect(prompt).toContain("dominantCostPlanNode");

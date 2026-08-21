@@ -212,8 +212,8 @@ describe("buildAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis()
     );
-    expect(cells[1].value).toContain("| Table | Index | Est. rows | Actual rows | Est./actual ratio | Columns used |");
-    expect(cells[1].value).toContain("| orders | - | 50 | 37 | 0.74x |");
+    expect(cells[1].value).toContain("| Table | Index | Est. rows | Actual rows | Est./actual ratio | Access fraction | Filter pass rate | Columns used |");
+    expect(cells[1].value).toContain("| orders | - | 50 | 37 | 0.74x | - | - |");
   });
 
   it("adds an actual-plan subsection when a MySQL artifact is present", () => {

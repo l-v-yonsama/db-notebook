@@ -431,6 +431,8 @@ defineExpose({
               <th>Est. rows</th>
               <th>Actual rows</th>
               <th>Est./actual ratio</th>
+              <th>Access fraction</th>
+              <th>Filter pass rate</th>
               <th>Columns used</th>
             </tr>
           </thead>
@@ -441,19 +443,15 @@ defineExpose({
               <td>{{ row.estimatedRows ?? "-" }}</td>
               <td>{{ row.actualRows ?? "-" }}</td>
               <td>{{ row.rowEstimateRatio !== undefined ? `${row.rowEstimateRatio.toFixed(2)}x` : "-" }}</td>
+              <td>{{ row.tableAccessFraction !== undefined ? `${(row.tableAccessFraction * 100).toFixed(2)}%` : "-" }}</td>
+              <td>{{ row.predicateFilterSelectivity !== undefined ? `${(row.predicateFilterSelectivity * 100).toFixed(2)}%` : "-" }}</td>
               <td>{{ row.columnsUsed ?? "-" }}</td>
             </tr>
           </tbody>
         </table>
-        <!-- MySQL only today: real EXPLAIN ANALYZE tree text, unparsed - see
-             executionPlan.actualPlanText's own comment in db-drivers'
-             PerformanceTuningContext.ts for why this is a second, separate
-             block instead of being folded into planTreeText above (the
-             normalized plan tree stays estimate-only for MySQL; this is the
-             real timing/rows data instead, in MySQL's own native format). -->
-        <div v-if="context.executionPlan.actualPlanText" class="actual-plan-text-block">
-          <h4>Actual execution plan (EXPLAIN ANALYZE)</h4>
-          <pre class="plan-tree">{{ context.executionPlan.actualPlanText }}</pre>
+        <div v-if="context.executionPlan.actualPlan" class="actual-plan-text-block">
+          <h4>Actual execution plan ({{ context.executionPlan.actualPlan.source }})</h4>
+          <pre class="plan-tree">{{ context.executionPlan.actualPlan.content }}</pre>
         </div>
       </div>
 

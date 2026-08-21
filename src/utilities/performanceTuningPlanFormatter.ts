@@ -143,6 +143,8 @@ export type PlanTableMappingRow = {
   // comment in db-drivers' PerformanceTuningContext.ts).
   actualRows?: number;
   rowEstimateRatio?: number;
+  tableAccessFraction?: number;
+  predicateFilterSelectivity?: number;
   columnsUsed?: string;
 };
 
@@ -176,6 +178,8 @@ export function buildPlanTableMappingRows(mappings: PlanTableMapping[]): PlanTab
       estimatedRows: mapping.estimatedRows,
       actualRows: mapping.actualRows,
       rowEstimateRatio: mapping.rowEstimateRatio,
+      tableAccessFraction: mapping.tableAccessFraction?.value,
+      predicateFilterSelectivity: mapping.predicateFilterSelectivity?.value,
       columnsUsed: combineColumns(mapping),
     };
   });

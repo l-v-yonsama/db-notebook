@@ -183,15 +183,17 @@ function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): str
 // performanceTuningPlanFormatter.ts's top comment.
 function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRows>): string[] {
   const lines = [
-    "| Table | Index | Est. rows | Actual rows | Est./actual ratio | Columns used |",
-    "|---|---|---|---|---|---|",
+    "| Table | Index | Est. rows | Actual rows | Est./actual ratio | Access fraction | Filter pass rate | Columns used |",
+    "|---|---|---|---|---|---|---|---|",
   ];
   for (const row of rows) {
     const ratio = row.rowEstimateRatio !== undefined ? `${row.rowEstimateRatio.toFixed(2)}x` : "-";
+    const accessFraction = row.tableAccessFraction !== undefined ? `${(row.tableAccessFraction * 100).toFixed(2)}%` : "-";
+    const filterPassRate = row.predicateFilterSelectivity !== undefined ? `${(row.predicateFilterSelectivity * 100).toFixed(2)}%` : "-";
     lines.push(
       `| ${escapeMdCell(row.table)} | ${row.index ? escapeMdCell(row.index) : "-"} | ${
         row.estimatedRows ?? "-"
-      } | ${row.actualRows ?? "-"} | ${ratio} | ${row.columnsUsed ? escapeMdCell(row.columnsUsed) : "-"} |`
+      } | ${row.actualRows ?? "-"} | ${ratio} | ${accessFraction} | ${filterPassRate} | ${row.columnsUsed ? escapeMdCell(row.columnsUsed) : "-"} |`
     );
   }
   return lines;

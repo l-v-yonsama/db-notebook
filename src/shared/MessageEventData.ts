@@ -540,6 +540,8 @@ export type PlanTableMappingRowViewModel = {
   // populated only under analyze mode (Postgres today).
   actualRows?: number;
   rowEstimateRatio?: number;
+  tableAccessFraction?: number;
+  predicateFilterSelectivity?: number;
   columnsUsed?: string;
 };
 

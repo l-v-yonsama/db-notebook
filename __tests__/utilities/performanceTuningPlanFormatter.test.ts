@@ -147,7 +147,7 @@ describe("buildPlanTableMappingRows", () => {
     expect(buildPlanTableMappingRows([])).toEqual([]);
   });
 
-  it("carries actualRows/rowEstimateRatio through for an analyze-mode mapping (Postgres today)", () => {
+  it("carries actual-row and separated selectivity metrics through for an analyze-mode mapping", () => {
     const mappings: PlanTableMapping[] = [
       {
         planNodeId: "n1",
@@ -155,12 +155,16 @@ describe("buildPlanTableMappingRows", () => {
         estimatedRows: 50,
         actualRows: 37,
         rowEstimateRatio: 0.74,
+        tableAccessFraction: { value: 0.1, estimated: false, source: "test" },
+        predicateFilterSelectivity: { value: 0.37, estimated: false, source: "test" },
       },
     ];
     expect(buildPlanTableMappingRows(mappings)[0]).toMatchObject({
       estimatedRows: 50,
       actualRows: 37,
       rowEstimateRatio: 0.74,
+      tableAccessFraction: 0.1,
+      predicateFilterSelectivity: 0.37,
     });
   });
 
