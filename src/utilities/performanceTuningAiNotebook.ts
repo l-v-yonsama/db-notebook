@@ -201,20 +201,16 @@ function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRow
 // rendered as an EXPLAIN-style indented text block (a table would lose the
 // parent-child structure that's the whole point of an execution plan);
 // planTableMappings is genuinely flat, so that one becomes a table.
-// 2026-08-20 follow-up: actualPlanText (MySQL-only - see its own comment in
-// db-drivers' PerformanceTuningContext.ts) is a third, independent piece -
-// real EXPLAIN ANALYZE text the normalized plan tree above does not carry
-// for MySQL, so it gets its own fenced block rather than being merged into
-// either of the other two. Returns undefined (no cell at all) only when
-// none of the three has anything to show, rather than an empty/near-empty
-// section.
+// actualPlan is a third, independent piece of database-native runtime
+// evidence. It gets its own fenced block rather than being merged into the
+// normalized estimate tree or the table-mapping rows.
 function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string | undefined {
   const planTreeText = context.executionPlan.normalizedPlan
     ? formatPlanTree(context.executionPlan.normalizedPlan)
     : undefined;
   const rows = buildPlanTableMappingRows(context.planTableMappings);
-  const actualPlanText = context.executionPlan.actualPlanText;
-  if (!planTreeText && rows.length === 0 && !actualPlanText) {
+  const actualPlan = context.executionPlan.actualPlan;
+  if (!planTreeText && rows.length === 0 && !actualPlan) {
     return undefined;
   }
 
@@ -225,8 +221,15 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
   if (rows.length > 0) {
     lines.push("### Tables referenced by this plan", "", ...planTableMappingsTable(rows), "");
   }
-  if (actualPlanText) {
-    lines.push("### Actual execution plan (EXPLAIN ANALYZE)", "", "```text", actualPlanText, "```", "");
+  if (actualPlan) {
+    lines.push(
+      `### Actual execution plan (${actualPlan.source})`,
+      "",
+      `\`\`\`${actualPlan.format === "xml" ? "xml" : actualPlan.format === "json" ? "json" : "text"}`,
+      actualPlan.content,
+      "```",
+      "",
+    );
   }
   return lines.join("\n");
 }

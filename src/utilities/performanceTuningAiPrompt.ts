@@ -13,7 +13,7 @@ Base every finding and recommendation only on the information given in the conte
 
 Never claim a recommendation is guaranteed to work: this is one point-in-time context snapshot, not a live benchmark, and the user must verify and apply any change themselves - do not suggest that you or the user should run any SQL automatically as part of this analysis.
 
-If the context's "executionPlan" has an "actualPlanText" field, that is the database's own real EXPLAIN ANALYZE output (currently MySQL only) - the SQL was actually executed to measure it, and it contains real per-step timing/row counts. It is supplied as plain, unparsed text, separate from "executionPlan.normalizedPlan" (which stays an *estimate* even when actualPlanText is present): treat every line in it as ordinary text evidence you may quote or paraphrase in a finding/recommendation's "detail"/"rationale", but do not invent a "planNodeId" for any of it - that field must only ever reference an id that actually appears in executionPlan.normalizedPlan or planTableMappings.
+If the context's "executionPlan" has an "actualPlan" artifact, that is the database's own real runtime-plan evidence - the SQL was actually executed to measure it. Its "source" and "format" identify whether it is database text, XML, or JSON. It is separate from "executionPlan.normalizedPlan", which can remain an *estimate* even when actualPlan is present: treat it as ordinary evidence you may quote or paraphrase in a finding/recommendation's "detail"/"rationale", but do not invent a "planNodeId" from its visual/tree order - that field must only ever reference an id that actually appears in executionPlan.normalizedPlan or planTableMappings.
 
 An index is not always the right fix. If a WHERE/JOIN/GROUP BY predicate wraps a column in a function (e.g. LOWER(col), DATE(col), CAST(col AS ...)), a plain index on that column cannot be used for it at all (the predicate is not sargable) - in that case, prefer recommending a sargable rewrite of the predicate itself (for example, rewriting a DATE(created_at) = X range check as created_at >= X AND created_at < X + one day) as the primary recommendation, and only add a supporting index once the predicate is sargable. Do not recommend an index on a function-wrapped column (e.g. CREATE INDEX ... (LOWER(col))) without first checking its selectivity per the next paragraph.
 
@@ -62,6 +62,26 @@ The response must be a single JSON object with exactly this shape:
 
 If "findings" is empty, explain why in "summary" (for example, nothing actionable was found). "missingContext" should be an empty array if nothing is missing.`;
 
+// "Copy Prompt for Other AI" (2026-08-21 follow-up): a fallback for a user
+// whose vscode.lm-exposed models are too limited for good results (today
+// that's `vendor: "copilot"` only - see PerformanceTuningPreviewPanel.ts),
+// but who already has a paid ChatGPT/Claude/Codex/Claude Code subscription
+// they'd rather use directly, outside VS Code entirely. Reuses
+// ASSISTANT_ANALYSIS_PROMPT verbatim - none of that domain guidance
+// (sargable rewrites, selectivity checks, duplicate-index avoidance,
+// composite column order, WHERE-clause enumeration) is Copilot-specific -
+// and only swaps RESPONSE_FORMAT_INSTRUCTIONS' strict JSON contract for a
+// plain-text one, since there is no parser on the other end of a manual
+// copy/paste: the user reads the answer directly wherever they pasted it.
+const PLAIN_TEXT_RESPONSE_INSTRUCTIONS = `Answer in plain, well-organized text for a human reader - not JSON, and not wrapped in a code fence (except for actual SQL you are suggesting the user run).
+
+Structure your answer as:
+- A short summary of what is likely causing the slowness.
+- Findings: the specific, evidence-based facts from the context that support that summary.
+- Recommendations: concrete changes to make, each with a complete SQL statement to run where applicable (e.g. a full CREATE INDEX statement, or the fully rewritten query) - not just a description of the change.
+
+If nothing actionable was found, say so plainly instead of forcing a recommendation.`;
+
 export type PerformanceTuningAiPrompt = {
   assistant: string;
   user: string;
@@ -82,30 +102,18 @@ export type BuildAiAnalysisPromptOptions = {
   language?: string;
 };
 
-export function buildAiAnalysisPrompt(
-  context: PerformanceTuningContext,
-  options: BuildAiAnalysisPromptOptions = {}
-): PerformanceTuningAiPrompt {
-  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT, "", RESPONSE_FORMAT_INSTRUCTIONS];
-  if (options.translateResponse && options.language) {
-    assistantParts.push(
-      "",
-      `Write "summary", each finding's "title" and "detail", each recommendation's "title", "detail", and ` +
-        `"rationale", and each "missingContext" entry in the following language: ${options.language}. Do not ` +
-        `translate JSON field names, the fixed English values of "severity"/"confidence"/"riskLevel", ` +
-        `"suggestedSql" (it is SQL code), or any evidence identifier (schemaName/tableName/indexName/` +
-        `planNodeId/diagnosticCode) - leave those in English/unchanged.`
-    );
-  }
-  const assistant = [...assistantParts, ""].join("\n");
-
+// Shared by buildAiAnalysisPrompt() (the "user" half of its {assistant, user}
+// split) and buildPlainTextAnalysisPrompt() (folded into one combined
+// string, since a manual copy/paste has no separate system-message
+// channel) - identical content either way, just assembled differently.
+function buildContextSection(context: PerformanceTuningContext): string {
   // No summarization/truncation here (§7): RDSBaseDriver.enforcePayloadBudget()
   // has already shaped this JSON to fit maxPayloadBytes, and re-summarizing on
   // top of that would discard the very evidence findings/recommendations are
   // supposed to reference.
   const contextJson = JSON.stringify(context, null, 2);
 
-  const user = [
+  return [
     "Analyze the performance of the following SQL statement using the structured context collected below.",
     "",
     "This context was collected by Database Notebook's getPerformanceTuningContext() and contains the exact SQL, table/index definitions, and query predicates as read from the database - it has not been masked or redacted, and may contain literal values from the original query. Treat it accordingly.",
@@ -123,6 +131,43 @@ export function buildAiAnalysisPrompt(
     "```",
     "",
   ].join("\n");
+}
 
-  return { assistant, user };
+export function buildAiAnalysisPrompt(
+  context: PerformanceTuningContext,
+  options: BuildAiAnalysisPromptOptions = {}
+): PerformanceTuningAiPrompt {
+  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT, "", RESPONSE_FORMAT_INSTRUCTIONS];
+  if (options.translateResponse && options.language) {
+    assistantParts.push(
+      "",
+      `Write "summary", each finding's "title" and "detail", each recommendation's "title", "detail", and ` +
+        `"rationale", and each "missingContext" entry in the following language: ${options.language}. Do not ` +
+        `translate JSON field names, the fixed English values of "severity"/"confidence"/"riskLevel", ` +
+        `"suggestedSql" (it is SQL code), or any evidence identifier (schemaName/tableName/indexName/` +
+        `planNodeId/diagnosticCode) - leave those in English/unchanged.`
+    );
+  }
+  const assistant = [...assistantParts, ""].join("\n");
+
+  return { assistant, user: buildContextSection(context) };
+}
+
+// "Copy Prompt for Other AI" toolbar action (PerformanceTuningPreviewPanel.ts) -
+// one combined, self-contained string meant for a manual paste into an
+// external AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...), not a
+// vscode.lm call. See PLAIN_TEXT_RESPONSE_INSTRUCTIONS's own doc comment for
+// why the domain guidance is reused as-is and only the response-format
+// instructions differ. No translateResponse option (unlike
+// buildAiAnalysisPrompt()) - the user is pasting into a live chat they can
+// just ask a follow-up in their own language if wanted, and there is no
+// enum-valued JSON here for a translation instruction to risk corrupting.
+export function buildPlainTextAnalysisPrompt(context: PerformanceTuningContext): string {
+  return [
+    ASSISTANT_ANALYSIS_PROMPT,
+    "",
+    PLAIN_TEXT_RESPONSE_INSTRUCTIONS,
+    "",
+    buildContextSection(context),
+  ].join("\n");
 }

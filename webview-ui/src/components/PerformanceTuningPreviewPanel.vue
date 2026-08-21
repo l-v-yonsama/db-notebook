@@ -22,6 +22,9 @@ const planTreeText = ref<string | undefined>(undefined);
 const planTableMappingRows = ref<PlanTableMappingRowViewModel[]>([]);
 const sqlHtml = ref("");
 const jsonHtml = ref("");
+// "Copy Prompt for Other AI" (2026-08-21 follow-up) - see
+// MessageEventData.ts's own doc comment on this field.
+const plainTextPrompt = ref("");
 const payloadBytes = ref(0);
 const maxPayloadBytes = ref(0);
 
@@ -84,6 +87,7 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   planTableMappingRows.value = v.planTableMappingRows;
   sqlHtml.value = v.sqlHtml;
   jsonHtml.value = v.jsonHtml;
+  plainTextPrompt.value = v.plainTextPrompt;
   payloadBytes.value = v.payloadBytes;
   maxPayloadBytes.value = v.maxPayloadBytes;
   languageModels.value = v.languageModels;
@@ -211,6 +215,19 @@ defineExpose({
         <VsCodeButton :disabled="isAnalyzing" title="Analyze this context with AI" @click="analyzeWithAi">
           <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
         </VsCodeButton>
+        <!-- "Copy Prompt for Other AI" (2026-08-21 follow-up) - for a user
+             whose vscode.lm-exposed models are too limited (this extension
+             only queries `vendor: "copilot"`, so this is only ever whatever
+             models Copilot itself exposes) but who already has a ChatGPT/
+             Claude.ai/Claude Code/Codex subscription they'd rather paste
+             into directly. Copies the same domain-guided prompt as "Analyze
+             with AI", just asking for a plain-text answer instead of JSON
+             (see performanceTuningAiPrompt.ts's buildPlainTextAnalysisPrompt()) -
+             no vscode.lm call happens for this button. -->
+        <CopyToClipboardButton appearance="secondary" :content="plainTextPrompt"
+          title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)">
+          <fa icon="comment-dots" />Copy Prompt for Other AI
+        </CopyToClipboardButton>
         <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success'" title="Save the AI analysis as a new Notebook under reports/performance-tuning/"
           @click="saveAiAnalysisAsNotebook">
           <fa icon="book" />Save as Notebook

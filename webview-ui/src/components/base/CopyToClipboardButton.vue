@@ -5,6 +5,12 @@
     <fa v-else-if="state === 'loading'" icon="spinner" spin />
     <fa v-else-if="state === 'success'" icon="check" class="success" />
     <fa v-else icon="times" class="error" />
+    <!-- Optional text label, for use as a toolbar-style icon+text button
+         (e.g. PerformanceTuningPreviewPanel.vue's "Copy Prompt for Other AI")
+         instead of this component's original icon-only inline use next to a
+         section header. Every existing call site passes no slot content, so
+         they render exactly as before. -->
+    <slot />
   </vscode-button>
 </template>
 

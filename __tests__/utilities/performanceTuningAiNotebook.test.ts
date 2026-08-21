@@ -216,13 +216,17 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells[1].value).toContain("| orders | - | 50 | 37 | 0.74x |");
   });
 
-  it("adds an 'Actual execution plan (EXPLAIN ANALYZE)' subsection when actualPlanText is present (MySQL)", () => {
+  it("adds an actual-plan subsection when a MySQL artifact is present", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext({
         executionPlan: {
           mode: "analyze",
           format: "json",
-          actualPlanText: "-> Filter: (status = 'shipped')  (actual time=0.05..1.2 rows=5 loops=1)",
+          actualPlan: {
+            source: "EXPLAIN ANALYZE",
+            format: "text",
+            content: "-> Filter: (status = 'shipped')  (actual time=0.05..1.2 rows=5 loops=1)",
+          },
         },
         planTableMappings: [{ planNodeId: "n0", tableName: "orders" }],
       }),
@@ -232,10 +236,14 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells[1].value).toContain("actual time=0.05..1.2 rows=5 loops=1");
   });
 
-  it("adds the execution plan cell for actualPlanText alone, with no normalizedPlan or table mappings", () => {
+  it("adds the execution plan cell for an actual-plan artifact alone, with no normalizedPlan or table mappings", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext({
-        executionPlan: { mode: "analyze", format: "json", actualPlanText: "-> Table scan on orders" },
+        executionPlan: {
+          mode: "analyze",
+          format: "json",
+          actualPlan: { source: "EXPLAIN ANALYZE", format: "text", content: "-> Table scan on orders" },
+        },
       }),
       buildAnalysis()
     );

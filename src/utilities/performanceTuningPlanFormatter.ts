@@ -39,7 +39,7 @@ function formatTableRef(relation: PlanNode["relation"]): string | undefined {
 // to the majority of this project's users) rather than inventing a new one.
 // The same slot doubles for `actual` under analyze mode (Postgres ships
 // this today; MySQL's real EXPLAIN ANALYZE data is unparsed text instead -
-// see executionPlan.actualPlanText - so PlanNode.actual stays empty there).
+// see executionPlan.actualPlan - so PlanNode.actual stays empty there).
 function formatEstimated(estimated: PlanNode["estimated"]): string | undefined {
   if (!estimated) {
     return undefined;
@@ -139,7 +139,7 @@ export type PlanTableMappingRow = {
   // PostgresPerformanceTuningProvider issues EXPLAIN (ANALYZE, BUFFERS,
   // FORMAT JSON); Oracle/SQL Server/MySQL leave these undefined, MySQL
   // because its real EXPLAIN ANALYZE data lives in
-  // executionPlan.actualPlanText instead, unparsed - see that field's
+  // executionPlan.actualPlan instead, unparsed - see that field's
   // comment in db-drivers' PerformanceTuningContext.ts).
   actualRows?: number;
   rowEstimateRatio?: number;

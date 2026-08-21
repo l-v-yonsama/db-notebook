@@ -8,6 +8,7 @@ import {
   faCircleXmark,
   faClipboard,
   faCodeCompare,
+  faCommentDots,
   faDatabase,
   faEye,
   faFileExcel,
@@ -44,6 +45,7 @@ library.add(faClipboard);
 library.add(faCirclePlay);
 library.add(faCircleXmark);
 library.add(faCodeCompare);
+library.add(faCommentDots);
 library.add(faDatabase);
 library.add(faEye);
 library.add(faFileExcel);

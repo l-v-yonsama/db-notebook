@@ -586,6 +586,14 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
       sqlHtml: string;
       jsonHtml: string;
+      // "Copy Prompt for Other AI" (2026-08-21 follow-up) - a self-contained
+      // plain-text prompt (buildPlainTextAnalysisPrompt(), extension-side)
+      // for a manual paste into an external AI chat (ChatGPT/Claude.ai/
+      // Claude Code/Codex/...) the user already has a subscription for,
+      // bypassing vscode.lm/Copilot entirely. Precomputed here for the same
+      // reason sqlHtml/jsonHtml are - a pure string build, ready to copy
+      // instantly with no round-trip to the extension host.
+      plainTextPrompt: string;
       // Computed on the extension side (Buffer.byteLength) rather than
       // re-serialized/measured in the webview, so the displayed number
       // always matches what RDSBaseDriver.enforcePayloadBudget() itself saw.

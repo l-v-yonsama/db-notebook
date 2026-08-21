@@ -1,6 +1,6 @@
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { describe, expect, it } from "vitest";
-import { buildAiAnalysisPrompt } from "../../src/utilities/performanceTuningAiPrompt";
+import { buildAiAnalysisPrompt, buildPlainTextAnalysisPrompt } from "../../src/utilities/performanceTuningAiPrompt";
 
 function buildContext(overrides: Partial<PerformanceTuningContext> = {}): PerformanceTuningContext {
   return {
@@ -53,12 +53,13 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant.toLowerCase()).toContain("do not suggest that you or the user should run any sql automatically");
   });
 
-  it("explains executionPlan.actualPlanText (MySQL's unparsed EXPLAIN ANALYZE text) so it isn't mistaken for the normalized plan", () => {
+  it("explains executionPlan.actualPlan as a vendor artifact so it isn't mistaken for the normalized plan", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext());
-    expect(assistant).toContain("actualPlanText");
-    expect(assistant.toLowerCase()).toContain("unparsed");
+    expect(assistant).toContain("actualPlan");
+    expect(assistant).toContain("source");
+    expect(assistant).toContain("format");
     // planNodeId evidence only makes sense against the normalized plan tree -
-    // the prompt must not imply actualPlanText's own lines can be cited that way.
+    // the prompt must not imply an actual-plan artifact's own lines can be cited that way.
     expect(assistant).toContain("planNodeId");
   });
 
@@ -120,5 +121,47 @@ describe("buildAiAnalysisPrompt", () => {
     const withExplicitFalse = buildAiAnalysisPrompt(buildContext(), {});
     expect(withNoOptions.assistant).toBe(withExplicitFalse.assistant);
     expect(withNoOptions.assistant).not.toContain("following language");
+  });
+});
+
+// 2026-08-21 follow-up: "Copy Prompt for Other AI" - a manual-paste fallback
+// for a user whose vscode.lm-exposed models are too limited (vendor:
+// "copilot" only today), reusing the same domain guidance as
+// buildAiAnalysisPrompt() but with plain-text, not JSON, response
+// instructions, folded into one combined string.
+describe("buildPlainTextAnalysisPrompt", () => {
+  it("returns a single string, not an {assistant, user} pair", () => {
+    const prompt = buildPlainTextAnalysisPrompt(buildContext());
+    expect(typeof prompt).toBe("string");
+  });
+
+  it("includes the target SQL and the full context JSON verbatim", () => {
+    const context = buildContext({
+      statement: { sql: "SELECT * FROM orders WHERE tenant_id = 42", source: "editor" },
+    });
+    const prompt = buildPlainTextAnalysisPrompt(context);
+    expect(prompt).toContain("SELECT * FROM orders WHERE tenant_id = 42");
+    expect(prompt).toContain(JSON.stringify(context, null, 2));
+  });
+
+  it("reuses the same domain guidance as buildAiAnalysisPrompt() (sargable rewrites, selectivity, duplicate-index check, column order, dominantCostPlanNode)", () => {
+    const prompt = buildPlainTextAnalysisPrompt(buildContext());
+    expect(prompt.toLowerCase()).toContain("sargable");
+    expect(prompt).toContain("filterSelectivity");
+    expect(prompt).toContain("tables[].definition.indexes");
+    expect(prompt.toLowerCase()).toContain("equality-condition columns before range-condition columns");
+    expect(prompt).toContain("dominantCostPlanNode");
+  });
+
+  it("asks for plain text, not the strict JSON response contract", () => {
+    const prompt = buildPlainTextAnalysisPrompt(buildContext());
+    expect(prompt).toContain("plain, well-organized text");
+    expect(prompt).not.toContain("JSON.stringify");
+    expect(prompt).not.toContain('"riskLevel"');
+  });
+
+  it("still asks for a complete SQL statement in each recommendation, not just a description", () => {
+    const prompt = buildPlainTextAnalysisPrompt(buildContext());
+    expect(prompt.toLowerCase()).toContain("complete sql statement");
   });
 });

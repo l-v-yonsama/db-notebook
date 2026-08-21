@@ -27,7 +27,7 @@ import { getErrorMessage } from "../utilities/errorUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
 import { buildLanguageModelSelection, defaultTranslateResponse } from "../utilities/lmModelSelection";
 import { saveAiAnalysisAsNotebook } from "../utilities/performanceTuningAiNotebook";
-import { buildAiAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
+import { buildAiAnalysisPrompt, buildPlainTextAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
 import { findPossibleDuplicateIndex } from "../utilities/performanceTuningIndexDuplication";
 import { buildPlanTableMappingRows, formatPlanTree } from "../utilities/performanceTuningPlanFormatter";
@@ -159,6 +159,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const contextJson = JSON.stringify(context, null, 2);
     const payloadBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
 
+    // "Copy Prompt for Other AI" (2026-08-21 follow-up): precomputed here,
+    // like sqlHtml/jsonHtml below, so the toolbar button can copy it
+    // instantly with no round-trip - it's a pure string build, not an actual
+    // vscode.lm call, so there's nothing to await.
+    const plainTextPrompt = buildPlainTextAnalysisPrompt(context);
+
     const [sqlHtml, jsonHtml, models] = await Promise.all([
       createCodeHtmlString({ code: context.statement.sql, lang: "sql" }),
       createCodeHtmlString({ code: contextJson, lang: "json" }),
@@ -202,6 +208,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           planTableMappingRows,
           sqlHtml,
           jsonHtml,
+          plainTextPrompt,
           payloadBytes,
           maxPayloadBytes: DEFAULT_MAX_PAYLOAD_BYTES,
           languageModels,
