@@ -304,6 +304,7 @@ describe("buildAiAnalysisNotebookCells", () => {
       buildAnalysis()
     );
     expect(cells[1].value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
+    expect(cells[1].value).toContain("```actual-plan");
     expect(cells[1].value).toContain("actual time=0.05..1.2 rows=5 loops=1");
   });
 

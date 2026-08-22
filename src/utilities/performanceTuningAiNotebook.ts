@@ -250,7 +250,7 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
     lines.push(
       `### Actual execution plan (${actualPlan.source})`,
       "",
-      `\`\`\`${actualPlan.format === "xml" ? "xml" : actualPlan.format === "json" ? "json" : "text"}`,
+      "```actual-plan",
       actualPlan.content,
       "```",
       "",

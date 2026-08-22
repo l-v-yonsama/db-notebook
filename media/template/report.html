@@ -38,6 +38,25 @@
         position: relative;
       }
 
+      /* Keep any long code/result block usable in a resized report window. */
+      pre {
+        max-height: 80vh;
+        overflow-x: auto;
+        overflow-y: auto;
+      }
+
+      /* DBMS_XPLAN and similar native plans use spaces to form columns.
+         Restrict this to the dedicated Markdown fence so normal report text
+         and regular SQL/JSON code blocks retain their existing appearance. */
+      pre.actual-execution-plan,
+      pre.actual-execution-plan code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-variant-ligatures: none;
+        white-space: pre;
+        font-size: small;
+        line-height: 1.25;
+      }
+
       span.tag.contains {
         position: absolute;
         right: 10px;
@@ -258,7 +277,8 @@
           } catch (e) {
             value = hljs.highlightAuto(code).value;
           }
-          return "<pre><code>" + value + "</code></pre>";
+          const planClass = language === "actual-plan" ? ' class="actual-execution-plan"' : "";
+          return "<pre" + planClass + "><code>" + value + "</code></pre>";
         };
         renderer.heading = (tokens, depth) => {
           return `<h${depth} class='subtitle is-${depth}'>${tokens}</h${depth}>`;
