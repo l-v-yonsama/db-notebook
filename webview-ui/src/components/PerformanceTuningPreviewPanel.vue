@@ -3,6 +3,7 @@ import type {
   LabelValueItem,
   PerformanceTuningAiAnalysisViewState,
   PerformanceTuningDiagnosticGroupViewModel,
+  PerformanceTuningHumanSummary,
   PerformanceTuningPreviewPanelEventData,
   PlanTableMappingRowViewModel,
 } from "@/utilities/vscode";
@@ -12,6 +13,7 @@ import { computed, ref } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
+import PerformanceTuningSnapshot from "./base/PerformanceTuningSnapshot.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
@@ -21,6 +23,9 @@ const diagnosticGroups = ref<PerformanceTuningDiagnosticGroupViewModel[]>([]);
 const planTreeText = ref<string | undefined>(undefined);
 const actualPlanDisplayText = ref<string | undefined>(undefined);
 const planTableMappingRows = ref<PlanTableMappingRowViewModel[]>([]);
+const humanSummary = ref<PerformanceTuningHumanSummary | undefined>(undefined);
+const queryDiagramAvailable = ref(false);
+const queryDiagramHasWarnings = ref(false);
 const sqlHtml = ref("");
 const jsonHtml = ref("");
 // "Copy Prompt for Other AI" (2026-08-21 follow-up) - see
@@ -131,6 +136,9 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   planTreeText.value = v.planTreeText;
   actualPlanDisplayText.value = v.actualPlanDisplayText;
   planTableMappingRows.value = v.planTableMappingRows;
+  humanSummary.value = v.humanSummary;
+  queryDiagramAvailable.value = v.queryDiagramAvailable;
+  queryDiagramHasWarnings.value = v.queryDiagramHasWarnings;
   sqlHtml.value = v.sqlHtml;
   jsonHtml.value = v.jsonHtml;
   plainTextPrompt.value = v.plainTextPrompt;
@@ -342,6 +350,14 @@ defineExpose({
     </div>
 
     <div class="scrollArea">
+      <div v-if="humanSummary" class="section performance-snapshot-section">
+        <h3 class="section-title">Performance snapshot</h3>
+        <PerformanceTuningSnapshot :summary="humanSummary" />
+        <p v-if="queryDiagramAvailable" class="section-note query-diagram-notice">
+          A query-scoped ER diagram will be included when you save this analysis as a Notebook; view it in the saved DBN or HTML report.<span v-if="queryDiagramHasWarnings"> Some relationships could not be resolved conservatively; the saved Notebook includes the details.</span>
+        </p>
+      </div>
+
       <!-- 0. AI Analysis (Step 10, design doc §6.1). Always rendered, even at
            idle (2026-08-20 follow-up): a first-time user had no on-screen
            indication of *where* the result would show up until after

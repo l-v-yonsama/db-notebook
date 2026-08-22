@@ -37,6 +37,7 @@ import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
 import type { PerformanceTuningAiAnalysisResult } from "./PerformanceTuningAiAnalysis";
+import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSummary";
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
@@ -588,6 +589,12 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       // remains in context.executionPlan.actualPlan / Full Context JSON.
       actualPlanDisplayText?: string;
       planTableMappingRows: PlanTableMappingRowViewModel[];
+      // Deterministic, human-readable facts built once by the extension host.
+      humanSummary: PerformanceTuningHumanSummary;
+      // Mermaid itself is intentionally not bundled into the Preview webview.
+      // The saved DBN/HTML report contains the query-scoped diagram instead.
+      queryDiagramAvailable: boolean;
+      queryDiagramHasWarnings: boolean;
       // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
       // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
       sqlHtml: string;

@@ -270,6 +270,8 @@ const createHtml = async (
     htmlContents = [];
     cells.forEach((cell, idx) => {
       const cellMeta: CellMeta = cell.metadata;
+      const cellLabel = cellMeta.cellLabel;
+      const cellTitle = `${isCellOrigin ? "CELL" : "No"}${idx + 1}`;
       htmlContents.push(`<hr class="cellIdx${idx}" />`);
       const id = `id${idx}`;
 
@@ -278,18 +280,17 @@ const createHtml = async (
       if (cellMeta.publishParams?.topicName) {
         const subscriptionName = cellMeta.publishParams.topicName ?? "";
         htmlContents.push(
-          `<h4 class="title is-4" ><a name="cell${idx + 1}">${isCellOrigin ? "CELL" : "No"}${
-            idx + 1
-          }<span style="padding:10px; font-size:medium;">TOPIC: ${escapeHtml(
+          `<h4 class="title is-4" ><a name="cell${idx + 1}">${cellTitle}<span style="padding:10px; font-size:medium;">TOPIC: ${escapeHtml(
             subscriptionName
           )}</span></a></h4>`
         );
       } else {
         htmlContents.push(
-          `<h4 class="title is-4" ><a name="cell${idx + 1}">${isCellOrigin ? "CELL" : "No"}${
-            idx + 1
-          }</a></h4>`
+          `<h4 class="title is-4" ><a name="cell${idx + 1}">${cellTitle}</a></h4>`
         );
+      }
+      if (cellLabel) {
+        htmlContents.push(`<h5 class="subtitle is-5">${escapeHtml(cellLabel)}</h5>`);
       }
       if (isMarkupCell(cell)) {
         htmlContents.push(`<div id="${id}" class="block">`);
@@ -605,21 +606,21 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
   }
   let s = "";
 
-  // A user-set cellLabel (CellLabelProvider in statusBarProviders.ts) takes
-  // priority over the bare language id - it's the whole point of that
-  // status bar item: a raw "json" tag says nothing about what a JSON cell
-  // actually holds (see performanceTuningAiNotebook.ts's Full Context JSON /
-  // AI analysis JSON cells for the motivating case).
+  // A user-set cellLabel identifies the cell's content (for example, "Full
+  // context JSON"). Keep it as the final plain-text description, following
+  // the language and execution-status tags used by the other cell types.
   const { cellLabel } = cell.metadata as CellMeta;
+  const labelText = cellLabel ? ` ${escapeHtml(cellLabel)}` : "";
   if (cellLabel) {
-    s = `<span class="tag is-info is-light">${escapeHtml(cellLabel)}</span>`;
+    const language = cell.document.languageId || "Code";
+    s = `<span class="tag is-info is-light">${escapeHtml(language)}</span>`;
   } else if (cell.document.languageId) {
     s = `<span class="tag is-info is-light">${cell.document.languageId}</span>`;
   }
 
   if (cell.outputs.length === 0) {
     s += '<span class="tag is-info is-light">Not executed</span>';
-    return s;
+    return s + labelText;
   }
   // SKIPPED CELL ------
   if (
@@ -630,13 +631,13 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
     )
   ) {
     s += '<span class="tag is-warning is-light">Skipped</span>';
-    return s;
+    return s + labelText;
   }
 
   // LM RESULET CELL -------
   if (cell.outputs.some((it) => (it.metadata as RunResultMetadata)?.lmResult !== undefined)) {
     s += '<span class="tag is-warning is-light">Evaluated</span>';
-    return s;
+    return s + labelText;
   }
 
   let hasError = cell.outputs.some((it) => (it.metadata as RunResultMetadata)?.status === "error");
@@ -704,7 +705,7 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
     }
   });
 
-  return s;
+  return s + labelText;
 };
 
 const createDiffTitle = (item: DiffTabInnerItem) => {
@@ -715,4 +716,3 @@ const createDiffTitle = (item: DiffTabInnerItem) => {
   const updated = `<span class="tag is-info is-light">Updated:${diffResult.updated}</span>`;
   return `${escapeHtml(title)}${escapeHtml(comment)} ${inserted} ${deleted} ${updated}`;
 };
-

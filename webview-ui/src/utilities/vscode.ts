@@ -16,6 +16,7 @@ export * from "../../../src/shared/MessageEventData";
 export * from "../../../src/shared/ModeType";
 export * from "../../../src/shared/PerformanceTuningAiAnalysis";
 export * from "../../../src/shared/PerformanceTuningBinds";
+export * from "../../../src/shared/PerformanceTuningHumanSummary";
 export * from "../../../src/shared/PublishEditorParams";
 export * from "../../../src/shared/QueryStatisticsParams";
 export * from "../../../src/shared/RecordRule";

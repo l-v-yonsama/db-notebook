@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createHtmlFromHarItem } from "../../src/utilities/htmlGenerator";
+import { createHtmlFromHarItem, createHtmlFromNotebook } from "../../src/utilities/htmlGenerator";
 
 const tmpFiles: string[] = [];
 
@@ -142,5 +142,33 @@ describe("createHtmlFromHarItem", () => {
 
     const html = await fs.promises.readFile(targetPath, "utf8");
     expect(html.length).toBeGreaterThan(0);
+  });
+});
+
+describe("createHtmlFromNotebook", () => {
+  it("renders a labeled JSON cell as plain text in both the TOC and its heading", async () => {
+    const targetPath = tmpHtmlPath();
+    const jsonCell = {
+      document: {
+        languageId: "json",
+        getText: () => '{"formatVersion":1}',
+      },
+      metadata: { cellLabel: "Full context JSON" },
+      outputs: [],
+    };
+    const notebook = {
+      getCells: () => [jsonCell],
+    };
+
+    const err = await createHtmlFromNotebook(notebook as never, targetPath);
+    expect(err).toBe("");
+
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).toContain('<a name="cell1">CELL1</a>');
+    expect(html).toContain('<h5 class="subtitle is-5">Full context JSON</h5>');
+    expect(html).toContain(
+      '<span class="tag is-info is-light">json</span><span class="tag is-info is-light">Not executed</span> Full context JSON'
+    );
+    expect(html).not.toContain('<span class="tag is-info is-light">Full context JSON</span>');
   });
 });

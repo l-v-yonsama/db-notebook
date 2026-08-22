@@ -68,6 +68,20 @@ function buildAnalysis(
   };
 }
 
+type BuiltCell = ReturnType<typeof buildAiAnalysisNotebookCells>[number];
+
+function findCell(cells: BuiltCell[], text: string): BuiltCell {
+  const cell = cells.find((candidate) => candidate.value.includes(text));
+  expect(cell, `Expected a notebook cell containing ${text}`).toBeDefined();
+  return cell!;
+}
+
+function findJsonCell(cells: BuiltCell[], label: string): BuiltCell {
+  const cell = cells.find((candidate) => candidate.metadata?.cellLabel === label);
+  expect(cell, `Expected the ${label} JSON cell`).toBeDefined();
+  return cell!;
+}
+
 describe("buildAiAnalysisNotebookFilename", () => {
   it("sanitizes non-alphanumeric characters in the database name and embeds a timestamp", () => {
     const now = new Date(2026, 7, 18, 9, 5, 3); // 2026-08-18 09:05:03 local
@@ -84,49 +98,51 @@ describe("buildAiAnalysisNotebookFilename", () => {
 });
 
 describe("buildAiAnalysisNotebookCells", () => {
-  it("builds three markdown cells (overview + analysis + JSON appendix intro) followed by context, request, and response JSON cells", () => {
+  it("builds overview, human snapshot, analysis, appendix, and the three reproducibility JSON cells", () => {
     const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
 
-    expect(cells).toHaveLength(6);
+    expect(cells).toHaveLength(7);
     expect(cells[0].kind).toBe(NotebookCellKind.Markup);
     expect(cells[0].languageId).toBe("markdown");
     expect(cells[0].value).toContain("SELECT * FROM orders WHERE tenant_id = 42");
 
     expect(cells[1].kind).toBe(NotebookCellKind.Markup);
     expect(cells[1].languageId).toBe("markdown");
-    expect(cells[1].value).toContain("### Findings");
-    expect(cells[1].value).toContain("### Recommendations");
-    expect(cells[1].value).toContain("### Missing context");
-    expect(cells[1].value).toContain("Full table scan");
-    expect(cells[1].value).toContain("Add an index on tenant_id");
-    expect(cells[1].value).toContain("An ANALYZE plan would confirm the actual row counts.");
+    expect(cells[1].value).toContain("## Performance snapshot");
 
-    expect(cells[2].kind).toBe(NotebookCellKind.Markup);
-    expect(cells[2].languageId).toBe("markdown");
-    expect(cells[2].value).toContain("Full context JSON");
-    expect(cells[2].value).toContain("AI request messages");
-    expect(cells[2].value).toContain("AI analysis JSON");
+    expect(cells[2].value).toContain("### Findings");
+    expect(cells[2].value).toContain("### Recommendations");
+    expect(cells[2].value).toContain("### Missing context");
+    expect(cells[2].value).toContain("Full table scan");
+    expect(cells[2].value).toContain("Add an index on tenant_id");
+    expect(cells[2].value).toContain("An ANALYZE plan would confirm the actual row counts.");
 
-    expect(cells[3].kind).toBe(NotebookCellKind.Code);
-    expect(cells[3].languageId).toBe("json");
-    expect(JSON.parse(cells[3].value)).toMatchObject({ database: { databaseName: "app" } });
-    expect(cells[3].metadata).toEqual({ cellLabel: "Full context JSON" });
+    expect(cells[3].kind).toBe(NotebookCellKind.Markup);
+    expect(cells[3].languageId).toBe("markdown");
+    expect(cells[3].value).toContain("Full context JSON");
+    expect(cells[3].value).toContain("AI request messages");
+    expect(cells[3].value).toContain("AI analysis JSON");
 
     expect(cells[4].kind).toBe(NotebookCellKind.Code);
     expect(cells[4].languageId).toBe("json");
-    expect(JSON.parse(cells[4].value)).toMatchObject({
+    expect(JSON.parse(cells[4].value)).toMatchObject({ database: { databaseName: "app" } });
+    expect(cells[4].metadata).toEqual({ cellLabel: "Full context JSON" });
+
+    expect(cells[5].kind).toBe(NotebookCellKind.Code);
+    expect(cells[5].languageId).toBe("json");
+    expect(JSON.parse(cells[5].value)).toMatchObject({
       model: { id: "gpt-4o" },
       messages: [
         { role: "assistant" },
         { role: "user", content: expect.stringContaining("SELECT * FROM orders") },
       ],
     });
-    expect(cells[4].metadata).toEqual({ cellLabel: "AI request messages" });
+    expect(cells[5].metadata).toEqual({ cellLabel: "AI request messages" });
 
-    expect(cells[5].kind).toBe(NotebookCellKind.Code);
-    expect(cells[5].languageId).toBe("json");
-    expect(JSON.parse(cells[5].value)).toMatchObject({ summary: "The query does a full scan on orders." });
-    expect(cells[5].metadata).toEqual({ cellLabel: "AI analysis JSON" });
+    expect(cells[6].kind).toBe(NotebookCellKind.Code);
+    expect(cells[6].languageId).toBe("json");
+    expect(JSON.parse(cells[6].value)).toMatchObject({ summary: "The query does a full scan on orders." });
+    expect(cells[6].metadata).toEqual({ cellLabel: "AI analysis JSON" });
   });
 
   it("records whether the AI request used full or compact input in the overview", () => {
@@ -157,13 +173,14 @@ describe("buildAiAnalysisNotebookCells", () => {
         ],
       })
     );
-    expect(withDuplicate[1].value).toContain("Possible duplicate");
-    expect(withDuplicate[1].value).toContain("`idx_products_category`");
+    const analysisCell = findCell(withDuplicate, "### Recommendations");
+    expect(analysisCell.value).toContain("Possible duplicate");
+    expect(analysisCell.value).toContain("`idx_products_category`");
 
     const withoutDuplicate = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
     // The default fixture's recommendation has no possibleDuplicateOfIndex -
     // its table row must still render a "-" placeholder cell, not an empty one.
-    expect(withoutDuplicate[1].value).toMatch(/\| Add an index on tenant_id \|.*\| - \|/);
+    expect(findCell(withoutDuplicate, "### Recommendations").value).toMatch(/\| Add an index on tenant_id \|.*\| - \|/);
   });
 
   it("renders 'No findings/recommendations were reported' placeholders instead of empty tables", () => {
@@ -171,8 +188,8 @@ describe("buildAiAnalysisNotebookCells", () => {
       buildContext(),
       buildAnalysis({ findings: [], recommendations: [] })
     );
-    expect(cells[1].value).toContain("No findings were reported");
-    expect(cells[1].value).toContain("No recommendations were reported");
+    expect(findCell(cells, "### Findings").value).toContain("No findings were reported");
+    expect(findCell(cells, "### Recommendations").value).toContain("No recommendations were reported");
   });
 
   it("rebuilds the saved request with the language option used by the original analysis", () => {
@@ -182,7 +199,7 @@ describe("buildAiAnalysisNotebookCells", () => {
         request: { promptFormatVersion: 1, translateResponse: true, language: "ja", contextDetail: "full" },
       })
     );
-    const request = JSON.parse(cells[4].value);
+    const request = JSON.parse(findJsonCell(cells, "AI request messages").value);
     expect(request.messages[0].content).toContain("following language: ja");
   });
 
@@ -205,8 +222,8 @@ describe("buildAiAnalysisNotebookCells", () => {
         request: { promptFormatVersion: 1, translateResponse: false, language: "en", contextDetail: "compact" },
       })
     );
-    const fullContext = cells[4].value;
-    const request = JSON.parse(cells[5].value);
+    const fullContext = findJsonCell(cells, "Full context JSON").value;
+    const request = JSON.parse(findJsonCell(cells, "AI request messages").value);
     expect(fullContext).toContain("ActualRows");
     expect(request.messages[1].content).toContain("contentOmittedFromAiInput");
     expect(request.messages[1].content).not.toContain("ActualRows");
@@ -215,7 +232,7 @@ describe("buildAiAnalysisNotebookCells", () => {
 
   it("omits the execution plan cell entirely when there is neither a plan nor any table mappings (default fixture)", () => {
     const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
-    // Same 6-cell shape as the first test above - explicit here so this
+    // Same base shape as the first test above - explicit here so this
     // invariant has its own name/intent rather than relying on that count.
     expect(cells.every((c) => !c.value.includes("## Execution plan"))).toBe(true);
   });
@@ -240,15 +257,14 @@ describe("buildAiAnalysisNotebookCells", () => {
       buildAnalysis()
     );
 
-    expect(cells).toHaveLength(7);
-    expect(cells[1].kind).toBe(NotebookCellKind.Markup);
-    expect(cells[1].value).toContain("## Execution plan");
-    expect(cells[1].value).toContain("```text");
-    expect(cells[1].value).toContain("Seq Scan");
-    expect(cells[1].value).toContain("### Tables referenced by this plan");
-    expect(cells[1].value).toContain("| orders |");
-    // Everything else just shifts down by one - Analysis is now cells[2].
-    expect(cells[2].value).toContain("### Findings");
+    expect(cells).toHaveLength(9);
+    const executionPlanCell = findCell(cells, "## Execution plan");
+    expect(executionPlanCell.kind).toBe(NotebookCellKind.Markup);
+    expect(executionPlanCell.value).toContain("```text");
+    expect(executionPlanCell.value).toContain("Seq Scan");
+    expect(executionPlanCell.value).toContain("### Tables referenced by this plan");
+    expect(executionPlanCell.value).toContain("| orders |");
+    expect(findCell(cells, "### Findings").value).toContain("### Findings");
   });
 
   it("still adds the execution plan cell for table mappings alone, with no normalizedPlan", () => {
@@ -256,10 +272,10 @@ describe("buildAiAnalysisNotebookCells", () => {
       buildContext({ planTableMappings: [{ planNodeId: "n0", tableName: "orders" }] }),
       buildAnalysis()
     );
-    expect(cells).toHaveLength(7);
-    expect(cells[1].value).toContain("## Execution plan");
-    expect(cells[1].value).not.toContain("```text");
-    expect(cells[1].value).toContain("### Tables referenced by this plan");
+    expect(cells).toHaveLength(9);
+    const executionPlanCell = findCell(cells, "## Execution plan");
+    expect(executionPlanCell.value).not.toContain("```text");
+    expect(executionPlanCell.value).toContain("### Tables referenced by this plan");
   });
 
   it("includes Actual rows/ratio columns in the table when an analyze-mode mapping has them", () => {
@@ -271,8 +287,9 @@ describe("buildAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis()
     );
-    expect(cells[1].value).toContain("| Table | Index | Est. rows | Actual rows | Actual/est. ratio | Access fraction | Filter pass rate | Columns used |");
-    expect(cells[1].value).toContain("| orders | - | 50 | 37 | 0.74x | - | - |");
+    const executionPlanCell = findCell(cells, "## Execution plan");
+    expect(executionPlanCell.value).toContain("| Table | Index | Est. rows | Actual rows | Actual/est. ratio | Access fraction | Filter pass rate | Columns used |");
+    expect(executionPlanCell.value).toContain("| orders | - | 50 | 37 | 0.74x | - | - |");
   });
 
   it("keeps a very small actual/estimated ratio visible instead of rounding it to 0.00x", () => {
@@ -284,7 +301,7 @@ describe("buildAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis()
     );
-    expect(cells[1].value).toContain("0.0000333x");
+    expect(findCell(cells, "## Execution plan").value).toContain("0.0000333x");
   });
 
   it("adds an actual-plan subsection when a MySQL artifact is present", () => {
@@ -303,9 +320,10 @@ describe("buildAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis()
     );
-    expect(cells[1].value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
-    expect(cells[1].value).toContain("```actual-plan");
-    expect(cells[1].value).toContain("actual time=0.05..1.2 rows=5 loops=1");
+    const executionPlanCell = findCell(cells, "## Execution plan");
+    expect(executionPlanCell.value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
+    expect(executionPlanCell.value).toContain("```actual-plan");
+    expect(executionPlanCell.value).toContain("actual time=0.05..1.2 rows=5 loops=1");
   });
 
   it("adds the execution plan cell for an actual-plan artifact alone, with no normalizedPlan or table mappings", () => {
@@ -319,10 +337,10 @@ describe("buildAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis()
     );
-    expect(cells).toHaveLength(7);
-    expect(cells[1].value).toContain("## Execution plan");
-    expect(cells[1].value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
-    expect(cells[1].value).not.toContain("### Tables referenced by this plan");
+    expect(cells).toHaveLength(8);
+    const executionPlanCell = findCell(cells, "## Execution plan");
+    expect(executionPlanCell.value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
+    expect(executionPlanCell.value).not.toContain("### Tables referenced by this plan");
   });
 });
 

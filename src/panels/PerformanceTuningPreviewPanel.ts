@@ -3,6 +3,7 @@ import {
   DEFAULT_MAX_PAYLOAD_BYTES,
   PerformanceTuningContext,
   RDSBaseDriver,
+  createPerformanceQueryDiagram,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   CancellationTokenSource,
@@ -31,6 +32,7 @@ import { saveAiAnalysisAsNotebook } from "../utilities/performanceTuningAiNotebo
 import { buildAiAnalysisPrompt, buildPlainTextAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
 import { findPossibleDuplicateIndex } from "../utilities/performanceTuningIndexDuplication";
+import { buildPerformanceTuningHumanSummary } from "../utilities/performanceTuningHumanSummary";
 import {
   buildPlanTableMappingRows,
   formatActualPlanForDisplay,
@@ -244,6 +246,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       : undefined;
     const actualPlanDisplayText = formatActualPlanForDisplay(context.executionPlan.actualPlan);
     const planTableMappingRows = buildPlanTableMappingRows(context.planTableMappings);
+    const humanSummary = buildPerformanceTuningHumanSummary(context);
+    const queryDiagram = createPerformanceQueryDiagram(context);
 
     // "Language model"/"Translate response" defaults for Analyze with AI
     // (2026-08-19 follow-up, design doc §0). No gpt-4o-family preference
@@ -262,6 +266,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           planTreeText,
           actualPlanDisplayText,
           planTableMappingRows,
+          humanSummary,
+          queryDiagramAvailable: Boolean(queryDiagram),
+          queryDiagramHasWarnings: (queryDiagram?.warnings.length ?? 0) > 0,
           sqlHtml,
           jsonHtml,
           plainTextPrompt,

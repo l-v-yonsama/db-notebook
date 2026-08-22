@@ -174,6 +174,14 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant).toContain("PLAN_OBSERVATION");
   });
 
+  it("requires physical-health and statistics review without conflating maintenance operations", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant).toContain('"physicalHealth"');
+    expect(assistant).toContain("dead tuples");
+    expect(assistant).toContain("VACUUM FULL");
+    expect(assistant).toContain("missingContext");
+  });
+
   it("adds a translate instruction naming the language when translateResponse and language are both given", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext(), {
       translateResponse: true,

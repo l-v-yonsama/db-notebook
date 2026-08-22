@@ -229,6 +229,43 @@
         return s.replace(/&(amp|lt|gt|quot|#39|#x60);/g, (match) => entityMap[match]);
       }
 
+      function escapeHtmlText(s) {
+        return s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = src;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      function renderMermaidDiagrams() {
+        // Mermaid is intentionally not a static dependency: most reports do
+        // not contain a diagram. Load the pinned renderer only after Markdown
+        // insertion and only when a generated query diagram is present.
+        if (!document.querySelector("pre.mermaid")) {
+          return;
+        }
+
+        loadScript("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js")
+          .then(() => {
+            window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+            return window.mermaid.run({ querySelector: "pre.mermaid", suppressErrors: true });
+          })
+          .catch((e) => {
+            console.warn("Mermaid rendering failed; leaving the source visible.", e);
+          });
+      }
+
       $(function () {
         $("button.button.clipboard").click(function () {
           const $this = $(this);
@@ -268,6 +305,9 @@
 
         var renderer = new marked.Renderer();
         renderer.code = (code, language) => {
+          if (language === "mermaid") {
+            return '<pre class="mermaid">' + escapeHtmlText(code) + "</pre>";
+          }
           let value;
           try {
             value =
@@ -307,6 +347,8 @@
             console.error("at " + idx, e);
           }
         });
+
+        renderMermaidDiagrams();
 
         // tab click
         $("div.tabs li > a").click(function () {

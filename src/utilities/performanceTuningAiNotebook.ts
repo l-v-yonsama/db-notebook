@@ -1,4 +1,7 @@
-import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  createPerformanceQueryDiagram,
+  type PerformanceTuningContext,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { NotebookCellData, NotebookCellKind, Uri, ViewColumn, workspace } from "vscode";
 import { openNotebookFile, writeNotebookFile } from "../notebook/notebookFileUtil";
 import type {
@@ -7,8 +10,10 @@ import type {
   PerformanceTuningAiFinding,
   PerformanceTuningAiRecommendation,
 } from "../shared/PerformanceTuningAiAnalysis";
+import type { PerformanceTuningHumanSummary } from "../shared/PerformanceTuningHumanSummary";
 import { createDirectory, existsUri } from "./fsUtil";
 import { buildAiAnalysisPrompt } from "./performanceTuningAiPrompt";
+import { buildPerformanceTuningHumanSummary } from "./performanceTuningHumanSummary";
 import { buildPlanTableMappingRows, formatPlanTree } from "./performanceTuningPlanFormatter";
 
 // Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
@@ -98,6 +103,10 @@ function formatFractionAsPercent(value: number | undefined): string {
   return `${text}%`;
 }
 
+function formatNumber(value: number | undefined): string {
+  return value === undefined ? "-" : value.toLocaleString("en-US");
+}
+
 function buildOverviewMarkdown(
   context: PerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult
@@ -130,6 +139,71 @@ function buildOverviewMarkdown(
   lines.push("```sql");
   lines.push(context.statement.sql);
   lines.push("```");
+  return lines.join("\n");
+}
+
+export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHumanSummary): string {
+  const lines = [
+    "## Performance snapshot",
+    "",
+    "_Deterministic summaries of collected database facts; these are separate from the AI analysis._",
+    "",
+    "| Statement | Evidence | Scope | Collection |",
+    "|---|---|---|---|",
+    `| ${summary.profile.statementKind} | ${summary.profile.evidence === "actual" ? "Actual measured" : "Estimate only"} | ${summary.profile.tableCount} ${summary.profile.tableCount === 1 ? "table" : "tables"} | ${summary.profile.collectionStatus} |`,
+    "",
+  ];
+  if (summary.profile.tableRefs.length > 0) {
+    lines.push(`**Query tables:** ${summary.profile.tableRefs.map(escapeMdCell).join(" · ")}`, "");
+  }
+
+  lines.push(
+    "### Observed signals",
+    "",
+    "| Level | Signal | Table | Observation | Raw data |",
+    "|---|---|---|---|---|",
+  );
+  summary.signals.forEach((signal) => {
+    lines.push(
+      `| ${signal.level} | ${escapeMdCell(signal.title)} | ${signal.tableRef ? escapeMdCell(signal.tableRef) : "-"} | ${escapeMdCell(signal.summary)} | ${escapeMdCell(signal.rawDataPath)} |`,
+    );
+  });
+
+  if (summary.rowFlows.length > 0) {
+    lines.push(
+      "",
+      "### Table row flow",
+      "",
+      "| Table | Table rows | Accessed | Local filter output | Plan output | Access fraction | Filter pass rate | Raw data |",
+      "|---|---|---|---|---|---|---|---|",
+    );
+    const isDml = ["INSERT", "UPDATE", "DELETE"].includes(summary.profile.statementKind);
+    summary.rowFlows.forEach((flow) => {
+      lines.push(
+        `| ${escapeMdCell(flow.tableRef)} | ${formatNumber(flow.totalRows)}${flow.totalRows !== undefined && flow.totalRowsEstimated ? " (estimated)" : ""} | ${isDml ? "Not measured (DML)" : formatNumber(flow.accessedRows)} | ${isDml ? "Not measured (DML)" : formatNumber(flow.filterOutputRows)} | ${isDml ? "Not measured (DML)" : formatNumber(flow.planOutputRows)} | ${isDml ? "Not measured (DML)" : formatFractionAsPercent(flow.accessFraction)} | ${isDml ? "Not measured (DML)" : formatFractionAsPercent(flow.filterPassRate)} | ${escapeMdCell(flow.rawDataPath)} |`,
+      );
+    });
+  }
+  return lines.join("\n");
+}
+
+function buildQueryStructureMarkdown(context: PerformanceTuningContext): string | undefined {
+  const diagram = createPerformanceQueryDiagram(context);
+  if (!diagram) {
+    return undefined;
+  }
+  const lines = [
+    "## Query structure",
+    "",
+    "_Only tables and columns relevant to this SQL are shown. Relationship lines are drawn only from unambiguous declared foreign keys._",
+    "",
+    "```mermaid",
+    diagram.mermaid,
+    "```",
+  ];
+  if (diagram.warnings.length > 0) {
+    lines.push("", "### Diagram notes", "", ...diagram.warnings.map((warning) => `- ${warning}`));
+  }
   return lines.join("\n");
 }
 
@@ -304,7 +378,15 @@ export function buildAiAnalysisNotebookCells(
   context: PerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult
 ): NotebookCellData[] {
-  const cells: NotebookCellData[] = [markupCell(buildOverviewMarkdown(context, analysis))];
+  const cells: NotebookCellData[] = [
+    markupCell(buildOverviewMarkdown(context, analysis)),
+    markupCell(buildPerformanceSnapshotMarkdown(buildPerformanceTuningHumanSummary(context))),
+  ];
+
+  const queryStructureMarkdown = buildQueryStructureMarkdown(context);
+  if (queryStructureMarkdown) {
+    cells.push(markupCell(queryStructureMarkdown));
+  }
 
   // Right after the Overview/SQL cell and before the AI Summary - so reading
   // order matches the Preview Panel's layout (SQL → what the plan actually
