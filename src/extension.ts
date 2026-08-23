@@ -47,7 +47,6 @@ import { onDidChangeRunningState } from "./aiTools/mcpServer/server";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { CfnDiagramSettingsPanel } from "./panels/CfnDiagramSettingsPanel";
-import { Chat2QueryPanel } from "./panels/Chat2QueryPanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
 import { DBDumpSettingsPanel } from "./panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "./panels/DBRestoreSettingsPanel";
@@ -124,7 +123,6 @@ export async function activate(context: ExtensionContext) {
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
   HarFilePanel.setStateStorage(stateStorage);
   LMPromptCreatePanel.setStateStorage(stateStorage);
-  Chat2QueryPanel.setStateStorage(stateStorage);
   PublishEditorPanel.setStateStorage(stateStorage);
   SubscriptionSettingPanel.setStateStorage(stateStorage);
   DBDumpSettingsPanel.setStateStorage(stateStorage);

@@ -194,10 +194,6 @@ Log Parse機能は、アプリケーションログを解析し、構造化さ�
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/19_lm.gif)
 
-- AIによるSQLクエリ生成
-
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/20_chat2query.gif)
-
 - Database Notebookの接続設定を、GitHub Copilot Chat(Agent mode)のAIツールとして利用
   - 接続の一覧・テスト、スキーマの調査、クエリ・トランザクションの実行、非SQLリソース(Redis, Memcache, MQTT, Keycloak, Auth0, AWS)のスキャン、`.dbn` Notebookの作成・編集まで — 既に保存済みの認証情報をそのまま再利用できます
   - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)

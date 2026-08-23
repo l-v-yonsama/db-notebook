@@ -1,7 +1,6 @@
 export type ComponentName =
   | "CountRecordView"
   | "ChartsView"
-  | "Chat2QueryPanel"
   | "MdhView"
   | "DBDumpSettingsPanel"
   | "DBRestoreSettingsPanel"

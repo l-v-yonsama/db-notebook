@@ -81,7 +81,7 @@ export type PerformanceTuningAiPrompt = {
 };
 
 export type BuildAiAnalysisPromptOptions = {
-  // Mirrors Chat2QueryPanel.ts/lmUtil.ts's translateResponse flag, but placed
+  // Mirrors the other AI panels' translateResponse flag, but placed
   // in the *assistant* prompt (not appended to the user prompt like those
   // two) and scoped to specific fields - PerformanceTuningAiAnalysisResult is
   // strict JSON with literal-union enum fields (severity/confidence/

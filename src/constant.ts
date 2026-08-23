@@ -60,8 +60,6 @@ export const CREATE_CFN_DIAGRAM = `${EXTENSION_NAME}.create-cfn-diagram`;
 
 export const CREATE_INSERT_SCRIPT_WITH_SETTINGS = `${EXTENSION_NAME}.create-insert-script-with-settings`;
 
-export const OPEN_CHAT_2_QUERY = `${EXTENSION_NAME}.open-chat-2-query`;
-
 export const COPY_RESOURCE_NAME = `${EXTENSION_NAME}.copy-resource-name`;
 export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 

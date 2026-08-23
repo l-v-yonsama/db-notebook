@@ -244,8 +244,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     // "Language model"/"Translate response" defaults for Analyze with AI
     // (2026-08-19 follow-up, design doc §0). No gpt-4o-family preference
     // (deliberately - see lmModelSelection.ts); translateResponse defaults
-    // off only for an English display language, same as Chat2QueryPanel.ts/
-    // LMPromptCreatePanel.ts.
+    // off only for an English display language, same as LMPromptCreatePanel.ts.
     const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(models);
 
     const msg: PerformanceTuningPreviewPanelEventData = {
@@ -335,7 +334,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         try {
           // By-id resolution against the model the user picked in the
           // dropdown (2026-08-19 follow-up) - same send-time lookup pattern
-          // Chat2QueryPanel.ts/lmUtil.ts use, instead of the old hardcoded
+          // LMPromptCreatePanel.ts uses, instead of the old hardcoded
           // `{ vendor: "copilot" }` + first-result pick.
           [model] = await lm.selectChatModels(
             languageModelId ? { id: languageModelId } : { vendor: "copilot" }

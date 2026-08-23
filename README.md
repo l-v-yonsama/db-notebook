@@ -195,10 +195,6 @@ The Log Parse feature analyzes application logs and extracts structured SQL exec
 
   - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/19_lm.gif)
 
-- Generate SQL queries with AI
-
-  - ![](https://raw.githubusercontent.com/l-v-yonsama/db-notebook/main/docs/images/20_chat2query.gif)
-
 - Use Database Notebook's connections as AI tools in GitHub Copilot Chat (Agent mode)
   - List/test connections, inspect schema, run queries & transactions, scan non-SQL resources (Redis, Memcache, MQTT, Keycloak, Auth0, AWS), and create/edit `.dbn` notebooks — all reusing the credentials you've already saved
   - [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md)

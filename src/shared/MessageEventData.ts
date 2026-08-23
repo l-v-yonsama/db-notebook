@@ -44,7 +44,6 @@ import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 
 export type MessageEventData =
   | ChartsViewEventData
-  | Chat2QueryPanelEventData
   | CfnDiagramSettingsPanelEventData
   | CodeResolverEditorEventData
   | CountRecordViewEventData
@@ -606,8 +605,8 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       payloadBytes: number;
       maxPayloadBytes: number;
       // Analyze with AI's "Language model"/"Translate response" options
-      // (2026-08-19 follow-up) - populated the same way as Chat2QueryPanel's/
-      // LMPromptCreatePanel's own languageModels (lm.selectChatModels({vendor:
+      // (2026-08-19 follow-up) - populated the same way as LMPromptCreatePanel's
+      // own languageModels (lm.selectChatModels({vendor:
       // "copilot"}) mapped 1:1, no filtering), except defaultLanguageModelId
       // carries no gpt-4o-family preference (see lmModelSelection.ts) and
       // translateResponse's default is env.language !== "en", same as those
@@ -704,39 +703,6 @@ export type LMPromptCreatePanelEventData = BaseMessageEventData<
     setPrompts?: {
       assistantPromptText: string;
       userPromptText: string;
-    };
-  }
->;
-
-export type Chat2QueryPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-prompts" | "set-results",
-  "Chat2QueryPanel",
-  {
-    initialize?: {
-      allTables: DbTable[];
-      selectedTableNames: string[];
-      assistantPromptText: string;
-      userPromptText: string;
-      languageModels: LabelValueItem[];
-      languageModelId: string;
-      queryContent: string;
-      translateResponse: boolean;
-      withTableDefinition: boolean;
-      withSampleData: boolean;
-      errorMessage: string;
-      screenMode: "setting" | "generating" | "generated";
-    };
-    setPrompts?: {
-      assistantPromptText: string;
-      userPromptText: string;
-    };
-    setResult?: {
-      screenMode: "setting" | "generating" | "generated";
-      elapsedTime: string;
-      modelName: string;
-      explanation: string;
-      queryText: string;
-      errorMessage: string;
     };
   }
 >;

@@ -13,7 +13,6 @@ import ToolsView from "@/components/views/ToolsView.vue";
 
 // ===== Panel(設定・入力フォーム系) =====
 import CfnDiagramSettings from "@/components/CfnDiagramSettings.vue";
-import Chat2QueryPanel from "@/components/Chat2QueryPanel.vue";
 import CreateInsertScriptSettingsPanel from "@/components/CreateInsertScriptSettingsPanel.vue";
 import CsvParseSettingPanel from "@/components/CsvParseSettingPanel.vue";
 import DBDumpSettingsPanel from "@/components/DBDumpSettingsPanel.vue";
@@ -57,7 +56,6 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> = {
   DBDumpSettingsPanel: DBDumpSettingsPanel, // DBダンプ設定
   HttpEventPanel: HttpEventPanel, // HTTPリクエスト/レスポンスの表示
   LMPromptCreatePanel: LMPromptCreatePanel, // LM(言語モデル)向けプロンプト作成
-  Chat2QueryPanel: Chat2QueryPanel, // チャットからSQLクエリを生成
   CreateInsertScriptSettingsPanel: CreateInsertScriptSettingsPanel, // INSERT文生成の設定
   CsvParseSettingPanel: CsvParseSettingPanel, // CSV取り込み設定
   LogParseSettingPanel: LogParseSettingPanel, // ログ解析設定

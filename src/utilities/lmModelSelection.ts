@@ -1,7 +1,7 @@
 import type { LabelValueItem } from "../shared/LabelValueItem";
 
 // Backs the "Language model" picker in PerformanceTuningPreviewPanel.ts,
-// Chat2QueryPanel.ts, and LMPromptCreatePanel.ts (originally added for
+// and LMPromptCreatePanel.ts (originally added for
 // PerformanceTuningPreviewPanel - misc/design/performance-tuning-structured-
 // ai-analysis-plan.ja.md §0, 2026-08-19 - then the other two panels were
 // refactored onto it the same day so all three share one "no gpt-4o-family
@@ -73,7 +73,7 @@ export function buildLanguageModelSelection(models: LanguageModelSummary[]): Lan
   };
 }
 
-/** Mirrors Chat2QueryPanel.ts/LMPromptCreatePanel.ts's `isEnLanguageUser` default. */
+/** Uses the shared default for AI panels: translate except for English UI users. */
 export function defaultTranslateResponse(language: string | undefined): boolean {
   return language !== "en";
 }

@@ -58,7 +58,6 @@ import {
   GET_LOCKS,
   GET_SESSIONS,
   LOAD_DB_SCHEMA,
-  OPEN_CHAT_2_QUERY,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DB_NOTEBOOK,
   OPEN_MDH_VIEWER,
@@ -83,7 +82,6 @@ import {
 import { SQLConfigurationViewProvider } from "../../form";
 import { MqttDriverManager } from "../../mqtt/MqttDriverManager";
 import { CfnDiagramSettingsPanel } from "../../panels/CfnDiagramSettingsPanel";
-import { Chat2QueryPanel } from "../../panels/Chat2QueryPanel";
 import { CreateInsertScriptSettingsPanel } from "../../panels/CreateInsertScriptSettingsPanel";
 import { DBDumpSettingsPanel } from "../../panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "../../panels/DBRestoreSettingsPanel";
@@ -510,18 +508,6 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   context.subscriptions.push(
     commands.registerCommand(VIEW_LAST_ROWS, async (tableRes: DbTable) => {
       viewRows(stateStorage, tableRes, "last");
-    })
-  );
-
-  context.subscriptions.push(
-    commands.registerCommand(OPEN_CHAT_2_QUERY, async (schemaRes: DbSchema) => {
-      const { conName } = schemaRes.meta;
-      const setting = await stateStorage.getConnectionSettingByName(conName);
-      if (!setting) {
-        return;
-      }
-
-      Chat2QueryPanel.render(context.extensionUri, conName, schemaRes);
     })
   );
 
