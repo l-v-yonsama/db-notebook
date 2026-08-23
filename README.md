@@ -10,6 +10,7 @@ Database Notebook brings SQL, JavaScript/TypeScript, Markdown, and query results
 
 - **Investigate incidents across databases, logs, and cloud resources** — Query production and staging databases, inspect CloudWatch logs, and scan AWS resources (S3, SQS, DynamoDB, Secrets Manager, SSM) — all from the same notebook, so the whole investigation stays in one reusable file.
 - **Keep SQL, JavaScript, Markdown, and results in one reusable file** — Mix SQL, JavaScript/TypeScript, shell, and Markdown cells with variables shared between them, then export the results as HTML or Excel. See [Database Notebook file examples](/docs/examples/databaseNotebook.md).
+- **Diagnose and improve slow SQL** — Collect execution plans, table statistics, indexes, and physical-health signals together, then use the evidence to investigate bottlenecks. See the [Performance Tuning Guide](/docs/examples/performanceTuning.md).
 - **Reuse your saved connections from GitHub Copilot Chat / MCP clients** — The same connections you set up in the DB Explorer are available as AI tools in Copilot Chat (Agent mode), and via a standalone MCP server for other MCP clients (Claude Code, Claude Desktop, Cursor, ...). See [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md).
 
 ## Quickstart (3–5 min)
@@ -209,6 +210,7 @@ The Log Parse feature analyzes application logs and extracts structured SQL exec
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
+- [Performance Tuning Guide](/docs/examples/performanceTuning.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
 - [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)

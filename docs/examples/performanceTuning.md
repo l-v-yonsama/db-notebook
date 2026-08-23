@@ -1,83 +1,117 @@
-# パフォーマンスチューニングの使い方
+# Performance Tuning Guide
 
-## できること
+Database Notebook helps you investigate slow SQL statements by gathering the execution plan and
+related table metadata in one place. Where supported, you can also run the statement to collect an
+actual execution plan and measurements.
 
-Database Notebookでは、遅いSQLに対して実行計画、関連テーブルの統計・インデックス・物理状態をまとめて確認できます。対応するデータベースでは、実際にSQLを実行して得た実測計画も確認できます。
+## TOC
 
-主な用途は次のとおりです。
+- 1. [Overview](#1-overview)
+- 2. [Start a performance tuning preview](#2-start-a-performance-tuning-preview)
+- 3. [Read the preview](#3-read-the-preview)
+  - 3.1. [Performance snapshot](#31-performance-snapshot)
+  - 3.2. [Collection issues and information](#32-collection-issues-and-information)
+  - 3.3. [Execution plan](#33-execution-plan)
+- 4. [Run Explain Analyze](#4-run-explain-analyze)
+- 5. [Analyze with AI](#5-analyze-with-ai)
+- 6. [Save and share the analysis](#6-save-and-share-the-analysis)
 
-- 実行計画と実測行数の差を確認する
-- インデックスや統計、メンテナンス状態の手掛かりを確認する
-- Copilotまたは外部AIに、収集済みの根拠を渡して改善案を求める
-- 分析結果をDBN／HTMLレポートとして保存する
+## 1. Overview
 
-## 開始する
+Use the preview to inspect the evidence needed to diagnose a slow statement:
 
-SQL HistoryまたはQuery Statisticsから、対象SQLのパフォーマンスチューニングPreviewを開きます。
+- Compare estimated and actual row counts when actual measurements are available.
+- Review indexes, optimizer statistics, and physical-maintenance signals.
+- Give Copilot or another AI the collected evidence to request improvement ideas.
+- Save the analysis as a Database Notebook (DBN) or export it as an HTML report.
 
-SQLにプレースホルダーがある場合は、代表的なバインド値を入力します。入力値は計画取得だけに利用され、保存設定には書き込みません。
+## 2. Start a performance tuning preview
 
-Previewでは、最初に見積り計画と関連メタデータを収集します。`Status: complete` は必要な収集が完了したことを示します。`partial` の場合は、`Collection issues` で取得できなかった情報と影響を確認してください。
+Open the performance tuning preview for the target statement from **SQL History** or **Query
+Statistics**.
 
-## 画面の読み方
+If the SQL contains placeholders, provide representative bind values. These values are used only to
+retrieve the plan; they are not written to the saved connection settings.
 
-### Performance snapshot
+The preview first collects an estimated plan and related metadata. `Status: complete` means the
+required collection has finished. If the status is `partial`, review **Collection issues** to see
+which information could not be collected and how that affects the analysis.
 
-AIとは別に、収集結果から決定的に作られた要約です。
+## 3. Read the preview
 
-- `Evidence: Estimate only` は見積り計画のみです。
-- `Evidence: Actual measured` は実測値があります。
-- `Observed signals` は見積り精度やテーブル保守状態の手掛かりです。
-- `Table row flow` は、テーブル全体、アクセス対象、フィルタ通過後、計画出力の行数を並べます。
+### 3.1. Performance snapshot
 
-`Access fraction` はテーブル全体のうちアクセス対象になった割合です。`Filter pass rate` は、そのアクセス対象のうちフィルタを通過した割合です。両者は別の指標です。
+The performance snapshot is a deterministic summary created from the collected data; it is separate
+from any AI analysis.
 
-### Collection issues と Information
+- `Evidence: Estimate only` means that only the estimated plan is available.
+- `Evidence: Actual measured` means actual measurements are available.
+- `Observed signals` highlights clues about estimate accuracy and table maintenance.
+- `Table row flow` shows the rows in the full table, the rows accessed, the rows that pass filters,
+  and the rows output by the plan.
 
-`Collection issues` は、権限不足や取得上限などにより分析精度へ影響する情報です。必要ならSuggested actionとTechnical detailsを確認してください。
+`Access fraction` is the proportion of the full table that the plan accesses. `Filter pass rate` is
+the proportion of those accessed rows that pass the filter. They measure different things.
 
-`Information` は、filesortや一時表などの計画上の特徴です。単独では問題の確定を意味しません。
+### 3.2. Collection issues and information
 
-### Execution plan
+**Collection issues** reports information that can affect the accuracy of the analysis, such as
+insufficient permissions or collection limits. Review the suggested action and technical details
+when needed.
 
-実測がある場合は、実測根拠を優先して表示します。
+**Information** identifies plan characteristics such as filesorts or temporary tables. A
+characteristic by itself does not prove that there is a problem.
 
-- PostgreSQLは正規化実行計画に実測時間・行数が含まれます。
-- MySQL、Oracle、SQL Serverは、ベンダー固有のActual execution planを別途表示する場合があります。
-- `Table metrics` では、見積り行数・実測行数・比率とフィルタ指標を比較できます。
+### 3.3. Execution plan
 
-## Run Explain Analyze
+When actual measurements are available, the preview prioritizes actual evidence.
 
-`Run Explain Analyze` は、対象SQLを実際にデータベースで実行します。読み取りでも負荷やロック待ちが発生し得るため、確認ダイアログの内容を確認してから実行してください。
+- PostgreSQL includes actual timing and row counts in its normalized execution plan.
+- MySQL, Oracle, and SQL Server may display a separate, vendor-specific actual execution plan.
+- `Table metrics` compares estimated and actual row counts, ratios, and filter metrics.
 
-- 単一SELECTだけが対象です。
-- INSERT、UPDATE、DELETEは見積り計画のみです。
-- 成功すると、警告表示が消え、`Evidence: Actual measured` と実測計画・実測指標が表示されます。
+## 4. Run Explain Analyze
 
-本番環境での実行は、対象SQLの負荷と運用ルールを確認したうえで行ってください。
+`Run Explain Analyze` executes the target SQL on the database to obtain an actual plan. Even a
+read-only statement can create load or wait for locks, so read the confirmation dialog before
+continuing.
 
-## AIで分析する
+- Only a single `SELECT` statement is eligible.
+- `INSERT`, `UPDATE`, and `DELETE` statements use an estimated plan only.
+- On success, the warning disappears and `Evidence: Actual measured`, actual plans, and measured
+  metrics are displayed.
 
-1. 必要なら先に `Run Explain Analyze` を実行します。
-2. Language modelを選択します。
-3. 日本語で回答を受けたい場合は `Translate response` を有効にします。
-4. `Analyze with AI` を選択します。
+Before running this in production, confirm the statement's expected load and your operational
+rules.
 
-AIの回答にはSummary、Findings、Recommendations、Missing contextが含まれます。推奨SQLは自動実行されません。DDLや書き換えSQLは、テスト環境・実行計画・影響範囲を確認してから実行してください。
+## 5. Analyze with AI
 
-Copilot以外を使う場合は `Copy Prompt for Other AI` を選択し、ChatGPT、Claude、Codexなどへ貼り付けます。Translate responseが有効な場合は、コピーされるプロンプトにも回答言語の指定が含まれます。
+1. Run `Run Explain Analyze` first if actual measurements are needed and it is safe to do so.
+2. Select a language model.
+3. Enable `Translate response` if you want the response in another language.
+4. Select `Analyze with AI`.
 
-## 保存して共有する
+The AI response includes a summary, findings, recommendations, and missing context. Suggested SQL
+is never run automatically. Validate DDL and rewritten SQL in a test environment, review their
+execution plans, and assess their impact before applying them.
 
-AI分析が成功した後、`Save as Notebook` を選択すると、ワークスペースの `reports/performance-tuning/` にDBNが作成されます。
+To use an AI other than Copilot, select `Copy Prompt for Other AI` and paste the prompt into a
+client such as ChatGPT, Claude, or Codex. When `Translate response` is enabled, the copied prompt
+also specifies the response language.
 
-保存したDBNには次が含まれます。
+## 6. Save and share the analysis
 
-- SQLとPerformance snapshot
-- Collection issues / Information
-- SQLに絞ったER図と関連インデックス
-- 実行計画と実測計画
-- AI分析結果
-- Full context JSON、AI request messages、AI analysis JSON
+After an AI analysis succeeds, select `Save as Notebook` to create a DBN under
+`reports/performance-tuning/` in the workspace.
 
-DBNをHTML出力すると、MermaidのER図と整形済みの実測計画をブラウザで確認できます。
+The saved DBN includes:
+
+- The SQL statement and performance snapshot.
+- Collection issues and information.
+- A SQL-scoped ER diagram and related indexes.
+- Estimated and actual execution plans.
+- The AI analysis result.
+- Full context JSON, AI request messages, and AI analysis JSON.
+
+Export the DBN as HTML to view the Mermaid ER diagram and formatted actual execution plan in a
+browser.

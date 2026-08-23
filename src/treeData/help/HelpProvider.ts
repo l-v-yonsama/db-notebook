@@ -34,6 +34,11 @@ const HELP_ITEMS = [
     icon: "replace-all",
   },
   {
+    name: "Performance Tuning Guide",
+    uri: `${DOCS_BASE}/docs/examples/performanceTuning.html`,
+    icon: "pulse",
+  },
+  {
     name: "Log Parser Usage Guide",
     uri: `${DOCS_BASE}/docs/examples/log_parser_usage_guide.html`,
     icon: "output",

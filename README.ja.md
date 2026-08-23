@@ -10,6 +10,7 @@ Database Notebook は、SQL・JavaScript/TypeScript・Markdown・実行結果を
 
 - **DB・ログ・クラウドリソースを横断した障害調査** — 本番/ステージング環境のDB、CloudWatchログ、AWSリソース(S3, SQS, DynamoDB, Secrets Manager, SSM)を同じNotebookから調査できます。調査全体が一つの再利用可能なファイルにまとまります。
 - **SQL・JavaScript・Markdown・実行結果を一つのファイルで管理** — SQL・JavaScript/TypeScript・シェル・Markdownセルを混在させ、セル間で変数を共有できます。結果はHTMLまたはExcelとして出力可能です。詳細は [Database Notebook file examples](/docs/examples/databaseNotebook.md) を参照してください。
+- **遅いSQLの診断と改善** — 実行計画、テーブル統計、インデックス、物理状態のシグナルをまとめて収集し、ボトルネック調査の根拠として利用できます。詳細は [Performance Tuning Guide](/docs/examples/performanceTuning.md) を参照してください。
 - **保存済み接続を GitHub Copilot Chat / MCP クライアントから利用** — DB Explorerで設定した接続を、Copilot Chat(Agent mode)のAIツールとして、また外部のMCPクライアント(Claude Code, Claude Desktop, Cursor, ...)向けのスタンドアロンMCPサーバー経由でも利用できます。詳細は [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md) を参照してください。
 
 ## 3〜5分で試す Quickstart
@@ -208,6 +209,7 @@ Log Parse機能は、アプリケーションログを解析し、構造化さ�
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
+- [Performance Tuning Guide](/docs/examples/performanceTuning.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
 - [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
