@@ -244,7 +244,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     // "Language model"/"Translate response" defaults for Analyze with AI
     // (2026-08-19 follow-up, design doc §0). No gpt-4o-family preference
     // (deliberately - see lmModelSelection.ts); translateResponse defaults
-    // off only for an English display language, same as LMPromptCreatePanel.ts.
+    // off only for an English display language.
     const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(models);
 
     const msg: PerformanceTuningPreviewPanelEventData = {
@@ -295,8 +295,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
   // Step 10 "Analyze with AI" (design doc §6.1/§7/§11). Builds the prompt
   // from the currently-rendered context (never re-fetched, never re-sent by
-  // the webview), calls the model directly the same way lmUtil.ts's SQL
-  // annotation feature does (vscode.lm, not a LanguageModelTool - this is a
+  // the webview), calls the model directly through vscode.lm rather than a
+  // LanguageModelTool. This is a
   // single deterministic request/response, not a conversational tool call),
   // and posts the parsed structured result back. Never throws past this
   // method - every failure path ends in an "error" analysis-update instead.
@@ -334,7 +334,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         try {
           // By-id resolution against the model the user picked in the
           // dropdown (2026-08-19 follow-up) - same send-time lookup pattern
-          // LMPromptCreatePanel.ts uses, instead of the old hardcoded
+          // used by the preview, instead of the old hardcoded
           // `{ vendor: "copilot" }` + first-result pick.
           [model] = await lm.selectChatModels(
             languageModelId ? { id: languageModelId } : { vendor: "copilot" }

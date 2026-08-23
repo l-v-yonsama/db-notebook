@@ -151,7 +151,7 @@ export const CELL_EXECUTE_EXPLAIN = `${EXTENSION_NAME}.cell-execute-explain`;
 export const CELL_EXECUTE_EXPLAIN_ANALYZE = `${EXTENSION_NAME}.cell-execute-explain-analyze`;
 
 // NOTEBOOK CELL TITLE (CELL TOOLBAR-ACTION)
-export const CELL_TOOLBAR_LM = `${EXTENSION_NAME}.cell-toolbar-lm`;
+export const CELL_TOOLBAR_PERFORMANCE_TUNING = `${EXTENSION_NAME}.cell-toolbar-performance-tuning`;
 export const CELL_TOOLBAR_FORMAT = `${EXTENSION_NAME}.cell-toolbar-format`;
 export const CELL_TOOLBAR_DUPLICATE_WITH_METADATA = `${EXTENSION_NAME}.cell-toolbar-duplicate-with-metadata`;
 

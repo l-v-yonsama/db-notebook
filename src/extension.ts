@@ -52,7 +52,6 @@ import { DBDumpSettingsPanel } from "./panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "./panels/DBRestoreSettingsPanel";
 import { DynamoQueryPanel } from "./panels/DynamoQueryPanel";
 import { HarFilePanel } from "./panels/HarFilePanel";
-import { LMPromptCreatePanel } from "./panels/LMPromptCreatePanel";
 import { LogParseSettingPanel } from "./panels/LogParseSettingPanel";
 import { NotebookCellMetadataPanel } from "./panels/NotebookCellMetadataPanel";
 import { PublishEditorPanel } from "./panels/PublishEditorPanel";
@@ -122,7 +121,6 @@ export async function activate(context: ExtensionContext) {
   ViewConditionPanel.setStateStorage(stateStorage);
   NotebookCellMetadataPanel.setStateStorage(stateStorage);
   HarFilePanel.setStateStorage(stateStorage);
-  LMPromptCreatePanel.setStateStorage(stateStorage);
   PublishEditorPanel.setStateStorage(stateStorage);
   SubscriptionSettingPanel.setStateStorage(stateStorage);
   DBDumpSettingsPanel.setStateStorage(stateStorage);

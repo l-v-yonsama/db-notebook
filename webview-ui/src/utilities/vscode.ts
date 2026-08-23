@@ -10,7 +10,6 @@ export * from "../../../src/shared/DBRestoreParams";
 export * from "../../../src/shared/DynamoDBConditionParams";
 export * from "../../../src/shared/ExtChartJs";
 export * from "../../../src/shared/LabelValueItem";
-export * from "../../../src/shared/LMPromptCreateConditionParams";
 export * from "../../../src/shared/MessageEventData";
 export * from "../../../src/shared/ModeType";
 export * from "../../../src/shared/PerformanceTuningAiAnalysis";

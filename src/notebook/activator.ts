@@ -44,7 +44,7 @@ import {
   CELL_SPECIFY_MQTT_TOPIC_TO_USE,
   CELL_TOOLBAR_DUPLICATE_WITH_METADATA,
   CELL_TOOLBAR_FORMAT,
-  CELL_TOOLBAR_LM,
+  CELL_TOOLBAR_PERFORMANCE_TUNING,
   CREATE_NEW_NOTEBOOK,
   CREATE_NOTEBOOK_FROM_SQL,
   CREATE_SQLITE_DEMO,
@@ -56,9 +56,9 @@ import {
   SHOW_NOTEBOOK_ALL_VARIABLES,
   SPECIFY_CONNECTION_TO_ALL_CELLS,
   SPECIFY_USING_DB_TO_ALL_CELLS,
+  START_PERFORMANCE_TUNING_FROM_HISTORY,
 } from "../constant";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
-import { LMPromptCreatePanel } from "../panels/LMPromptCreatePanel";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
 import { VariablesPanel } from "../panels/VariablesPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
@@ -70,6 +70,7 @@ import { getFormatterConfig } from "../utilities/configUtil";
 import { readResource } from "../utilities/fsUtil";
 import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
 import { log } from "../utilities/logger";
+import { findPerformanceTuningHistoryForCell } from "../utilities/performanceTuningCell";
 import {
   getCompatibleConnectionSettings,
   getSelectedCells,
@@ -91,6 +92,25 @@ import { createSqliteDemo, resetSqliteDemo, SqliteDemoOptions } from "./sqliteDe
 const PREFIX = "[notebook/activator]";
 
 export function activateNotebook(context: ExtensionContext, stateStorage: StateStorage) {
+  const updatePerformanceTuningCellContext = async (cell: NotebookCell): Promise<void> => {
+    const history = await findPerformanceTuningHistoryForCell(stateStorage, cell);
+    const activeEditor = window.activeNotebookEditor;
+    const activeCell = activeEditor?.notebook.cellAt(activeEditor.selections[0]?.start);
+    if (activeCell?.document.uri.toString() !== cell.document.uri.toString()) {
+      return;
+    }
+    await commands.executeCommand("setContext", "cellCanStartPerformanceTuning", history !== undefined);
+  };
+
+  const updateActivePerformanceTuningCellContext = (): void => {
+    const activeEditor = window.activeNotebookEditor;
+    const activeCell = activeEditor?.notebook.cellAt(activeEditor.selections[0]?.start);
+    if (activeCell) {
+      resetCellContext(activeCell);
+      void updatePerformanceTuningCellContext(activeCell);
+    }
+  };
+
   log(`${PREFIX} start activateNotebook.`);
   let controller: MainController;
 
@@ -705,9 +725,16 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
   // Notebook cell-toolbar commands
   {
-    registerDisposableCommand(CELL_TOOLBAR_LM, async (cell: NotebookCell) => {
-      LMPromptCreatePanel.setMainController(controller);
-      LMPromptCreatePanel.render(context.extensionUri, cell);
+    registerDisposableCommand(CELL_TOOLBAR_PERFORMANCE_TUNING, async (cell: NotebookCell) => {
+      const history = await findPerformanceTuningHistoryForCell(stateStorage, cell);
+      if (!history) {
+        window.showInformationMessage(
+          "Run the current SQL cell successfully before starting performance tuning."
+        );
+        await commands.executeCommand("setContext", "cellCanStartPerformanceTuning", false);
+        return;
+      }
+      await commands.executeCommand(START_PERFORMANCE_TUNING_FROM_HISTORY, history);
     });
   }
   {
@@ -813,8 +840,18 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       const cell = e.notebookEditor.notebook.cellAt(e.selections[0]?.start);
       commands.executeCommand("setContext", "cellLangId", cell.document.languageId);
       resetCellContext(cell);
+      void updatePerformanceTuningCellContext(cell);
     })
   );
+  context.subscriptions.push(
+    workspace.onDidChangeNotebookDocument((e) => {
+      const activeEditor = window.activeNotebookEditor;
+      if (activeEditor?.notebook.uri.toString() === e.notebook.uri.toString()) {
+        updateActivePerformanceTuningCellContext();
+      }
+    })
+  );
+  updateActivePerformanceTuningCellContext();
 
   log(`${PREFIX} end activateNotebook.`);
 }

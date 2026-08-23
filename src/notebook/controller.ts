@@ -24,7 +24,7 @@ import type {
   NodeRunAxiosEvent,
   RunResultMetadata,
 } from "../shared/RunResultMetadata";
-import { CellMeta, LMEvaluateTarget, RunResult, SQLMode } from "../types/Notebook";
+import { CellMeta, RunResult, SQLMode } from "../types/Notebook";
 import { ChartsViewParams } from "../types/views";
 import {
   getNodeConfig,
@@ -36,7 +36,6 @@ import {
   createMqttPublishResultMarkdownText,
   createResponseBodyMarkdown,
 } from "../utilities/httpUtil";
-import { runLm } from "../utilities/lmUtil";
 import { log, logError } from "../utilities/logger";
 import {
   hasAnyRdhOutputCell,
@@ -98,7 +97,6 @@ export class MainController {
   private readonly noteSessions = new Map<string, NoteSession>();
   private readonly noteVariables = new Map<string, { [key: string]: any }>();
   private sqlMode: SQLMode | undefined = undefined;
-  private lmEvaluateTarget: LMEvaluateTarget | undefined = undefined;
 
   constructor(private context: ExtensionContext, private stateStorage: StateStorage) {
     this._controller = notebooks.createNotebookController(
@@ -175,10 +173,6 @@ export class MainController {
 
   setSqlMode(sqlMode: SQLMode): void {
     this.sqlMode = sqlMode;
-  }
-
-  setLMEvaluateTarget(lmEvaluateTarget: LMEvaluateTarget): void {
-    this.lmEvaluateTarget = lmEvaluateTarget;
   }
 
   setActiveContext(notebook: NotebookDocument) {
@@ -261,7 +255,6 @@ export class MainController {
       }
     }
     this.sqlMode = undefined;
-    this.lmEvaluateTarget = undefined;
   }
 
   async execute(cell: NotebookCell) {
@@ -679,12 +672,6 @@ export class MainController {
         commands.executeCommand(REFRESH_SQL_HISTORIES);
       }
 
-      if (this.lmEvaluateTarget && r.metadata) {
-        await runLm(this.stateStorage, cell, r.metadata, noteSession.cancellationTokenSourceList);
-        r.evaluated = true;
-      }
-      this.lmEvaluateTarget = undefined;
-
       return r;
     } else if (isCwqlCell(cell)) {
       noteSession.awsKernel = new AwsKernel(this.stateStorage);
@@ -729,4 +716,5 @@ export const resetCellContext = (cell: NotebookCell) => {
   }
 
   commands.executeCommand("setContext", "cellMetaConnectionName", meta.connectionName ?? "");
+  commands.executeCommand("setContext", "cellCanStartPerformanceTuning", false);
 };

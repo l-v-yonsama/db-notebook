@@ -140,10 +140,6 @@ vi.mock("../../src/utilities/fsUtil", () => ({
   existsFileOnWorkspace: hoistedMocks.existsFileOnWorkspaceMock,
   initializeStorageTmpPath: vi.fn(async () => undefined),
 }));
-vi.mock("../../src/utilities/lmUtil", () => ({
-  runLm: vi.fn(async () => undefined),
-}));
-
 export type NodeKernelFake = {
   getStoredVariables: Mock;
   updateVariable: Mock;

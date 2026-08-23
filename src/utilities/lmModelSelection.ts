@@ -1,14 +1,9 @@
 import type { LabelValueItem } from "../shared/LabelValueItem";
 
-// Backs the "Language model" picker in PerformanceTuningPreviewPanel.ts,
-// and LMPromptCreatePanel.ts (originally added for
-// PerformanceTuningPreviewPanel - misc/design/performance-tuning-structured-
-// ai-analysis-plan.ja.md §0, 2026-08-19 - then the other two panels were
-// refactored onto it the same day so all three share one "no gpt-4o-family
-// preference, default to whatever Copilot returns first" policy instead of
-// three copies that could drift). None of the three panels' own UI/
-// persistence patterns changed - only this shared list/default-selection
-// logic.
+// Backs the "Language model" picker in PerformanceTuningPreviewPanel.ts.
+// It was extracted from that panel's AI-analysis design work on 2026-08-19
+// so the model-list/default-selection policy remains isolated from the panel
+// UI and cannot drift as the feature evolves.
 //
 // Deliberately takes a plain summary shape rather than importing
 // vscode.LanguageModelChat as a value, so this stays a pure function with no

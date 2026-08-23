@@ -4,15 +4,6 @@ import type { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export type SQLMode = "None" | "Query" | "Explain" | "ExplainAnalyze";
 
-export type LMEvaluateTarget = "Query";
-
-export type LMPromptCreateConditions = {
-  translateResponse: boolean;
-  withTableDefinition: boolean;
-  withRetrievedExecutionPlan: boolean;
-  languageModelId: string;
-};
-
 export type CellMetaChart = {
   title: string;
   type: "bar" | "doughnut" | "line" | "pie" | "radar" | "scatter" | "pairPlot" | "histogram";
@@ -58,7 +49,6 @@ export type CellMeta = {
   logGroupName?: string;
   logGroupStartTimeOffset?: "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "12h" | "1d" | "1w";
   chart?: CellMetaChart;
-  lmPromptCreateConditions?: LMPromptCreateConditions;
   publishParams?: PublishParams;
   subscribeParams?: SubscribeParams;
   readonly [key: string]: any;

@@ -479,8 +479,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     // history entry could only ever fail to collect a plan. estimateBindParameters()
     // needs the connection's resource tree for column-type estimation (the
     // same reason ToolsViewProvider already requires an RdsDatabase for
-    // Query Statistics); load it the same way LMPromptCreatePanel.ts's
-    // createPrompt() does for the same reason.
+    // Query Statistics); load it before building the preview request.
     let databaseResource = stateStorage.getFirstRdsDatabaseByName(history.connectionName);
     if (databaseResource === undefined) {
       const { ok, result } = await stateStorage.loadResource(history.connectionName, false, true);

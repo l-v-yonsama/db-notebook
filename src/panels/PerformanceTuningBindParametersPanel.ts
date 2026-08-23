@@ -19,8 +19,8 @@ import { BasePanel } from "./BasePanel";
 // bind collection into PerformanceTuningPreviewPanel itself (which would
 // require that panel to grow a "not collected yet" phase it doesn't have
 // today), this is a small, dedicated, entry-point-agnostic panel - same
-// family as ViewConditionPanel.vue/LMPromptCreatePanel.vue - that both
-// entry points open via openPerformanceTuningPreview()
+// family as ViewConditionPanel.vue - that both entry points open via
+// openPerformanceTuningPreview()
 // (src/utilities/performanceTuningBindConfirmation.ts) whenever the target
 // SQL has detected placeholders. PerformanceTuningPreviewPanel itself is
 // completely unmodified by this change.

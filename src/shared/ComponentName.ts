@@ -15,7 +15,6 @@ export type ComponentName =
   | "HttpEventPanel"
   | "LogParseSettingPanel"
   | "LogParseResultView"
-  | "LMPromptCreatePanel"
   | "ViewConditionPanel"
   | "PublishEditorPanel"
   | "WriteHttpEventToClipboardParamsPanel"

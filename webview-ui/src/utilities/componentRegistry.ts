@@ -21,7 +21,6 @@ import DynamoQueryPanel from "@/components/DynamoQueryPanel.vue";
 import ERDiagramSettings from "@/components/ERDiagramSettings.vue";
 import HarFilePanel from "@/components/HarFilePanel.vue";
 import HttpEventPanel from "@/components/HttpEventPanel.vue";
-import LMPromptCreatePanel from "@/components/LMPromptCreatePanel.vue";
 import LogParseSettingPanel from "@/components/LogParseSettingPanel/LogParseSettingPanel.vue";
 import NotebookCellMetadataPanel from "@/components/NotebookCellMetadataPanel.vue";
 import PerformanceTuningBindParametersPanel from "@/components/PerformanceTuningBindParametersPanel.vue";
@@ -55,7 +54,6 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> = {
   DBRestoreSettingsPanel: DBRestoreSettingsPanel, // DBリストア設定
   DBDumpSettingsPanel: DBDumpSettingsPanel, // DBダンプ設定
   HttpEventPanel: HttpEventPanel, // HTTPリクエスト/レスポンスの表示
-  LMPromptCreatePanel: LMPromptCreatePanel, // LM(言語モデル)向けプロンプト作成
   CreateInsertScriptSettingsPanel: CreateInsertScriptSettingsPanel, // INSERT文生成の設定
   CsvParseSettingPanel: CsvParseSettingPanel, // CSV取り込み設定
   LogParseSettingPanel: LogParseSettingPanel, // ログ解析設定

@@ -57,7 +57,6 @@ export type MessageEventData =
   | ERDiagramSettingsPanelEventData
   | HarFilePanelEventData
   | HttpEventPanelEventData
-  | LMPromptCreatePanelEventData
   | LogParseSettingPanelEventData
   | LogParseResultViewEventData
   | MdhViewEventData
@@ -605,8 +604,8 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
       payloadBytes: number;
       maxPayloadBytes: number;
       // Analyze with AI's "Language model"/"Translate response" options
-      // (2026-08-19 follow-up) - populated the same way as LMPromptCreatePanel's
-      // own languageModels (lm.selectChatModels({vendor:
+      // (2026-08-19 follow-up) - populated directly from
+      // lm.selectChatModels({vendor:
       // "copilot"}) mapped 1:1, no filtering), except defaultLanguageModelId
       // carries no gpt-4o-family preference (see lmModelSelection.ts) and
       // translateResponse's default is env.language !== "en", same as those
@@ -681,28 +680,6 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
       codeFileItems: LabelValueItem[];
       ruleFileItems: LabelValueItem[];
       columnItems: RdhKey[];
-    };
-  }
->;
-
-export type LMPromptCreatePanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "set-prompts",
-  "LMPromptCreatePanel",
-  {
-    initialize?: {
-      errorMessage: string;
-      hasExplainPlan: boolean;
-      assistantPromptText: string;
-      userPromptText: string;
-      languageModels: LabelValueItem[];
-      languageModelId: string;
-      translateResponse: boolean;
-      withTableDefinition: boolean;
-      withRetrievedExecutionPlan: boolean;
-    };
-    setPrompts?: {
-      assistantPromptText: string;
-      userPromptText: string;
     };
   }
 >;
