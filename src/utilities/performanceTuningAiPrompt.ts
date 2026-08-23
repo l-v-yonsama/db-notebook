@@ -1,10 +1,6 @@
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 
-// Builds the {assistant, user} prompt pair for Step 10's "Analyze with AI"
-// flow (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md §7).
-// Pure/deterministic - no vscode.lm call happens here, so this is unit
-// testable without a language model. Mirrors lmUtil.ts's createPrompt()
-// {assistant, user} split (the existing SQL-annotation AI feature).
+// Builds deterministic assistant/user prompt pairs without calling vscode.lm.
 
 const ASSISTANT_ANALYSIS_PROMPT = `You are a database performance tuning expert.
 Your job is to analyze the structured performance tuning context supplied by the user - an execution plan, related table definitions, optimizer statistics, physical health metrics, and structured collection diagnostics - and explain why the target SQL statement may be slow, then suggest safe, verifiable improvements.
@@ -68,17 +64,8 @@ The response must be a single JSON object with exactly this shape:
 
 If "findings" is empty, explain why in "summary" (for example, nothing actionable was found). "missingContext" should be an empty array if nothing is missing.`;
 
-// "Copy Prompt for Other AI" (2026-08-21 follow-up): a fallback for a user
-// whose vscode.lm-exposed models are too limited for good results (today
-// that's `vendor: "copilot"` only - see PerformanceTuningPreviewPanel.ts),
-// but who already has a paid ChatGPT/Claude/Codex/Claude Code subscription
-// they'd rather use directly, outside VS Code entirely. Reuses
-// ASSISTANT_ANALYSIS_PROMPT verbatim - none of that domain guidance
-// (sargable rewrites, selectivity checks, duplicate-index avoidance,
-// composite column order, WHERE-clause enumeration) is Copilot-specific -
-// and only swaps RESPONSE_FORMAT_INSTRUCTIONS' strict JSON contract for a
-// plain-text one, since there is no parser on the other end of a manual
-// copy/paste: the user reads the answer directly wherever they pasted it.
+// External AI copy uses the same domain guidance, but requests plain text
+// because no response parser is involved.
 const PLAIN_TEXT_RESPONSE_INSTRUCTIONS = `Answer in plain, well-organized text for a human reader - not JSON, and not wrapped in a code fence (except for actual SQL you are suggesting the user run).
 
 Structure your answer as:

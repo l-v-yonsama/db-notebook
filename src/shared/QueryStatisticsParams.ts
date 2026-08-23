@@ -16,12 +16,8 @@ export type BindParameterRow = Omit<EstimatedBindParameter, "location"> & {
   location?: EstimatedBindParameterLocation;
 };
 
-// Search conditions for the Query Statistics Tools View mode (§10 Phase 5 of
-// misc/design/performance-tuning-context-implementation-plan.ja.md). A
-// deliberately narrow, fully-normalized shape (no optional fields) - the
-// panel/provider always work with a complete set of conditions; only the
-// *initial* params coming in from a resource tree command may be partial
-// (see ToolsViewParams.search below).
+// Fully normalized Query Statistics search conditions. Initial callers may
+// be partial, but the view/provider always use this complete shape.
 export type QueryStatisticsSearchParams = {
   sortBy: StatementStatisticsSortKey;
   limit: number;

@@ -1,13 +1,5 @@
-// Step 10 ("構造化 AI 分析") of the Performance Tuning Context feature - see
-// misc/design/performance-tuning-structured-ai-analysis-plan.ja.md §5. This
-// is the *only* place AI reasoning about a PerformanceTuningContext gets a
-// type: db-drivers reports observed facts only (see that package's
-// PerformanceTuningContext.ts doc comment), and every other AI-facing path
-// in this extension (SQL annotation, schema prompts, RunQueryTool) already
-// returns free-text/markdown rather than a schema like this - this feature
-// is deliberately the structured one, per the design's decision to make Step
-// 10's response verifiable against the Full Context JSON rather than a plain
-// chat reply.
+// Structured AI output for performance tuning. Evidence references let users
+// verify findings against the collected Full Context JSON.
 
 /**
  * Points a finding/recommendation back at the specific piece of

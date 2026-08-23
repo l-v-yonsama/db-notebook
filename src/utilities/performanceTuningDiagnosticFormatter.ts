@@ -9,25 +9,9 @@ import type {
   PerformanceTuningDiagnosticGroupViewModel,
 } from "../shared/MessageEventData";
 
-// Turns getPerformanceTuningContext()'s raw, per-node
-// PerformanceTuningDiagnostic[] and UnavailableSection[] into a small number
-// of beginner-facing groups for the preview panel - see
-// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5.
-// The driver only promises a stable `code` (or, for UnavailableSection, a
-// stable `section`) plus honest technical fields; every beginner-facing
-// sentence below is owned entirely by this file, keyed off those stable
-// values - never by pattern-matching the driver's own English `message`/
-// `reason` text (§4.4: "Driverは安定したcodeと技術情報を返し、UIがcodeに応じ
-// て初心者向け文面を組み立てる"). An unrecognized code/section still produces
-// a group (falling back to the driver's own message/reason as the summary),
-// so a UI built against an older version of this file never silently drops
-// information a newer db-drivers started sending (§4.4).
-//
-// Grouping never drops a diagnostic or unavailableSection - every input
-// entry appears in exactly one output group's `details[]`, deduplicated
-// only in the sense that same-cause entries share one summary/title rather
-// than repeating it per node (§4.4: "同じnodeをdeduplicateしても、異なる
-// nodeのdetailをまとめて消さない").
+// Converts raw diagnostics into concise user-facing groups. Stable driver
+// codes select the wording; unknown values still retain their raw message.
+// Every input item remains available in exactly one group's details.
 
 const SEVERITY_ORDER: Record<"info" | "warning", number> = { info: 0, warning: 1 };
 

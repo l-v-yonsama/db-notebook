@@ -154,6 +154,60 @@ describe("buildAiAnalysisNotebookCells", () => {
     );
   });
 
+  it("places human-readable collection diagnostics before the execution plan and AI analysis", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        collection: {
+          collectedAt: "2026-08-18T00:00:00.000Z",
+          status: "partial",
+          diagnostics: [
+            {
+              code: "PLAN_OBSERVATION",
+              severity: "info",
+              affectsCompleteness: false,
+              scope: "executionPlan",
+              message: "Uses filesort.",
+              node: { id: "n0", operation: "Sort" },
+            },
+          ],
+          unavailableSections: [
+            {
+              section: "columnStatistics",
+              schemaName: "public",
+              tableName: "orders",
+              reason: "permission denied for pg_stats",
+            },
+          ],
+        },
+        executionPlan: {
+          mode: "analyze",
+          format: "json",
+          normalizedPlan: {
+            id: "n0",
+            depth: 0,
+            operation: "Sort",
+            children: [],
+          },
+          actualPlan: { source: "EXPLAIN ANALYZE", format: "text", content: "actual plan" },
+        },
+        planTableMappings: [{ planNodeId: "n0", tableName: "orders" }],
+      }),
+      buildAnalysis(),
+    );
+
+    const values = cells.map((cell) => cell.value);
+    const issueIndex = values.findIndex((value) => value.includes("## Collection issues"));
+    const informationIndex = values.findIndex((value) => value.includes("## Information"));
+    const planIndex = values.findIndex((value) => value.includes("## Execution plan"));
+    const analysisIndex = values.findIndex((value) => value.includes("### Findings"));
+    expect(issueIndex).toBeGreaterThan(1);
+    expect(informationIndex).toBeGreaterThan(issueIndex);
+    expect(planIndex).toBeGreaterThan(informationIndex);
+    expect(analysisIndex).toBeGreaterThan(planIndex);
+    expect(values[issueIndex]).toContain("Column statistics unavailable");
+    expect(values[informationIndex]).toContain("Plan observation");
+  });
+
   it("lists query-relevant indexes directly below the saved query structure diagram", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext({
@@ -311,7 +365,7 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(executionPlanCell.kind).toBe(NotebookCellKind.Markup);
     expect(executionPlanCell.value).toContain("```text");
     expect(executionPlanCell.value).toContain("Seq Scan");
-    expect(executionPlanCell.value).toContain("### Tables referenced by this plan");
+    expect(executionPlanCell.value).toContain("### Table metrics");
     expect(executionPlanCell.value).toContain("| orders |");
     expect(findCell(cells, "### Findings").value).toContain("### Findings");
   });
@@ -324,7 +378,7 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells).toHaveLength(9);
     const executionPlanCell = findCell(cells, "## Execution plan");
     expect(executionPlanCell.value).not.toContain("```text");
-    expect(executionPlanCell.value).toContain("### Tables referenced by this plan");
+    expect(executionPlanCell.value).toContain("### Table metrics");
   });
 
   it("includes Actual rows/ratio columns in the table when an analyze-mode mapping has them", () => {
@@ -371,8 +425,31 @@ describe("buildAiAnalysisNotebookCells", () => {
     );
     const executionPlanCell = findCell(cells, "## Execution plan");
     expect(executionPlanCell.value).toContain("### Actual execution plan (EXPLAIN ANALYZE)");
+    expect(executionPlanCell.value).toContain("### Table metrics");
     expect(executionPlanCell.value).toContain("```actual-plan");
     expect(executionPlanCell.value).toContain("actual time=0.05..1.2 rows=5 loops=1");
+  });
+
+  it("puts actual-plan evidence before estimated topology and table metrics", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        executionPlan: {
+          mode: "analyze",
+          format: "json",
+          normalizedPlan: { id: "n0", depth: 0, operation: "Index Scan", children: [] },
+          actualPlan: { source: "EXPLAIN ANALYZE", format: "text", content: "actual plan" },
+        },
+        planTableMappings: [{ planNodeId: "n0", tableName: "orders" }],
+      }),
+      buildAnalysis(),
+    );
+    const executionPlan = findCell(cells, "## Execution plan").value;
+    expect(executionPlan.indexOf("### Actual execution plan")).toBeLessThan(
+      executionPlan.indexOf("### Estimated plan topology"),
+    );
+    expect(executionPlan.indexOf("### Estimated plan topology")).toBeLessThan(
+      executionPlan.indexOf("### Table metrics"),
+    );
   });
 
   it("adds the execution plan cell for an actual-plan artifact alone, with no normalizedPlan or table mappings", () => {

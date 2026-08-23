@@ -5,12 +5,9 @@ import {
   RdsDatabase,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 
-// See misc/design/performance-tuning-query-statistics-parameter-input-plan.ja.md
-// §7.2 for the full rationale. `sql`/`normalizedSql` are always the row's
-// existing `query` column (every Vendor already returns it); `representative*`
-// is currently MySQL-only (QUERY_SAMPLE_TEXT and friends) and undefined for
-// every other Vendor, which selectPlanSql() below treats the same as "not
-// usable" and falls straight through to normalizedSql.
+// Shared SQL and placeholder selection for Query Statistics previews.
+// A usable representative SQL is preferred; otherwise the normalized SQL is
+// used consistently for both bind estimation and context collection.
 export type QueryStatisticsPlanInput = {
   sql: string;
   normalizedSql?: string;

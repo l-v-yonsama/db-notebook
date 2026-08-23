@@ -10,14 +10,8 @@ import { PerformanceTuningPreviewPanel } from "../panels/PerformanceTuningPrevie
 import { validatePlanBindsInput } from "../shared/PerformanceTuningBinds";
 import { createRDSDriver, workflow } from "./driverResolver";
 
-// The parts of a performance-tuning request that stay the same whether the
-// resulting plan is estimated or analyzed - i.e. everything
-// getPerformanceTuningContext() needs *except* `plan.mode`/`allowExecution`
-// themselves. Held by PerformanceTuningPreviewPanel as instance state
-// (2026-08-20 follow-up, "Run EXPLAIN ANALYZE") so a later analyze-mode
-// re-run doesn't need the webview to send any of it back - same "the panel
-// already has what it needs" precedent as AnalyzePerformanceTuningWithAiActionCommand/
-// SaveAiAnalysisAsNotebookActionCommand.
+// Request state retained by the host panel so it can rerun the same statement
+// in analyze mode without trusting the webview to resend it.
 export type PerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
   databaseName: string;
@@ -28,22 +22,13 @@ export type PerformanceTuningPreviewRequest = {
   };
   plan: {
     binds?: unknown[];
-    // SQL Server-only today (named parameter substitution in SHOWPLAN - see
-    // db-drivers' PerformanceTuningContext.ts). Same non-persistence rule as
-    // `binds` itself: call-scoped only, never stored/logged/echoed back.
+    // Named placeholders required by SQL Server plan substitution. Like binds,
+    // they are call-scoped and never persisted or logged.
     bindMarkers?: string[];
   };
-  // Explicit fallback for tables the vendor plan itself couldn't resolve -
-  // sanctioned specifically for MySQL's EXPLAIN FORMAT=JSON reporting an
-  // aliased table's *alias* (not its real name) as `table_name` (§6.5/§7.7
-  // of performance-tuning-query-statistics-parameter-input-plan.ja.md).
-  // Additive only: RDSBaseDriver.getPerformanceTuningContext() unions this
-  // in alongside whatever the plan resolved, never replaces it.
+  // Additive fallback for tables that the vendor plan cannot resolve.
   targetTables?: Array<{ schemaName?: string; tableName: string }>;
-  // Corrects a plan-resolved table name that's actually an alias (same
-  // MySQL EXPLAIN gap as targetTables above, but this *replaces* the
-  // wrong name instead of adding a second entry - §6.6/§7.7). Keyed by the
-  // lowercased alias (or bare table name for an unaliased reference).
+  // Corrects a plan-resolved alias to its real table name.
   tableAliasMap?: Record<string, { schemaName?: string; tableName: string }>;
 };
 
@@ -62,14 +47,8 @@ export type StartPerformanceTuningPreviewResult = {
   technicalMessage?: string;
 };
 
-// Extracted from the 9a SQL-History handler so History and Query Statistics
-// (9b) never duplicate static-support checks, progress UI, AbortController
-// wiring, or getPerformanceTuningContext() error handling
-// (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5
-// "Preview接続の共通化と競合防止"). Both callers get the same
-// {status, message, technicalMessage} back and decide independently how to
-// surface it - History as a notification, Query Statistics inline via its
-// own previewStatus/previewMessage/previewTechnicalMessage.
+// Shared by SQL History and Query Statistics so capability checks, progress,
+// cancellation, and error handling stay consistent.
 export async function startPerformanceTuningPreview(
   params: StartPerformanceTuningPreviewParams
 ): Promise<StartPerformanceTuningPreviewResult> {

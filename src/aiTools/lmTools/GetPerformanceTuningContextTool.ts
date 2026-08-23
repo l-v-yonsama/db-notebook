@@ -18,15 +18,8 @@ import { resolveMcpEnabledConnection } from "./mcpAccessControl";
 
 const PREFIX = "[lmTools/GetPerformanceTuningContextTool]";
 
-// (B) of misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
-// §4/§9. Read-only data feed for a conversational agent (Copilot Chat or an
-// MCP client) - this tool never calls an AI model itself (no nested LM call);
-// it just returns the same PerformanceTuningContext JSON the Preview Panel
-// shows, so the *calling* model can reason about it in its own turn. `mode`
-// is hardcoded to 'estimate' and `binds`/`allowExecution` are not accepted as
-// input: unlike runDbQuery, there is no write-confirmation dialog here, and
-// 'analyze' mode actually executes the SQL - not appropriate for a tool
-// described as read-only (§9).
+// Read-only context feed for Copilot Chat and MCP clients. It always requests
+// an estimated plan because analyze mode executes the target SQL.
 export type GetPerformanceTuningContextToolInput = {
   connectionName: string;
   sql: string;

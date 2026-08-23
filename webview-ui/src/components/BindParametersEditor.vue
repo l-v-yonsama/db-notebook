@@ -8,12 +8,8 @@ import {
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
-// See misc/design/performance-tuning-query-statistics-parameter-input-plan.ja.md
-// §4/§7.3 for the full design. `modelValue` is always fully-formed rows
-// (ToolsView.vue turns a fresh estimate into rows via estimatesToRows()
-// before ever handing them to this component) - Add/Del/renumber all live
-// in bindParameterRows.ts as plain functions so they stay unit-testable
-// outside this SFC.
+// The parent owns complete rows; pure helpers perform add, delete, and
+// renumber operations outside this component.
 type Props = {
   modelValue: BindParameterRow[];
   dbType: string;

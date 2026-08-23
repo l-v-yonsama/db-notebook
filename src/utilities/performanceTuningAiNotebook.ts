@@ -10,19 +10,16 @@ import type {
   PerformanceTuningAiFinding,
   PerformanceTuningAiRecommendation,
 } from "../shared/PerformanceTuningAiAnalysis";
+import { actualExecutionEvidenceSource, hasActualExecutionEvidence } from "../shared/PerformanceTuningActualEvidence";
 import type { PerformanceTuningHumanSummary } from "../shared/PerformanceTuningHumanSummary";
 import { createDirectory, existsUri } from "./fsUtil";
 import { buildAiAnalysisPrompt } from "./performanceTuningAiPrompt";
+import { buildPerformanceTuningDiagnosticGroups } from "./performanceTuningDiagnosticFormatter";
 import { buildPerformanceTuningHumanSummary } from "./performanceTuningHumanSummary";
 import { buildPlanTableMappingRows, formatPlanTree } from "./performanceTuningPlanFormatter";
 
-// Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
-// §8): always creates a new Notebook under a fixed
-// reports/performance-tuning/ folder (no save dialog, no appending to an
-// existing Notebook - decided with the user rather than left as an open
-// question, see the design doc's §16.1). Cell construction (pure) is kept
-// separate from the write/open I/O below it so it stays unit-testable
-// without mocking vscode.workspace.fs.
+// Report cells are built separately from notebook I/O so their contents stay
+// unit-testable without VS Code filesystem mocks.
 const REPORTS_SUBPATH = ["reports", "performance-tuning"] as const;
 
 function pad2(n: number): string {
@@ -227,6 +224,56 @@ function buildQueryStructureMarkdown(context: PerformanceTuningContext): string 
   return lines.join("\n");
 }
 
+function diagnosticGroupsMarkdown(
+  groups: ReturnType<typeof buildPerformanceTuningDiagnosticGroups>,
+): string[] {
+  const lines: string[] = [];
+  groups.forEach((group) => {
+    lines.push(`### ${group.title}`, "", group.summary, "");
+    if (group.suggestedAction) {
+      lines.push(`**Suggested action:** ${group.suggestedAction}`, "");
+    }
+    lines.push("| Node | Operation | Object | Table | Detail |", "|---|---|---|---|---|");
+    group.details.forEach((detail) => {
+      const tableRef = [detail.schemaName, detail.tableName].filter(Boolean).join(".");
+      lines.push(
+        `| ${escapeMdCell(detail.nodeId ?? "-")} | ${escapeMdCell(detail.operation ?? "-")} | ${
+          escapeMdCell(detail.objectName ?? "-")
+        } | ${escapeMdCell(tableRef || "-")} | ${escapeMdCell(detail.technicalMessage)} |`,
+      );
+    });
+    lines.push("");
+  });
+  return lines;
+}
+
+function buildDiagnosticSections(context: PerformanceTuningContext): {
+  collectionIssues?: string;
+  information?: string;
+} {
+  const groups = buildPerformanceTuningDiagnosticGroups(
+    context.collection.diagnostics,
+    context.collection.unavailableSections,
+  );
+  const issues = groups.filter((group) => group.severity === "warning");
+  const information = groups.filter((group) => group.severity === "info");
+
+  return {
+    collectionIssues: issues.length > 0
+      ? ["## Collection issues", "", ...diagnosticGroupsMarkdown(issues)].join("\n")
+      : undefined,
+    information: information.length > 0
+      ? [
+          "## Information",
+          "",
+          "_The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed performance problem — see each item's technical details._",
+          "",
+          ...diagnosticGroupsMarkdown(information),
+        ].join("\n")
+      : undefined,
+  };
+}
+
 function findingsTable(findings: PerformanceTuningAiFinding[]): string[] {
   if (findings.length === 0) {
     return ["_No findings were reported._"];
@@ -329,19 +376,17 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
     : undefined;
   const rows = buildPlanTableMappingRows(context.planTableMappings);
   const actualPlan = context.executionPlan.actualPlan;
+  const hasActualEvidence = hasActualExecutionEvidence(context);
+  const actualEvidenceSource = actualExecutionEvidenceSource(context);
   if (!planTreeText && rows.length === 0 && !actualPlan) {
     return undefined;
   }
 
   const lines: string[] = ["## Execution plan", ""];
-  if (planTreeText) {
-    lines.push("```text", planTreeText, "```", "");
-  }
-  if (rows.length > 0) {
-    lines.push("### Tables referenced by this plan", "", ...planTableMappingsTable(rows), "");
-  }
   if (actualPlan) {
     lines.push(
+      `_Runtime evidence from ${actualPlan.source} is shown first. The estimated topology below is retained only for structured table/predicate metadata and comparison._`,
+      "",
       `### Actual execution plan (${actualPlan.source})`,
       "",
       "```actual-plan",
@@ -349,6 +394,23 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
       "```",
       "",
     );
+  }
+  if (planTreeText) {
+    lines.push(
+      actualPlan
+        ? "### Estimated plan topology"
+        : hasActualEvidence
+          ? `### Actual execution plan (${actualEvidenceSource})`
+          : "### Execution plan topology",
+      "",
+      "```text",
+      planTreeText,
+      "```",
+      "",
+    );
+  }
+  if (rows.length > 0) {
+    lines.push("### Table metrics", "", ...planTableMappingsTable(rows), "");
   }
   return lines.join("\n");
 }
@@ -403,15 +465,21 @@ export function buildAiAnalysisNotebookCells(
     markupCell(buildPerformanceSnapshotMarkdown(buildPerformanceTuningHumanSummary(context))),
   ];
 
+  const diagnosticSections = buildDiagnosticSections(context);
+  if (diagnosticSections.collectionIssues) {
+    cells.push(markupCell(diagnosticSections.collectionIssues));
+  }
+  if (diagnosticSections.information) {
+    cells.push(markupCell(diagnosticSections.information));
+  }
+
   const queryStructureMarkdown = buildQueryStructureMarkdown(context);
   if (queryStructureMarkdown) {
     cells.push(markupCell(queryStructureMarkdown));
   }
 
-  // Right after the Overview/SQL cell and before the AI Summary - so reading
-  // order matches the Preview Panel's layout (SQL → what the plan actually
-  // does → the AI's interpretation of it → raw JSON appendix). Omitted
-  // entirely (no cell) when there's no plan/table data to show.
+  // Evidence precedes the AI interpretation in both the Preview and saved
+  // report: SQL/snapshot/diagnostics → structure → execution plan → AI.
   const executionPlanMarkdown = buildExecutionPlanMarkdown(context);
   if (executionPlanMarkdown) {
     cells.push(markupCell(executionPlanMarkdown));

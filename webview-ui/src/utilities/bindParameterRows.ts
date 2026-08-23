@@ -3,14 +3,9 @@ import { GeneralColumnType } from "@l-v-yonsama/rdh";
 import * as DBTypeConst from "@/types/lib/DBType";
 import type { BindParameterRow } from "@/utilities/vscode";
 
-// Pure Add/Del/renumber helpers behind BindParametersEditor.vue, kept out of
-// the component itself so they stay unit-testable
-// (misc/design/performance-tuning-query-statistics-parameter-input-plan.ja.md
-// §7.3: "Add / Del / renumberはcomponent内のpure helperへ分離し、unit test
-// 可能にする"). None of these ever throw or need a Vue instance.
+// Pure add, delete, and renumber helpers for BindParametersEditor.vue.
 
-// crypto.randomUUID() is available in every VS Code webview (Chromium-based,
-// same as the design doc's own example at §5.2).
+// VS Code webviews run on Chromium, where crypto.randomUUID() is available.
 function newRowId(): string {
   return crypto.randomUUID();
 }

@@ -4,28 +4,18 @@ import type { QueryStatisticsPlanInput } from "./queryStatisticsPlanSql";
 export type MappedStatementStatisticsRow = {
   sql: string;
   statistics: SelectedStatementStatistics;
-  // Feeds selectPlanSql() (misc/design/performance-tuning-query-statistics-
-  // parameter-input-plan.ja.md §7.2). `sql`/`normalizedSql` are always
-  // `query` itself; `representative*` is only ever populated for MySQL rows
-  // that have QUERY_SAMPLE_TEXT (§3.1/§6.4 of the same doc) and stays
-  // undefined for every other Vendor/row shape, which selectPlanSql()
-  // already treats as "not usable, fall through to normalizedSql".
+  // Feeds selectPlanSql(); representative SQL is optional vendor evidence.
   planInput: QueryStatisticsPlanInput;
 };
 
-// Converts one row's values from getStatementStatistics()'s common 15-column
-// RDH into the { sql, statistics, planInput } snapshot getPerformanceTuningContext()
-// and selectPlanSql() need, without any Vendor-specific branching in the UI
-// (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5
-// "行選択とworkload変換"). A pure function so it stays unit-testable outside
-// of ToolsViewProvider's VS Code-coupled state.
+// Converts one statistics row into the stable snapshot used by plan selection
+// and context collection, without vendor-specific UI branching.
 //
 // Deliberately conservative: a numeric column that's missing/non-finite
 // stays `undefined` (never coerced to 0 - a real 0 execution count and "this
 // Vendor doesn't report this column" must stay distinguishable), and a
 // non-parseable date column stays `undefined` rather than becoming
-// "Invalid Date". `statement_id`/`source` are optional per §10 Phase 5
-// ("Vendorが返さない項目はundefinedのままにする").
+// "Invalid Date". Vendor-specific optional values also remain undefined.
 export function mapStatementStatisticsRow(
   values: { [key: string]: any } | undefined | null
 ): MappedStatementStatisticsRow | undefined {

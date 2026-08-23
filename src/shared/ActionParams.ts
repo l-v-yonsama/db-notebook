@@ -121,28 +121,15 @@ export type ShowMessageActionCommand = BaseActionCommand<
 
 export type KillActionCommand = BaseActionCommand<"kill", { sessionOrPid: number | undefined }>;
 
-// Query Statistics mode only (ToolsView.vue). Sent by the explicit
-// Search/Refresh action (or Enter), never on every keystroke - the webview
-// owns the form fields; the extension host is the source of truth for
-// clamping/defaulting them (misc/design/performance-tuning-context-implementation-plan.ja.md
-// §10 Phase 5: "入力変更だけでは検索せず...最終的なclampは引き続きDriverの責務とする").
+// Query Statistics searches are explicit; the extension host remains the
+// source of truth for normalizing the submitted parameters.
 export type SearchQueryStatisticsActionCommand = BaseActionCommand<
   "searchQueryStatistics",
   Partial<QueryStatisticsSearchParams>
 >;
 
-// Starts a performance tuning context preview from a selected Query
-// Statistics row. Carries only `resultVersion` + `rowIndex`, never the row's
-// own values - ToolsViewProvider re-resolves `rdh.rows[rowIndex].values`
-// itself from the version it still holds, so a compromised/buggy webview
-// can't substitute arbitrary SQL/statistics into the collected context
-// (§10 Phase 5 "行選択とworkload変換"). No bind values here (2026-08-19
-// follow-up, misc/design/performance-tuning-query-statistics-parameter-
-// input-plan.ja.md's successor design): ToolsViewProvider now re-estimates
-// placeholders itself and, when any are found, hands off to
-// PerformanceTuningBindParametersPanel (openPerformanceTuningPreview()) to
-// collect them - the same panel/flow SQL History uses - rather than
-// collecting them inline in ToolsView.vue first.
+// Starts a preview from a selected Query Statistics row. The host resolves
+// the row by version and index, then gathers placeholders when necessary.
 export type PreviewPerformanceTuningActionCommand = BaseActionCommand<
   "previewPerformanceTuning",
   { resultVersion: number; rowIndex: number }
@@ -159,16 +146,8 @@ export type SubmitPerformanceTuningBindParametersActionCommand = BaseActionComma
   { values: unknown[]; markers: unknown[] }
 >;
 
-// Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
-// §6.1). PerformanceTuningPreviewPanel already holds the
-// PerformanceTuningContext it rendered as instance state (the same context
-// PreviewPerformanceTuningActionCommand's caller already had `driver.
-// getPerformanceTuningContext()` build), so the only things the webview
-// needs to send are the two live AI-options selections it owns (2026-08-19
-// follow-up, model/translate picker) - deliberately not persisted host-side
-// across previews (unlike Chat2QueryPanel.ts's "ok"-on-every-change/instance-
-// state pattern), since this panel already resets all AI state on every new
-// preview anyway.
+// The host already owns the rendered context; the webview only sends the
+// current model and translation selections.
 export type AnalyzePerformanceTuningWithAiActionCommand = BaseActionCommand<
   "analyzePerformanceTuningWithAi",
   { languageModelId: string; translateResponse: boolean }

@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import type { PerformanceTuningDiagnosticGroupViewModel } from "@/utilities/vscode";
 
-// Renders one already-grouped/summarized PerformanceTuningDiagnostic (or
-// UnavailableSection) group, built extension-side by
-// buildPerformanceTuningDiagnosticGroups() - see
-// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5. This
-// component only lays the view model out; it never derives copy or decides
-// grouping itself (§4.4).
+// Renders host-prepared diagnostic groups without interpreting raw codes.
 const props = defineProps<{
   group: PerformanceTuningDiagnosticGroupViewModel;
 }>();
@@ -63,21 +58,21 @@ const tableRefOf = (schemaName: string | undefined, tableName: string | undefine
 
 <style scoped>
 .DiagnosticGroupCard {
-  border-left: 3px solid var(--vscode-editorWidget-border, #444);
+  border-left: 3px solid var(--vscode-editorWidget-border);
   padding: 4px 8px;
   margin-bottom: 8px;
   border-radius: 2px;
-  background: var(--vscode-editorWidget-background, transparent);
+  background: var(--vscode-editorWidget-background);
 }
 
 /* Info is deliberately neutral/blue, never the warning color (§4.4) - a
    non-table plan source or a factual plan observation is not an issue. */
 .DiagnosticGroupCard.info {
-  border-left-color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+  border-left-color: var(--vscode-notificationsInfoIcon-foreground);
 }
 
 .DiagnosticGroupCard.warning {
-  border-left-color: var(--vscode-editorWarning-foreground, #ff9800);
+  border-left-color: var(--vscode-editorWarning-foreground);
 }
 
 .summary-row {
@@ -87,11 +82,11 @@ const tableRefOf = (schemaName: string | undefined, tableName: string | undefine
 }
 
 .DiagnosticGroupCard.info .codicon {
-  color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+  color: var(--vscode-notificationsInfoIcon-foreground);
 }
 
 .DiagnosticGroupCard.warning .codicon {
-  color: var(--vscode-editorWarning-foreground, #ff9800);
+  color: var(--vscode-editorWarning-foreground);
 }
 
 .text {
@@ -135,7 +130,7 @@ const tableRefOf = (schemaName: string | undefined, tableName: string | undefine
 
 .technical-details th,
 .technical-details td {
-  border: 1px solid var(--vscode-editorWidget-border, #444);
+  border: 1px solid var(--vscode-editorWidget-border);
   padding: 2px 6px;
   text-align: left;
   vertical-align: top;

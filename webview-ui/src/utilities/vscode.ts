@@ -15,6 +15,7 @@ export * from "../../../src/shared/LMPromptCreateConditionParams";
 export * from "../../../src/shared/MessageEventData";
 export * from "../../../src/shared/ModeType";
 export * from "../../../src/shared/PerformanceTuningAiAnalysis";
+export * from "../../../src/shared/PerformanceTuningActualEvidence";
 export * from "../../../src/shared/PerformanceTuningBinds";
 export * from "../../../src/shared/PerformanceTuningHumanSummary";
 export * from "../../../src/shared/PublishEditorParams";

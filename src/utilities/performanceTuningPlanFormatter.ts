@@ -1,24 +1,7 @@
-import type {
-  ActualPlanArtifact,
-  PlanNode,
-  PlanTableMapping,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import type { ActualPlanArtifact, PlanNode, PlanTableMapping } from "@l-v-yonsama/multi-platform-database-drivers";
 
-// Renders getPerformanceTuningContext()'s execution-plan data readably for
-// both surfaces that show it (PerformanceTuningPreviewPanel.vue,
-// performanceTuningAiNotebook.ts's generated .dbn) - see
-// misc/design/performance-tuning-structured-ai-analysis-plan.ja.md's
-// "execution plan display" follow-up (2026-08-19) for the design rationale.
-// Pure/vscode-free, same discipline as performanceTuningDiagnosticFormatter.ts:
-// a single formatter, called once host-side, both surfaces just display its
-// output as-is (no per-surface re-derivation).
-//
-// Two different renderers for two different data shapes: normalizedPlan is a
-// *tree* (a table would lose the parent-child structure that's the whole
-// point of an execution plan), so it's rendered as a classic EXPLAIN-style
-// indented text tree instead. planTableMappings is a genuinely *flat* array
-// (one row per table/index the plan touches), so that one does become a
-// table - see buildPlanTableMappingRows() below.
+// Formats plan data once for the Preview and saved notebook. The normalized
+// plan remains an indented tree; table mappings are rendered as table rows.
 
 const BRANCH = "├─ ";
 const LAST_BRANCH = "└─ ";
@@ -36,11 +19,13 @@ function formatTableRef(relation: PlanNode["relation"]): string | undefined {
     : qualified;
 }
 
-// Postgres's own EXPLAIN cost notation, reused verbatim (instantly familiar
-// to the majority of this project's users) rather than inventing a new one.
-// The same slot doubles for `actual` under analyze mode (Postgres ships
-// this today; MySQL's real EXPLAIN ANALYZE data is unparsed text instead -
-// see executionPlan.actualPlan - so PlanNode.actual stays empty there).
+function formatPlanTableMappingReference(mapping: Pick<PlanTableMapping, "schemaName" | "tableName" | "alias">): string {
+  const qualified = [mapping.schemaName, mapping.tableName].filter(Boolean).join(".");
+  return mapping.alias && mapping.alias !== mapping.tableName ? `${qualified} ${mapping.alias}` : qualified;
+}
+
+// Normalized nodes can include structured actual values where the driver can
+// associate runtime evidence with individual nodes.
 function formatEstimated(estimated: PlanNode["estimated"]): string | undefined {
   if (!estimated) {
     return undefined;
@@ -75,10 +60,8 @@ function formatActual(actual: PlanNode["actual"]): string | undefined {
   return parts.length > 0 ? `(actual ${parts.join(" ")})` : undefined;
 }
 
-// One line per node, composed from operation + relation + indexName +
-// joinType - operation alone isn't self-sufficient across vendors (MySQL's
-// is a bare access_type like "ref"/"ALL"; SQL Server splits joinType out
-// separately from the physical op) so every available piece is included.
+// Include every available attribute because vendors split plan information
+// differently across operation, relation, index, and join type.
 function formatNodeLine(node: PlanNode): string {
   const parts: string[] = [node.operation];
 
@@ -209,10 +192,8 @@ function combineColumns(mapping: PlanTableMapping): string | undefined {
  */
 export function buildPlanTableMappingRows(mappings: PlanTableMapping[]): PlanTableMappingRow[] {
   return mappings.map((mapping) => {
-    const qualified = [mapping.schemaName, mapping.tableName].filter(Boolean).join(".");
-    const table = mapping.alias && mapping.alias !== mapping.tableName ? `${qualified} ${mapping.alias}` : qualified;
     return {
-      table,
+      table: formatPlanTableMappingReference(mapping),
       index: mapping.indexName,
       estimatedRows: mapping.estimatedRows,
       actualRows: mapping.actualRows,

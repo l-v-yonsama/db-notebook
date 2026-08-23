@@ -497,14 +497,8 @@ export type VariablesPanelEventData = BaseMessageEventData<
   }
 >;
 
-// Beginner-facing view of one group of same-cause PerformanceTuningDiagnostic
-// entries (or, for the warning severity, of UnavailableSection entries) -
-// built once, extension-side, by buildPerformanceTuningDiagnosticGroups()
-// (src/utilities/performanceTuningDiagnosticFormatter.ts) so the Vue
-// component never hand-rolls per-code copy or grouping itself
-// (misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5).
-// Declared here (not in that utility file) since both the extension host
-// (which builds it) and the webview (which only renders it) need the shape.
+// User-facing diagnostic groups are built extension-side and rendered by the
+// webview. The shared shape lives here for both sides.
 export type PerformanceTuningDiagnosticDetailViewModel = {
   nodeId?: string;
   operation?: string;
@@ -546,13 +540,8 @@ export type PlanTableMappingRowViewModel = {
   columnsUsed?: string;
 };
 
-// Step 10 (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
-// §6/§11). A tagged status rather than separate optional fields, so the Vue
-// component can switch on one value instead of juggling
-// result/errorMessage/rawResponseText independently going stale relative to
-// each other. `savedNotebookRelativePath` is set independently of `status`
-// (via a later "analysis-update" post after a successful save) since saving
-// happens after a successful analysis without discarding the shown result.
+// A tagged status prevents independently optional AI fields from becoming
+// inconsistent. Saving does not discard a successful analysis.
 export type PerformanceTuningAiAnalysisViewState = {
   status: "idle" | "running" | "success" | "error";
   result?: PerformanceTuningAiAnalysisResult;
@@ -838,10 +827,7 @@ export type ToolsViewEventData = BaseMessageEventData<
   {
     // sessions/locks keep their original minimal shape (RDH is the only
     // state, and search happens over the base DbResource that opened them).
-    // queryStatistics carries QueryStatisticsViewState in full on every
-    // update - including a preview-status-only change - so the webview
-    // never has to reconcile a partial patch against state it already holds
-    // (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5).
+    // Query Statistics always receives its complete state snapshot.
     refresh:
       | { mode: "sessions" | "locks"; rdh?: ResultSetData }
       | ({ mode: "queryStatistics" } & QueryStatisticsViewState);

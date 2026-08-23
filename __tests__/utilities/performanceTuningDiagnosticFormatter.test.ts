@@ -5,8 +5,7 @@ import type {
 import { describe, expect, it } from "vitest";
 import { buildPerformanceTuningDiagnosticGroups } from "../../src/utilities/performanceTuningDiagnosticFormatter";
 
-// The exact pg_stat_statements/pg_stat_statements_info scenario from
-// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4.
+// Two non-table PostgreSQL plan sources should share one user-facing group.
 const n3n4Diagnostics: PerformanceTuningDiagnostic[] = [
   {
     code: "NON_TABLE_PLAN_SOURCE",

@@ -48,16 +48,8 @@ import { BasePanel } from "./BasePanel";
 // is mathematically at the advertised boundary does not still fail at send.
 const AI_INPUT_TOKEN_SAFETY_MARGIN = 128;
 
-// "What would be sent" preview for getPerformanceTuningContext()'s result
-// (推奨着手順 step 9a; diagnostic display per
-// misc/design/performance-tuning-context-implementation-plan.ja.md §4.4/§10 Phase 5), plus
-// Step 10's "Analyze with AI" flow
-// (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md §6). No
-// literal masking (matches the design's §9.2 policy). Diagnostic
-// grouping/copy is computed once here (buildPerformanceTuningDiagnosticGroups())
-// rather than in the Vue component, so it stays unit-testable with the rest
-// of this extension's vitest suite instead of needing a separate webview-ui
-// test setup.
+// Host-side state and orchestration for the Preview and AI analysis. Build
+// user-facing diagnostic groups here so rendering stays simple and testable.
 export class PerformanceTuningPreviewPanel extends BasePanel {
   public static currentPanel: PerformanceTuningPreviewPanel | undefined;
 

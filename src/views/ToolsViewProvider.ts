@@ -46,14 +46,8 @@ dayjs.extend(utc);
 
 type ToolsViewMode = "sessions" | "locks" | "queryStatistics";
 
-// Discriminated by viewMode (rather than a bag of optional fields) so a
-// sessions/locks caller can never accidentally omit queryStatistics-only
-// data, and vice versa (misc/design/performance-tuning-context-implementation-plan.ja.md
-// §10 Phase 5 "ToolsViewParamsはoptional fieldの寄せ集めではなくdiscriminated
-// unionにする"). `res` is a plain DbResource for sessions/locks (matches
-// GET_LOCKS/GET_SESSIONS's existing DbDatabase-typed callers) but narrows to
-// RdsDatabase for queryStatistics, since only the 4 static-support RDS
-// vendors ever reach that mode.
+// A discriminated union keeps Query Statistics data separate from sessions
+// and locks, whose resource type is broader.
 export type ToolsViewParams =
   | { viewMode: "sessions" | "locks"; conName: string; res: DbResource }
   | {
@@ -64,9 +58,7 @@ export type ToolsViewParams =
     };
 
 // Resolved once per render()/query and never re-derived from the RDH result
-// - res.name (the database resource the command was invoked on) is the only
-// source of truth for which database is queried (§10 Phase 5 "database
-// resourceのres.nameをtarget databaseの唯一のsource of truthとする").
+// - res.name is the only source of truth for the queried database.
 type QueryStatisticsDatabaseInfo = {
   connectionName: string;
   databaseName: string;

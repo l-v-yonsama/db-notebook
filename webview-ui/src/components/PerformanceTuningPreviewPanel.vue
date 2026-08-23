@@ -7,7 +7,7 @@ import type {
   PerformanceTuningPreviewPanelEventData,
   PlanTableMappingRowViewModel,
 } from "@/utilities/vscode";
-import { vscode } from "@/utilities/vscode";
+import { actualExecutionEvidenceSource, hasActualExecutionEvidence, vscode } from "@/utilities/vscode";
 import type { CapabilityStatus, PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { computed, ref } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
@@ -35,18 +35,12 @@ const translatedPlainTextPrompt = ref("");
 const payloadBytes = ref(0);
 const maxPayloadBytes = ref(0);
 
-// Analyze with AI's "Language model"/"Translate response" options
-// (2026-08-19 follow-up, design doc §0) - shown whenever a context is
-// loaded (not gated on analysis.status), since the choice has to be made
-// *before* clicking Analyze with AI.
+// AI options are available as soon as a context is loaded.
 const languageModels = ref<LabelValueItem[]>([]);
 const languageModelId = ref("");
 const translateResponse = ref(false);
 
-// Step 10 "Analyze with AI" (misc/design/performance-tuning-structured-ai-analysis-plan.ja.md
-// §6.1). Reset to idle on every new "initialize" (a fresh preview
-// invalidates whatever analysis was shown for the previous one - mirrors
-// PerformanceTuningPreviewPanel.ts's own renderGeneration-based reset).
+// A fresh context invalidates the previous analysis.
 const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
 
 // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Whether this connection's
@@ -74,6 +68,12 @@ const statementAllowsActualPlan = computed(
 );
 const isDmlEstimate = computed(
   () => context.value?.statement.kind !== undefined && context.value.statement.kind !== "select"
+);
+const hasActualEvidence = computed(
+  () => context.value !== undefined && hasActualExecutionEvidence(context.value),
+);
+const actualEvidenceSource = computed(
+  () => context.value ? actualExecutionEvidenceSource(context.value) : undefined,
 );
 const actualPlanButtonTitle = computed(() => {
   if (!statementAllowsActualPlan.value) {
@@ -299,7 +299,7 @@ defineExpose({
     <p v-if="!statementAllowsActualPlan" class="section-note">
       This {{ context.statement.kind ?? "non-SELECT" }} statement uses an estimated plan only. Actual runtime metrics are not collected here.
     </p>
-    <p v-else-if="analyzedExecutionPlan.available && !context.executionPlan.actualPlan" class="section-note actual-plan-warning">
+    <p v-else-if="analyzedExecutionPlan.available && !hasActualEvidence" class="section-note actual-plan-warning">
       <fa icon="triangle-exclamation" />
       "Run Explain Analyze" executes the SQL above for real against the database, instead of only
       estimating its plan.
@@ -322,7 +322,7 @@ defineExpose({
         <span>{{ context.database.vendor }}{{ context.database.version ? ` ${context.database.version}` : "" }} ・
           {{ context.database.databaseName }}<span v-if="context.database.schemaName">.{{ context.database.schemaName }}</span></span>
       </div>
-      <div class="row">
+      <div class="row status-summary">
         <span class="label">Status</span>
         <span class="badge" :class="context.collection.status">{{ context.collection.status }}</span>
         <!-- complete badge stays green even with informational notes present
@@ -330,10 +330,8 @@ defineExpose({
         <span v-if="context.collection.status === 'complete' && infoGroups.length > 0" class="notes-hint">
           {{ infoGroups.length }} {{ infoGroups.length === 1 ? "note" : "notes" }}
         </span>
-      </div>
-      <div class="row">
-        <span class="label">Payload size</span>
-        <span :class="{ exceeded: payloadExceeded }">
+        <span class="payload-size" :class="{ exceeded: payloadExceeded }">
+          <span class="label-inline">Payload size:</span>
           {{ payloadBytes.toLocaleString() }} / {{ maxPayloadBytes.toLocaleString() }} bytes
           <span v-if="payloadExceeded">(exceeds limit)</span>
         </span>
@@ -354,17 +352,17 @@ defineExpose({
         <h3 class="section-title">Performance snapshot</h3>
         <PerformanceTuningSnapshot :summary="humanSummary" />
         <p v-if="queryDiagramAvailable" class="section-note query-diagram-notice">
-          A query-scoped ER diagram will be included when you save this analysis as a Notebook; view it in the saved DBN or HTML report.<span v-if="queryDiagramHasWarnings"> Some relationships could not be resolved conservatively; the saved Notebook includes the details.</span>
+          A query-scoped structure view (ER diagram and relevant indexes) will be included when you save this analysis as a Notebook; view it in the saved DBN or HTML report.<span v-if="queryDiagramHasWarnings"> Some relationships could not be resolved conservatively; the saved Notebook includes the details.</span>
         </p>
       </div>
 
-      <!-- 0. AI Analysis (Step 10, design doc §6.1). Always rendered, even at
+      <!-- AI Analysis is always rendered, even at
            idle (2026-08-20 follow-up): a first-time user had no on-screen
            indication of *where* the result would show up until after
            clicking "Analyze with AI" - this idle-state hint gives that area
            a visible home from the start, doubling as a hint for the
-           SQL/Information-first, Analyze-with-AI-second workflow. -->
-      <div class="section ai-analysis">
+           evidence-first, Analyze-with-AI-second workflow. -->
+      <div class="section ai-analysis ai-analysis-section">
         <div class="section-title-row">
           <h3 class="section-title">AI Analysis</h3>
           <CopyToClipboardButton v-if="analysisJson" class="copy-analysis-btn" :content="analysisJson" title="Copy AI analysis JSON" />
@@ -450,7 +448,7 @@ defineExpose({
 
       <!-- 3. Collection issues: warning-severity diagnostics + unavailable
            sections, already merged into one list extension-side (§6.1/§6.3). -->
-      <div v-if="issueGroups.length > 0" class="section">
+      <div v-if="issueGroups.length > 0" class="section collection-issues-section">
         <h3 class="section-title">Collection issues</h3>
         <DiagnosticGroupCard v-for="g in issueGroups" :key="g.key" :group="g" />
       </div>
@@ -464,7 +462,7 @@ defineExpose({
            plan had several different characteristics; see
            performanceTuningDiagnosticFormatter.ts's PLAN_OBSERVATION case for
            the shortened per-group summary this replaces). -->
-      <div v-if="infoGroups.length > 0" class="section">
+      <div v-if="infoGroups.length > 0" class="section information-section">
         <h3 class="section-title">Information</h3>
         <p class="section-note">
           The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed
@@ -479,7 +477,7 @@ defineExpose({
            structure); planTableMappings is a genuinely flat per-table array,
            so that one is a small table. Both come pre-formatted from
            performanceTuningPlanFormatter.ts - this component only renders. -->
-      <div v-if="planTreeText || planTableMappingRows.length > 0" class="section">
+      <div v-if="planTreeText || planTableMappingRows.length > 0" class="section execution-plan-section">
         <h3 class="section-title">
           Execution plan
           <span v-if="context.executionPlan.mode === 'analyze'" class="badge analyzed-badge">analyzed</span>
@@ -488,8 +486,11 @@ defineExpose({
           Real execution time: {{ context.executionPlan.executionTimeMs }} ms
         </p>
         <p v-if="context.executionPlan.actualPlan" class="section-note">
-          Runtime evidence from {{ context.executionPlan.actualPlan.source }} is shown first. The estimated
-          topology is retained below only for structured table/predicate metadata and comparison.
+          Runtime evidence from {{ actualEvidenceSource }} is shown first. The estimated topology is retained
+          below only for structured table/predicate metadata and comparison.
+        </p>
+        <p v-else-if="hasActualEvidence" class="section-note">
+          Runtime evidence from {{ actualEvidenceSource }} is included in the normalized execution plan below.
         </p>
         <p v-else class="section-note">
           {{ isDmlEstimate ? "DML statement — estimated plan only; runtime measurements are not collected." : "Estimated plan only — the SQL has not been executed for runtime measurements." }}
@@ -499,10 +500,11 @@ defineExpose({
           <pre class="plan-tree">{{ actualPlanDisplayText ?? context.executionPlan.actualPlan.content }}</pre>
         </div>
         <details v-if="planTreeText" class="advanced-details" :open="!context.executionPlan.actualPlan">
-          <summary>{{ context.executionPlan.actualPlan ? "Estimated plan topology" : "Execution plan topology" }}</summary>
+          <summary>{{ context.executionPlan.actualPlan ? "Estimated plan topology" : hasActualEvidence ? `Actual execution plan (${actualEvidenceSource})` : "Execution plan topology" }}</summary>
           <pre class="plan-tree">{{ planTreeText }}</pre>
         </details>
         <table v-if="planTableMappingRows.length > 0" class="plan-table-mappings">
+          <caption>Table metrics</caption>
           <thead>
             <tr>
               <th>Table</th>
@@ -532,7 +534,7 @@ defineExpose({
 
       <!-- 6. Full context JSON, as "Advanced details" - collapsed by default
            (§6.5). -->
-      <details class="section advanced-details">
+      <details class="section advanced-details advanced-details-section">
         <summary class="section-title">Advanced details: Full context JSON</summary>
         <p class="advanced-note">
           This preview includes SQL, table definitions, and predicates exactly as collected. Review the content
@@ -588,7 +590,29 @@ defineExpose({
          so they don't land on a shared line. Vertically centering the row
          instead is the standard fix for a row of mixed form controls. */
       &.ai-options {
+        display: grid;
+        grid-template-columns: 110px max-content 220px max-content;
         align-items: center;
+
+        .label {
+          min-width: 0;
+        }
+      }
+
+      &.status-summary {
+        display: grid;
+        grid-template-columns: 110px max-content 220px max-content;
+        align-items: baseline;
+
+        .label {
+          min-width: 0;
+        }
+
+        // Column 4 is also where "Translate response" starts above.
+        .payload-size {
+          grid-column: 4;
+          white-space: nowrap;
+        }
       }
     }
 
@@ -648,35 +672,32 @@ defineExpose({
     padding: 1px 6px;
     border-radius: 3px;
     font-size: 0.9em;
+    border: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
 
     &.complete {
-      background: var(--vscode-testing-iconPassed, #2e7d32);
-      color: white;
+      border-color: var(--vscode-testing-iconPassed);
     }
 
     &.partial {
-      background: var(--vscode-editorWarning-foreground, #ff9800);
-      color: black;
+      border-color: var(--vscode-editorWarning-foreground);
     }
 
     &.confidence-high {
-      background: var(--vscode-testing-iconPassed, #2e7d32);
-      color: white;
+      border-color: var(--vscode-testing-iconPassed);
     }
 
     &.confidence-medium {
-      background: var(--vscode-editorWarning-foreground, #ff9800);
-      color: black;
+      border-color: var(--vscode-editorWarning-foreground);
     }
 
     &.confidence-low {
-      background: var(--vscode-errorForeground, #f44336);
-      color: white;
+      border-color: var(--vscode-errorForeground);
     }
 
     &.analyzed-badge {
-      background: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
-      color: white;
+      border-color: var(--vscode-notificationsInfoIcon-foreground);
       font-weight: normal;
       margin-left: 6px;
     }
@@ -691,7 +712,7 @@ defineExpose({
      right under the toolbar, so the risk is visible before the button is
      ever clicked, not just in its tooltip. */
   .actual-plan-warning {
-    color: var(--vscode-editorWarning-foreground, #ff9800);
+    color: var(--vscode-editorWarning-foreground);
     font-size: 0.85em;
     margin: 2px 0 6px 0;
   }
@@ -709,6 +730,16 @@ defineExpose({
     min-height: 0;
     overflow: auto;
     margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+
+    // Keep the visible reading order aligned with the saved DBN report.
+    .performance-snapshot-section { order: 1; }
+    .collection-issues-section { order: 2; }
+    .information-section { order: 3; }
+    .execution-plan-section { order: 4; }
+    .ai-analysis-section { order: 5; }
+    .advanced-details-section { order: 6; }
 
     .section {
       margin-bottom: 12px;
@@ -762,7 +793,7 @@ defineExpose({
       overflow: auto;
       white-space: pre;
       font-size: 0.85em;
-      background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
+      background: var(--vscode-textCodeBlock-background);
       border-radius: 3px;
     }
 
@@ -774,9 +805,17 @@ defineExpose({
       width: 100%;
       font-size: 0.85em;
 
+      caption {
+        caption-side: top;
+        margin: 0 0 4px 0;
+        text-align: left;
+        font-size: 1.1em;
+        font-weight: 600;
+      }
+
       th,
       td {
-        border: 1px solid var(--vscode-editorWidget-border, #444);
+        border: 1px solid var(--vscode-editorWidget-border);
         padding: 2px 6px;
         text-align: left;
         vertical-align: top;
@@ -841,25 +880,25 @@ defineExpose({
     }
 
     .ai-card {
-      border-left: 3px solid var(--vscode-editorWidget-border, #444);
+      border-left: 3px solid var(--vscode-editorWidget-border);
       padding: 4px 8px;
       margin-bottom: 6px;
       border-radius: 2px;
-      background: var(--vscode-editorWidget-background, transparent);
+      background: var(--vscode-editorWidget-background);
 
       &.info,
       &.low {
-        border-left-color: var(--vscode-notificationsInfoIcon-foreground, #3794ff);
+        border-left-color: var(--vscode-notificationsInfoIcon-foreground);
       }
 
       &.warning,
       &.risk-medium {
-        border-left-color: var(--vscode-editorWarning-foreground, #ff9800);
+        border-left-color: var(--vscode-editorWarning-foreground);
       }
 
       &.critical,
       &.risk-high {
-        border-left-color: var(--vscode-errorForeground, #f44336);
+        border-left-color: var(--vscode-errorForeground);
       }
     }
 
@@ -883,12 +922,12 @@ defineExpose({
       font-size: 0.85em;
       margin: 4px 0;
       padding: 4px 6px;
-      background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
+      background: var(--vscode-textCodeBlock-background);
       border-radius: 2px;
     }
 
     .ai-card-duplicate-warning {
-      color: var(--vscode-editorWarning-foreground, #ff9800);
+      color: var(--vscode-editorWarning-foreground);
       font-size: 0.85em;
       margin: 4px 0;
     }

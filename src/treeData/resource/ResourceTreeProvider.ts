@@ -372,13 +372,8 @@ export class DBDatabaseItem extends vscode.TreeItem {
             dbType === DBType.Oracle
           ) {
             showSessions = true;
-            // Same static vendor set as getStatementStatistics() support
-            // today (kept as its own flag rather than reusing showSessions,
-            // since the two capabilities are unrelated and could diverge -
-            // this is just where they currently happen to agree). The
-            // runtime double-check (supportsGetStatementStatistics()) still
-            // happens when the Query Statistics view actually opens
-            // (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5).
+            // Query Statistics still performs a runtime capability check when
+            // the view opens; it is independent from session support.
             showQueryStatistics = true;
           }
           exportable =

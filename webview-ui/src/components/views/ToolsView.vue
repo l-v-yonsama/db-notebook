@@ -23,7 +23,7 @@ const mode = ref("sessions" as ToolsViewEventData["value"]["refresh"]["mode"]);
 const rdh = ref(undefined as ResultSetData | undefined);
 const clickedCellParams = ref(undefined as CellFocusParams | undefined);
 
-// --- Query Statistics mode only (misc/design/performance-tuning-context-implementation-plan.ja.md §10 Phase 5) ---
+// --- Query Statistics mode only ---
 const searchStatus = ref<QueryStatisticsSearchStatus>("loading");
 const searchMessage = ref<string | undefined>(undefined);
 const previewStatus = ref<QueryStatisticsPreviewStatus>("idle");

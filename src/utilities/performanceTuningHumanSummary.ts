@@ -3,6 +3,7 @@ import type {
   PlanTableMapping,
   TableTuningContext,
 } from "@l-v-yonsama/multi-platform-database-drivers";
+import { hasActualExecutionEvidence } from "../shared/PerformanceTuningActualEvidence";
 import type {
   PerformanceTuningHumanSignal,
   PerformanceTuningHumanSummary,
@@ -245,14 +246,7 @@ export function buildPerformanceTuningHumanSummary(
   const mappingRefs = context.planTableMappings.map(mappingRef);
   const refs = mappingRefs.length > 0 ? mappingRefs : context.tables.map(tableRef);
   const tableRefs = [...new Set(refs)];
-  const actual = context.statement.analyzeEligibility?.allowed !== false && (
-    Boolean(context.executionPlan.actualPlan) ||
-    context.planTableMappings.some((mapping) =>
-      mapping.actualRows !== undefined ||
-      mapping.tableAccessRows?.estimated === false ||
-      mapping.predicateFilterOutputRows?.estimated === false,
-    )
-  );
+  const actual = hasActualExecutionEvidence(context);
 
   const collectionSignal: PerformanceTuningHumanSignal[] = context.collection.status === "partial"
     ? [{

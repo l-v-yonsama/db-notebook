@@ -13,9 +13,8 @@ import { StateStorage } from "../../utilities/StateStorage";
 /**
  * Phase 1 + 2 scope: all read/connection/schema/query tools (everything except the
  * notebook-authoring tools, `createDbNotebook`/`editDbNotebook`, which stay
- * Copilot-only for now). `getPerformanceTuningContext` (Step 10,
- * misc/design/performance-tuning-structured-ai-analysis-plan.ja.md §9) joined this set
- * later, on the same reasoning: it's read-only and doesn't author a Notebook.
+ * Copilot-only for now). `getPerformanceTuningContext` is included because it
+ * is read-only and does not author a Notebook.
  * `description`s below are copied verbatim from `package.json`'s
  * `contributes.languageModelTools` (the Copilot Chat versions of these same tools) so
  * both surfaces stay in sync and describe identical behavior.
