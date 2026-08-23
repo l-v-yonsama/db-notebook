@@ -982,9 +982,9 @@
       ],
       "notebook/cell/title": [
         {
-          "command": "database-notebook.cell-toolbar-lm",
+          "command": "database-notebook.cell-toolbar-performance-tuning",
           "group": "inline",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' ) && cellMetaConnectionName !== '' "
+          "when": "notebookType == 'database-notebook-type' && cellLangId == 'sql' && cellCanStartPerformanceTuning"
         },
         {
           "command": "database-notebook.cell-toolbar-format",
@@ -1395,10 +1395,10 @@
         "icon": "$(debug-alt-small)"
       },
       {
-        "command": "database-notebook.cell-toolbar-lm",
-        "title": "Activate the AI Assistant",
-        "shortTitle": "Activate AI",
-        "icon": "$(robot)"
+        "command": "database-notebook.cell-toolbar-performance-tuning",
+        "title": "Open Performance Tuning Preview",
+        "shortTitle": "Performance tuning",
+        "icon": "$(pulse)"
       },
       {
         "command": "database-notebook.cell-toolbar-format",
