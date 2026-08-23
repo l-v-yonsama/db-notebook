@@ -23,8 +23,9 @@ shows an example prompt / tool input / result for every tool currently available
   - 5.4. [Run Database Query — `#runDbQuery`](#54-run-database-query--rundbquery)
   - 5.5. [Run Database Transaction — `#runDbTransaction`](#55-run-database-transaction--rundbtransaction)
   - 5.6. [Scan Database Resource — `#scanDbResource`](#56-scan-database-resource--scandbresource)
-  - 5.7. [Create Database Notebook — `#createDbNotebook`](#57-create-database-notebook--createdbnotebook)
-  - 5.8. [Edit Database Notebook — `#editDbNotebook`](#58-edit-database-notebook--editdbnotebook)
+  - 5.7. [Get Performance Tuning Context — `#getPerformanceTuningContext`](#57-get-performance-tuning-context--getperformancetuningcontext)
+  - 5.8. [Create Database Notebook — `#createDbNotebook`](#58-create-database-notebook--createdbnotebook)
+  - 5.9. [Edit Database Notebook — `#editDbNotebook`](#59-edit-database-notebook--editdbnotebook)
 - 6. [Putting it together: a chained example](#6-putting-it-together-a-chained-example)
 - 7. [Troubleshooting](#7-troubleshooting)
 
@@ -45,6 +46,7 @@ anything a second time. For those same connections from an external MCP client, 
 | Run Database Query | `#runDbQuery` | Runs one SQL statement (or one PartiQL statement against DynamoDB) |
 | Run Database Transaction | `#runDbTransaction` | Runs several SQL statements as one all-or-nothing transaction |
 | Scan Database Resource | `#scanDbResource` | Searches a non-SQL resource (Redis, Memcache, MQTT, Keycloak, Auth0, AWS S3/SQS/CloudWatch) |
+| Get Performance Tuning Context | `#getPerformanceTuningContext` | Gets estimated plan, related schema, statistics, and physical-health facts for one SQL statement |
 | Create Database Notebook | `#createDbNotebook` | Creates a new `.dbn` notebook from cells or raw SQL |
 | Edit Database Notebook | `#editDbNotebook` | Inserts/replaces/deletes cells, or updates a cell's metadata/source, in an existing `.dbn` notebook |
 
@@ -92,10 +94,11 @@ run:
   a DynamoDB (PartiQL) connection — **every** statement on either of those, reads included.
 - `#runDbTransaction` always asks, regardless of what the statements are.
 - `#editDbNotebook` always asks, regardless of which operations are in the batch.
-- `#listDbConnections`, `#testDbConnection`, `#getDbSchema`, `#scanDbResource`, and
+- `#listDbConnections`, `#testDbConnection`, `#getDbSchema`, `#scanDbResource`,
+  `#getPerformanceTuningContext`, and
   `#createDbNotebook` never ask — they either can't change existing data (the first four), or
   `#createDbNotebook` limits its own blast radius by refusing to overwrite anything that already
-  exists (see [5.7](#57-create-database-notebook--createdbnotebook)).
+  exists (see [5.8](#58-create-database-notebook--createdbnotebook)).
 
 Each dialog offers **"Allow Once"** and **"Allow in this Session"** (labels may vary slightly by
 VS Code version) — see [Troubleshooting](#6-troubleshooting) for an important gotcha with the
@@ -451,7 +454,39 @@ session:7566-a1b2c3d4 hash 1m 58s {"customerNo":7566,"loginAt":"2026-07-19T09:00
 session:7698-e5f6a7b8 hash 5m 40s {"customerNo":7698,"loginAt":"2026-07-19T09:02:11Z"}
 ```
 
-### 5.7. Create Database Notebook — `#createDbNotebook`
+### 5.7. Get Performance Tuning Context — `#getPerformanceTuningContext`
+
+Returns a vendor-neutral, read-only snapshot for investigating why one SQL statement may be slow.
+It supports MySQL, PostgreSQL, SQL Server, and Oracle. The snapshot includes the **estimated**
+execution plan, related table definitions and indexes, optimizer statistics, physical-health
+signals, and collection diagnostics.
+
+The supplied SQL is **not executed**: this tool always obtains an estimated plan and never runs
+`EXPLAIN ANALYZE`. It returns observed facts rather than an AI conclusion; ask Copilot to reason
+from the returned data. SQL text, predicates, and DDL are not masked, so treat the result as
+database-sensitive information.
+
+**Prompt(EN)**
+
+> Why is this query slow on localMysql? Use the performance tuning context and give evidence-based recommendations.
+
+**Prompt(JA)**
+
+> localMysql で次のSQLが遅い理由を、パフォーマンスチューニング情報を根拠に分析して改善案を教えて。
+
+**Tool input**
+
+```json
+{
+  "connectionName": "localMysql",
+  "sql": "SELECT * FROM orders WHERE DATE(created_at) = '2025-12-15'"
+}
+```
+
+Use optional `databaseName` when the connection has no configured default database. Use optional
+`schemaName` when table resolution needs an explicit schema, such as PostgreSQL.
+
+### 5.8. Create Database Notebook — `#createDbNotebook`
 
 Creates a new `.dbn` file from a cell list, or from raw multi-statement SQL text (split into one
 SQL cell per statement, same as the "Create Notebook from SQL" command), and opens it. Refuses to
@@ -496,7 +531,7 @@ and can error.
 
 The new notebook opens in the editor immediately so you can review or run it.
 
-### 5.8. Edit Database Notebook — `#editDbNotebook`
+### 5.9. Edit Database Notebook — `#editDbNotebook`
 
 Applies an ordered batch of operations — `insertCells`, `replaceCells`, `deleteCells`,
 `updateCellMetadata` (merges fields, doesn't wipe out settings it doesn't know about, like chart

@@ -53,6 +53,7 @@ another machine) and requires a bearer token on every request, including the ini
 | Run Database Query | `runDbQuery` | Runs one SQL statement (or one PartiQL statement against DynamoDB) |
 | Run Database Transaction | `runDbTransaction` | Runs several SQL statements as one all-or-nothing transaction |
 | Scan Database Resource | `scanDbResource` | Searches a non-SQL resource (Redis, Memcache, MQTT, Keycloak, Auth0, AWS S3/SQS/CloudWatch) |
+| Get Performance Tuning Context | `getPerformanceTuningContext` | Returns a read-only execution-plan, schema, statistics, and physical-health snapshot for one SQL statement |
 
 `createDbNotebook`/`editDbNotebook` (creating/editing `.dbn` files) are **not** exposed here — see
 the table above for why — use Copilot Chat in VS Code for those.
@@ -354,11 +355,32 @@ of type) still applies exactly as it does for Copilot's tools.
 
 Every tool listed in [1](#1-overview) shares its implementation with the matching Copilot Chat
 tool, so the input fields and result text are identical — the only difference is how you invoke it
-and how writes get confirmed ([6](#6-confirmation-for-writes)). Rather than repeat all six tools'
+and how writes get confirmed ([6](#6-confirmation-for-writes)). Rather than repeat all seven tools'
 examples here, see
 [the Copilot Chat guide's Tool reference](./lmToolsUsageGuide.md#5-tool-reference) for the full set
 (request shape, sample output, error shapes) — just drop the `#` prefix from a tool's name to get
 its MCP tool name (e.g. `#getDbSchema` → `getDbSchema`).
+
+For performance investigation, use `getPerformanceTuningContext`. It supports MySQL, PostgreSQL,
+SQL Server, and Oracle, and returns the estimated execution plan together with relevant table
+definitions, indexes, optimizer statistics, physical-health signals, and collection diagnostics.
+It **never executes the supplied SQL**: this tool always requests an estimated plan, not `ANALYZE`.
+The result can contain SQL literals and DDL exactly as collected, so handle it as database-sensitive
+information. For example:
+
+> Why is this query likely slow on localMysql? Use the performance tuning context and give only
+> evidence-based recommendations.
+
+```json
+{
+  "connectionName": "localMysql",
+  "sql": "SELECT * FROM orders WHERE DATE(created_at) = '2025-12-15'"
+}
+```
+
+Use `databaseName` when the connection has no default database, and `schemaName` when table
+resolution needs an explicit schema (for example, PostgreSQL). The tool returns facts only; the MCP
+client's model is responsible for interpreting them and proposing changes.
 
 One example, end to end, using the running example from
 [the main Database Notebook examples page](./databaseNotebook.md) (a `customer` table on a
