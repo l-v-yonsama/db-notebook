@@ -201,6 +201,26 @@ function buildQueryStructureMarkdown(context: PerformanceTuningContext): string 
     diagram.mermaid,
     "```",
   ];
+  if (diagram.relevantIndexes.length > 0) {
+    lines.push(
+      "",
+      "### Indexes relevant to this SQL",
+      "",
+      "| Table | Index | Key columns | Included columns | Query relevance |",
+      "|---|---|---|---|---|",
+    );
+    diagram.relevantIndexes.forEach((index) => {
+      const tableRef = [index.schemaName, index.tableName].filter(Boolean).join(".") +
+        (index.alias ? ` (alias ${index.alias})` : "");
+      const indexKind = index.primary ? "PRIMARY" : index.unique ? "UNIQUE" : undefined;
+      const indexName = `${escapeMdCell(index.indexName)}${indexKind ? ` (${indexKind})` : ""}`;
+      lines.push(
+        `| ${escapeMdCell(tableRef)} | ${indexName} | ${escapeMdCell(index.columns.join(", "))} | ${
+          index.includedColumns?.length ? escapeMdCell(index.includedColumns.join(", ")) : "-"
+        } | ${escapeMdCell(index.relevance.join("; "))} |`,
+      );
+    });
+  }
   if (diagram.warnings.length > 0) {
     lines.push("", "### Diagram notes", "", ...diagram.warnings.map((warning) => `- ${warning}`));
   }

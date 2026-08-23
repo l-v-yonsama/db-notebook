@@ -154,6 +154,55 @@ describe("buildAiAnalysisNotebookCells", () => {
     );
   });
 
+  it("lists query-relevant indexes directly below the saved query structure diagram", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext({
+        statement: {
+          sql: "SELECT * FROM orders o WHERE o.created_at >= '2026-01-01'",
+          source: "editor",
+        },
+        tables: [
+          {
+            schemaName: "public",
+            tableName: "orders",
+            definition: {
+              columns: [
+                { columnName: "id", dataType: "bigint", nullable: false },
+                { columnName: "created_at", dataType: "timestamp", nullable: false },
+              ],
+              constraints: [{ type: "primaryKey", columns: ["id"] }],
+              indexes: [
+                {
+                  indexName: "idx_orders_created_at",
+                  unique: false,
+                  primary: false,
+                  columns: [{ columnName: "created_at", direction: "asc" }],
+                },
+              ],
+            },
+          },
+        ],
+        planTableMappings: [
+          {
+            planNodeId: "n0",
+            schemaName: "public",
+            tableName: "orders",
+            alias: "o",
+            indexName: "idx_orders_created_at",
+            filterColumns: ["created_at"],
+          },
+        ],
+      }),
+      buildAnalysis(),
+    );
+
+    const structureCell = findCell(cells, "## Query structure");
+    expect(structureCell.value).toContain("### Indexes relevant to this SQL");
+    expect(structureCell.value).toContain(
+      "| public.orders (alias o) | idx_orders_created_at | created_at | - | plan access; WHERE |",
+    );
+  });
+
   // 2026-08-21 follow-up (summary.md's Full Context improvement item 4) -
   // possibleDuplicateOfIndex is host-computed upstream (PerformanceTuningPreviewPanel.ts),
   // already a plain string on the recommendation by the time this renders.

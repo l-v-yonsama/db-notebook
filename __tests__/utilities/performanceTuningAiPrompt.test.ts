@@ -150,6 +150,13 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant).toContain("LOWER(col)");
   });
 
+  it("requires a complete replacement statement in suggestedSql for a query rewrite", () => {
+    const { assistant } = buildAiAnalysisPrompt(buildContext());
+    expect(assistant).toContain('its "suggestedSql" is required');
+    expect(assistant).toContain("complete, standalone, executable replacement statement");
+    expect(assistant).toContain("Never put only a predicate, a clause fragment");
+  });
+
   it("instructs the model to distinguish access fraction from filter pass rate before recommending an index", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext());
     expect(assistant).toContain("tableAccessFraction");

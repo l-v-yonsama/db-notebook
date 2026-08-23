@@ -21,6 +21,8 @@ Before recommending an index or SQL rewrite, review every target table's "physic
 
 An index is not always the right fix. If a WHERE/JOIN/GROUP BY predicate wraps a column in a function (e.g. LOWER(col), DATE(col), CAST(col AS ...)), a plain index on that column cannot be used for it at all (the predicate is not sargable) - in that case, prefer recommending a sargable rewrite of the predicate itself (for example, rewriting a DATE(created_at) = X range check as created_at >= X AND created_at < X + one day) as the primary recommendation, and only add a supporting index once the predicate is sargable. Do not recommend an index on a function-wrapped column (e.g. CREATE INDEX ... (LOWER(col))) without first checking its selectivity per the next paragraph.
 
+When a recommendation rewrites the target SQL, its "suggestedSql" is required. It must be a complete, standalone, executable replacement statement: retain the target statement's SELECT/INSERT/UPDATE/DELETE form and every unaffected FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT/OFFSET, and locking clause. Change only what the recommendation requires. Never put only a predicate, a clause fragment, an ellipsis, or pseudocode in "suggestedSql". Omit "suggestedSql" only when the recommendation has no executable SQL (for example, a workload review or a request for missing information).
+
 Before recommending an index, distinguish the two independent metrics on the relevant "planTableMappings" entry: "tableAccessFraction" is the table-access candidate set relative to the whole table, while "predicateFilterSelectivity" is the pass rate of a local Filter after that access. Never call one evidence for the other, and never invent either metric when absent. A non-covering index on a predicate matching roughly 20% or more of a table's rows is often ignored by the query optimizer, or can make performance worse than a full scan. State the specific metric and figure you used explicitly in the recommendation's "rationale".
 
 Before finalizing any CREATE INDEX in "suggestedSql", check "tables[].definition.indexes" for the target table and do not propose an index whose column set already exists verbatim - that is a wasted, sometimes outright invalid, suggestion.
@@ -54,7 +56,7 @@ The response must be a single JSON object with exactly this shape:
       "detail": "what to change",
       "rationale": "why this should help, referencing specific facts from the context",
       "riskLevel": "low" | "medium" | "high",
-      "suggestedSql": "optional illustrative SQL (e.g. a candidate CREATE INDEX statement); omit if not applicable",
+      "suggestedSql": "required for an SQL rewrite; then a complete standalone replacement statement, never a clause fragment. Otherwise optional executable SQL (e.g. a candidate CREATE INDEX statement); omit only when no SQL is applicable",
       "evidence": { "...": "same shape as above, all optional" }
     }
   ],

@@ -758,7 +758,7 @@ defineExpose({
     .plan-tree {
       margin: 0 0 8px 0;
       padding: 6px 8px;
-      max-height: 300px;
+      max-height: 180px;
       overflow: auto;
       white-space: pre;
       font-size: 0.85em;
