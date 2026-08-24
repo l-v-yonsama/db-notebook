@@ -109,20 +109,24 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     "getPerformanceTuningContext",
     {
       description:
-        "Returns a structured, vendor-neutral snapshot of everything needed to reason about why a single SQL statement (MySQL/PostgreSQL/SQL Server/Oracle only) may be slow: the estimated execution plan, the definitions/indexes/constraints of the tables it touches, optimizer statistics, physical health metrics (bloat/fragmentation/stale-statistics style signals), and structured collection diagnostics noting anything that could not be collected and why. This is read-only and observational -- it never executes the SQL (always an estimated plan, never ANALYZE) and never returns AI judgement of its own; reason about the returned JSON yourself. The SQL, table/index definitions, and predicates are included exactly as read from the database, not masked or redacted, and may contain literal values -- treat the response accordingly. Use this when the user asks why a query is slow, wants to tune performance, or asks about a query's execution plan/statistics/indexes together rather than one at a time (use getDbSchema instead for just table structure). If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+        "Returns a structured, vendor-neutral snapshot of everything needed to reason about why a single statement may be slow or expensive: for a SQL connection (MySQL/PostgreSQL/SQL Server/Oracle), the estimated execution plan, table/index/constraint definitions, optimizer statistics, and physical health metrics; for an AWS connection configured for DynamoDB, a static access-path classification (Query vs. Scan) of a PartiQL SELECT against the table/index key schema, the table/index definitions and Capacity mode, and recent CloudWatch throughput/throttling metrics. Both include structured collection diagnostics noting anything that could not be collected and why. This is read-only and observational -- it never executes the statement or reads item/row data (SQL: always an estimated plan, never ANALYZE; DynamoDB: a static classification only, never a Query/Scan/GetItem/Run Observed Read) and never returns AI judgement of its own; reason about the returned JSON yourself. The statement, table/index definitions, and predicates are included exactly as read from the database, not masked or redacted, and may contain literal values -- treat the response accordingly. Use this when the user asks why a query or statement is slow or expensive, wants to tune performance, or asks about its execution plan/access pattern/statistics/indexes together rather than one at a time (use getDbSchema instead for just table structure). If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
       inputSchema: {
         connectionName: z
           .string()
           .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
-        sql: z.string().describe("The SQL statement to analyze. It is never executed."),
+        sql: z
+          .string()
+          .describe(
+            "The SQL statement to analyze (or, for an AWS connection configured for DynamoDB, a PartiQL SELECT statement). It is never executed."
+          ),
         databaseName: z
           .string()
           .optional()
-          .describe("Optional: the database/catalog to analyze against. Omit to use the connection's configured default database."),
+          .describe("Optional: the database/catalog to analyze against. SQL connections only; ignored for a DynamoDB connection. Omit to use the connection's configured default database."),
         schemaName: z
           .string()
           .optional()
-          .describe("Optional: the schema to resolve tables in, for vendors where this differs from databaseName (e.g. PostgreSQL). Omit to let the driver resolve it."),
+          .describe("Optional: the schema to resolve tables in, for vendors where this differs from databaseName (e.g. PostgreSQL). SQL connections only; ignored for a DynamoDB connection. Omit to let the driver resolve it."),
       },
       annotations: {
         readOnlyHint: true,

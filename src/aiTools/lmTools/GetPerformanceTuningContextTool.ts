@@ -1,4 +1,9 @@
 import {
+  AnyPerformanceTuningContext,
+  AwsDriver,
+  ConnectionSetting,
+  DBType,
+  DynamoDbPerformanceTuningContext,
   PerformanceTuningContext,
   RDSBaseDriver,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -10,7 +15,7 @@ import {
   LanguageModelToolResult,
 } from "vscode";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
-import { createRDSDriver, workflow } from "../../utilities/driverResolver";
+import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
@@ -19,7 +24,12 @@ import { resolveMcpEnabledConnection } from "./mcpAccessControl";
 const PREFIX = "[lmTools/GetPerformanceTuningContextTool]";
 
 // Read-only context feed for Copilot Chat and MCP clients. It always requests
-// an estimated plan because analyze mode executes the target SQL.
+// an estimated plan (SQL vendors) / static collection only (DynamoDB)
+// because analyze mode/Run Observed Read execute the target statement -
+// tool-triggered real execution is out of scope for both engines (design
+// doc §14: "静的コンテキスト対応" only). `sql` doubles as the PartiQL text
+// for a DynamoDB connection; `databaseName`/`schemaName` are SQL-only and
+// simply unused for one.
 export type GetPerformanceTuningContextToolInput = {
   connectionName: string;
   sql: string;
@@ -76,7 +86,7 @@ export async function getPerformanceTuningContextText(
 }
 
 export type PerformanceTuningContextFetchResult =
-  | { ok: true; context: PerformanceTuningContext }
+  | { ok: true; context: AnyPerformanceTuningContext }
   | { ok: false; message: string; availableConnectionNames?: string[] };
 
 export function formatPerformanceTuningContextResultForModel(
@@ -112,6 +122,10 @@ async function fetchPerformanceTuningContext(
   }
   const setting = resolution.setting;
 
+  if (setting.dbType === DBType.Aws) {
+    return fetchDynamoDbPerformanceTuningContext(setting, sql);
+  }
+
   const resolvedDatabaseName = databaseName ?? setting.database;
   if (!resolvedDatabaseName) {
     return {
@@ -137,6 +151,46 @@ async function fetchPerformanceTuningContext(
           schemaName,
           statement: { sql, source: "editor" },
           plan: { mode: "estimate" },
+        })
+        .then((r) => {
+          if (!r.ok || !r.result) {
+            throw new Error(r.message);
+          }
+          return r.result;
+        }),
+    false
+  );
+
+  if (!result.ok || !result.result) {
+    return { ok: false, message: result.message };
+  }
+  return { ok: true, context: result.result };
+}
+
+// DynamoDB counterpart (design doc §14). Static collection only, mirroring
+// the RDB path's always-estimate-mode call above: `sql` is treated as a
+// PartiQL SELECT, and databaseName/schemaName (SQL-only) are neither
+// required nor consulted - the target table/index is resolved from the
+// PartiQL text itself (see DynamoDbPerformanceTuningProvider.ts's
+// extractDynamoPartiqlTarget()).
+async function fetchDynamoDbPerformanceTuningContext(
+  setting: ConnectionSetting,
+  sql: string
+): Promise<PerformanceTuningContextFetchResult> {
+  const driverForSupportCheck = await createSQLSupportDriver<AwsDriver>(setting, false);
+  if (!driverForSupportCheck.supportsGetDynamoDbPerformanceTuningContext()) {
+    return {
+      ok: false,
+      message: `DynamoDB performance tuning context is not available for this connection.`,
+    };
+  }
+
+  const result = await workflow<AwsDriver, DynamoDbPerformanceTuningContext>(
+    setting,
+    (driver) =>
+      driver
+        .getDynamoDbPerformanceTuningContext({
+          statement: { source: "editor", request: { kind: "partiql", text: sql } },
         })
         .then((r) => {
           if (!r.ok || !r.result) {
