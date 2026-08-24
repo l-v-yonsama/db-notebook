@@ -8,6 +8,18 @@ export type SQLHistoryPerformance = {
   totalElapsedTimeMilli: number;
   maxElapsedTimeMilli: number;
   lastElapsedTimeMilli: number;
+  // Additive Capacity aggregates, folded in from summary.capacityUnits the
+  // same way as the elapsed-time fields above - only ever populated when at
+  // least one execution actually reported a capacityUnits value (DynamoDB
+  // today), never defaulted to 0 for vendors that don't report it. Field
+  // names mirror db-drivers' DynamoDbWorkloadContext
+  // (totalCapacityUnits/maxCapacityUnits/lastCapacityUnits/
+  // capacitySampleCount) so the two stay easy to line up when a DynamoDB
+  // Preview merges SQL History workload into its Context.
+  capacitySampleCount?: number;
+  totalCapacityUnits?: number;
+  maxCapacityUnits?: number;
+  lastCapacityUnits?: number;
 };
 
 export type SQLHistory = {

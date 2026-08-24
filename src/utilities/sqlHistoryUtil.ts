@@ -28,6 +28,7 @@ export const migrateLegacyPerformance = (previous: SQLHistory): SQLHistoryPerfor
     return { ...EMPTY_PERFORMANCE };
   }
   const legacyElapsed = previous.summary?.elapsedTimeMilli;
+  const legacyCapacity = previous.summary?.capacityUnits;
   if (legacyElapsed === undefined) {
     return { ...EMPTY_PERFORMANCE };
   }
@@ -36,6 +37,9 @@ export const migrateLegacyPerformance = (previous: SQLHistory): SQLHistoryPerfor
     totalElapsedTimeMilli: legacyElapsed,
     maxElapsedTimeMilli: legacyElapsed,
     lastElapsedTimeMilli: legacyElapsed,
+    ...(legacyCapacity !== undefined
+      ? { capacitySampleCount: 1, totalCapacityUnits: legacyCapacity, maxCapacityUnits: legacyCapacity, lastCapacityUnits: legacyCapacity }
+      : {}),
   };
 };
 
@@ -185,38 +189,78 @@ export const migrateStoredSQLHistory = (stored: StoredSQLHistory): SQLHistory | 
   };
 };
 
-// Folds a new execution's elapsed time into the previous entry's stats.
-// Runs without a measurable duration (e.g. errors) leave the aggregates
-// untouched, so failed re-runs don't skew avg/max.
+// Folds a new execution's Capacity reading into the base aggregates. A run
+// with no measurable capacityUnits (any non-AWS vendor, or an AWS run whose
+// summary didn't carry one) leaves these fields exactly as they were -
+// mirrors mergeSQLHistoryPerformance's own elapsedTimeMilli rule.
+const mergeCapacity = (
+  base: SQLHistoryPerformance,
+  capacityUnits: number | undefined
+): Pick<SQLHistoryPerformance, "capacitySampleCount" | "totalCapacityUnits" | "maxCapacityUnits" | "lastCapacityUnits"> => {
+  if (capacityUnits === undefined) {
+    return {
+      capacitySampleCount: base.capacitySampleCount,
+      totalCapacityUnits: base.totalCapacityUnits,
+      maxCapacityUnits: base.maxCapacityUnits,
+      lastCapacityUnits: base.lastCapacityUnits,
+    };
+  }
+  return {
+    capacitySampleCount: (base.capacitySampleCount ?? 0) + 1,
+    totalCapacityUnits: (base.totalCapacityUnits ?? 0) + capacityUnits,
+    maxCapacityUnits: Math.max(base.maxCapacityUnits ?? 0, capacityUnits),
+    lastCapacityUnits: capacityUnits,
+  };
+};
+
+// Folds a new execution's elapsed time (and, additively, Capacity) into the
+// previous entry's stats. Runs without a measurable duration (e.g. errors)
+// leave the elapsed-time aggregates untouched, so failed re-runs don't skew
+// avg/max; the Capacity aggregates follow the same rule independently via
+// mergeCapacity().
 export const mergeSQLHistoryPerformance = (
   previous: SQLHistory,
-  elapsedTimeMilli: number | undefined
+  elapsedTimeMilli: number | undefined,
+  capacityUnits?: number
 ): SQLHistoryPerformance => {
   const base = migrateLegacyPerformance(previous);
+  const capacity = mergeCapacity(base, capacityUnits);
   if (elapsedTimeMilli === undefined) {
-    return base;
+    return { ...base, ...capacity };
   }
   return {
     sampleCount: base.sampleCount + 1,
     totalElapsedTimeMilli: base.totalElapsedTimeMilli + elapsedTimeMilli,
     maxElapsedTimeMilli: Math.max(base.maxElapsedTimeMilli, elapsedTimeMilli),
     lastElapsedTimeMilli: elapsedTimeMilli,
+    ...capacity,
   };
 };
 
 export const createInitialSQLHistoryPerformance = (
-  elapsedTimeMilli: number | undefined
+  elapsedTimeMilli: number | undefined,
+  capacityUnits?: number
 ): SQLHistoryPerformance => {
+  const capacity =
+    capacityUnits !== undefined
+      ? { capacitySampleCount: 1, totalCapacityUnits: capacityUnits, maxCapacityUnits: capacityUnits, lastCapacityUnits: capacityUnits }
+      : {};
   if (elapsedTimeMilli === undefined) {
-    return { ...EMPTY_PERFORMANCE };
+    return { ...EMPTY_PERFORMANCE, ...capacity };
   }
   return {
     sampleCount: 1,
     totalElapsedTimeMilli: elapsedTimeMilli,
     maxElapsedTimeMilli: elapsedTimeMilli,
     lastElapsedTimeMilli: elapsedTimeMilli,
+    ...capacity,
   };
 };
 
 export const averageElapsedTimeMilli = (performance: SQLHistoryPerformance): number =>
   performance.sampleCount > 0 ? performance.totalElapsedTimeMilli / performance.sampleCount : 0;
+
+export const averageCapacityUnits = (performance: SQLHistoryPerformance): number | undefined =>
+  performance.capacitySampleCount && performance.capacitySampleCount > 0
+    ? (performance.totalCapacityUnits ?? 0) / performance.capacitySampleCount
+    : undefined;

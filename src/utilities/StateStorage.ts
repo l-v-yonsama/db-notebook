@@ -392,8 +392,12 @@ export class StateStorage {
     // evicted by unrelated one-off queries while sitting at its old position.
     const isNew = sameHistoryIndex < 0;
     const performance = isNew
-      ? createInitialSQLHistoryPerformance(history.summary?.elapsedTimeMilli)
-      : mergeSQLHistoryPerformance(list[sameHistoryIndex], history.summary?.elapsedTimeMilli);
+      ? createInitialSQLHistoryPerformance(history.summary?.elapsedTimeMilli, history.summary?.capacityUnits)
+      : mergeSQLHistoryPerformance(
+          list[sameHistoryIndex],
+          history.summary?.elapsedTimeMilli,
+          history.summary?.capacityUnits
+        );
     const previous = isNew ? undefined : list[sameHistoryIndex];
     if (previous) {
       list.splice(sameHistoryIndex, 1);

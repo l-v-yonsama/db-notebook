@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SQLHistory } from "../../src/types/SQLHistory";
 import {
+  averageCapacityUnits,
   averageElapsedTimeMilli,
   containsExplainStatement,
   createInitialSQLHistoryPerformance,
@@ -96,6 +97,113 @@ describe("mergeSQLHistoryPerformance", () => {
       },
     });
     expect(mergeSQLHistoryPerformance(previous, undefined)).toEqual(previous.performance);
+  });
+});
+
+describe("Capacity aggregation (DynamoDB)", () => {
+  it("createInitialSQLHistoryPerformance: capacityUnitsが与えられればcapacitySampleCount=1で初期化する", () => {
+    expect(createInitialSQLHistoryPerformance(120, 2.5)).toEqual({
+      sampleCount: 1,
+      totalElapsedTimeMilli: 120,
+      maxElapsedTimeMilli: 120,
+      lastElapsedTimeMilli: 120,
+      capacitySampleCount: 1,
+      totalCapacityUnits: 2.5,
+      maxCapacityUnits: 2.5,
+      lastCapacityUnits: 2.5,
+    });
+  });
+
+  it("createInitialSQLHistoryPerformance: capacityUnitsが無ければcapacity系フィールドは含まれない(0埋めしない)", () => {
+    const result = createInitialSQLHistoryPerformance(120);
+    expect(result.capacitySampleCount).toBeUndefined();
+    expect(result.totalCapacityUnits).toBeUndefined();
+  });
+
+  it("mergeSQLHistoryPerformance: capacityUnitsを繰り返しマージするとsum/max/lastが正しく更新される", () => {
+    const previous = baseHistory({
+      performance: {
+        sampleCount: 1,
+        totalElapsedTimeMilli: 100,
+        maxElapsedTimeMilli: 100,
+        lastElapsedTimeMilli: 100,
+        capacitySampleCount: 1,
+        totalCapacityUnits: 2,
+        maxCapacityUnits: 2,
+        lastCapacityUnits: 2,
+      },
+    });
+    expect(mergeSQLHistoryPerformance(previous, 50, 5)).toEqual({
+      sampleCount: 2,
+      totalElapsedTimeMilli: 150,
+      maxElapsedTimeMilli: 100,
+      lastElapsedTimeMilli: 50,
+      capacitySampleCount: 2,
+      totalCapacityUnits: 7,
+      maxCapacityUnits: 5,
+      lastCapacityUnits: 5,
+    });
+  });
+
+  it("mergeSQLHistoryPerformance: capacityUnitsがundefined(非AWSベンダー等)なら集計を変えない", () => {
+    const previous = baseHistory({
+      performance: {
+        sampleCount: 1,
+        totalElapsedTimeMilli: 100,
+        maxElapsedTimeMilli: 100,
+        lastElapsedTimeMilli: 100,
+        capacitySampleCount: 1,
+        totalCapacityUnits: 2,
+        maxCapacityUnits: 2,
+        lastCapacityUnits: 2,
+      },
+    });
+    const result = mergeSQLHistoryPerformance(previous, 50);
+    expect(result.capacitySampleCount).toBe(1);
+    expect(result.totalCapacityUnits).toBe(2);
+    expect(result.maxCapacityUnits).toBe(2);
+    expect(result.lastCapacityUnits).toBe(2);
+  });
+
+  it("mergeSQLHistoryPerformance: capacityUnits=0は欠落扱いしない", () => {
+    const previous = baseHistory();
+    const result = mergeSQLHistoryPerformance(previous, 10, 0);
+    expect(result.capacitySampleCount).toBe(1);
+    expect(result.totalCapacityUnits).toBe(0);
+    expect(result.lastCapacityUnits).toBe(0);
+  });
+});
+
+describe("averageCapacityUnits", () => {
+  it("capacitySampleCountが0または未設定ならundefinedを返す", () => {
+    expect(
+      averageCapacityUnits({ sampleCount: 1, totalElapsedTimeMilli: 1, maxElapsedTimeMilli: 1, lastElapsedTimeMilli: 1 })
+    ).toBeUndefined();
+    expect(
+      averageCapacityUnits({
+        sampleCount: 1,
+        totalElapsedTimeMilli: 1,
+        maxElapsedTimeMilli: 1,
+        lastElapsedTimeMilli: 1,
+        capacitySampleCount: 0,
+        totalCapacityUnits: 0,
+      })
+    ).toBeUndefined();
+  });
+
+  it("capacitySampleCountがあれば total / count を返す", () => {
+    expect(
+      averageCapacityUnits({
+        sampleCount: 4,
+        totalElapsedTimeMilli: 400,
+        maxElapsedTimeMilli: 150,
+        lastElapsedTimeMilli: 90,
+        capacitySampleCount: 4,
+        totalCapacityUnits: 20,
+        maxCapacityUnits: 8,
+        lastCapacityUnits: 5,
+      })
+    ).toBe(5);
   });
 });
 
