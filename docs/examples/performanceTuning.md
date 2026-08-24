@@ -16,6 +16,7 @@ DynamoDB. Where supported, you can also run the statement once to collect actual
 - 4. [Run Explain Analyze](#4-run-explain-analyze)
 - 5. [Analyze with AI](#5-analyze-with-ai)
 - 6. [Save and share the analysis](#6-save-and-share-the-analysis)
+  - 6.1. [Full Context JSON](#61-full-context-json)
 - 7. [DynamoDB](#7-dynamodb)
   - 7.1. [How DynamoDB differs from SQL here](#71-how-dynamodb-differs-from-sql-here)
   - 7.2. [Start a preview](#72-start-a-preview)
@@ -123,6 +124,51 @@ The saved DBN includes:
 
 Export the DBN as HTML to view the Mermaid ER diagram and formatted actual execution plan in a
 browser.
+
+### 6.1. Full Context JSON
+
+The saved notebook's **Full context JSON** cell is the complete, machine-readable evidence snapshot
+collected before the AI interprets it. It is useful when you want to verify an AI finding against
+the source evidence, compare two tuning runs, or analyze the same context with another tool. It is
+not the AI response; that is stored separately as **AI analysis JSON**.
+
+Every context includes `formatVersion`, target statement information, and a `collection` block.
+Check `collection.status` first: `complete` means all required sections were collected, while
+`partial` means `diagnostics` or `unavailableSections` should be reviewed before drawing a
+conclusion. An omitted optional field means that the value was not available; it must not be read as
+zero.
+
+For an RDB context, the main sections are:
+
+- `database` and `statement` — the target database, SQL, statement type, and source.
+- `workload` — execution counts, elapsed time, rows, and read statistics when the source provides
+  them.
+- `executionPlan` — the normalized plan, vendor-native plan artifacts, planning/execution time,
+  runtime observations, and the dominant-cost node when available.
+- `tables` — the definitions, indexes, statistics, and physical-health evidence for related tables.
+- `planTableMappings` — links plan nodes to tables/indexes and records row-estimate, access-fraction,
+  and filter-selectivity evidence.
+
+For a DynamoDB context, `engine` is `dynamodb`, and the plan-oriented sections are replaced by:
+
+- `service` and `statement` — the region/target and PartiQL or native Query information.
+- `accessPattern` — the static `Query`/`Scan` classification, key conditions, post-read filters,
+  projection, and consistency.
+- `table` — Capacity mode, key schema, LSI/GSI definitions, TTL, and Contributor Insights status.
+- `workload` — the rolling timing, item-count, and Consumed Capacity summary from matching history.
+- `observation` — one previously observed or user-confirmed read; check `bounded` before treating it
+  as representative of the full result.
+- `cloudWatch` — table/index/operation-level time series. A series with `noData: true` is missing
+  data, not measured zero activity.
+
+Where a metric uses `{ value, estimated, source, unit }`, use `source` and `estimated` to judge how
+strong the evidence is. Also treat the JSON as potentially sensitive: RDB SQL/DDL and DynamoDB
+PartiQL text can contain literals and are not automatically redacted. DynamoDB bind values,
+`ExpressionAttributeValues`, returned items, and pagination keys are intentionally not stored.
+
+The Full Context JSON remains complete in the notebook even if a large RDB vendor artifact had to
+be omitted from a compact AI request. Use **AI request messages** to see the exact prompt and context
+projection sent to the selected model.
 
 ## 7. DynamoDB
 
