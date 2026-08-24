@@ -158,6 +158,14 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     expect(assistant).toContain("DYNAMODB_ACCOUNT_LIMIT_THROTTLING_OBSERVED");
   });
 
+  it("explains DYNAMODB_ON_DEMAND_LIMIT_THROTTLING_OBSERVED as a user-configured cap needing review, not something AWS auto-scaling resolves on its own", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain("user-configured");
+    expect(assistant).toContain("not resolved by AWS's automatic scaling");
+    expect(assistant).toContain("raising or removing it");
+    expect(assistant).not.toContain("automatic scale-up within minutes");
+  });
+
   it("only allows suggestedSql for a standalone PartiQL rewrite, never a native Query", () => {
     const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
     expect(assistant).toContain("only appropriate for a PartiQL rewrite");

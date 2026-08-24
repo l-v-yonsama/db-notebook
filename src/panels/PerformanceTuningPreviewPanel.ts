@@ -857,7 +857,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
                     request: staticRequest,
                     workload: request.workload,
                   },
-                  observation: { mode: "executeOnce" },
+                  observation: { mode: "executeOnce", allowExecution: true },
                 },
                 { signal: controller.signal, execution }
               )
