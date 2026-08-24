@@ -1,156 +1,120 @@
 <script setup lang="ts">
+// Shared shell (2026-08-24 follow-up, DynamoDB support - design doc §11.3's
+// 3-component split). Owns the toolbar, AI options, AI Analysis, Collection
+// issues/Information (both already-engine-agnostic view models), and Full
+// context JSON - see RelationalPerformanceTuningView.vue's top comment for
+// why each per-engine child is mounted twice (part="header"/"body") rather
+// than owning a `<section>` of its own.
 import type {
+  DynamoDbPerformanceTuningInitializeViewModel,
   LabelValueItem,
   PerformanceTuningAiAnalysisViewState,
-  PerformanceTuningDiagnosticGroupViewModel,
-  PerformanceTuningHumanSummary,
   PerformanceTuningPreviewPanelEventData,
-  PlanTableMappingRowViewModel,
+  RelationalPerformanceTuningInitializeViewModel,
 } from "@/utilities/vscode";
-import { actualExecutionEvidenceSource, hasActualExecutionEvidence, vscode } from "@/utilities/vscode";
-import type { CapabilityStatus, PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
+import { vscode } from "@/utilities/vscode";
 import { computed, ref } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
-import PerformanceTuningSnapshot from "./base/PerformanceTuningSnapshot.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import DynamoDbPerformanceTuningView from "./DynamoDbPerformanceTuningView.vue";
+import RelationalPerformanceTuningView from "./RelationalPerformanceTuningView.vue";
 
-const context = ref<PerformanceTuningContext | undefined>(undefined);
-const diagnosticGroups = ref<PerformanceTuningDiagnosticGroupViewModel[]>([]);
-const planTreeText = ref<string | undefined>(undefined);
-const actualPlanDisplayText = ref<string | undefined>(undefined);
-const planTableMappingRows = ref<PlanTableMappingRowViewModel[]>([]);
-const humanSummary = ref<PerformanceTuningHumanSummary | undefined>(undefined);
-const queryDiagramAvailable = ref(false);
-const queryDiagramHasWarnings = ref(false);
-const sqlHtml = ref("");
-const jsonHtml = ref("");
-// "Copy Prompt for Other AI" (2026-08-21 follow-up) - see
-// MessageEventData.ts's own doc comment on this field.
-const plainTextPrompt = ref("");
-const translatedPlainTextPrompt = ref("");
-const payloadBytes = ref(0);
-const maxPayloadBytes = ref(0);
+const relational = ref<RelationalPerformanceTuningInitializeViewModel | undefined>(undefined);
+const dynamodb = ref<DynamoDbPerformanceTuningInitializeViewModel | undefined>(undefined);
+const engine = computed(() => (relational.value ? "relational" : dynamodb.value ? "dynamodb" : undefined));
+// Whichever of the two is currently set. Only the shell-owned fields shared
+// by both (PerformanceTuningPreviewShellFields in MessageEventData.ts:
+// jsonHtml/plainTextPrompt/.../languageModels/...) are ever read through
+// this union; every per-engine field is read from relational/dynamodb
+// directly instead (see the child component invocations below).
+const active = computed(() => relational.value ?? dynamodb.value);
+
+const diagnosticGroups = computed(() => active.value?.diagnosticGroups ?? []);
+// buildPerformanceTuningDiagnosticGroups()/buildDynamoDbPerformanceTuningDiagnosticGroups()
+// (extension-side) already sort information before warnings and never mix
+// severities within one group - this just splits that single ordered list
+// into the two display sections. Neither list is re-sorted or re-derived here.
+const infoGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "info"));
+const issueGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "warning"));
+
+const contextJson = computed(() => (active.value ? JSON.stringify(active.value.context, null, 2) : ""));
+// Payload-size display (with its own exceeded check) now lives in each
+// engine's own header row - see Relational/DynamoDbPerformanceTuningView.vue -
+// so the shell itself has no more use for that computation.
 
 // AI options are available as soon as a context is loaded.
 const languageModels = ref<LabelValueItem[]>([]);
 const languageModelId = ref("");
 const translateResponse = ref(false);
-
-// A fresh context invalidates the previous analysis.
-const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
-
-// "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Whether this connection's
-// Provider even supports analyze mode at all - drives the button's disabled
-// state and its tooltip when it is disabled. isRunningActualPlan has no
-// "success" branch of its own: a
-// successful run replaces the whole panel via a fresh "initialize" instead
-// (see initialize() below, which is also what resets this back to false).
-const analyzedExecutionPlan = ref<CapabilityStatus>({ available: false });
-const isRunningActualPlan = ref(false);
-
-// Only used for the "Copy JSON" button (needs plain text, not the
-// highlighted HTML) - kept in sync with what the extension side rendered
-// into jsonHtml since both stringify the same context with the same args.
-const contextJson = computed(() => (context.value ? JSON.stringify(context.value, null, 2) : ""));
-
-const payloadExceeded = computed(
-  () => maxPayloadBytes.value > 0 && payloadBytes.value > maxPayloadBytes.value
-);
+// "Copy Prompt for Other AI" (2026-08-21 follow-up) - see
+// MessageEventData.ts's own doc comment on this field.
+const plainTextPrompt = ref("");
+const translatedPlainTextPrompt = ref("");
 const copyPromptForOtherAi = computed(() =>
   translateResponse.value ? translatedPlainTextPrompt.value : plainTextPrompt.value
 );
+
+// A fresh context invalidates the previous analysis.
+const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
+const isAnalyzing = computed(() => analysis.value.status === "running");
+const analysisJson = computed(() =>
+  analysis.value.result ? JSON.stringify(analysis.value.result, null, 2) : ""
+);
+
+// "Run Explain Analyze" (RDB) / "Run Observed Read" (DynamoDB) - one shared
+// running flag + host round trip, since the two are mutually exclusive per
+// engine (only one of the two buttons below is ever shown) and behave
+// identically from the shell's perspective: optimistic true on click, reset
+// by "stop-progress" or a fresh "initialize" (a successful run always
+// replaces the whole panel via the latter, never a "success" branch of its
+// own here).
+const isRunningSecondaryAction = ref(false);
+
 const statementAllowsActualPlan = computed(
-  () => context.value?.statement.analyzeEligibility?.allowed ?? true
-);
-const isDmlEstimate = computed(
-  () => context.value?.statement.kind !== undefined && context.value.statement.kind !== "select"
-);
-const hasActualEvidence = computed(
-  () => context.value !== undefined && hasActualExecutionEvidence(context.value),
-);
-const actualEvidenceSource = computed(
-  () => context.value ? actualExecutionEvidenceSource(context.value) : undefined,
+  () => relational.value?.context.statement.analyzeEligibility?.allowed ?? true
 );
 const actualPlanButtonTitle = computed(() => {
   if (!statementAllowsActualPlan.value) {
-    return context.value?.statement.analyzeEligibility?.reason ?? "Explain Analyze is limited to a single SELECT statement.";
+    return relational.value?.context.statement.analyzeEligibility?.reason ??
+      "Explain Analyze is limited to a single SELECT statement.";
   }
-  return analyzedExecutionPlan.value.available
+  return relational.value?.analyzedExecutionPlan.available
     ? "Run this SQL for real to measure its actual execution plan (real query execution - see the note below)"
-    : (analyzedExecutionPlan.value.message ?? "Not available for this database");
+    : (relational.value?.analyzedExecutionPlan.message ?? "Not available for this database");
 });
 
-// Keep meaningful very small runtime ratios visible. A fixed two-decimal
-// display turns a valid nested-loop inner access such as 1 / 30,000 into
-// "0.00x" or "0.00%", which looks like missing/zero evidence instead of a
-// highly selective access.
-const formatRatio = (value: number | undefined): string => {
-  if (value === undefined) {
-    return "-";
+const observationEligibility = computed(() => dynamodb.value?.context.statement.observationEligibility);
+const observedReadButtonTitle = computed(() => {
+  if (observationEligibility.value?.allowed === false) {
+    return observationEligibility.value.reason ?? "This statement is not eligible for Run Observed Read.";
   }
-  const text = value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
-    ? value.toPrecision(3)
-    : value.toFixed(2);
-  return `${text}x`;
-};
-
-const formatFractionAsPercent = (value: number | undefined): string => {
-  if (value === undefined) {
-    return "-";
-  }
-  const percent = value * 100;
-  const text = percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
-  return `${text}%`;
-};
-const formatActualRows = (value: number | undefined): string =>
-  value === undefined && isDmlEstimate.value ? "Not measured (DML)" : (value ?? "-").toString();
-const formatRuntimeMetric = (value: number | undefined, format: (value: number | undefined) => string): string =>
-  value === undefined && isDmlEstimate.value ? "Not measured (DML)" : format(value);
-
-// buildPerformanceTuningDiagnosticGroups() (extension-side) already sorts
-// information before warnings and never mixes severities within one group -
-// this just splits that single ordered list into the two display sections
-// §6.1 puts in different places. Neither list is re-sorted or re-derived
-// here (§7: grouping/copy stays entirely in that one pure function).
-const infoGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "info"));
-const issueGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "warning"));
-
-// §6.4: "partial なのに画面上に理由が1件も表示されない状態を禁止する" - status
-// is derived driver-side from unavailableSections/diagnostics together
-// (db-drivers §2.2), so whenever it's 'partial', issueGroups is guaranteed
-// non-empty by construction (every unavailableSections entry and every
-// affectsCompleteness diagnostic becomes a warning-severity group). Nothing
-// extra to compute here; this comment just records the invariant this
-// template relies on.
+  return dynamodb.value?.observedReadCapability.available
+    ? "Read real items to measure this statement's actual Consumed Capacity and result shape (real query execution - see the note below)"
+    : (dynamodb.value?.observedReadCapability.message ?? "Not available for this connection");
+});
 
 const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initialize"]): void => {
   if (v === undefined) {
     return;
   }
-  context.value = v.context;
-  diagnosticGroups.value = v.diagnosticGroups;
-  planTreeText.value = v.planTreeText;
-  actualPlanDisplayText.value = v.actualPlanDisplayText;
-  planTableMappingRows.value = v.planTableMappingRows;
-  humanSummary.value = v.humanSummary;
-  queryDiagramAvailable.value = v.queryDiagramAvailable;
-  queryDiagramHasWarnings.value = v.queryDiagramHasWarnings;
-  sqlHtml.value = v.sqlHtml;
-  jsonHtml.value = v.jsonHtml;
-  plainTextPrompt.value = v.plainTextPrompt;
-  translatedPlainTextPrompt.value = v.translatedPlainTextPrompt;
-  payloadBytes.value = v.payloadBytes;
-  maxPayloadBytes.value = v.maxPayloadBytes;
+  if (v.engine === "relational") {
+    relational.value = v;
+    dynamodb.value = undefined;
+  } else {
+    dynamodb.value = v;
+    relational.value = undefined;
+  }
   languageModels.value = v.languageModels;
   languageModelId.value = v.languageModelId;
   translateResponse.value = v.translateResponse;
+  plainTextPrompt.value = v.plainTextPrompt;
+  translatedPlainTextPrompt.value = v.translatedPlainTextPrompt;
   analysis.value = { status: "idle" };
-  analyzedExecutionPlan.value = v.analyzedExecutionPlan;
-  isRunningActualPlan.value = false;
+  isRunningSecondaryAction.value = false;
 };
 
 const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
@@ -165,11 +129,12 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
       }
       break;
     case "stop-progress":
-      // "Run EXPLAIN ANALYZE" cancelled or failed - a successful run
-      // instead arrives as a fresh "initialize" above, which already
-      // resets this itself. The failure/cancellation reason (if any) was
-      // already shown as a native VS Code notification, extension-side.
-      isRunningActualPlan.value = false;
+      // "Run Explain Analyze"/"Run Observed Read" cancelled or failed - a
+      // successful run instead arrives as a fresh "initialize" above, which
+      // already resets this itself. The failure/cancellation reason (if
+      // any) was already shown as a native VS Code notification,
+      // extension-side.
+      isRunningSecondaryAction.value = false;
       break;
   }
 };
@@ -195,24 +160,27 @@ const saveAiAnalysisAsNotebook = (): void => {
   });
 };
 
-// "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). The confirmation itself is
-// entirely host-side (a modal window.showWarningMessage - see
-// PerformanceTuningPreviewPanel.ts's runActualPlan()); this only sets the
-// optimistic "running" state so the button disables itself immediately -
+// The confirmation itself is entirely host-side (a modal
+// window.showWarningMessage - see PerformanceTuningPreviewPanel.ts's
+// runActualPlan()/runObservedRead()); these only set the optimistic
+// "running" state so the button disables itself immediately -
 // stop-progress above resets it again if the user declines that modal or
 // the run fails.
 const runActualPlan = (): void => {
-  isRunningActualPlan.value = true;
+  isRunningSecondaryAction.value = true;
   vscode.postCommand({
     command: "runActualPlan",
     params: {},
   });
 };
 
-const isAnalyzing = computed(() => analysis.value.status === "running");
-const analysisJson = computed(() =>
-  analysis.value.result ? JSON.stringify(analysis.value.result, null, 2) : ""
-);
+const runObservedRead = (): void => {
+  isRunningSecondaryAction.value = true;
+  vscode.postCommand({
+    command: "runObservedRead",
+    params: {},
+  });
+};
 
 const evidenceLabel = (
   evidence:
@@ -236,6 +204,12 @@ const evidenceLabel = (
   if (evidence.diagnosticCode) {
     parts.push(`Diagnostic: ${evidence.diagnosticCode}`);
   }
+  // DynamoDB counterpart (design doc §12) - DynamoDB evidence has no
+  // schema/table/index/plan-node identity of its own to point at the same
+  // way (PerformanceTuningAiEvidenceRef.contextPath's own doc comment).
+  if (evidence.contextPath) {
+    parts.push(`Context: ${evidence.contextPath}`);
+  }
   return parts.join(" / ");
 };
 
@@ -245,25 +219,34 @@ defineExpose({
 </script>
 
 <template>
-  <section class="PerformanceTuningPreviewPanel" v-if="context">
+  <section class="PerformanceTuningPreviewPanel" v-if="engine">
     <PanelActionToolbar @cancel="close" cancel-label="" cancel-title="Close">
       <template #left>
-        <!-- "Run Explain Analyze" (2026-08-20 follow-up) - listed first
-             since it's the button a user reaches for first (real execution
-             plan before asking AI to analyze it), and deliberately a
-             distinct icon/label from "Analyze with AI" below (that one only
-             sends the already-collected context to an AI model; this one
-             executes the SQL for real). Disabled, with the capability
-             message as its tooltip, when this connection's Provider does
-             not support analyze mode. Title Case to match "Analyze with AI"/
-             "Save as Notebook" below. -->
+        <!-- "Run Explain Analyze" (RDB) / "Run Observed Read" (DynamoDB) -
+             listed first since it's the button a user reaches for first
+             (real evidence before asking AI to analyze it), and
+             deliberately a distinct icon/label from "Analyze with AI" below
+             (that one only sends the already-collected context to an AI
+             model; this one executes for real). Disabled, with the
+             capability/eligibility message as its tooltip, when this
+             connection/statement does not support it. -->
         <VsCodeButton
+          v-if="engine === 'relational'"
           appearance="secondary"
-          :disabled="isRunningActualPlan || !analyzedExecutionPlan.available || !statementAllowsActualPlan"
+          :disabled="isRunningSecondaryAction || !relational?.analyzedExecutionPlan.available || !statementAllowsActualPlan"
           :title="actualPlanButtonTitle"
           @click="runActualPlan"
         >
-          <fa icon="circle-play" />{{ isRunningActualPlan ? "Running…" : "Run Explain Analyze" }}
+          <fa icon="circle-play" />{{ isRunningSecondaryAction ? "Running…" : "Run Explain Analyze" }}
+        </VsCodeButton>
+        <VsCodeButton
+          v-else
+          appearance="secondary"
+          :disabled="isRunningSecondaryAction || !dynamodb?.observedReadCapability.available || observationEligibility?.allowed === false"
+          :title="observedReadButtonTitle"
+          @click="runObservedRead"
+        >
+          <fa icon="circle-play" />{{ isRunningSecondaryAction ? "Running…" : "Run Observed Read" }}
         </VsCodeButton>
         <VsCodeButton :disabled="isAnalyzing" title="Analyze this context with AI" @click="analyzeWithAi">
           <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
@@ -274,42 +257,53 @@ defineExpose({
              models Copilot itself exposes) but who already has a ChatGPT/
              Claude.ai/Claude Code/Codex subscription they'd rather paste
              into directly. Copies the same domain-guided prompt as "Analyze
-             with AI", just asking for a plain-text answer instead of JSON
-             (see performanceTuningAiPrompt.ts's buildPlainTextAnalysisPrompt()) -
+             with AI", just asking for a plain-text answer instead of JSON -
              no vscode.lm call happens for this button. -->
         <CopyToClipboardButton appearance="secondary" :content="copyPromptForOtherAi"
           title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)">
           <fa icon="comment-dots" />Copy Prompt for Other AI
         </CopyToClipboardButton>
-        <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success'" title="Save the AI analysis as a new Notebook under reports/performance-tuning/"
+        <!-- Save as Notebook: DynamoDB analyses can't be saved yet (its own
+             report cell structure is separate, not-yet-implemented work -
+             design doc §13) - see PerformanceTuningPreviewPanel.ts's
+             saveAnalysisAsNotebook() for the host-side half of this gate. -->
+        <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success' || engine === 'dynamodb'"
+          :title="engine === 'dynamodb' ? 'Not yet available for DynamoDB analyses' : 'Save the AI analysis as a new Notebook under reports/performance-tuning/'"
           @click="saveAiAnalysisAsNotebook">
           <fa icon="book" />Save as Notebook
         </VsCodeButton>
       </template>
     </PanelActionToolbar>
 
-    <!-- First layer of the "Run Explain Analyze" two-layer confirmation
-         (2026-08-20 follow-up) - a persistent, always-visible warning next
+    <!-- First layer of the "Run Explain Analyze"/"Run Observed Read"
+         two-layer confirmation - a persistent, always-visible warning next
          to the button, so the risk is visible *before* a user ever clicks
-         it. The second layer (a blocking modal) is host-side, on click -
-         see PerformanceTuningPreviewPanel.ts's runActualPlan(). Hidden once
-         a run has already succeeded for this context (actualPlan
-         present) - at that point the risk already materialized and is
-         redundant with the actual plan shown below. -->
-    <p v-if="!statementAllowsActualPlan" class="section-note">
-      This {{ context.statement.kind ?? "non-SELECT" }} statement uses an estimated plan only. Actual runtime metrics are not collected here.
-    </p>
-    <p v-else-if="analyzedExecutionPlan.available && !hasActualEvidence" class="section-note actual-plan-warning">
-      <fa icon="triangle-exclamation" />
-      "Run Explain Analyze" executes the SQL above for real against the database, instead of only
-      estimating its plan.
-    </p>
+         it. The second layer (a blocking modal) is host-side, on click. -->
+    <template v-if="engine === 'relational'">
+      <p v-if="!statementAllowsActualPlan" class="section-note">
+        This {{ relational?.context.statement.kind ?? "non-SELECT" }} statement uses an estimated plan only. Actual runtime metrics are not collected here.
+      </p>
+      <p v-else-if="relational?.analyzedExecutionPlan.available" class="section-note actual-plan-warning">
+        <fa icon="triangle-exclamation" />
+        "Run Explain Analyze" executes the SQL above for real against the database, instead of only
+        estimating its plan.
+      </p>
+    </template>
+    <template v-else>
+      <p v-if="observationEligibility?.allowed === false" class="section-note">
+        Run Observed Read is not available for this statement: {{ observationEligibility.reason }}
+      </p>
+      <p v-else-if="dynamodb?.observedReadCapability.available" class="section-note actual-plan-warning">
+        <fa icon="triangle-exclamation" />
+        "Run Observed Read" reads real items from the table above (a single response, up to 100 items),
+        instead of only classifying the statement statically.
+      </p>
+    </template>
 
-    <!-- 1. Database / Status / Payload size (§6.1) -->
     <div class="header">
-      <!-- Analyze with AI's model/translation options (2026-08-19 follow-up) -
-           always visible (not gated on analysis.status), since the choice
-           has to be made before clicking the button in the toolbar above. -->
+      <!-- Analyze with AI's model/translation options - always visible (not
+           gated on analysis.status), since the choice has to be made before
+           clicking the button in the toolbar above. -->
       <div class="row ai-options">
         <span class="label">AI options</span>
         <label for="languageModelId" class="label-inline">Language model</label>
@@ -317,51 +311,19 @@ defineExpose({
           :disabled="isAnalyzing || languageModels.length === 0" style="width: 220px" />
         <VsCodeCheckbox v-model="translateResponse" :disabled="isAnalyzing">Translate response</VsCodeCheckbox>
       </div>
-      <div class="row">
-        <span class="label">Database</span>
-        <span>{{ context.database.vendor }}{{ context.database.version ? ` ${context.database.version}` : "" }} ・
-          {{ context.database.databaseName }}<span v-if="context.database.schemaName">.{{ context.database.schemaName }}</span></span>
-      </div>
-      <div class="row status-summary">
-        <span class="label">Status</span>
-        <span class="badge" :class="context.collection.status">{{ context.collection.status }}</span>
-        <!-- complete badge stays green even with informational notes present
-             (§6.4) - this is a supplementary count, not a new status value. -->
-        <span v-if="context.collection.status === 'complete' && infoGroups.length > 0" class="notes-hint">
-          {{ infoGroups.length }} {{ infoGroups.length === 1 ? "note" : "notes" }}
-        </span>
-        <span class="payload-size" :class="{ exceeded: payloadExceeded }">
-          <span class="label-inline">Payload size:</span>
-          {{ payloadBytes.toLocaleString() }} / {{ maxPayloadBytes.toLocaleString() }} bytes
-          <span v-if="payloadExceeded">(exceeds limit)</span>
-        </span>
-      </div>
-
-      <!-- 2. SQL (§6.1) -->
-      <div class="row sql">
-        <span class="label">SQL</span>
-        <div class="code-panel">
-          <div class="sql-block" v-html="sqlHtml"></div>
-          <CopyToClipboardButton class="copy-btn" :content="context.statement.sql" title="Copy SQL" />
-        </div>
-      </div>
+      <RelationalPerformanceTuningView v-if="engine === 'relational'" :data="relational!" part="header" />
+      <DynamoDbPerformanceTuningView v-else :data="dynamodb!" part="header" />
     </div>
 
     <div class="scrollArea">
-      <div v-if="humanSummary" class="section performance-snapshot-section">
-        <h3 class="section-title">Performance snapshot</h3>
-        <PerformanceTuningSnapshot :summary="humanSummary" />
-        <p v-if="queryDiagramAvailable" class="section-note query-diagram-notice">
-          A query-scoped structure view (ER diagram and relevant indexes) will be included when you save this analysis as a Notebook; view it in the saved DBN or HTML report.<span v-if="queryDiagramHasWarnings"> Some relationships could not be resolved conservatively; the saved Notebook includes the details.</span>
-        </p>
-      </div>
+      <RelationalPerformanceTuningView v-if="engine === 'relational'" :data="relational!" part="body" />
+      <DynamoDbPerformanceTuningView v-else :data="dynamodb!" part="body" />
 
-      <!-- AI Analysis is always rendered, even at
-           idle (2026-08-20 follow-up): a first-time user had no on-screen
-           indication of *where* the result would show up until after
-           clicking "Analyze with AI" - this idle-state hint gives that area
-           a visible home from the start, doubling as a hint for the
-           evidence-first, Analyze-with-AI-second workflow. -->
+      <!-- AI Analysis is always rendered, even at idle: a first-time user
+           had no on-screen indication of *where* the result would show up
+           until after clicking "Analyze with AI" - this idle-state hint
+           gives that area a visible home from the start, doubling as a hint
+           for the evidence-first, Analyze-with-AI-second workflow. -->
       <div class="section ai-analysis ai-analysis-section">
         <div class="section-title-row">
           <h3 class="section-title">AI Analysis</h3>
@@ -369,7 +331,7 @@ defineExpose({
         </div>
 
         <p v-if="analysis.status === 'idle'" class="section-note">
-          Review the SQL and details above, then click "Analyze with AI" to see the analysis results here.
+          Review the details above, then click "Analyze with AI" to see the analysis results here.
         </p>
 
         <p v-else-if="analysis.status === 'running'" class="analysis-status">Analyzing with AI…</p>
@@ -412,9 +374,10 @@ defineExpose({
               <p class="ai-card-detail">{{ r.detail }}</p>
               <p class="ai-card-rationale"><span class="label-inline">Rationale:</span> {{ r.rationale }}</p>
               <pre v-if="r.suggestedSql" class="ai-card-sql">{{ r.suggestedSql }}</pre>
-              <!-- possibleDuplicateOfIndex (2026-08-21 follow-up) is
-                   host-computed, never AI-authored - see
-                   PerformanceTuningAiRecommendation's own doc comment. -->
+              <!-- possibleDuplicateOfIndex is host-computed, never
+                   AI-authored, and RDB-only (never set for a DynamoDB
+                   context - see PerformanceTuningPreviewPanel.ts's
+                   analyzeWithAi()). -->
               <p v-if="r.possibleDuplicateOfIndex" class="ai-card-duplicate-warning">
                 <fa icon="triangle-exclamation" />
                 Possible duplicate of existing index "{{ r.possibleDuplicateOfIndex }}" - verify before running.
@@ -446,102 +409,36 @@ defineExpose({
         </div>
       </div>
 
-      <!-- 3. Collection issues: warning-severity diagnostics + unavailable
-           sections, already merged into one list extension-side (§6.1/§6.3). -->
+      <!-- Collection issues: warning-severity diagnostics + unavailable
+           sections, already merged into one list extension-side, for
+           whichever engine is active. -->
       <div v-if="issueGroups.length > 0" class="section collection-issues-section">
         <h3 class="section-title">Collection issues</h3>
         <DiagnosticGroupCard v-for="g in issueGroups" :key="g.key" :group="g" />
       </div>
 
-      <!-- 4. Information / plan notes: informational, never warning-colored
-           (§6.1/§6.2). Shared framing sentence shown once here rather than
-           repeated inside every group's own summary (2026-08-20 follow-up:
-           several PLAN_OBSERVATION groups - one per distinct plan
-           characteristic - used to each carry the identical explanatory
-           sentence, stacking into a lot of repeated vertical space when a
-           plan had several different characteristics; see
-           performanceTuningDiagnosticFormatter.ts's PLAN_OBSERVATION case for
-           the shortened per-group summary this replaces). -->
+      <!-- Information: informational, never warning-colored. Shared framing
+           sentence shown once here rather than repeated inside every
+           group's own summary. -->
       <div v-if="infoGroups.length > 0" class="section information-section">
         <h3 class="section-title">Information</h3>
         <p class="section-note">
-          The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed
-          performance problem — see each item's technical details.
+          The items below describe {{ engine === "relational" ? "execution-plan" : "access-pattern/collection" }}
+          characteristics. On their own, they don't indicate a confirmed performance problem — see each item's
+          technical details.
         </p>
         <DiagnosticGroupCard v-for="g in infoGroups" :key="g.key" :group="g" />
       </div>
 
-      <!-- 5. Execution plan (2026-08-19 follow-up): normalizedPlan is a
-           tree, so it's rendered as an EXPLAIN-style indented text block
-           rather than a table (a table would lose the parent-child
-           structure); planTableMappings is a genuinely flat per-table array,
-           so that one is a small table. Both come pre-formatted from
-           performanceTuningPlanFormatter.ts - this component only renders. -->
-      <div v-if="planTreeText || planTableMappingRows.length > 0" class="section execution-plan-section">
-        <h3 class="section-title">
-          Execution plan
-          <span v-if="context.executionPlan.mode === 'analyze'" class="badge analyzed-badge">analyzed</span>
-        </h3>
-        <p v-if="context.executionPlan.executionTimeMs !== undefined" class="section-note">
-          Real execution time: {{ context.executionPlan.executionTimeMs }} ms
-        </p>
-        <p v-if="context.executionPlan.actualPlan" class="section-note">
-          Runtime evidence from {{ actualEvidenceSource }} is shown first. The estimated topology is retained
-          below only for structured table/predicate metadata and comparison.
-        </p>
-        <p v-else-if="hasActualEvidence" class="section-note">
-          Runtime evidence from {{ actualEvidenceSource }} is included in the normalized execution plan below.
-        </p>
-        <p v-else class="section-note">
-          {{ isDmlEstimate ? "DML statement — estimated plan only; runtime measurements are not collected." : "Estimated plan only — the SQL has not been executed for runtime measurements." }}
-        </p>
-        <div v-if="context.executionPlan.actualPlan" class="actual-plan-text-block">
-          <h4>Actual execution plan ({{ context.executionPlan.actualPlan.source }})</h4>
-          <pre class="plan-tree">{{ actualPlanDisplayText ?? context.executionPlan.actualPlan.content }}</pre>
-        </div>
-        <details v-if="planTreeText" class="advanced-details" :open="!context.executionPlan.actualPlan">
-          <summary>{{ context.executionPlan.actualPlan ? "Estimated plan topology" : hasActualEvidence ? `Actual execution plan (${actualEvidenceSource})` : "Execution plan topology" }}</summary>
-          <pre class="plan-tree">{{ planTreeText }}</pre>
-        </details>
-        <table v-if="planTableMappingRows.length > 0" class="plan-table-mappings">
-          <caption>Table metrics</caption>
-          <thead>
-            <tr>
-              <th>Table</th>
-              <th>Index</th>
-              <th>Est. rows</th>
-              <th>Actual rows</th>
-              <th>Actual/est. ratio</th>
-              <th>Access fraction</th>
-              <th>Filter pass rate</th>
-              <th>Columns used</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, i) in planTableMappingRows" :key="`plan-table-${i}`">
-              <td>{{ row.table }}</td>
-              <td>{{ row.index ?? "-" }}</td>
-              <td>{{ row.estimatedRows ?? "-" }}</td>
-              <td>{{ formatActualRows(row.actualRows) }}</td>
-              <td>{{ formatRuntimeMetric(row.rowEstimateRatio, formatRatio) }}</td>
-              <td>{{ formatRuntimeMetric(row.tableAccessFraction, formatFractionAsPercent) }}</td>
-              <td>{{ formatRuntimeMetric(row.predicateFilterSelectivity, formatFractionAsPercent) }}</td>
-              <td>{{ row.columnsUsed ?? "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- 6. Full context JSON, as "Advanced details" - collapsed by default
-           (§6.5). -->
+      <!-- Full context JSON, as "Advanced details" - collapsed by default. -->
       <details class="section advanced-details advanced-details-section">
         <summary class="section-title">Advanced details: Full context JSON</summary>
         <p class="advanced-note">
-          This preview includes SQL, table definitions, and predicates exactly as collected. Review the content
-          before sending it to an AI service.
+          This preview includes the statement/target, table definitions, and predicates exactly as collected.
+          Review the content before sending it to an AI service.
         </p>
         <div class="code-panel json-panel">
-          <div class="json-block" v-html="jsonHtml"></div>
+          <div class="json-block" v-html="active?.jsonHtml"></div>
           <CopyToClipboardButton class="copy-btn" :content="contextJson" title="Copy JSON" />
         </div>
       </details>
@@ -574,15 +471,6 @@ defineExpose({
       align-items: baseline;
       margin-bottom: 4px;
 
-      &.sql {
-        align-items: flex-start;
-
-        .code-panel {
-          flex: 1 1 auto;
-          min-width: 0;
-        }
-      }
-
       /* `align-items: baseline` (the .row default) aligns by text baseline,
          which looks fine for plain text rows but goes ragged once the row
          mixes a <label>, a <vscode-dropdown>, and a <vscode-checkbox> - each
@@ -598,22 +486,6 @@ defineExpose({
           min-width: 0;
         }
       }
-
-      &.status-summary {
-        display: grid;
-        grid-template-columns: 110px max-content 220px max-content;
-        align-items: baseline;
-
-        .label {
-          min-width: 0;
-        }
-
-        // Column 4 is also where "Translate response" starts above.
-        .payload-size {
-          grid-column: 4;
-          white-space: nowrap;
-        }
-      }
     }
 
     .label {
@@ -621,39 +493,16 @@ defineExpose({
       min-width: 110px;
       flex: 0 0 auto;
     }
-
-    .sql-block {
-      max-height: 160px;
-      overflow: auto;
-      border-radius: 3px;
-    }
   }
 
-  /* Wraps a code block + its floating copy button. `position: relative`
-     makes it the positioning root for `.copy-btn` - same pattern RDH.vue
-     already uses for its per-cell copy button (`td.vcell { position:
-     relative }` + `.cell-actions { position: absolute }`), rather than
-     putting the button as a flex sibling of the code block: a flex sibling
-     only stays visible if the code block correctly shrinks to the row's
-     available width, and an unbroken long SQL/JSON line can blow that
-     sizing up (the block ends up sized to its content instead of the
-     container, pushing the button off-screen). Taking the button out of
-     flow avoids depending on that. `min-width: 0`/`min-height: 0` on the
-     flex item itself is still needed so it can actually shrink within the
-     row/column instead of growing to fit its (potentially very wide/tall)
-     content. */
+  /* Wraps the Full Context JSON code block + its floating copy button - see
+     RelationalPerformanceTuningView.vue's own .code-panel comment (this is
+     the same pattern, just for the shell's shared JSON section instead of a
+     per-engine SQL/PartiQL row). */
   .code-panel {
     position: relative;
   }
 
-  /* createCodeHtmlString() (Prism, extension-side) renders
-     <pre class="code-highlight"><code>...</code></pre> - v-html content
-     bypasses Vue's `scoped` attribute, so these rules target it via
-     :deep(). Colors/background/padding already come from the global
-     .code-highlight rules in assets/scss/main.scss; only wrapping/sizing
-     is overridden here. The extra right padding keeps code text from
-     running under the floating copy button. */
-  .sql-block :deep(pre.code-highlight),
   .json-block :deep(pre.code-highlight) {
     margin: 0;
     white-space: pre-wrap;
@@ -676,14 +525,6 @@ defineExpose({
     background: var(--vscode-editor-background);
     color: var(--vscode-foreground);
 
-    &.complete {
-      border-color: var(--vscode-testing-iconPassed);
-    }
-
-    &.partial {
-      border-color: var(--vscode-editorWarning-foreground);
-    }
-
     &.confidence-high {
       border-color: var(--vscode-testing-iconPassed);
     }
@@ -695,20 +536,9 @@ defineExpose({
     &.confidence-low {
       border-color: var(--vscode-errorForeground);
     }
-
-    &.analyzed-badge {
-      border-color: var(--vscode-notificationsInfoIcon-foreground);
-      font-weight: normal;
-      margin-left: 6px;
-    }
   }
 
-  .notes-hint {
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.9em;
-  }
-
-  /* "Run EXPLAIN ANALYZE" first-layer warning (2026-08-20 follow-up) - sits
+  /* "Run Explain Analyze"/"Run Observed Read" first-layer warning - sits
      right under the toolbar, so the risk is visible before the button is
      ever clicked, not just in its tooltip. */
   .actual-plan-warning {
@@ -717,14 +547,14 @@ defineExpose({
     margin: 2px 0 6px 0;
   }
 
-  .exceeded {
-    color: var(--vscode-errorForeground);
+  .label-inline {
     font-weight: 600;
   }
 
   /* The scrollable body between the fixed header and footer - Collection
-     issues / Information / Advanced details can all be long, so only this
-     area scrolls, keeping Database/Status/SQL always visible. */
+     issues / Information / AI Analysis / Advanced details, plus each
+     engine's own body sections, can all be long, so only this area scrolls,
+     keeping the header always visible. */
   .scrollArea {
     flex: 1 1 auto;
     min-height: 0;
@@ -733,13 +563,15 @@ defineExpose({
     display: flex;
     flex-direction: column;
 
-    // Keep the visible reading order aligned with the saved DBN report.
-    .performance-snapshot-section { order: 1; }
+    /* Keep the visible reading order aligned with the saved DBN report -
+       see RelationalPerformanceTuningView.vue's/DynamoDbPerformanceTuningView.vue's
+       own <style> for their sections' order values (1 and 4-7 respectively;
+       only one of the two is ever mounted at a time, so their numbering
+       never has to avoid colliding with each other, only with these). */
     .collection-issues-section { order: 2; }
     .information-section { order: 3; }
-    .execution-plan-section { order: 4; }
-    .ai-analysis-section { order: 5; }
-    .advanced-details-section { order: 6; }
+    .ai-analysis-section { order: 8; }
+    .advanced-details-section { order: 9; }
 
     .section {
       margin-bottom: 12px;
@@ -784,54 +616,7 @@ defineExpose({
       }
     }
 
-    /* --- Execution plan (2026-08-19 follow-up) --- */
-
-    .plan-tree {
-      margin: 0 0 8px 0;
-      padding: 6px 8px;
-      max-height: 180px;
-      overflow: auto;
-      white-space: pre;
-      font-size: 0.85em;
-      background: var(--vscode-textCodeBlock-background);
-      border-radius: 3px;
-    }
-
-    /* Same border/padding/font-size as DiagnosticGroupCard.vue's
-       .technical-details table, for visual consistency between the two
-       "small detail table" spots this panel now has. */
-    .plan-table-mappings {
-      border-collapse: collapse;
-      width: 100%;
-      font-size: 0.85em;
-
-      caption {
-        caption-side: top;
-        margin: 0 0 4px 0;
-        text-align: left;
-        font-size: 1.1em;
-        font-weight: 600;
-      }
-
-      th,
-      td {
-        border: 1px solid var(--vscode-editorWidget-border);
-        padding: 2px 6px;
-        text-align: left;
-        vertical-align: top;
-      }
-    }
-
-    .actual-plan-text-block {
-      margin-top: 8px;
-
-      h4 {
-        margin: 0 0 4px 0;
-        font-size: 0.95em;
-      }
-    }
-
-    /* --- AI Analysis (Step 10) --- */
+    /* --- AI Analysis --- */
 
     .section-title-row {
       display: flex;
@@ -910,10 +695,6 @@ defineExpose({
     .ai-card-detail,
     .ai-card-rationale {
       margin: 0 0 2px 0;
-    }
-
-    .label-inline {
-      font-weight: 600;
     }
 
     .ai-card-sql {

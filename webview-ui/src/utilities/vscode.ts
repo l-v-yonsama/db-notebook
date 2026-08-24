@@ -8,6 +8,7 @@ export * from "../../../src/shared/CreateScriptConditionParams";
 export * from "../../../src/shared/DBDumpParams";
 export * from "../../../src/shared/DBRestoreParams";
 export * from "../../../src/shared/DynamoDBConditionParams";
+export * from "../../../src/shared/DynamoDbPerformanceTuningHumanSummary";
 export * from "../../../src/shared/ExtChartJs";
 export * from "../../../src/shared/LabelValueItem";
 export * from "../../../src/shared/MessageEventData";
