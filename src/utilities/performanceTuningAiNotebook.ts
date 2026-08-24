@@ -39,20 +39,25 @@ export function buildAiAnalysisNotebookFilename(databaseName: string, now: Date 
   return `perf-tuning-analysis-${safeDb}-${formatTimestamp(now)}.dbn`;
 }
 
-function markupCell(value: string): NotebookCellData {
+// Exported (2026-08-24 follow-up, DynamoDB support): the report-building
+// helpers below are all engine-agnostic (NotebookCellData construction,
+// PerformanceTuningAiEvidenceRef/PerformanceTuningDiagnosticGroupViewModel
+// are already shared types), so dynamoDbPerformanceTuningNotebook.ts reuses
+// them directly rather than duplicating them.
+export function markupCell(value: string): NotebookCellData {
   return new NotebookCellData(NotebookCellKind.Markup, value, "markdown");
 }
 
 // cellLabel (CellLabelProvider in statusBarProviders.ts) is what keeps these
 // two JSON cells from showing up as an unlabeled "json"+"Not executed" pair
 // in the notebook's TOC/HTML report - see getTocInfoHtml() in htmlGenerator.ts.
-function jsonCodeCell(value: string, cellLabel: string): NotebookCellData {
+export function jsonCodeCell(value: string, cellLabel: string): NotebookCellData {
   const cell = new NotebookCellData(NotebookCellKind.Code, value, "json");
   cell.metadata = { cellLabel };
   return cell;
 }
 
-function evidenceLine(evidence: PerformanceTuningAiEvidenceRef | undefined): string {
+export function evidenceLine(evidence: PerformanceTuningAiEvidenceRef | undefined): string {
   if (!evidence) {
     return "-";
   }
@@ -70,6 +75,9 @@ function evidenceLine(evidence: PerformanceTuningAiEvidenceRef | undefined): str
   if (evidence.diagnosticCode) {
     parts.push(`Diagnostic: ${evidence.diagnosticCode}`);
   }
+  if (evidence.contextPath) {
+    parts.push(`Context: ${evidence.contextPath}`);
+  }
   return parts.length > 0 ? parts.join(" / ") : "-";
 }
 
@@ -77,7 +85,7 @@ function evidenceLine(evidence: PerformanceTuningAiEvidenceRef | undefined): str
 // these fields are expected to contain them in practice, but a defensive
 // escape keeps a stray literal from breaking the table layout instead of
 // silently dropping content.
-function escapeMdCell(value: string): string {
+export function escapeMdCell(value: string): string {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br/>");
 }
 
@@ -100,7 +108,7 @@ function formatFractionAsPercent(value: number | undefined): string {
   return `${text}%`;
 }
 
-function formatNumber(value: number | undefined): string {
+export function formatNumber(value: number | undefined): string {
   return value === undefined ? "-" : value.toLocaleString("en-US");
 }
 
@@ -224,7 +232,14 @@ function buildQueryStructureMarkdown(context: PerformanceTuningContext): string 
   return lines.join("\n");
 }
 
-function diagnosticGroupsMarkdown(
+// Exported (2026-08-24 follow-up) - operates only on the already
+// engine-agnostic PerformanceTuningDiagnosticGroupViewModel shape (the
+// `ReturnType<typeof buildPerformanceTuningDiagnosticGroups>` annotation is
+// just this file's own way of naming that type without a separate import;
+// buildDynamoDbPerformanceTuningDiagnosticGroups() returns the identical
+// shape), so dynamoDbPerformanceTuningNotebook.ts reuses this directly for
+// its own Collection issues/Information sections.
+export function diagnosticGroupsMarkdown(
   groups: ReturnType<typeof buildPerformanceTuningDiagnosticGroups>,
 ): string[] {
   const lines: string[] = [];
@@ -311,7 +326,11 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
   return lines;
 }
 
-function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): string {
+// Exported (2026-08-24 follow-up) - takes only `analysis`
+// (PerformanceTuningAiAnalysisResult, the shared response shape for both
+// engines), no RDB-specific field, so dynamoDbPerformanceTuningNotebook.ts
+// reuses it directly.
+export function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): string {
   const lines: string[] = [];
   lines.push("## Summary");
   lines.push("");
@@ -419,7 +438,9 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
 // cellLabel alone (CellLabelProvider) makes the TOC/HTML report readable,
 // but doesn't explain *why* the raw data is there when reading the notebook
 // itself top to bottom.
-function buildJsonAppendixMarkdown(): string {
+// Exported (2026-08-24 follow-up) - generic text, mentions no RDB-specific
+// concept, so dynamoDbPerformanceTuningNotebook.ts reuses it directly.
+export function buildJsonAppendixMarkdown(): string {
   return [
     "## Appendix: Raw data",
     "",

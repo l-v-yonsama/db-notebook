@@ -33,6 +33,7 @@ import { buildDynamoDbAccessPatternViewModel } from "../utilities/dynamoDbPerfor
 import { buildDynamoDbAiAnalysisPrompt, buildDynamoDbPlainTextAnalysisPrompt } from "../utilities/dynamoDbPerformanceTuningAiPrompt";
 import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "../utilities/dynamoDbPerformanceTuningDiagnosticFormatter";
 import { buildDynamoDbPerformanceTuningHumanSummary } from "../utilities/dynamoDbPerformanceTuningHumanSummary";
+import { saveDynamoDbAiAnalysisAsNotebook } from "../utilities/dynamoDbPerformanceTuningNotebook";
 import { toDynamoDbQueryAnalysisInput } from "../utilities/dynamoDbQueryAnalysisInput";
 import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
@@ -647,24 +648,22 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
   }
 
-  // Step 10 "Save as Notebook" (design doc §8). Always creates a brand new
-  // .dbn under reports/performance-tuning/ - never appends to an existing
-  // Notebook, never prompts a save dialog (both decided with the user, §16.1).
-  // RDB only for now - DynamoDbPerformanceTuningContext needs its own report
-  // cell structure (design doc §13, a separate, not-yet-implemented body of
-  // work: dynamoDbPerformanceTuningNotebook.ts) rather than being forced
-  // through saveAiAnalysisAsNotebook()'s RDB-shaped cells.
+  // Step 10 "Save as Notebook" (design doc §8/§13). Always creates a brand
+  // new .dbn under reports/performance-tuning/ - never appends to an
+  // existing Notebook, never prompts a save dialog (both decided with the
+  // user, §16.1). DynamoDbPerformanceTuningContext gets its own report cell
+  // structure (design doc §13) via a separate builder rather than being
+  // forced through saveAiAnalysisAsNotebook()'s RDB-shaped cells.
   private async saveAnalysisAsNotebook(): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.context || !this.lastAnalysis) {
       return;
     }
-    if (isDynamoDbPerformanceTuningContext(this.context)) {
-      window.showInformationMessage("Save as Notebook is not yet available for DynamoDB analyses.");
-      return;
-    }
-
-    const result = await saveAiAnalysisAsNotebook(this.context, this.lastAnalysis);
+    const context = this.context;
+    const lastAnalysis = this.lastAnalysis;
+    const result = isDynamoDbPerformanceTuningContext(context)
+      ? await saveDynamoDbAiAnalysisAsNotebook(context, lastAnalysis)
+      : await saveAiAnalysisAsNotebook(context, lastAnalysis);
     if (!result.ok) {
       window.showErrorMessage(result.message);
       return;

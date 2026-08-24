@@ -263,12 +263,11 @@ defineExpose({
           title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)">
           <fa icon="comment-dots" />Copy Prompt for Other AI
         </CopyToClipboardButton>
-        <!-- Save as Notebook: DynamoDB analyses can't be saved yet (its own
-             report cell structure is separate, not-yet-implemented work -
-             design doc §13) - see PerformanceTuningPreviewPanel.ts's
-             saveAnalysisAsNotebook() for the host-side half of this gate. -->
-        <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success' || engine === 'dynamodb'"
-          :title="engine === 'dynamodb' ? 'Not yet available for DynamoDB analyses' : 'Save the AI analysis as a new Notebook under reports/performance-tuning/'"
+        <!-- Save as Notebook - one shared button; PerformanceTuningPreviewPanel.ts's
+             saveAnalysisAsNotebook() picks the RDB or DynamoDB report
+             builder itself based on the currently-held context. -->
+        <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success'"
+          title="Save the AI analysis as a new Notebook under reports/performance-tuning/"
           @click="saveAiAnalysisAsNotebook">
           <fa icon="book" />Save as Notebook
         </VsCodeButton>
