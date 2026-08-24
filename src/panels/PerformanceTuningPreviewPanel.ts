@@ -1,9 +1,14 @@
 import {
+  AnyPerformanceTuningContext,
+  AwsDriver,
   CapabilityStatus,
   DEFAULT_MAX_PAYLOAD_BYTES,
+  DynamoDbPerformanceTuningCallOptions,
+  DynamoDbPerformanceTuningContext,
   PerformanceTuningContext,
   RDSBaseDriver,
   createPerformanceQueryDiagram,
+  isDynamoDbPerformanceTuningContext,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   CancellationTokenSource,
@@ -24,6 +29,10 @@ import {
   PerformanceTuningPreviewPanelEventData,
 } from "../shared/MessageEventData";
 import { PerformanceTuningAiAnalysisResult } from "../shared/PerformanceTuningAiAnalysis";
+import { buildDynamoDbAccessPatternViewModel } from "../utilities/dynamoDbPerformanceTuningAccessPatternFormatter";
+import { buildDynamoDbAiAnalysisPrompt, buildDynamoDbPlainTextAnalysisPrompt } from "../utilities/dynamoDbPerformanceTuningAiPrompt";
+import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "../utilities/dynamoDbPerformanceTuningDiagnosticFormatter";
+import { buildDynamoDbPerformanceTuningHumanSummary } from "../utilities/dynamoDbPerformanceTuningHumanSummary";
 import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
@@ -38,9 +47,11 @@ import {
   formatActualPlanForDisplay,
   formatPlanTree,
 } from "../utilities/performanceTuningPlanFormatter";
-// Type-only: avoids a runtime circular import with performanceTuningPreview.ts,
-// which imports this class (the value) the other way.
+// Type-only: avoids a runtime circular import with performanceTuningPreview.ts/
+// dynamoDbPerformanceTuningPreview.ts, which import this class (the value)
+// the other way.
 import type { PerformanceTuningPreviewRequest } from "../utilities/performanceTuningPreview";
+import type { DynamoDbPerformanceTuningPreviewRequest } from "../utilities/dynamoDbPerformanceTuningPreview";
 import { BasePanel } from "./BasePanel";
 
 // countTokens() is model-specific, but message framing added by the provider
@@ -50,6 +61,9 @@ const AI_INPUT_TOKEN_SAFETY_MARGIN = 128;
 
 // Host-side state and orchestration for the Preview and AI analysis. Build
 // user-facing diagnostic groups here so rendering stays simple and testable.
+// One panel class, shared by both engines (design doc §11.3's "共通 shell") -
+// see renderSub()'s isDynamoDbPerformanceTuningContext() branch for where
+// the two diverge.
 export class PerformanceTuningPreviewPanel extends BasePanel {
   public static currentPanel: PerformanceTuningPreviewPanel | undefined;
 
@@ -93,6 +107,39 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
   }
 
+  // DynamoDB counterpart of the above. No compact-context retry loop: a
+  // DynamoDB context has no large raw vendor artifact to trim in the first
+  // place (no execution plan at all - see buildCompactAiAnalysisContext()'s
+  // own doc comment for what RDB actually strips), so there is nothing a
+  // second, smaller attempt could remove.
+  private async buildDynamoDbMessagesWithinModelInputLimit(
+    model: LanguageModelChat,
+    context: DynamoDbPerformanceTuningContext,
+    translateResponse: boolean,
+    token: CancellationTokenSource["token"],
+  ): Promise<LanguageModelChatMessage[]> {
+    const maximum = model.maxInputTokens;
+    if (!Number.isFinite(maximum) || maximum <= AI_INPUT_TOKEN_SAFETY_MARGIN) {
+      throw new Error("The selected AI model does not report a usable input-token limit.");
+    }
+    const prompt = buildDynamoDbAiAnalysisPrompt(context, { translateResponse, language: env.language });
+    const messages = [
+      LanguageModelChatMessage.Assistant(prompt.assistant),
+      LanguageModelChatMessage.User(prompt.user),
+    ];
+    const inputTokens = (
+      await Promise.all(messages.map((message) => model.countTokens(message, token)))).reduce(
+      (total, count) => total + count,
+      0,
+    );
+    if (inputTokens + AI_INPUT_TOKEN_SAFETY_MARGIN > maximum) {
+      throw new Error(
+        `The selected model accepts at most ${maximum} input tokens, but this DynamoDB performance context requires ${inputTokens} tokens.`,
+      );
+    }
+    return messages;
+  }
+
   // The singleton panel can be re-render()ed with a new context before a
   // prior renderSub() call's async syntax highlighting finishes (e.g. Query
   // Statistics' 9b lets a user trigger back-to-back previews from different
@@ -107,12 +154,14 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   // analysis of it (if any) - held as instance state because
   // analyzePerformanceTuningWithAi/saveAiAnalysisAsNotebook carry no params
   // (design doc §12): the webview never re-sends data the extension host
-  // already has.
-  private context: PerformanceTuningContext | undefined;
+  // already has. Union of both engines (2026-08-24 follow-up, DynamoDB
+  // support) - see isDynamoDbPerformanceTuningContext() for how methods below
+  // narrow it.
+  private context: AnyPerformanceTuningContext | undefined;
   private lastAnalysis: PerformanceTuningAiAnalysisResult | undefined;
   private analysisCancellationSource: CancellationTokenSource | undefined;
 
-  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - the original request
+  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - the original RDB request
   // (everything getPerformanceTuningContext() needs besides plan.mode
   // itself) and this connection's static capability to even do it at all,
   // both set once by render() and reused by runActualPlan() below so the
@@ -121,12 +170,22 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   // the estimate/analyze pair for the same preview.
   private request: PerformanceTuningPreviewRequest | undefined;
   private analyzedExecutionPlan: CapabilityStatus = { available: false };
+  // "Run Observed Read" - the DynamoDB counterpart of the two fields above,
+  // kept as separate fields (not shared ones) since exactly one of
+  // request/dynamoDbRequest is ever set for a given preview (render() clears
+  // the other) - see renderDynamoDb()/render() below.
+  private dynamoDbRequest: DynamoDbPerformanceTuningPreviewRequest | undefined;
+  private observedReadCapability: CapabilityStatus = { available: false };
   // AbortController, not a vscode.CancellationTokenSource, since it feeds
-  // getPerformanceTuningContext()'s own `{signal}` option directly - same
-  // bridge (`token.onCancellationRequested(() => controller.abort())`)
-  // startPerformanceTuningPreview() itself already uses for the initial
-  // (estimate-mode) collection.
-  private actualPlanRunController: AbortController | undefined;
+  // getPerformanceTuningContext()/getDynamoDbPerformanceTuningContext()'s own
+  // `{signal}` option directly - same bridge
+  // (`token.onCancellationRequested(() => controller.abort())`)
+  // startPerformanceTuningPreview()/startDynamoDbPerformanceTuningPreview()
+  // themselves already use for the initial (estimate-mode/static) collection.
+  // Shared by runActualPlan() and runObservedRead(): the two are mutually
+  // exclusive (a panel shows exactly one engine's context at a time), so one
+  // field is enough.
+  private secondaryExecutionController: AbortController | undefined;
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     super(panel, extensionUri);
@@ -139,12 +198,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
   }
 
-  public static render(
-    extensionUri: Uri,
-    context: PerformanceTuningContext,
-    request: PerformanceTuningPreviewRequest,
-    analyzedExecutionPlan: CapabilityStatus
-  ) {
+  private static ensurePanel(extensionUri: Uri): PerformanceTuningPreviewPanel {
     if (PerformanceTuningPreviewPanel.currentPanel) {
       PerformanceTuningPreviewPanel.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     } else {
@@ -166,37 +220,74 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         extensionUri
       );
     }
+    return PerformanceTuningPreviewPanel.currentPanel;
+  }
+
+  public static render(
+    extensionUri: Uri,
+    context: PerformanceTuningContext,
+    request: PerformanceTuningPreviewRequest,
+    analyzedExecutionPlan: CapabilityStatus
+  ) {
+    const panel = PerformanceTuningPreviewPanel.ensurePanel(extensionUri);
     // Held for "Run EXPLAIN ANALYZE" (runActualPlan() below) - constant
     // across the initial (estimate-mode) preview and any later analyze-mode
     // re-run of it, so only the first render() call's values matter; a
     // later renderSub()-only re-render (the re-run itself) does not touch
     // either field.
-    PerformanceTuningPreviewPanel.currentPanel.request = request;
-    PerformanceTuningPreviewPanel.currentPanel.analyzedExecutionPlan = analyzedExecutionPlan;
-    PerformanceTuningPreviewPanel.currentPanel.renderSub(context);
+    panel.request = request;
+    panel.dynamoDbRequest = undefined;
+    panel.analyzedExecutionPlan = analyzedExecutionPlan;
+    panel.observedReadCapability = { available: false };
+    panel.renderSub(context);
+  }
+
+  // DynamoDB counterpart of render() (design doc §11.3's shared shell -
+  // startDynamoDbPerformanceTuningPreview()'s own entry point).
+  public static renderDynamoDb(
+    extensionUri: Uri,
+    context: DynamoDbPerformanceTuningContext,
+    request: DynamoDbPerformanceTuningPreviewRequest,
+    observedReadCapability: CapabilityStatus
+  ) {
+    const panel = PerformanceTuningPreviewPanel.ensurePanel(extensionUri);
+    panel.request = undefined;
+    panel.dynamoDbRequest = request;
+    panel.analyzedExecutionPlan = { available: false };
+    panel.observedReadCapability = observedReadCapability;
+    panel.renderSub(context);
   }
 
   getComponentName(): ComponentName {
     return "PerformanceTuningPreviewPanel";
   }
 
-  private async renderSub(context: PerformanceTuningContext): Promise<void> {
+  private async renderSub(context: AnyPerformanceTuningContext): Promise<void> {
     const myGeneration = ++this.renderGeneration;
 
     // A new context invalidates any AI analysis in flight or already shown
     // for the previous one - cancel the in-flight request (if any) and
     // clear the stale result so a stray "Save as Notebook" can't save
-    // analysis text for a SQL statement no longer on screen.
+    // analysis text for a statement no longer on screen.
     this.analysisCancellationSource?.cancel();
     this.analysisCancellationSource = undefined;
-    // A new context (a fresh preview, or this same preview's own analyze-mode
-    // re-run replacing itself) invalidates a still-running EXPLAIN ANALYZE
-    // the same way - never let a stale one's result land after this one.
-    this.actualPlanRunController?.abort();
-    this.actualPlanRunController = undefined;
+    // A new context (a fresh preview, or this same preview's own re-run
+    // replacing itself) invalidates a still-running EXPLAIN ANALYZE/Run
+    // Observed Read the same way - never let a stale one's result land after
+    // this one.
+    this.secondaryExecutionController?.abort();
+    this.secondaryExecutionController = undefined;
     this.context = context;
     this.lastAnalysis = undefined;
 
+    if (isDynamoDbPerformanceTuningContext(context)) {
+      await this.renderDynamoDbSub(context, myGeneration);
+      return;
+    }
+    await this.renderRelationalSub(context, myGeneration);
+  }
+
+  private async renderRelationalSub(context: PerformanceTuningContext, myGeneration: number): Promise<void> {
     // Computed here (not in the webview) so the number shown always matches
     // what RDSBaseDriver.enforcePayloadBudget() itself measured the result
     // against.
@@ -252,6 +343,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       componentName: "PerformanceTuningPreviewPanel",
       value: {
         initialize: {
+          engine: "relational",
           context,
           diagnosticGroups,
           planTreeText,
@@ -276,6 +368,67 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     this.getWebviewPanel().webview.postMessage(msg);
   }
 
+  private async renderDynamoDbSub(context: DynamoDbPerformanceTuningContext, myGeneration: number): Promise<void> {
+    const contextJson = JSON.stringify(context, null, 2);
+    const payloadBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
+
+    const plainTextPrompt = buildDynamoDbPlainTextAnalysisPrompt(context);
+    const translatedPlainTextPrompt = buildDynamoDbPlainTextAnalysisPrompt(context, {
+      translateResponse: true,
+      language: env.language,
+    });
+
+    const [sqlHtml, jsonHtml, models] = await Promise.all([
+      // Only a PartiQL statement has SQL-like text to highlight - see
+      // DynamoDbPerformanceTuningInitializeViewModel.sqlHtml's own comment.
+      context.statement.text
+        ? createCodeHtmlString({ code: context.statement.text, lang: "sql" })
+        : Promise.resolve(undefined),
+      createCodeHtmlString({ code: contextJson, lang: "json" }),
+      lm.selectChatModels({ vendor: "copilot" }),
+    ]);
+
+    if (myGeneration !== this.renderGeneration) {
+      return;
+    }
+
+    const diagnosticGroups = buildDynamoDbPerformanceTuningDiagnosticGroups(
+      context.collection.diagnostics,
+      context.collection.unavailableSections,
+    );
+    const humanSummary = buildDynamoDbPerformanceTuningHumanSummary(context);
+    const accessPattern = buildDynamoDbAccessPatternViewModel(context.accessPattern);
+    const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(models);
+
+    const msg: PerformanceTuningPreviewPanelEventData = {
+      command: "initialize",
+      componentName: "PerformanceTuningPreviewPanel",
+      value: {
+        initialize: {
+          engine: "dynamodb",
+          context,
+          diagnosticGroups,
+          accessPattern,
+          humanSummary,
+          sqlHtml,
+          jsonHtml,
+          plainTextPrompt,
+          translatedPlainTextPrompt,
+          payloadBytes,
+          // Matches RDB's own default (DynamoDbPerformanceTuningProvider.ts's
+          // DEFAULT_MAX_PAYLOAD_BYTES is intentionally the same value) - one
+          // displayed budget, not a second constant to keep in sync.
+          maxPayloadBytes: DEFAULT_MAX_PAYLOAD_BYTES,
+          languageModels,
+          languageModelId: defaultLanguageModelId,
+          translateResponse: defaultTranslateResponse(env.language),
+          observedReadCapability: this.observedReadCapability,
+        },
+      },
+    };
+    this.getWebviewPanel().webview.postMessage(msg);
+  }
+
   protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
     switch (message.command) {
       case "cancel":
@@ -290,6 +443,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       case "runActualPlan":
         await this.runActualPlan();
         break;
+      case "runObservedRead":
+        await this.runObservedRead();
+        break;
     }
   }
 
@@ -300,6 +456,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   // single deterministic request/response, not a conversational tool call),
   // and posts the parsed structured result back. Never throws past this
   // method - every failure path ends in an "error" analysis-update instead.
+  // Shared by both engines: PerformanceTuningAiAnalysisResult is the same
+  // response shape either way (design doc §12), only the prompt differs.
   private async analyzeWithAi(languageModelId: string, translateResponse: boolean): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.context) {
@@ -359,14 +517,23 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         let compact = false;
         try {
           progress.report({ message: `Checking input size for ${model.family}...` });
-          const prepared = await this.buildMessagesWithinModelInputLimit(
-            model,
-            context,
-            translateResponse,
-            cts.token,
-          );
-          messages = prepared.messages;
-          compact = prepared.compact;
+          if (isDynamoDbPerformanceTuningContext(context)) {
+            messages = await this.buildDynamoDbMessagesWithinModelInputLimit(
+              model,
+              context,
+              translateResponse,
+              cts.token,
+            );
+          } else {
+            const prepared = await this.buildMessagesWithinModelInputLimit(
+              model,
+              context,
+              translateResponse,
+              cts.token,
+            );
+            messages = prepared.messages;
+            compact = prepared.compact;
+          }
         } catch (e) {
           if (this.analysisCancellationSource === cts) {
             this.analysisCancellationSource = undefined;
@@ -439,10 +606,15 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           // Full Context improvement item 4) is host-computed here, never
           // trusted from the model's own JSON - a deterministic backstop
           // for the model's own duplicate-index self-check (prompt item 3),
-          // independent of whether the model actually followed it.
+          // independent of whether the model actually followed it. RDB
+          // only (design doc §12: "possibleDuplicateOfIndex の host-side
+          // CREATE INDEX 検査は RDB Context の場合だけ実行する") - DynamoDB has
+          // no CREATE INDEX concept at all to check against.
           recommendations: (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).map((r) => ({
             ...r,
-            possibleDuplicateOfIndex: findPossibleDuplicateIndex(r?.suggestedSql, context)?.matchedIndexName,
+            possibleDuplicateOfIndex: isDynamoDbPerformanceTuningContext(context)
+              ? undefined
+              : findPossibleDuplicateIndex(r?.suggestedSql, context)?.matchedIndexName,
           })),
           confidence:
             parsed.confidence === "high" || parsed.confidence === "medium" ? parsed.confidence : "low",
@@ -477,9 +649,17 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   // Step 10 "Save as Notebook" (design doc §8). Always creates a brand new
   // .dbn under reports/performance-tuning/ - never appends to an existing
   // Notebook, never prompts a save dialog (both decided with the user, §16.1).
+  // RDB only for now - DynamoDbPerformanceTuningContext needs its own report
+  // cell structure (design doc §13, a separate, not-yet-implemented body of
+  // work: dynamoDbPerformanceTuningNotebook.ts) rather than being forced
+  // through saveAiAnalysisAsNotebook()'s RDB-shaped cells.
   private async saveAnalysisAsNotebook(): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.context || !this.lastAnalysis) {
+      return;
+    }
+    if (isDynamoDbPerformanceTuningContext(this.context)) {
+      window.showInformationMessage("Save as Notebook is not yet available for DynamoDB analyses.");
       return;
     }
 
@@ -517,7 +697,15 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     if (!this.request || !this.analyzedExecutionPlan.available) {
       return;
     }
-    const eligibility = this.context?.statement.analyzeEligibility;
+    const context = this.context;
+    // this.request only being set for an RDB preview (render()/renderDynamoDb()
+    // never set both) makes this unreachable in practice; guarded anyway so
+    // this method stays type-safe against `context`'s union type without an
+    // unsound cast.
+    if (!context || isDynamoDbPerformanceTuningContext(context)) {
+      return;
+    }
+    const eligibility = context.statement.analyzeEligibility;
     if (eligibility?.allowed === false) {
       void window.showErrorMessage(
         eligibility.reason ?? "Explain Analyze is limited to a single SELECT statement."
@@ -544,7 +732,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       },
       async (_progress, token) => {
         const controller = new AbortController();
-        this.actualPlanRunController = controller;
+        this.secondaryExecutionController = controller;
         token.onCancellationRequested(() => controller.abort());
 
         const { ok, message, result } = await workflow<RDSBaseDriver, PerformanceTuningContext>(
@@ -570,8 +758,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           true
         );
 
-        if (this.actualPlanRunController === controller) {
-          this.actualPlanRunController = undefined;
+        if (this.secondaryExecutionController === controller) {
+          this.secondaryExecutionController = undefined;
         }
         if (myGeneration !== this.renderGeneration) {
           // A newer preview replaced this one while the run was in flight -
@@ -590,13 +778,109 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
   }
 
+  // "Run Observed Read" - the DynamoDB counterpart of runActualPlan() above.
+  // Actually reads real items (server-side, real I/O, capped at a single API
+  // response / a small item count by db-drivers - see
+  // DynamoDbExecutionMetaTracker/DYNAMODB_OBSERVED_READ_MAX_ITEMS) to measure
+  // this statement's real Consumed Capacity and result shape. Same two-layer
+  // confirmation as runActualPlan() (static warning text in the webview, plus
+  // this modal). v1 only supports the PartiQL entry points (SQL History,
+  // executed Notebook cells) - see DynamoDbPerformanceTuningPreviewRequest's
+  // own doc comment for why the native-Query (Dynamo Query Panel) variant
+  // isn't wired in yet.
+  private async runObservedRead(): Promise<void> {
+    const myGeneration = this.renderGeneration;
+    if (!this.dynamoDbRequest || !this.observedReadCapability.available) {
+      return;
+    }
+    const context = this.context;
+    if (!context || !isDynamoDbPerformanceTuningContext(context)) {
+      return;
+    }
+    if (!context.statement.observationEligibility.allowed) {
+      void window.showErrorMessage(
+        context.statement.observationEligibility.reason ??
+          "Run Observed Read is not available for this statement."
+      );
+      return;
+    }
+    const request = this.dynamoDbRequest;
+
+    const confirmed = await window.showWarningMessage(
+      `This reads real items from "${request.connectionSetting.name}" (a single response, up to 100 items) to measure this statement's actual Consumed Capacity and result shape. Continue?`,
+      { modal: true },
+      "Run"
+    );
+    if (confirmed !== "Run") {
+      await this.postStopProgress();
+      return;
+    }
+
+    await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+        title: "Running observed read...",
+      },
+      async (_progress, token) => {
+        const controller = new AbortController();
+        this.secondaryExecutionController = controller;
+        token.onCancellationRequested(() => controller.abort());
+
+        // No `parameters` - observationEligibility.allowed already guarantees
+        // this statement's text has no unresolved `?` marker to bind (§7.1/
+        // §7.4, Decision 1 of the design review).
+        const execution: DynamoDbPerformanceTuningCallOptions["execution"] = { kind: "partiql" };
+
+        const { ok, message, result } = await workflow<AwsDriver, DynamoDbPerformanceTuningContext>(
+          request.connectionSetting,
+          (driver) =>
+            driver
+              .getDynamoDbPerformanceTuningContext(
+                {
+                  statement: {
+                    source: request.statement.source,
+                    request: request.statement.request,
+                    workload: request.workload,
+                  },
+                  observation: { mode: "executeOnce" },
+                },
+                { signal: controller.signal, execution }
+              )
+              .then((r) => {
+                if (!r.ok || !r.result) {
+                  throw new Error(r.message);
+                }
+                return r.result;
+              }),
+          true
+        );
+
+        if (this.secondaryExecutionController === controller) {
+          this.secondaryExecutionController = undefined;
+        }
+        if (myGeneration !== this.renderGeneration) {
+          return;
+        }
+
+        if (ok && result) {
+          await this.renderSub(result);
+          return;
+        }
+
+        window.showErrorMessage(`Failed to run observed read.${message ? ` ${message}` : ""}`);
+        await this.postStopProgress();
+      }
+    );
+  }
+
   // Generic "clear whatever loading indicator you're showing" signal, same
   // BaseMessageEventDataCommand ScanPanel.ts/DynamoQueryPanel.ts etc. already
-  // use for the identical purpose - the webview's own isRunningActualPlan
-  // resets on this rather than needing a dedicated command/payload just for
-  // "the run didn't succeed" (the error text itself already went to
-  // window.showErrorMessage above, or there is none - a user-declined
-  // confirmation is not an error).
+  // use for the identical purpose - the webview's own isRunningActualPlan/
+  // isRunningObservedRead resets on this rather than needing a dedicated
+  // command/payload just for "the run didn't succeed" (the error text itself
+  // already went to window.showErrorMessage above, or there is none - a
+  // user-declined confirmation is not an error).
   private async postStopProgress(): Promise<void> {
     const msg: PerformanceTuningPreviewPanelEventData = {
       command: "stop-progress",
@@ -625,7 +909,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
   protected preDispose(): void {
     this.analysisCancellationSource?.cancel();
-    this.actualPlanRunController?.abort();
+    this.secondaryExecutionController?.abort();
     PerformanceTuningPreviewPanel.currentPanel = undefined;
   }
 }

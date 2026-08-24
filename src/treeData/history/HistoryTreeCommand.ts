@@ -33,6 +33,10 @@ import {
 } from "../../constant";
 
 import {
+  AwsDriver,
+  ConnectionSetting,
+  DBType,
+  DynamoDbWorkloadContext,
   RDSBaseDriver,
   RdsDatabase,
   SelectedStatementStatistics,
@@ -47,11 +51,15 @@ import { CellMeta } from "../../types/Notebook";
 import { SQLHistory } from "../../types/SQLHistory";
 import { MdhViewParams } from "../../types/views";
 import { showWindowErrorMessage } from "../../utilities/alertUtil";
-import { createRDSDriver, workflow } from "../../utilities/driverResolver";
+import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
 import { existsFileOnWorkspace } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { readCodeResolverFile, readRuleFile } from "../../utilities/notebookUtil";
-import { openPerformanceTuningPreview } from "../../utilities/performanceTuningBindConfirmation";
+import {
+  openDynamoDbPerformanceTuningPreview,
+  openPerformanceTuningPreview,
+} from "../../utilities/performanceTuningBindConfirmation";
+import { averageCapacityUnits, averageElapsedTimeMilli } from "../../utilities/sqlHistoryUtil";
 import { HistoryTreeProvider } from "./HistoryTreeProvider";
 
 type HistoryTreeParams = {
@@ -368,10 +376,86 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
   });
 
+  // AWS/DynamoDB branch of START_PERFORMANCE_TUNING_FROM_HISTORY below -
+  // design doc §11.3: "AWS branch。databaseName不要、PartiQL bind を`?`に正規
+  // 化". Deliberately much shorter than the RDB branch: no databaseName
+  // resolution (DynamoDB has no such concept), no estimateBindParameters()/
+  // Bind Parameters Panel (Decision 1 of the design review - see
+  // openDynamoDbPerformanceTuningPreview()'s own doc comment for why), and no
+  // resolveTargetTables()/resolveTableAliasMap()/stateStorage.loadResource()/
+  // getFirstRdsDatabaseByName() (all RDB-only concepts; loadResource() in
+  // particular internally does a `Scan Limit 1` for attribute-type
+  // estimation, which would violate the static Preview's no-item-data-read
+  // guarantee - §11.3's own note on the AWS history branch).
+  const startDynamoDbPerformanceTuningFromHistory = async (
+    connectionSetting: ConnectionSetting,
+    history: SQLHistory
+  ): Promise<void> => {
+    // normalizeQuery() converts db-notebook's canonical `:name` bind syntax
+    // into DynamoDB PartiQL's `?` positional markers - the same conversion
+    // EXECUTE_SQL_HISTORY above needs, and required regardless of whether
+    // every marker's value happens to be known: eligibility for Run Observed
+    // Read is decided later, driver-side, purely from whether the resulting
+    // *text* still contains a `?` (§7.1/§7.4).
+    const driver = await createSQLSupportDriver<AwsDriver>(connectionSetting, true);
+    const toPositionedParameter = driver.isPositionedParameterAvailable();
+    const toPositionalCharacter = driver.getPositionalCharacter();
+    const nativeSql = normalizeQuery({
+      query: history.sqlDoc,
+      toPositionedParameter,
+      toPositionalCharacter,
+    }).query;
+
+    // SQL History's rolling Capacity/timing aggregate for this exact
+    // statement (sqlHistoryUtil.ts) - the DynamoDB counterpart of the RDB
+    // branch's `statistics` below, folded into the collected Context as
+    // workload evidence (§6.5) rather than a separate statement-statistics
+    // surface (DynamoDB has none to route through - design doc §5.1).
+    const workload: DynamoDbWorkloadContext | undefined = history.performance
+      ? {
+          executionCount: history.performance.sampleCount,
+          totalClientElapsedTimeMs: history.performance.totalElapsedTimeMilli,
+          averageClientElapsedTimeMs: averageElapsedTimeMilli(history.performance),
+          maxClientElapsedTimeMs: history.performance.maxElapsedTimeMilli,
+          lastClientElapsedTimeMs: history.performance.lastElapsedTimeMilli,
+          capacitySampleCount: history.performance.capacitySampleCount,
+          totalCapacityUnits: history.performance.totalCapacityUnits,
+          averageCapacityUnits: averageCapacityUnits(history.performance),
+          maxCapacityUnits: history.performance.maxCapacityUnits,
+          lastCapacityUnits: history.performance.lastCapacityUnits,
+          lastReturnedItemCount: history.summary?.selectedRows,
+          lastScannedItemCount: history.summary?.scannedRows,
+          source: "sqlHistory",
+          lastExecutedAt: history.executedAt ? new Date(history.executedAt).toISOString() : undefined,
+        }
+      : undefined;
+
+    const result = await openDynamoDbPerformanceTuningPreview({
+      extensionUri: context.extensionUri,
+      connectionSetting,
+      statement: { source: "sqlHistory", request: { kind: "partiql", text: nativeSql } },
+      workload,
+    });
+
+    if (result.status === "failed") {
+      showWindowErrorMessage(
+        [result.message, result.technicalMessage].filter(Boolean).join(" ") ||
+          "Failed to collect DynamoDB performance tuning context."
+      );
+    }
+    // "cancelled" mirrors the RDB branch's own handling below - nothing
+    // further to show; "opened" needs no notification either.
+  };
+
   registerDisposableCommand(START_PERFORMANCE_TUNING_FROM_HISTORY, async (history: SQLHistory) => {
     const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
     if (!connectionSetting) {
       showWindowErrorMessage("Missing connection " + history.connectionName);
+      return;
+    }
+
+    if (connectionSetting.dbType === DBType.Aws) {
+      await startDynamoDbPerformanceTuningFromHistory(connectionSetting, history);
       return;
     }
 

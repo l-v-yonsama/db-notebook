@@ -6,6 +6,7 @@ import type {
   DbResource,
   DbSchema,
   DbTable,
+  DynamoDbPerformanceTuningContext,
   EstimatedBindParameter,
   ExtractedSqlResult,
   LogParseParams,
@@ -34,6 +35,7 @@ import type { ComponentName } from "./ComponentName";
 import type { DBDumpInputParams, DBDumpSettingsUIParams } from "./DBDumpParams";
 import type { DBRestoreInputParams, DBRestoreSettingsUIParams } from "./DBRestoreParams";
 import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
+import type { DynamoDbPerformanceTuningHumanSummary } from "./DynamoDbPerformanceTuningHumanSummary";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
 import type { PerformanceTuningAiAnalysisResult } from "./PerformanceTuningAiAnalysis";
@@ -538,6 +540,27 @@ export type PlanTableMappingRowViewModel = {
   columnsUsed?: string;
 };
 
+// Built once, extension-side, by buildDynamoDbAccessPatternViewModel()
+// (src/utilities/dynamoDbPerformanceTuningAccessPatternFormatter.ts) from
+// DynamoDbPerformanceTuningContext.accessPattern - the DynamoDB counterpart
+// of PlanTableMappingRowViewModel above (RDB has no equivalent structure to
+// share this with; DynamoDB access patterns are a genuinely different shape,
+// see that context type's own top comment). Purely presentational text -
+// every source field is already value-free, so this view model is too.
+export type DynamoDbAccessPatternViewModel = {
+  operationLabel: string;
+  accessPathLabel: string;
+  confidence: "certain" | "unknown";
+  targetRef: string;
+  partitionKeyText: string;
+  sortKeyText?: string;
+  postReadFilterText: string;
+  projectionText: string;
+  consistentReadLabel: string;
+  limitText?: string;
+  scanDirectionLabel?: string;
+};
+
 // A tagged status prevents independently optional AI fields from becoming
 // inconsistent. Saving does not discard a successful analysis.
 export type PerformanceTuningAiAnalysisViewState = {
@@ -551,76 +574,115 @@ export type PerformanceTuningAiAnalysisViewState = {
   savedNotebookRelativePath?: string;
 };
 
+// Common to both engines' AI/full-JSON shell fields (2026-08-24 follow-up,
+// DynamoDB support) - factored out only to avoid repeating these seven
+// fields' doc comments twice, not exposed/used as a type on its own anywhere
+// else.
+type PerformanceTuningPreviewShellFields = {
+  // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
+  // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
+  jsonHtml: string;
+  // "Copy Prompt for Other AI" (2026-08-21 follow-up) - a self-contained
+  // plain-text prompt (buildPlainTextAnalysisPrompt(), extension-side) for a
+  // manual paste into an external AI chat (ChatGPT/Claude.ai/Claude Code/
+  // Codex/...) the user already has a subscription for, bypassing vscode.lm/
+  // Copilot entirely. Precomputed here for the same reason jsonHtml is - a
+  // pure string build, ready to copy instantly with no round-trip to the
+  // extension host.
+  plainTextPrompt: string;
+  // The same external-AI prompt with the current UI language response
+  // instruction. The webview switches between these immediately when
+  // the Translate response checkbox changes, without a host round trip.
+  translatedPlainTextPrompt: string;
+  // Computed on the extension side (Buffer.byteLength) rather than
+  // re-serialized/measured in the webview, so the displayed number always
+  // matches what the driver's own payload-limit enforcement saw.
+  payloadBytes: number;
+  maxPayloadBytes: number;
+  // Analyze with AI's "Language model"/"Translate response" options
+  // (2026-08-19 follow-up) - populated directly from
+  // lm.selectChatModels({vendor: "copilot"}) mapped 1:1, no filtering),
+  // except defaultLanguageModelId carries no gpt-4o-family preference (see
+  // lmModelSelection.ts) and translateResponse's default is
+  // env.language !== "en", same as those two panels.
+  languageModels: LabelValueItem[];
+  languageModelId: string;
+  translateResponse: boolean;
+};
+
+// RDB view model (2026-08-24 follow-up: split out of the formerly-flat
+// `initialize` shape so a DynamoDB sibling could be added below without
+// forcing RDB-only fields like planTreeText/queryDiagram* to become
+// meaningless-when-absent on a DynamoDB payload too). `engine` is a
+// view-model-only discriminant - PerformanceTuningContext itself has no such
+// field (see isDynamoDbPerformanceTuningContext()'s own doc comment for why).
+export type RelationalPerformanceTuningInitializeViewModel = PerformanceTuningPreviewShellFields & {
+  engine: "relational";
+  context: PerformanceTuningContext;
+  // Grouped/summarized once, extension-side, from
+  // context.collection.diagnostics + .unavailableSections - see
+  // PerformanceTuningDiagnosticGroupViewModel above. Ordered
+  // information-first, in the same provenance order collection.diagnostics
+  // itself has (plan-level, then per-table); the Vue component splits by
+  // severity for the Information vs. Collection issues sections but does
+  // not itself re-sort or re-derive anything.
+  diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
+  // Execution plan display (2026-08-19 follow-up). planTreeText is
+  // undefined when executionPlan.normalizedPlan itself is absent
+  // (e.g. a Provider that hasn't wired it, or SQLite); an empty
+  // planTableMappingRows array is normal (a plan can legitimately touch
+  // zero tables) and just means that sub-section doesn't render.
+  planTreeText?: string;
+  // XML runtime artifacts (currently SQL Server's SET STATISTICS XML)
+  // are indented extension-side for display only. The exact raw artifact
+  // remains in context.executionPlan.actualPlan / Full Context JSON.
+  actualPlanDisplayText?: string;
+  planTableMappingRows: PlanTableMappingRowViewModel[];
+  // Deterministic, human-readable facts built once by the extension host.
+  humanSummary: PerformanceTuningHumanSummary;
+  // Mermaid itself is intentionally not bundled into the Preview webview.
+  // The saved DBN/HTML report contains the query-scoped diagram instead.
+  queryDiagramAvailable: boolean;
+  queryDiagramHasWarnings: boolean;
+  sqlHtml: string;
+  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - whether this
+  // connection's Provider can actually collect an analyze-mode plan at
+  // all (driver.checkPerformanceTuningContextAvailability(), the same
+  // static per-Provider capability check RunActualPlanActionCommand's
+  // handler itself does not need to repeat). `message` (when present)
+  // explains an unavailable capability in the button tooltip.
+  analyzedExecutionPlan: CapabilityStatus;
+};
+
+// DynamoDB counterpart (2026-08-24 follow-up, design doc §11.3). No
+// planTreeText/actualPlanDisplayText/planTableMappingRows/queryDiagram* -
+// DynamoDB has no execution plan or declared-FK diagram to show (§6.1); its
+// own structural evidence is accessPattern/humanSummary instead.
+export type DynamoDbPerformanceTuningInitializeViewModel = PerformanceTuningPreviewShellFields & {
+  engine: "dynamodb";
+  context: DynamoDbPerformanceTuningContext;
+  diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
+  accessPattern: DynamoDbAccessPatternViewModel;
+  humanSummary: DynamoDbPerformanceTuningHumanSummary;
+  // Only set when context.statement.text is present (a PartiQL statement) -
+  // a native Query/Scan statement has no SQL-like text to highlight, so the
+  // webview falls back to rendering `accessPattern` alone for the "Target"
+  // section in that case (design doc §11.3 item 2).
+  sqlHtml?: string;
+  // "Run Observed Read" - the DynamoDB counterpart of RDB's
+  // analyzedExecutionPlan above, kept as its own field (not the same field
+  // reused) since the two capabilities are genuinely different checks with
+  // different messages - see DynamoDbPerformanceTuningCapabilities.observedRead's
+  // own doc comment in db-drivers for why `available` here never implies the
+  // caller's IAM policy was verified.
+  observedReadCapability: CapabilityStatus;
+};
+
 export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand | "analysis-update",
   "PerformanceTuningPreviewPanel",
   {
-    initialize?: {
-      context: PerformanceTuningContext;
-      // Grouped/summarized once, extension-side, from
-      // context.collection.diagnostics + .unavailableSections - see
-      // PerformanceTuningDiagnosticGroupViewModel above. Ordered
-      // information-first, in the same provenance order collection.diagnostics
-      // itself has (plan-level, then per-table); the Vue component splits by
-      // severity for the Information vs. Collection issues sections but does
-      // not itself re-sort or re-derive anything.
-      diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
-      // Execution plan display (2026-08-19 follow-up). planTreeText is
-      // undefined when executionPlan.normalizedPlan itself is absent
-      // (e.g. a Provider that hasn't wired it, or SQLite); an empty
-      // planTableMappingRows array is normal (a plan can legitimately touch
-      // zero tables) and just means that sub-section doesn't render.
-      planTreeText?: string;
-      // XML runtime artifacts (currently SQL Server's SET STATISTICS XML)
-      // are indented extension-side for display only. The exact raw artifact
-      // remains in context.executionPlan.actualPlan / Full Context JSON.
-      actualPlanDisplayText?: string;
-      planTableMappingRows: PlanTableMappingRowViewModel[];
-      // Deterministic, human-readable facts built once by the extension host.
-      humanSummary: PerformanceTuningHumanSummary;
-      // Mermaid itself is intentionally not bundled into the Preview webview.
-      // The saved DBN/HTML report contains the query-scoped diagram instead.
-      queryDiagramAvailable: boolean;
-      queryDiagramHasWarnings: boolean;
-      // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
-      // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
-      sqlHtml: string;
-      jsonHtml: string;
-      // "Copy Prompt for Other AI" (2026-08-21 follow-up) - a self-contained
-      // plain-text prompt (buildPlainTextAnalysisPrompt(), extension-side)
-      // for a manual paste into an external AI chat (ChatGPT/Claude.ai/
-      // Claude Code/Codex/...) the user already has a subscription for,
-      // bypassing vscode.lm/Copilot entirely. Precomputed here for the same
-      // reason sqlHtml/jsonHtml are - a pure string build, ready to copy
-      // instantly with no round-trip to the extension host.
-      plainTextPrompt: string;
-      // The same external-AI prompt with the current UI language response
-      // instruction. The webview switches between these immediately when
-      // the Translate response checkbox changes, without a host round trip.
-      translatedPlainTextPrompt: string;
-      // Computed on the extension side (Buffer.byteLength) rather than
-      // re-serialized/measured in the webview, so the displayed number
-      // always matches what RDSBaseDriver.enforcePayloadBudget() itself saw.
-      payloadBytes: number;
-      maxPayloadBytes: number;
-      // Analyze with AI's "Language model"/"Translate response" options
-      // (2026-08-19 follow-up) - populated directly from
-      // lm.selectChatModels({vendor:
-      // "copilot"}) mapped 1:1, no filtering), except defaultLanguageModelId
-      // carries no gpt-4o-family preference (see lmModelSelection.ts) and
-      // translateResponse's default is env.language !== "en", same as those
-      // two panels.
-      languageModels: LabelValueItem[];
-      languageModelId: string;
-      translateResponse: boolean;
-      // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - whether this
-      // connection's Provider can actually collect an analyze-mode plan at
-      // all (driver.checkPerformanceTuningContextAvailability(), the same
-      // static per-Provider capability check RunActualPlanActionCommand's
-      // handler itself does not need to repeat). `message` (when present)
-      // explains an unavailable capability in the button tooltip.
-      analyzedExecutionPlan: CapabilityStatus;
-    };
+    initialize?: RelationalPerformanceTuningInitializeViewModel | DynamoDbPerformanceTuningInitializeViewModel;
     analysis?: PerformanceTuningAiAnalysisViewState;
   }
 >;

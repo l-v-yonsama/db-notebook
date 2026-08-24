@@ -22,6 +22,14 @@ export type PerformanceTuningAiEvidenceRef = {
   planNodeId?: string;
   // Matches PerformanceTuningDiagnosticCode, same plain-string reasoning.
   diagnosticCode?: string;
+  // DynamoDB counterpart (design doc §12) - a JSON pointer-ish path into the
+  // DynamoDbPerformanceTuningContext this evidence is about, e.g.
+  // "/cloudWatch/series/0" or "/accessPattern". Additive and independent of
+  // the RDB-shaped fields above (which have no DynamoDB equivalent - there is
+  // no schema/table/index/plan-node identity to point at the same way), so
+  // one shared PerformanceTuningAiAnalysisResult type still fits both
+  // engines without a union.
+  contextPath?: string;
 };
 
 export type PerformanceTuningAiFindingSeverity = "info" | "warning" | "critical";
