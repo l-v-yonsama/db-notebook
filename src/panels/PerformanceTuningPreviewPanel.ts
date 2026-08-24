@@ -33,6 +33,7 @@ import { buildDynamoDbAccessPatternViewModel } from "../utilities/dynamoDbPerfor
 import { buildDynamoDbAiAnalysisPrompt, buildDynamoDbPlainTextAnalysisPrompt } from "../utilities/dynamoDbPerformanceTuningAiPrompt";
 import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "../utilities/dynamoDbPerformanceTuningDiagnosticFormatter";
 import { buildDynamoDbPerformanceTuningHumanSummary } from "../utilities/dynamoDbPerformanceTuningHumanSummary";
+import { toDynamoDbQueryAnalysisInput } from "../utilities/dynamoDbQueryAnalysisInput";
 import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
@@ -827,10 +828,24 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         this.secondaryExecutionController = controller;
         token.onCancellationRequested(() => controller.abort());
 
-        // No `parameters` - observationEligibility.allowed already guarantees
-        // this statement's text has no unresolved `?` marker to bind (§7.1/
-        // §7.4, Decision 1 of the design review).
-        const execution: DynamoDbPerformanceTuningCallOptions["execution"] = { kind: "partiql" };
+        // partiql: no `parameters` - observationEligibility.allowed already
+        // guarantees this statement's text has no unresolved `?` marker to
+        // bind (§7.1/§7.4, Decision 1 of the design review). query: the
+        // *real* QueryItemsAtClientInputParams (= QueryCommandInput,
+        // ExpressionAttributeValues included) this.dynamoDbRequest already
+        // holds - this is the one call in the whole flow that genuinely
+        // needs real values, since it actually executes.
+        const execution: DynamoDbPerformanceTuningCallOptions["execution"] =
+          request.statement.request.kind === "partiql"
+            ? { kind: "partiql" }
+            : { kind: "query", input: request.statement.request.input };
+        // The static `statement.request` sent alongside it, in contrast,
+        // always uses the values-free mirror - same reasoning as
+        // startDynamoDbPerformanceTuningPreview()'s own staticRequest.
+        const staticRequest =
+          request.statement.request.kind === "partiql"
+            ? request.statement.request
+            : { kind: "query" as const, input: toDynamoDbQueryAnalysisInput(request.statement.request.input) };
 
         const { ok, message, result } = await workflow<AwsDriver, DynamoDbPerformanceTuningContext>(
           request.connectionSetting,
@@ -840,7 +855,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
                 {
                   statement: {
                     source: request.statement.source,
-                    request: request.statement.request,
+                    request: staticRequest,
                     workload: request.workload,
                   },
                   observation: { mode: "executeOnce" },

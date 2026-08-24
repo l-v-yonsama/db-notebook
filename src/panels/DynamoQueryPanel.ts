@@ -17,6 +17,7 @@ import { DynamoQueryPanelEventData } from "../shared/MessageEventData";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
+import { startDynamoDbPerformanceTuningPreview } from "../utilities/dynamoDbPerformanceTuningPreview";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -190,6 +191,35 @@ export class DynamoQueryPanel extends BasePanel {
             commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
           } else {
             showWindowErrorMessage(message);
+          }
+        }
+        return;
+      case "previewDynamoDbPerformanceTuning":
+        {
+          // Same resolution as the "ok" (Execute) branch above -
+          // this.queryInput already carries the real, value-ful native
+          // Query this panel would execute, unchanged (design doc §11.3).
+          const { tableRes, queryInput } = this;
+          if (!tableRes || !queryInput || !DynamoQueryPanel.stateStorage) {
+            return;
+          }
+          const { conName } = tableRes.meta;
+          const setting = await DynamoQueryPanel.stateStorage.getConnectionSettingByName(conName);
+          if (!setting) {
+            return;
+          }
+
+          const result = await startDynamoDbPerformanceTuningPreview({
+            extensionUri: this.extensionUri,
+            connectionSetting: setting,
+            statement: { source: "dynamoQueryPanel", request: { kind: "query", input: queryInput } },
+          });
+
+          if (result.status === "failed") {
+            showWindowErrorMessage(
+              [result.message, result.technicalMessage].filter(Boolean).join(" ") ||
+                "Failed to collect DynamoDB performance tuning context."
+            );
           }
         }
         return;

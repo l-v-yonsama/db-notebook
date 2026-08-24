@@ -153,6 +153,16 @@ const cancel = () => {
     params: {},
   });
 };
+// "Preview Performance" (design doc §11.3) - the host already holds this
+// panel's current query state (tableRes/queryInput) from the last "ok"
+// message, the same reason Execute above sends no query details either -
+// see DynamoQueryPanel.ts's own "previewDynamoDbPerformanceTuning" handler.
+const previewPerformanceTuning = () => {
+  vscode.postCommand({
+    command: "previewDynamoDbPerformanceTuning",
+    params: {},
+  });
+};
 const ok = (preview: boolean) => {
   const params: DynamoDBConditionParams = {
     target: target.value,
@@ -224,6 +234,10 @@ defineExpose({
         <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="width:200px"
           @change="updateOptions()" />
       </template>
+      <VsCodeButton appearance="secondary" :disabled="!executable" @click="previewPerformanceTuning"
+        title="Preview this query's DynamoDB performance tuning context (static analysis - no items are read)">
+        <fa icon="magnifying-glass-chart" />Preview Performance
+      </VsCodeButton>
       <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute">
         <fa icon="check" />Execute
       </VsCodeButton>

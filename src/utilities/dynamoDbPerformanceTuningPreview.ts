@@ -4,10 +4,12 @@ import {
   DynamoDbPerformanceTuningCapabilities,
   DynamoDbPerformanceTuningContext,
   DynamoDbWorkloadContext,
+  QueryItemsAtClientInputParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ProgressLocation, Uri, window } from "vscode";
 import { PerformanceTuningPreviewPanel } from "../panels/PerformanceTuningPreviewPanel";
 import { createSQLSupportDriver, workflow } from "./driverResolver";
+import { toDynamoDbQueryAnalysisInput } from "./dynamoDbQueryAnalysisInput";
 
 // DynamoDB counterpart of performanceTuningPreview.ts's
 // startPerformanceTuningPreview(). Request state retained by the host panel
@@ -18,22 +20,26 @@ export type DynamoDbPerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
   statement: {
     source: "sqlHistory" | "editor" | "dynamoQueryPanel";
-    // v1 only wires up the PartiQL entry points (SQL History, an executed
-    // Notebook cell) - see HistoryTreeCommand.ts's AWS branch and
-    // activator.ts. A native Query request (Dynamo Query Panel's own
-    // "Preview Performance" button, design doc §11.3) needs a values-free
-    // DynamoDbQueryAnalysisInput for the static context plus the *real*
-    // AWS-SDK QueryCommandInput (with ExpressionAttributeValues) for Run
-    // Observed Read - db-notebook has no direct @aws-sdk/client-dynamodb
-    // dependency today (it always goes through db-drivers' own types), so
-    // that wiring is deliberately left for the Dynamo Query Panel
-    // integration step rather than guessed at here.
-    request: { kind: "partiql"; text: string };
+    request:
+      | { kind: "partiql"; text: string }
+      // Dynamo Query Panel's "Preview Performance" button - `input` is the
+      // *real* value-ful query (QueryItemsAtClientInputParams *is* the AWS
+      // SDK's QueryCommandInput, a bare type alias in db-drivers - see
+      // AwsDynamoServiceClient.ts), the same object DynamoQueryPanel.ts
+      // already builds to actually execute the query. Kept real (not
+      // pre-stripped) here, call-scoped only and never persisted/logged,
+      // mirroring RDB's own PerformanceTuningPreviewRequest.plan.binds - see
+      // startDynamoDbPerformanceTuningPreview() below for where the
+      // values-free mirror the static collection path needs is derived from
+      // it, and PerformanceTuningPreviewPanel.ts's runObservedRead() for
+      // where the real object is used directly (Run Observed Read genuinely
+      // needs real ExpressionAttributeValues to execute).
+      | { kind: "query"; input: QueryItemsAtClientInputParams };
   };
   // SQL History's rolling Capacity/timing aggregate for this exact statement
   // (sqlHistoryUtil.ts's mergeSQLHistoryPerformance/averageCapacityUnits) -
-  // optional, since an editor/Notebook-cell-originated preview has no prior
-  // history to aggregate.
+  // optional, since an editor/Notebook-cell/Dynamo-Query-Panel-originated
+  // preview has no prior history to aggregate.
   workload?: DynamoDbWorkloadContext;
 };
 
@@ -94,8 +100,17 @@ export async function startDynamoDbPerformanceTuningPreview(
       >(
         connectionSetting,
         async (driver) => {
+          // The static collection path only ever receives the values-free
+          // DynamoDbQueryAnalysisInput mirror for a native Query - never the
+          // real QueryItemsAtClientInputParams this request itself carries
+          // (which retains ExpressionAttributeValues, used only later, by
+          // runObservedRead(), for the one call that genuinely needs them).
+          const staticRequest =
+            statement.request.kind === "partiql"
+              ? statement.request
+              : { kind: "query" as const, input: toDynamoDbQueryAnalysisInput(statement.request.input) };
           const contextResult = await driver.getDynamoDbPerformanceTuningContext(
-            { statement: { source: statement.source, request: statement.request, workload } },
+            { statement: { source: statement.source, request: staticRequest, workload } },
             { signal: controller.signal }
           );
           if (!contextResult.ok || !contextResult.result) {
