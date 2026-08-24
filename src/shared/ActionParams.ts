@@ -98,7 +98,8 @@ export type ActionCommand =
   | SubmitPerformanceTuningBindParametersActionCommand
   | AnalyzePerformanceTuningWithAiActionCommand
   | SaveAiAnalysisAsNotebookActionCommand
-  | RunActualPlanActionCommand;
+  | RunActualPlanActionCommand
+  | RunObservedDynamoDbReadActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -166,6 +167,14 @@ export type SaveAiAnalysisAsNotebookActionCommand = BaseActionCommand<"saveAiAna
 // are needed here either. The confirmation gate itself is host-side (window.showWarningMessage,
 // modal) - see PerformanceTuningPreviewPanel.ts's runActualPlan().
 export type RunActualPlanActionCommand = BaseActionCommand<"runActualPlan">;
+
+// "Run Observed Read" - DynamoDB's counterpart to RunActualPlanActionCommand
+// above (same rationale: PerformanceTuningPreviewPanel holds the original
+// DynamoDB request - connectionSetting/statement - as instance state the
+// same way it already holds the RDB request, so no params are needed here
+// either). The confirmation gate is host-side (window.showWarningMessage,
+// modal) - see PerformanceTuningPreviewPanel.ts's runObservedRead().
+export type RunObservedDynamoDbReadActionCommand = BaseActionCommand<"runObservedRead">;
 
 export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
 export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;
