@@ -46,7 +46,7 @@ anything a second time. For those same connections from an external MCP client, 
 | Run Database Query | `#runDbQuery` | Runs one SQL statement (or one PartiQL statement against DynamoDB) |
 | Run Database Transaction | `#runDbTransaction` | Runs several SQL statements as one all-or-nothing transaction |
 | Scan Database Resource | `#scanDbResource` | Searches a non-SQL resource (Redis, Memcache, MQTT, Keycloak, Auth0, AWS S3/SQS/CloudWatch) |
-| Get Performance Tuning Context | `#getPerformanceTuningContext` | Gets estimated plan, related schema, statistics, and physical-health facts for one SQL statement |
+| Get Performance Tuning Context | `#getPerformanceTuningContext` | Gets the estimated plan (SQL) or a static access-path/Capacity snapshot (DynamoDB PartiQL), related schema, statistics, and physical-health/CloudWatch facts for one statement |
 | Create Database Notebook | `#createDbNotebook` | Creates a new `.dbn` notebook from cells or raw SQL |
 | Edit Database Notebook | `#editDbNotebook` | Inserts/replaces/deletes cells, or updates a cell's metadata/source, in an existing `.dbn` notebook |
 
@@ -456,15 +456,21 @@ session:7698-e5f6a7b8 hash 5m 40s {"customerNo":7698,"loginAt":"2026-07-19T09:02
 
 ### 5.7. Get Performance Tuning Context — `#getPerformanceTuningContext`
 
-Returns a vendor-neutral, read-only snapshot for investigating why one SQL statement may be slow.
-It supports MySQL, PostgreSQL, SQL Server, and Oracle. The snapshot includes the **estimated**
-execution plan, related table definitions and indexes, optimizer statistics, physical-health
-signals, and collection diagnostics.
+Returns a vendor-neutral, read-only snapshot for investigating why one statement may be slow or
+expensive. It supports MySQL, PostgreSQL, SQL Server, and Oracle, and — for an AWS connection
+configured for DynamoDB — a PartiQL `SELECT` statement too. For a SQL connection, the snapshot
+includes the **estimated** execution plan, related table definitions and indexes, optimizer
+statistics, and physical-health signals. For a DynamoDB connection, it includes a **static**
+access-path classification (whether the statement is guaranteed to run as a `Query`, or could fall
+back to a full `Scan`), the table/index key schema and Capacity mode, and recent CloudWatch
+throughput/throttling metrics for that table/index. Both include structured collection
+diagnostics.
 
-The supplied SQL is **not executed**: this tool always obtains an estimated plan and never runs
-`EXPLAIN ANALYZE`. It returns observed facts rather than an AI conclusion; ask Copilot to reason
-from the returned data. SQL text, predicates, and DDL are not masked, so treat the result as
-database-sensitive information.
+The supplied statement is **not executed**: this tool always obtains an estimated plan (SQL) or a
+static classification (DynamoDB) — it never runs `EXPLAIN ANALYZE`, a real DynamoDB `Query`/`Scan`,
+or reads any item data. It returns observed facts rather than an AI conclusion; ask Copilot to
+reason from the returned data. Statement text, predicates, and DDL/table definitions are not
+masked, so treat the result as database-sensitive information.
 
 **Prompt(EN)**
 
@@ -484,7 +490,29 @@ database-sensitive information.
 ```
 
 Use optional `databaseName` when the connection has no configured default database. Use optional
-`schemaName` when table resolution needs an explicit schema, such as PostgreSQL.
+`schemaName` when table resolution needs an explicit schema, such as PostgreSQL. Both are ignored
+for a DynamoDB connection.
+
+Against `awsProd` (an AWS connection configured for DynamoDB), `sql` is PartiQL instead, and
+`databaseName`/`schemaName` are unused — the target table/index is resolved from the statement's
+own `FROM` clause:
+
+**Prompt(EN)**
+
+> Why might this PartiQL statement scan the whole table on awsProd? Use the performance tuning context.
+
+**Prompt(JA)**
+
+> awsProd で次のPartiQL文がテーブル全体をスキャンしてしまう理由は? パフォーマンスチューニング情報を根拠に教えて。
+
+**Tool input**
+
+```json
+{
+  "connectionName": "awsProd",
+  "sql": "SELECT order_no, amount FROM \"orders_table\" WHERE customer_no = '7566'"
+}
+```
 
 ### 5.8. Create Database Notebook — `#createDbNotebook`
 
