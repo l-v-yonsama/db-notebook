@@ -38,6 +38,7 @@ export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;
 export const VIEW_DATA = `${EXTENSION_NAME}.view-data`;
 export const VIEW_TOP_ROWS = `${EXTENSION_NAME}.view-top-rows`;
 export const VIEW_LAST_ROWS = `${EXTENSION_NAME}.view-last-rows`;
+export const SCAN_ITEMS = `${EXTENSION_NAME}.scan-items`;
 export const FLUSH_DB = `${EXTENSION_NAME}.flush-db`;
 export const CREATE_CONNECTION_SETTING = `${EXTENSION_NAME}.create-connection-setting`;
 export const SHOW_CONNECTION_SETTING = `${EXTENSION_NAME}.show-connection-setting`;

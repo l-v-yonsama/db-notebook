@@ -159,6 +159,11 @@ function titleAndSummaryForDiagnosticGroup(
         summary: `No datapoints were returned for ${metricNames.length > 0 ? metricNames.join(", ") : "one or more metrics"} in the collection window. This is not the same fact as zero activity.`,
       };
     }
+    case "DYNAMODB_MONITORING_COLLECTION_SKIPPED":
+      return {
+        title: "CloudWatch monitoring not collected",
+        summary: first.message,
+      };
     case "DYNAMODB_SECTION_COLLECTION_FAILED": {
       const scope = first.scope;
       return {

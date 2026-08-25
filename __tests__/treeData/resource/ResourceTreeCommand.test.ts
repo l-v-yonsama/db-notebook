@@ -1,11 +1,26 @@
-import { DBType, DbConnection, RdsDatabase } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  AwsDriver,
+  DBType,
+  DbConnection,
+  DbDynamoTable,
+  RdsDatabase,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { commands, workspace } from "vscode";
 import type { ExtensionContext, TreeItem, TreeView } from "vscode";
-import { LOAD_DB_SCHEMA } from "../../../src/constant";
+import { LOAD_DB_SCHEMA, OPEN_MDH_VIEWER, SCAN_ITEMS } from "../../../src/constant";
 import { registerResourceTreeCommand } from "../../../src/treeData/resource/ResourceTreeCommand";
+import { workflow } from "../../../src/utilities/driverResolver";
 import type { ResourceTreeProvider } from "../../../src/treeData/resource/ResourceTreeProvider";
 import type { StateStorage } from "../../../src/utilities/StateStorage";
+
+vi.mock("../../../src/utilities/driverResolver", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/utilities/driverResolver")>();
+  return {
+    ...actual,
+    workflow: vi.fn(),
+  };
+});
 
 const mockDatabaseConfig = (resourceTreeAutoExpandTo: string) => {
   vi.mocked(workspace.getConfiguration).mockImplementation((section?: string) => {
@@ -100,5 +115,49 @@ describe(`${LOAD_DB_SCHEMA} と resourceTreeAutoExpandTo 設定の連携`, () =>
     await handler(conRes);
 
     expect(revealMock).not.toHaveBeenCalled();
+  });
+});
+
+describe(`${SCAN_ITEMS} command`, () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("scans at most 100 items and opens the result in the MDH viewer", async () => {
+    const result = { rows: [{ id: 1 }] };
+    const scanItemsAtClient = vi.fn(async () => result);
+    vi.mocked(workflow).mockImplementation(async (_setting, callback) => ({
+      ok: true,
+      message: "",
+      result: await callback({ dynamoClient: { scanItemsAtClient } } as unknown as AwsDriver),
+    }));
+
+    const context = makeContext();
+    const stateStorage = {
+      getConnectionSettingByName: vi.fn(async () => ({ name: "aws-connection" })),
+    } as unknown as StateStorage;
+    registerResourceTreeCommand({
+      context,
+      stateStorage,
+      dbResourceTree: makeDbResourceTree(),
+      dbResourceTreeView: makeDbResourceTreeView(),
+      connectionSettingViewProvider: {} as never,
+    });
+    const handler = getHandlerFor(SCAN_ITEMS);
+    const tableRes = {
+      name: "Orders",
+      meta: { conName: "aws-connection" },
+    } as unknown as DbDynamoTable;
+
+    await handler(tableRes);
+
+    expect(scanItemsAtClient).toHaveBeenCalledWith({
+      TableName: "Orders",
+      Limit: 100,
+    });
+    expect(commands.executeCommand).toHaveBeenCalledWith(OPEN_MDH_VIEWER, {
+      title: "Orders",
+      list: [result],
+    });
   });
 });

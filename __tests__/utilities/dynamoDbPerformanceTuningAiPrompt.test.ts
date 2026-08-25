@@ -151,6 +151,13 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     expect(assistant.toLowerCase()).toContain("hot");
   });
 
+  it("instructs the model to treat intentionally skipped monitoring as expected scope", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain("DYNAMODB_MONITORING_COLLECTION_SKIPPED");
+    expect(assistant).toContain("expected analysis scope");
+    expect(assistant).toContain("Do not recommend granting CloudWatch/Contributor Insights permissions");
+  });
+
   it("instructs the model not to conflate on-demand/provisioned throttling reasons", () => {
     const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
     expect(assistant).toContain("DYNAMODB_PROVISIONED_THROTTLING_OBSERVED");

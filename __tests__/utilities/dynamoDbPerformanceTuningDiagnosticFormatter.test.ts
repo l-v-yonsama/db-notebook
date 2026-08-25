@@ -67,6 +67,28 @@ describe("buildDynamoDbPerformanceTuningDiagnosticGroups", () => {
     expect(groups[0].details).toHaveLength(2);
   });
 
+  it("renders intentionally skipped monitoring as information rather than a collection warning", () => {
+    const groups = buildDynamoDbPerformanceTuningDiagnosticGroups(
+      [
+        diag({
+          code: "DYNAMODB_MONITORING_COLLECTION_SKIPPED",
+          severity: "info",
+          affectsCompleteness: false,
+          scope: "collection",
+          message: "CloudWatch metrics and Contributor Insights are outside the scope of local/custom DynamoDB endpoints.",
+        }),
+      ],
+      [],
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      severity: "info",
+      title: "CloudWatch monitoring not collected",
+      summary: expect.stringContaining("outside the scope"),
+    });
+    expect(groups[0].suggestedAction).toBeUndefined();
+  });
+
   it("distinguishes index-list truncation from payload truncation by scope", () => {
     const groups = buildDynamoDbPerformanceTuningDiagnosticGroups(
       [

@@ -699,6 +699,11 @@
           "group": "db-resourc@2"
         },
         {
+          "command": "database-notebook.scan-items",
+          "when": "view == database-notebook-connections && viewItem =~ /^DynamoTable.+$/",
+          "group": "db-resourc@3"
+        },
+        {
           "command": "database-notebook.copy-aws-secret-value",
           "when": "view == database-notebook-connections && viewItem =~ /^(SsmParameter|SecretsManagerSecret).+$/",
           "group": "inline"
@@ -1291,6 +1296,11 @@
       {
         "command": "database-notebook.view-last-rows",
         "title": "View Last 100 Rows",
+        "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.scan-items",
+        "title": "Scan 100 Items",
         "icon": "$(table)"
       },
       {

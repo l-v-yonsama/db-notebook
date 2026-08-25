@@ -159,6 +159,18 @@ function buildThrottlingSignal(context: DynamoDbPerformanceTuningContext): Dynam
       rawDataPath: "Full context JSON → cloudWatch / collection.diagnostics",
     };
   }
+  const monitoringSkipped = context.collection.diagnostics.find(
+    (d) => d.code === "DYNAMODB_MONITORING_COLLECTION_SKIPPED",
+  );
+  if (monitoringSkipped) {
+    return {
+      kind: "throttling",
+      level: "info",
+      title: "CloudWatch monitoring not collected",
+      summary: monitoringSkipped.message,
+      rawDataPath: "Full context JSON → collection.diagnostics",
+    };
+  }
   if (!context.cloudWatch) {
     return {
       kind: "throttling",

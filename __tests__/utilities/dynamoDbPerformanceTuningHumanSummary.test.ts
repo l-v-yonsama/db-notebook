@@ -234,6 +234,35 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
     ).toBe("unknown");
   });
 
+  it("treats intentionally skipped monitoring as informational instead of unknown", () => {
+    const value = context({
+      collection: {
+        collectedAt: "2026-08-24T00:00:00.000Z",
+        status: "complete",
+        diagnostics: [
+          {
+            code: "DYNAMODB_MONITORING_COLLECTION_SKIPPED",
+            severity: "info",
+            affectsCompleteness: false,
+            scope: "collection",
+            message: "CloudWatch metrics and Contributor Insights were not collected because CloudWatch is not enabled for this connection.",
+            tableName: "orders",
+          },
+        ],
+        unavailableSections: [],
+      },
+    });
+
+    const summary = buildDynamoDbPerformanceTuningHumanSummary(value);
+    const signal = summary.signals.find((s) => s.kind === "throttling");
+    expect(signal).toMatchObject({
+      level: "info",
+      title: "CloudWatch monitoring not collected",
+      summary: expect.stringContaining("not enabled for this connection"),
+    });
+    expect(summary.signals.some((s) => s.kind === "collection")).toBe(false);
+  });
+
   it("adds a collection-partial signal only when collection.status is partial", () => {
     const value = context({
       collection: {

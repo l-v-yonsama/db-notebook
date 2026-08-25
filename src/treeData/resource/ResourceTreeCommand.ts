@@ -1,5 +1,6 @@
 import {
   AwsDatabase,
+  AwsDriver,
   AwsServiceType,
   BaseSQLSupportDriver,
   DbCfnStack,
@@ -65,6 +66,7 @@ import {
   REFRESH_RESOURCES,
   REMOVE_SUBSCRIPTION,
   RESTORE_DATABASE,
+  SCAN_ITEMS,
   SHOW_CONNECTION_SETTING,
   SHOW_DYNAMO_QUERY_PANEL,
   SHOW_PUBLISH_EDITOR_PANEL,
@@ -512,6 +514,12 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   );
 
   context.subscriptions.push(
+    commands.registerCommand(SCAN_ITEMS, async (tableRes: DbDynamoTable) => {
+      await scanItems(stateStorage, tableRes);
+    })
+  );
+
+  context.subscriptions.push(
     commands.registerCommand(FLUSH_DB, async (conRes: DbConnection) => {
       await workflow<RedisDriver>(conRes, async (driver) => {
         const answer = await window.showInformationMessage(
@@ -752,6 +760,38 @@ async function viewRows(stateStorage: StateStorage, tableRes: DbTable, limitMode
         limitMode,
         limit: 100,
         limitLastColumn,
+      });
+    },
+    true
+  );
+
+  if (ok && result !== undefined) {
+    const commandParam: MdhViewParams = {
+      title: tableRes.name,
+      list: [result],
+    };
+    commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+  } else {
+    showWindowErrorMessage(message);
+  }
+}
+
+async function scanItems(stateStorage: StateStorage, tableRes: DbDynamoTable) {
+  const { conName } = tableRes.meta;
+  const setting = await stateStorage.getConnectionSettingByName(conName);
+  if (!setting) {
+    return;
+  }
+
+  const { ok, message, result } = await workflow<AwsDriver>(
+    setting,
+    async (driver) => {
+      if (!driver.dynamoClient) {
+        throw new Error("DynamoDB is not configured for this connection.");
+      }
+      return await driver.dynamoClient.scanItemsAtClient({
+        TableName: tableRes.name,
+        Limit: 100,
       });
     },
     true

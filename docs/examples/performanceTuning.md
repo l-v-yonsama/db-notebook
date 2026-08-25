@@ -2,8 +2,9 @@
 
 Database Notebook helps you investigate slow or expensive statements by gathering the relevant
 evidence in one place — the execution plan and related table metadata for MySQL, PostgreSQL, SQL
-Server, and Oracle, or a static access-path classification and Capacity/CloudWatch evidence for
-DynamoDB. Where supported, you can also run the statement once to collect actual measurements.
+Server, and Oracle, or a static access-path classification and Capacity evidence for DynamoDB.
+CloudWatch-backed DynamoDB monitoring evidence is also included when it is enabled for a real AWS
+connection. Where supported, you can run the statement once to collect actual measurements.
 
 ## TOC
 
@@ -159,12 +160,19 @@ For a DynamoDB context, `engine` is `dynamodb`, and the plan-oriented sections a
 - `service` and `statement` — the region/target and PartiQL or native Query information.
 - `accessPattern` — the static `Query`/`Scan` classification, key conditions, post-read filters,
   projection, and consistency.
-- `table` — Capacity mode, key schema, LSI/GSI definitions, TTL, and Contributor Insights status.
+- `table` — Capacity mode, key schema, LSI/GSI definitions, TTL, and, when monitoring collection is
+  enabled, Contributor Insights status.
 - `workload` — the rolling timing, item-count, and Consumed Capacity summary from matching history.
 - `observation` — one previously observed or user-confirmed read; check `bounded` before treating it
   as representative of the full result.
-- `cloudWatch` — table/index/operation-level time series. A series with `noData: true` is missing
-  data, not measured zero activity.
+- `cloudWatch` — table/index/operation-level time series when CloudWatch monitoring is collected. A
+  series with `noData: true` is missing data, not measured zero activity.
+
+The `cloudWatch` section and Contributor Insights status are intentionally omitted when CloudWatch
+is not selected as a service for the connection, or when DynamoDB uses a local/custom endpoint such
+as DynamoDB Local or LocalStack. In that case, `DYNAMODB_MONITORING_COLLECTION_SKIPPED` appears as
+an information diagnostic. This expected skip does not by itself make `collection.status` partial
+and does not indicate a missing IAM permission.
 
 Where a metric uses `{ value, estimated, source, unit }`, use `source` and `estimated` to judge how
 strong the evidence is. Also treat the JSON as potentially sensitive: RDB SQL/DDL and DynamoDB
@@ -186,8 +194,8 @@ evidence instead:
 | --- | --- |
 | Estimated/actual execution plan | Static access-path classification (`Query` vs. `Scan`), decided from the statement's key condition against the table/index key schema |
 | Estimated/actual row counts | `Count`/`ScannedCount` from a native `Query`/`Scan` observation (PartiQL has no `ScannedCount`) |
-| Optimizer statistics | Capacity mode, key/index definitions, recent CloudWatch time series |
-| Table maintenance signals (bloat, fragmentation, ...) | Consumed Capacity, throttling reasons, Contributor Insights status |
+| Optimizer statistics | Capacity mode, key/index definitions, and recent CloudWatch time series when monitoring collection is enabled |
+| Table maintenance signals (bloat, fragmentation, ...) | Consumed Capacity and, when monitoring collection is enabled, throttling reasons and Contributor Insights status |
 | `Run Explain Analyze` | `Run Observed Read` — a single, user-confirmed request, capped at 100 items |
 
 A PartiQL `SELECT` is guaranteed to run as a `Query` only when its `WHERE`/key condition includes
@@ -232,8 +240,18 @@ the execution plan:
   status, and every LSI/GSI's own key schema and projection.
 - **Observed request** — empty until a read has actually been observed (7.4), or carries over
   evidence from a matching SQL History execution.
-- **CloudWatch window metrics** — the last hour's Consumed Capacity/throttle time series for the
-  table/index/operation. This is *table-wide*, not scoped to this one statement — see 7.6.
+- **CloudWatch window metrics** — when monitoring collection is enabled, the last hour's Consumed
+  Capacity/throttle time series for the table/index/operation. This is *table-wide*, not scoped to
+  this one statement — see 7.6.
+
+CloudWatch metrics and Contributor Insights status are collected only when **CloudWatch is selected
+as a service for the connection and the connection uses the real AWS endpoint**. If CloudWatch is
+not selected, or the connection uses DynamoDB Local, LocalStack, or another custom endpoint, those
+requests are not sent. The preview reports **CloudWatch monitoring not collected** under
+**Information**; it does not add a **Collection issues** warning, make the collection `partial`, or
+suggest an IAM permission change solely because of this expected skip. On a real AWS connection
+with CloudWatch selected, an actual collection failure continues to appear under **Collection
+issues** with the relevant action and technical details.
 
 ### 7.4. Run Observed Read
 
@@ -253,12 +271,16 @@ run, never as a pre-flight guess.
 DynamoDB-specific prompt: it distinguishes the static access-path classification from a one-off
 observed read from CloudWatch's table-wide ambient activity, and never suggests a `CREATE INDEX`
 statement (DynamoDB has none) or treats a narrower projection as a Read Capacity saving.
+When monitoring was intentionally skipped because of the connection configuration or endpoint, the
+AI treats that as the expected analysis scope rather than a collection failure or IAM problem.
 
 `Save as Notebook` (6 above) also works the same way, with a DynamoDB-shaped report: overview and
-target statement, a statement-specific query-flow diagram, performance snapshot, collection issues, access
-pattern, table/index definition, observed request, CloudWatch metrics, the AI analysis, an appendix
-of the full CloudWatch datapoints behind the summarized table, and the full context/AI request/AI
-analysis JSON.
+target statement, a statement-specific query-flow diagram, performance snapshot, collection issues,
+access pattern, table/index definition, observed request, available CloudWatch metrics, the AI
+analysis, an appendix of the collected CloudWatch datapoints, and the full context/AI request/AI
+analysis JSON. When monitoring collection is outside the connection's configured scope, the
+CloudWatch section and raw-metrics appendix remain in the notebook and state that metrics or
+datapoints were not collected.
 
 ### 7.6. Constraints to keep in mind
 
@@ -268,8 +290,8 @@ These hold regardless of what the AI analysis suggests:
   charges for the size of the items it reads, not what's returned afterward.
 - A post-read filter doesn't add Capacity on top of a read — the items it filters out were already
   read and charged before the filter ran.
-- CloudWatch metrics are table/index/operation-scoped, aggregated over the whole collection window
-  — never evidence about this one statement alone.
+- When collected, CloudWatch metrics are table/index/operation-scoped, aggregated over the whole
+  collection window — never evidence about this one statement alone.
 - `Table and index definition`'s item count and table size are AWS-reported approximations, updated
   roughly every six hours — never treat them as an exact count.
 - A hot partition is never assumed from general throttling alone — only from a key-range-specific
