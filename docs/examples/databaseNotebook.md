@@ -10,6 +10,7 @@ This page shows an example of the use of the VS code extension "Database Noteboo
 - 2. [Controlling the Database with Javascript](#2-controlling-the-database-with-javascript)
   - 2.1. [Inserting parent and child records in the same transaction](#21-inserting-parent-and-child-records-in-the-same-transaction)
 - 3. [Multi-language flow: SQL → JavaScript → Markdown](#3-multi-language-flow-sql--javascript--markdown)
+- 4. [DynamoDB Query Result](#4-dynamodb-query-result)
 
 ## 1. Query examples
 
@@ -210,3 +211,40 @@ Cell[3] (Javascript cell)
 ```text
 Average age of 3 customers: 20.0
 ```
+
+## 4. DynamoDB Query Result
+
+A DynamoDB PartiQL `SELECT` (Notebook cell) or a native `Query` (Dynamo Query Panel) shows a
+different `[Query Result]` line than the RDB examples above — item-based wording instead of
+`rows in set`, and only the fields DynamoDB actually reported. (The Panel currently drives only
+native `Query`, which requires a partition key condition.)
+
+```text
+[Query Result] 38 items returned • 90 ms • Capacity not reported
+```
+
+```text
+[Query Result] 25 returned / 100 evaluated • 42 ms • 1.5 RCU • 25% pass
+```
+
+A few things about this line are easy to misread:
+
+- **`requests`, when shown, is not how many times you ran the statement.** It's how many DynamoDB
+  API responses the driver fetched *within that one execution* — a single large `SELECT` can span
+  multiple responses (the result exceeds the 1 MB per-response limit) that are fetched and merged
+  automatically.
+- **PartiQL never reports an evaluated-item count.** `ExecuteStatement` (what PartiQL runs as) has
+  no `ScannedCount` in its response, so a PartiQL result only ever shows the returned count
+  (`N items returned`), never a `returned / evaluated` split.
+- **A native `Query` can report both.** When it does, the line shows
+  `returned / evaluated` plus the filter pass rate (`returned ÷ evaluated`) — useful for seeing how
+  much of what DynamoDB read was actually discarded by a `Filter`.
+- **`Capacity not reported` does not mean zero Capacity was consumed.** It means DynamoDB (or a
+  compatible endpoint, e.g. DynamoDB Local) didn't return Consumed Capacity for that request at
+  all. An explicit `0 RCU`/`0 WCU`/`0 CU` — a real, reported zero — is shown differently and is not
+  confused with this case.
+- **`Result limited; additional items exist` means the result you're looking at is not the full
+  result.** It appears whenever the driver stopped with more data still available (most commonly a
+  `LIMIT` cutting off before DynamoDB ran out of items) — there's no "fetch next page" action in the
+  Notebook today, so this is a signal to add/raise a `LIMIT` or narrow the key condition rather than
+  an indication anything went wrong.
