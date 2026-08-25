@@ -196,7 +196,7 @@ evidence instead:
 | Estimated/actual row counts | `Count`/`ScannedCount` from a native `Query`/`Scan` observation (PartiQL has no `ScannedCount`) |
 | Optimizer statistics | Capacity mode, key/index definitions, and recent CloudWatch time series when monitoring collection is enabled |
 | Table maintenance signals (bloat, fragmentation, ...) | Consumed Capacity and, when monitoring collection is enabled, throttling reasons and Contributor Insights status |
-| `Run Explain Analyze` | `Run Observed Read` — a single, user-confirmed request, capped at 100 items |
+| `Run Explain Analyze` | `Run Observed Read` — a single, user-confirmed request, capped at 100 evaluated items |
 
 A PartiQL `SELECT` is guaranteed to run as a `Query` only when its `WHERE`/key condition includes
 an equality (or `IN`) test on the target table's or index's partition key. Anything else is a full
@@ -255,10 +255,13 @@ issues** with the relevant action and technical details.
 
 ### 7.4. Run Observed Read
 
-`Run Observed Read` sends the statement once for real — a single response, capped at 100 items —
-to measure its actual Consumed Capacity, returned/scanned item counts, and (for a native `Query`)
-filter pass rate. Like `Run Explain Analyze`, this is real I/O against the database, so read the
-confirmation dialog before continuing.
+`Run Observed Read` sends the statement once for real — the first response only, capped at 100
+evaluated items — to measure its actual Consumed Capacity, returned/scanned item counts, and (for a
+native `Query`) filter pass rate. A response can return zero matching items and still include a
+continuation marker when unevaluated items may remain; later pages are not fetched and are not
+guaranteed to contain a match. Running the observation again starts over from the beginning rather
+than continuing from that marker. Like `Run Explain Analyze`, this is real I/O against the database,
+so read the confirmation dialog before continuing.
 
 The button is disabled, with a reason shown next to it, whenever the statement isn't eligible: a
 PartiQL statement with an unresolved `?` placeholder (7.2), or when this connection's IAM policy

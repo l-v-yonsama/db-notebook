@@ -4,7 +4,7 @@ import { buildDynamoDbObservedReadNotice } from "../../webview-ui/src/utilities/
 describe("buildDynamoDbObservedReadNotice", () => {
   it("実測前は実データを読む安全警告を表示する", () => {
     expect(buildDynamoDbObservedReadNotice(undefined)).toBe(
-      '"Run Observed Read" reads real items from the table above (a single response, up to 100 items), instead of only classifying the statement statically.',
+      '"Run Observed Read" reads and evaluates real items from the table above (first response only, up to 100 items evaluated), instead of only classifying the statement statically.',
     );
   });
 
@@ -17,7 +17,20 @@ describe("buildDynamoDbObservedReadNotice", () => {
         bounded: true,
       }),
     ).toBe(
-      '"Run Observed Read" completed: 70 items returned (single bounded response; more pages available). Running it again will read real items from the table again.',
+      '"Run Observed Read" completed: 70 items returned (single bounded response). DynamoDB returned a continuation marker, so unevaluated items may remain; later pages may or may not contain matches. Running it again starts a new observed read from the beginning and reads real items again.',
+    );
+  });
+
+  it("0件でも継続可能な場合は後続範囲の一致を保証しない", () => {
+    expect(
+      buildDynamoDbObservedReadNotice({
+        source: "observedRead",
+        returnedItemCount: 0,
+        hasMorePages: true,
+        bounded: true,
+      }),
+    ).toBe(
+      '"Run Observed Read" completed: 0 items returned (single bounded response). DynamoDB returned a continuation marker, so unevaluated items may remain; later pages may or may not contain matches. Running it again starts a new observed read from the beginning and reads real items again.',
     );
   });
 
@@ -29,7 +42,7 @@ describe("buildDynamoDbObservedReadNotice", () => {
         bounded: false,
       }),
     ).toBe(
-      "Observed read evidence is already available: 1 item returned. Running it again will read real items from the table again.",
+      "Observed read evidence is already available: 1 item returned. Running Run Observed Read starts a new read from the beginning and reads real items.",
     );
   });
 });

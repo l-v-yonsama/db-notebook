@@ -1,7 +1,7 @@
 import type { DynamoDbReadObservation } from "@l-v-yonsama/multi-platform-database-drivers";
 
 const RUN_WARNING =
-  '"Run Observed Read" reads real items from the table above (a single response, up to 100 items), instead of only classifying the statement statically.';
+  '"Run Observed Read" reads and evaluates real items from the table above (first response only, up to 100 items evaluated), instead of only classifying the statement statically.';
 
 export function buildDynamoDbObservedReadNotice(
   observation: DynamoDbReadObservation | undefined,
@@ -21,10 +21,13 @@ export function buildDynamoDbObservedReadNotice(
   if (observation.bounded) {
     qualifiers.push("single bounded response");
   }
-  if (observation.hasMorePages) {
-    qualifiers.push("more pages available");
-  }
   const qualifierSummary = qualifiers.length > 0 ? ` (${qualifiers.join("; ")})` : "";
+  const continuationSummary = observation.hasMorePages
+    ? " DynamoDB returned a continuation marker, so unevaluated items may remain; later pages may or may not contain matches."
+    : "";
+  const rerunSummary = observation.source === "observedRead"
+    ? " Running it again starts a new observed read from the beginning and reads real items again."
+    : " Running Run Observed Read starts a new read from the beginning and reads real items.";
 
-  return `${prefix}${itemSummary}${qualifierSummary}. Running it again will read real items from the table again.`;
+  return `${prefix}${itemSummary}${qualifierSummary}.${continuationSummary}${rerunSummary}`;
 }
