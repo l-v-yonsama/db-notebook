@@ -13,6 +13,7 @@ import type {
   RelationalPerformanceTuningInitializeViewModel,
 } from "@/utilities/vscode";
 import { vscode } from "@/utilities/vscode";
+import { buildDynamoDbObservedReadNotice } from "@/utilities/dynamoDbObservedReadNotice";
 import { computed, ref } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
@@ -88,12 +89,17 @@ const actualPlanButtonTitle = computed(() => {
 });
 
 const observationEligibility = computed(() => dynamodb.value?.context.statement.observationEligibility);
+const observedReadNotice = computed(() =>
+  buildDynamoDbObservedReadNotice(dynamodb.value?.context.observation)
+);
 const observedReadButtonTitle = computed(() => {
   if (observationEligibility.value?.allowed === false) {
     return observationEligibility.value.reason ?? "This statement is not eligible for Run Observed Read.";
   }
   return dynamodb.value?.observedReadCapability.available
-    ? "Read real items to measure this statement's actual Consumed Capacity and result shape (real query execution - see the note below)"
+    ? dynamodb.value.context.observation
+      ? "Run another real read to refresh the observed measurements (real query execution - see the note below)"
+      : "Read real items to measure this statement's actual Consumed Capacity and result shape (real query execution - see the note below)"
     : (dynamodb.value?.observedReadCapability.message ?? "Not available for this connection");
 });
 
@@ -294,8 +300,7 @@ defineExpose({
       </p>
       <p v-else-if="dynamodb?.observedReadCapability.available" class="section-note actual-plan-warning">
         <fa icon="triangle-exclamation" />
-        "Run Observed Read" reads real items from the table above (a single response, up to 100 items),
-        instead of only classifying the statement statically.
+        {{ observedReadNotice }}
       </p>
     </template>
 

@@ -113,6 +113,11 @@ also specifies the response language.
 After an AI analysis succeeds, select `Save as Notebook` to create a DBN under
 `reports/performance-tuning/` in the workspace.
 
+The DBN starts with a linked table of contents and uses stable chapter numbers. For a quick review,
+start with **4. Summary and recommendations**, then follow its evidence references into the later
+chapters. If collection was partial, the first cell also directs you to **3. Collection status**
+before relying on the summary.
+
 The saved DBN includes:
 
 - The SQL statement and performance snapshot.
@@ -219,6 +224,10 @@ the execution plan:
   context was shortened to fit the size limit.
 - **Access pattern** — the resolved operation, partition/sort key condition, any post-read filter,
   projection, consistency, and (for a native `Query`) limit/scan direction.
+- **Query flow** — a statement-specific Mermaid funnel showing the target and key access. When one
+  read has been observed, its evaluated/returned item counts, filter pass rate, Consumed Capacity,
+  client time, and bounded status are added to the flow. The table's approximate item count is
+  labeled separately so it is not mistaken for a count from that one request.
 - **Table and index definition** — key schema, Capacity mode, approximate item count/size, TTL
   status, and every LSI/GSI's own key schema and projection.
 - **Observed request** — empty until a read has actually been observed (7.4), or carries over
@@ -246,7 +255,7 @@ observed read from CloudWatch's table-wide ambient activity, and never suggests 
 statement (DynamoDB has none) or treats a narrower projection as a Read Capacity saving.
 
 `Save as Notebook` (6 above) also works the same way, with a DynamoDB-shaped report: overview and
-target statement, a static query-flow diagram, performance snapshot, collection issues, access
+target statement, a statement-specific query-flow diagram, performance snapshot, collection issues, access
 pattern, table/index definition, observed request, CloudWatch metrics, the AI analysis, an appendix
 of the full CloudWatch datapoints behind the summarized table, and the full context/AI request/AI
 analysis JSON.

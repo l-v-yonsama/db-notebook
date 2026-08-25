@@ -146,6 +146,39 @@ describe("createHtmlFromHarItem", () => {
 });
 
 describe("createHtmlFromNotebook", () => {
+  it("DBN専用の目次セルをHTMLの目次と本文には重複出力しない", async () => {
+    const targetPath = tmpHtmlPath();
+    const dbnTocCell = {
+      document: {
+        languageId: "markdown",
+        getText: () => "# Performance Tuning AI Analysis\n\n## Table of contents",
+      },
+      metadata: { excludeFromHtml: true },
+      outputs: [],
+    };
+    const overviewCell = {
+      document: {
+        languageId: "markdown",
+        getText: () => "## 1. Overview",
+      },
+      metadata: {},
+      outputs: [],
+    };
+    const notebook = {
+      getCells: () => [dbnTocCell, overviewCell],
+    };
+
+    const err = await createHtmlFromNotebook(notebook as never, targetPath);
+    expect(err).toBe("");
+
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).not.toContain("Performance Tuning AI Analysis");
+    expect(html).not.toContain("Table of contents");
+    expect(html).toContain("1. Overview");
+    expect(html).toContain('var numOfContents = 1;');
+    expect(html).not.toContain('href="#cell2"');
+  });
+
   it("renders a labeled JSON cell as plain text in both the TOC and its heading", async () => {
     const targetPath = tmpHtmlPath();
     const jsonCell = {

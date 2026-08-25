@@ -93,34 +93,47 @@ function findJsonCell(cells: BuiltCell[], label: string): BuiltCell {
 }
 
 describe("buildDynamoDbAiAnalysisNotebookCells", () => {
-  it("builds overview/query-flow, snapshot, access pattern, table definition, observed request, CloudWatch, analysis, and the three reproducibility JSON cells (no collection issues/information/raw metrics for the default fixture)", () => {
+  it("builds a numbered, TOC-first report with summary chapter 4, detailed evidence, appendices, and JSON cells", () => {
     const cells = buildDynamoDbAiAnalysisNotebookCells(buildContext(), buildAnalysis());
 
-    expect(cells).toHaveLength(11);
+    expect(cells).toHaveLength(16);
     expect(cells[0].kind).toBe(NotebookCellKind.Markup);
-    expect(cells[0].value).toContain("SELECT * FROM orders WHERE pk = 'tenant#42'");
-    expect(cells[0].value).toContain("## Query flow");
-    expect(cells[0].value).toContain("```mermaid");
-    expect(cells[0].value).toContain("Partition/Sort key condition");
+    expect(cells[0].metadata).toEqual({ excludeFromHtml: true });
+    expect(cells[0].value).toContain("## Table of contents");
+    expect(cells[0].value).toContain("[4. Summary and recommendations](#4-summary-and-recommendations)");
+    expect(cells[1].value).toContain("## 1. Overview");
+    expect(cells[2].value).toContain("## 2. Target request");
+    expect(cells[2].value).toContain("SELECT * FROM orders WHERE pk = 'tenant#42'");
+    expect(cells[3].value).toContain("## 3. Collection status");
 
-    expect(cells[1].value).toContain("## Performance snapshot");
-    expect(cells[2].value).toContain("## Access pattern");
-    expect(cells[3].value).toContain("## Table and index definition");
-    expect(cells[4].value).toContain("## Observed request");
-    expect(cells[4].value).toContain("No read has been observed for this exact statement yet.");
-    expect(cells[5].value).toContain("## CloudWatch metrics");
-    expect(cells[5].value).toContain("CloudWatch metrics were not collected.");
+    expect(cells[4].value).toContain("## 4. Summary and recommendations");
+    expect(cells[4].value).toContain("### 4.1. Performance snapshot");
+    expect(cells[4].value).toContain("### 4.2. AI summary");
+    expect(cells[5].value).toContain("## 5. Query flow");
+    expect(cells[5].value).toContain("```mermaid");
+    expect(cells[5].value).toContain('Request["Step 1: Request<br/>PartiQL SELECT"]');
+    expect(cells[5].value).toContain('Result["Step 5: Result');
+    expect(cells[5].value).not.toMatch(/\["\d+\.\s/);
+    expect(cells[5].value).toContain("PK pk =");
+    expect(cells[5].value).toContain("Evaluation not measured");
+    expect(cells[6].value).toContain("## 6. Access pattern");
+    expect(cells[7].value).toContain("## 7. Observed measurements");
+    expect(cells[7].value).toContain("No read has been observed for this exact statement yet.");
+    expect(cells[8].value).toContain("## 8. Table and index information");
+    expect(cells[9].value).toContain("## 9. CloudWatch metrics");
+    expect(cells[9].value).toContain("CloudWatch metrics were not collected.");
+    expect(cells[10].value).toContain("## 10. Additional information");
+    expect(cells[11].value).toContain("## Appendix A. Raw CloudWatch metrics");
 
-    expect(cells[6].value).toContain("### Findings");
-    expect(cells[6].value).toContain("Full table scan");
+    expect(cells[4].value).toContain("### 4.3. Findings");
+    expect(cells[4].value).toContain("Full table scan");
 
-    expect(cells[7].value).toContain("Full context JSON");
-    expect(cells[7].value).toContain("AI request messages");
-    expect(cells[7].value).toContain("AI analysis JSON");
+    expect(cells[12].value).toContain("## Appendix B. Raw data");
+    expect(cells[12].value).toContain("Full context JSON");
 
-    expect(cells[8].kind).toBe(NotebookCellKind.Code);
-    expect(cells[8].metadata).toEqual({ cellLabel: "Full context JSON" });
-    expect(JSON.parse(cells[8].value)).toMatchObject({ service: { tableName: "orders" } });
+    expect(cells[13].kind).toBe(NotebookCellKind.Code);
+    expect(cells[13].metadata).toEqual({ cellLabel: "Full context JSON" });
+    expect(JSON.parse(cells[13].value)).toMatchObject({ service: { tableName: "orders" } });
   });
 
   it("shows a native-Query summary instead of a SQL fence when statement.text is absent", () => {
@@ -136,11 +149,11 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis(),
     );
-    expect(cells[0].value).not.toContain("```sql");
-    expect(cells[0].value).toContain("Native Query on orders (index iCountry)");
+    expect(cells[2].value).not.toContain("```sql");
+    expect(cells[2].value).toContain("Native Query on orders (index iCountry)");
   });
 
-  it("places Collection issues before Access pattern, and Information right before the AI analysis", () => {
+  it("places collection status before chapter 4 and additional information after the evidence chapters", () => {
     const cells = buildDynamoDbAiAnalysisNotebookCells(
       buildContext({
         collection: {
@@ -164,16 +177,16 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
       buildAnalysis(),
     );
     const values = cells.map((c) => c.value);
-    const overviewIndex = values.findIndex((v) => v.includes("# DynamoDB Performance Tuning AI Analysis"));
-    const issuesIndex = values.findIndex((v) => v.includes("## Collection issues"));
-    const accessPatternIndex = values.findIndex((v) => v.includes("## Access pattern"));
-    const informationIndex = values.findIndex((v) => v.includes("## Information"));
-    const analysisIndex = values.findIndex((v) => v.includes("### Findings"));
+    const overviewIndex = values.findIndex((v) => v.includes("## 1. Overview"));
+    const issuesIndex = values.findIndex((v) => v.includes("## 3. Collection status"));
+    const summaryIndex = values.findIndex((v) => v.includes("## 4. Summary and recommendations"));
+    const accessPatternIndex = values.findIndex((v) => v.includes("## 6. Access pattern"));
+    const informationIndex = values.findIndex((v) => v.includes("## 10. Additional information"));
 
     expect(issuesIndex).toBeGreaterThan(overviewIndex);
-    expect(accessPatternIndex).toBeGreaterThan(issuesIndex);
+    expect(summaryIndex).toBeGreaterThan(issuesIndex);
+    expect(accessPatternIndex).toBeGreaterThan(summaryIndex);
     expect(informationIndex).toBeGreaterThan(accessPatternIndex);
-    expect(analysisIndex).toBeGreaterThan(informationIndex);
     expect(values[issuesIndex]).toContain("CloudWatch metrics unavailable");
     expect(values[informationIndex]).toContain("Table metadata is approximate");
   });
@@ -193,15 +206,62 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis(),
     );
-    const observedCell = findCell(cells, "## Observed request");
+    const observedCell = findCell(cells, "## 7. Observed measurements");
     expect(observedCell.value).toContain("| Returned items | 3 |");
     expect(observedCell.value).toContain("1.5 total");
     expect(observedCell.value).toContain("Limited to a single API response");
+    const flowCell = findCell(cells, "## 5. Query flow");
+    expect(flowCell.value).toContain("Evaluated count unavailable in PartiQL");
+    expect(flowCell.value).toContain("3 returned");
+    expect(flowCell.value).toContain("Consumed Capacity: 1.5 total / 1.5 read CU");
   });
 
-  it("adds an 'Appendix: Raw metrics' cell only when CloudWatch series were actually collected", () => {
+  it("renders a native Query funnel with approximate table size and same-observation evaluated/returned metrics", () => {
+    const base = buildContext();
+    const cells = buildDynamoDbAiAnalysisNotebookCells(
+      buildContext({
+        statement: {
+          ...base.statement,
+          language: "dynamodb-query",
+          text: undefined,
+          source: "dynamoQueryPanel",
+          kind: "query",
+        },
+        accessPattern: {
+          ...base.accessPattern,
+          operation: "Query",
+          postReadFilter: { present: true, attributes: ["status"] },
+        },
+        table: {
+          ...base.table,
+          itemCount: { value: 3000, estimated: true, source: "DescribeTable.ItemCount" },
+        },
+        observation: {
+          source: "observedRead",
+          returnedItemCount: 25,
+          scannedItemCount: 100,
+          filterPassRate: 0.25,
+          consumedCapacity: { capacityUnits: 1.5, readCapacityUnits: 1.5 },
+          clientElapsedTimeMs: 42,
+          bounded: true,
+        },
+      }),
+      buildAnalysis(),
+    );
+
+    const flow = findCell(cells, "## 5. Query flow").value;
+    expect(flow).toContain("Approx. 3,000 items (AWS estimate)");
+    expect(flow).toContain("100 evaluated");
+    expect(flow).toContain("25 returned (25.00% pass)");
+    expect(flow).toContain("Client time: 42 ms");
+    expect(flow).toContain("Single bounded response");
+  });
+
+  it("keeps Appendix A stable and fills it with raw datapoints when CloudWatch series exist", () => {
     const withoutSeries = buildDynamoDbAiAnalysisNotebookCells(buildContext(), buildAnalysis());
-    expect(withoutSeries.some((c) => c.value.includes("## Appendix: Raw metrics"))).toBe(false);
+    expect(findCell(withoutSeries, "## Appendix A. Raw CloudWatch metrics").value).toContain(
+      "No raw CloudWatch datapoints were collected",
+    );
 
     const withSeries = buildDynamoDbAiAnalysisNotebookCells(
       buildContext({
@@ -222,12 +282,12 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
       }),
       buildAnalysis(),
     );
-    const appendixCell = findCell(withSeries, "## Appendix: Raw metrics");
+    const appendixCell = findCell(withSeries, "## Appendix A. Raw CloudWatch metrics");
     expect(appendixCell.value).toContain("ConsumedReadCapacityUnits");
     expect(appendixCell.value).toContain("| t0 | 1 |");
     expect(appendixCell.value).toContain("| t1 | 2 |");
 
-    const cloudWatchCell = findCell(withSeries, "## CloudWatch metrics");
+    const cloudWatchCell = findCell(withSeries, "## 9. CloudWatch metrics");
     expect(cloudWatchCell.value).toContain("| ConsumedReadCapacityUnits |");
   });
 

@@ -33,6 +33,9 @@ export type SubscribeParams = {
 export type CellMeta = {
   markAsSkip?: boolean;
   markAsRunInOrderAtJsonCell?: boolean;
+  // Used by report-only navigation cells that improve the DBN reading
+  // experience but would duplicate navigation already provided by HTML.
+  excludeFromHtml?: boolean;
   connectionName?: string;
   showComment?: boolean;
   // Short, user-set label for a non-markup cell whose content isn't

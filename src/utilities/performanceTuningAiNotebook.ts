@@ -12,6 +12,7 @@ import type {
 } from "../shared/PerformanceTuningAiAnalysis";
 import { actualExecutionEvidenceSource, hasActualExecutionEvidence } from "../shared/PerformanceTuningActualEvidence";
 import type { PerformanceTuningHumanSummary } from "../shared/PerformanceTuningHumanSummary";
+import type { CellMeta } from "../types/Notebook";
 import { createDirectory, existsUri } from "./fsUtil";
 import { buildAiAnalysisPrompt } from "./performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "./performanceTuningDiagnosticFormatter";
@@ -44,8 +45,12 @@ export function buildAiAnalysisNotebookFilename(databaseName: string, now: Date 
 // PerformanceTuningAiEvidenceRef/PerformanceTuningDiagnosticGroupViewModel
 // are already shared types), so dynamoDbPerformanceTuningNotebook.ts reuses
 // them directly rather than duplicating them.
-export function markupCell(value: string): NotebookCellData {
-  return new NotebookCellData(NotebookCellKind.Markup, value, "markdown");
+export function markupCell(value: string, metadata?: CellMeta): NotebookCellData {
+  const cell = new NotebookCellData(NotebookCellKind.Markup, value, "markdown");
+  if (metadata) {
+    cell.metadata = metadata;
+  }
+  return cell;
 }
 
 // cellLabel (CellLabelProvider in statusBarProviders.ts) is what keeps these
@@ -55,6 +60,40 @@ export function jsonCodeCell(value: string, cellLabel: string): NotebookCellData
   const cell = new NotebookCellData(NotebookCellKind.Code, value, "json");
   cell.metadata = { cellLabel };
   return cell;
+}
+
+export type NotebookTocEntry = {
+  label: string;
+  anchor: string;
+};
+
+/**
+ * Creates the first, beginner-oriented navigation cell used by both RDB and
+ * DynamoDB tuning notebooks.  The explicit anchors match VS Code's standard
+ * Markdown heading anchors, while the visible numbers remain useful even in
+ * a renderer that does not support cross-cell navigation.
+ */
+export function buildNotebookTocMarkdown(
+  title: string,
+  entries: NotebookTocEntry[],
+  collectionStatus: "complete" | "partial",
+): string {
+  const lines = [
+    `# ${title}`,
+    "",
+    "## Table of contents",
+    "",
+    ...entries.map((entry) => `- [${entry.label}](#${entry.anchor})`),
+    "",
+    "**Recommended starting point:** Read **4. Summary and recommendations** first, then use the later chapters to verify the supporting evidence.",
+  ];
+  if (collectionStatus === "partial") {
+    lines.push(
+      "",
+      "> ⚠️ Some evidence could not be collected. Read **3. Collection status** before relying on the summary.",
+    );
+  }
+  return lines.join("\n");
 }
 
 export function evidenceLine(evidence: PerformanceTuningAiEvidenceRef | undefined): string {
@@ -117,7 +156,11 @@ function buildOverviewMarkdown(
   analysis: PerformanceTuningAiAnalysisResult
 ): string {
   const lines: string[] = [];
-  lines.push("# Performance Tuning AI Analysis");
+  lines.push("## 1. Overview");
+  lines.push("");
+  lines.push(
+    `_This report analyzes one SQL statement against ${escapeMdCell(context.database.vendor)} and keeps the detailed evidence after the summary for verification._`,
+  );
   lines.push("");
   lines.push("| Item | Detail |");
   lines.push("|---|---|");
@@ -138,18 +181,16 @@ function buildOverviewMarkdown(
   );
   lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
   lines.push(`| Confidence | ${analysis.confidence} |`);
-  lines.push("");
-  lines.push("## Target SQL");
-  lines.push("");
-  lines.push("```sql");
-  lines.push(context.statement.sql);
-  lines.push("```");
   return lines.join("\n");
+}
+
+function buildTargetSqlMarkdown(context: PerformanceTuningContext): string {
+  return ["## 2. Target SQL", "", "```sql", context.statement.sql, "```"].join("\n");
 }
 
 export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHumanSummary): string {
   const lines = [
-    "## Performance snapshot",
+    "### 4.1. Performance snapshot",
     "",
     "_Deterministic summaries of collected database facts; these are separate from the AI analysis._",
     "",
@@ -163,7 +204,7 @@ export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHuman
   }
 
   lines.push(
-    "### Observed signals",
+    "#### 4.1.1. Observed signals",
     "",
     "| Level | Signal | Table | Observation | Raw data |",
     "|---|---|---|---|---|",
@@ -177,7 +218,7 @@ export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHuman
   if (summary.rowFlows.length > 0) {
     lines.push(
       "",
-      "### Table row flow",
+      "#### 4.1.2. Table row flow",
       "",
       "| Table | Table rows | Accessed | Local filter output | Plan output | Access fraction | Filter pass rate | Raw data |",
       "|---|---|---|---|---|---|---|---|",
@@ -192,13 +233,17 @@ export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHuman
   return lines.join("\n");
 }
 
-function buildQueryStructureMarkdown(context: PerformanceTuningContext): string | undefined {
+function buildQueryStructureMarkdown(context: PerformanceTuningContext): string {
   const diagram = createPerformanceQueryDiagram(context);
   if (!diagram) {
-    return undefined;
+    return [
+      "## 5. Query structure",
+      "",
+      "_No query structure diagram could be built from the collected table and predicate metadata._",
+    ].join("\n");
   }
   const lines = [
-    "## Query structure",
+    "## 5. Query structure",
     "",
     "_Only tables and columns relevant to this SQL are shown. Relationship lines are drawn only from unambiguous declared foreign keys._",
     "",
@@ -209,7 +254,7 @@ function buildQueryStructureMarkdown(context: PerformanceTuningContext): string 
   if (diagram.relevantIndexes.length > 0) {
     lines.push(
       "",
-      "### Indexes relevant to this SQL",
+      "### 5.1. Indexes relevant to this SQL",
       "",
       "| Table | Index | Key columns | Included columns | Query relevance |",
       "|---|---|---|---|---|",
@@ -227,7 +272,7 @@ function buildQueryStructureMarkdown(context: PerformanceTuningContext): string 
     });
   }
   if (diagram.warnings.length > 0) {
-    lines.push("", "### Diagram notes", "", ...diagram.warnings.map((warning) => `- ${warning}`));
+    lines.push("", "### 5.2. Diagram notes", "", ...diagram.warnings.map((warning) => `- ${warning}`));
   }
   return lines.join("\n");
 }
@@ -263,8 +308,8 @@ export function diagnosticGroupsMarkdown(
 }
 
 function buildDiagnosticSections(context: PerformanceTuningContext): {
-  collectionIssues?: string;
-  information?: string;
+  collectionIssues: string;
+  information: string;
 } {
   const groups = buildPerformanceTuningDiagnosticGroups(
     context.collection.diagnostics,
@@ -274,18 +319,28 @@ function buildDiagnosticSections(context: PerformanceTuningContext): {
   const information = groups.filter((group) => group.severity === "info");
 
   return {
-    collectionIssues: issues.length > 0
-      ? ["## Collection issues", "", ...diagnosticGroupsMarkdown(issues)].join("\n")
-      : undefined,
+    collectionIssues: [
+      "## 3. Collection status",
+      "",
+      `**Status:** ${context.collection.status}`,
+      "",
+      ...(issues.length > 0
+        ? diagnosticGroupsMarkdown(issues)
+        : ["_No collection issues were reported._"]),
+    ].join("\n"),
     information: information.length > 0
       ? [
-          "## Information",
+          "## 7. Additional information",
           "",
           "_The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed performance problem — see each item's technical details._",
           "",
           ...diagnosticGroupsMarkdown(information),
         ].join("\n")
-      : undefined,
+      : [
+          "## 7. Additional information",
+          "",
+          "_No additional execution-plan or collection information was reported._",
+        ].join("\n"),
   };
 }
 
@@ -332,15 +387,15 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
 // reuses it directly.
 export function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): string {
   const lines: string[] = [];
-  lines.push("## Summary");
+  lines.push("### 4.2. AI summary");
   lines.push("");
   lines.push(analysis.summary);
   lines.push("");
-  lines.push("### Findings");
+  lines.push("### 4.3. Findings");
   lines.push("");
   lines.push(...findingsTable(analysis.findings));
   lines.push("");
-  lines.push("### Recommendations");
+  lines.push("### 4.4. Recommendations");
   lines.push("");
   lines.push(...recommendationsTable(analysis.recommendations));
   lines.push("");
@@ -349,7 +404,7 @@ export function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResul
       `automatically and must be reviewed and run manually._`
   );
   lines.push("");
-  lines.push("### Missing context");
+  lines.push("### 4.5. Missing context");
   lines.push("");
   if (analysis.missingContext.length === 0) {
     lines.push("_None reported._");
@@ -389,7 +444,7 @@ function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRow
 // actualPlan is a third, independent piece of database-native runtime
 // evidence. It gets its own fenced block rather than being merged into the
 // normalized estimate tree or the table-mapping rows.
-function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string | undefined {
+function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string {
   const planTreeText = context.executionPlan.normalizedPlan
     ? formatPlanTree(context.executionPlan.normalizedPlan)
     : undefined;
@@ -398,15 +453,21 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
   const hasActualEvidence = hasActualExecutionEvidence(context);
   const actualEvidenceSource = actualExecutionEvidenceSource(context);
   if (!planTreeText && rows.length === 0 && !actualPlan) {
-    return undefined;
+    return [
+      "## 6. Execution plan",
+      "",
+      "_No execution plan or table-mapping evidence was collected._",
+    ].join("\n");
   }
 
-  const lines: string[] = ["## Execution plan", ""];
+  const lines: string[] = ["## 6. Execution plan", ""];
+  let subsection = 1;
+  const subsectionHeading = (title: string): string => `### 6.${subsection++}. ${title}`;
   if (actualPlan) {
     lines.push(
       `_Runtime evidence from ${actualPlan.source} is shown first. The estimated topology below is retained only for structured table/predicate metadata and comparison._`,
       "",
-      `### Actual execution plan (${actualPlan.source})`,
+      subsectionHeading(`Actual execution plan (${actualPlan.source})`),
       "",
       "```actual-plan",
       actualPlan.content,
@@ -417,10 +478,10 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
   if (planTreeText) {
     lines.push(
       actualPlan
-        ? "### Estimated plan topology"
+        ? subsectionHeading("Estimated plan topology")
         : hasActualEvidence
-          ? `### Actual execution plan (${actualEvidenceSource})`
-          : "### Execution plan topology",
+          ? subsectionHeading(`Actual execution plan (${actualEvidenceSource})`)
+          : subsectionHeading("Execution plan topology"),
       "",
       "```text",
       planTreeText,
@@ -429,7 +490,7 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
     );
   }
   if (rows.length > 0) {
-    lines.push("### Table metrics", "", ...planTableMappingsTable(rows), "");
+    lines.push(subsectionHeading("Table metrics"), "", ...planTableMappingsTable(rows), "");
   }
   return lines.join("\n");
 }
@@ -440,9 +501,9 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string |
 // itself top to bottom.
 // Exported (2026-08-24 follow-up) - generic text, mentions no RDB-specific
 // concept, so dynamoDbPerformanceTuningNotebook.ts reuses it directly.
-export function buildJsonAppendixMarkdown(): string {
+export function buildJsonAppendixMarkdown(appendixLabel = "Appendix A"): string {
   return [
-    "## Appendix: Raw data",
+    `## ${appendixLabel}. Raw data`,
     "",
     "The sections below are supplementary reference material, not part of the analysis itself: the exact " +
       "context sent to the AI (**Full context JSON**) and the AI's raw response (**AI analysis JSON**). They " +
@@ -481,38 +542,42 @@ export function buildAiAnalysisNotebookCells(
   context: PerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult
 ): NotebookCellData[] {
-  const cells: NotebookCellData[] = [
-    markupCell(buildOverviewMarkdown(context, analysis)),
-    markupCell(buildPerformanceSnapshotMarkdown(buildPerformanceTuningHumanSummary(context))),
+  const tocEntries: NotebookTocEntry[] = [
+    { label: "1. Overview", anchor: "1-overview" },
+    { label: "2. Target SQL", anchor: "2-target-sql" },
+    { label: "3. Collection status", anchor: "3-collection-status" },
+    { label: "4. Summary and recommendations", anchor: "4-summary-and-recommendations" },
+    { label: "5. Query structure", anchor: "5-query-structure" },
+    { label: "6. Execution plan", anchor: "6-execution-plan" },
+    { label: "7. Additional information", anchor: "7-additional-information" },
+    { label: "Appendix A. Raw data", anchor: "appendix-a-raw-data" },
   ];
-
   const diagnosticSections = buildDiagnosticSections(context);
-  if (diagnosticSections.collectionIssues) {
-    cells.push(markupCell(diagnosticSections.collectionIssues));
-  }
-  if (diagnosticSections.information) {
-    cells.push(markupCell(diagnosticSections.information));
-  }
-
-  const queryStructureMarkdown = buildQueryStructureMarkdown(context);
-  if (queryStructureMarkdown) {
-    cells.push(markupCell(queryStructureMarkdown));
-  }
-
-  // Evidence precedes the AI interpretation in both the Preview and saved
-  // report: SQL/snapshot/diagnostics → structure → execution plan → AI.
-  const executionPlanMarkdown = buildExecutionPlanMarkdown(context);
-  if (executionPlanMarkdown) {
-    cells.push(markupCell(executionPlanMarkdown));
-  }
-
-  cells.push(
-    markupCell(buildAnalysisMarkdown(analysis)),
+  const cells: NotebookCellData[] = [
+    markupCell(
+      buildNotebookTocMarkdown("Performance Tuning AI Analysis", tocEntries, context.collection.status),
+      { excludeFromHtml: true },
+    ),
+    markupCell(buildOverviewMarkdown(context, analysis)),
+    markupCell(buildTargetSqlMarkdown(context)),
+    markupCell(diagnosticSections.collectionIssues),
+    markupCell(
+      [
+        "## 4. Summary and recommendations",
+        "",
+        buildPerformanceSnapshotMarkdown(buildPerformanceTuningHumanSummary(context)),
+        "",
+        buildAnalysisMarkdown(analysis),
+      ].join("\n"),
+    ),
+    markupCell(buildQueryStructureMarkdown(context)),
+    markupCell(buildExecutionPlanMarkdown(context)),
+    markupCell(diagnosticSections.information),
     markupCell(buildJsonAppendixMarkdown()),
     jsonCodeCell(JSON.stringify(context, null, 2), "Full context JSON"),
     jsonCodeCell(buildAiRequestMessagesJson(context, analysis), "AI request messages"),
     jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON")
-  );
+  ];
   return cells;
 }
 

@@ -15,12 +15,14 @@ import {
   buildAiAnalysisNotebookFilename,
   buildAnalysisMarkdown,
   buildJsonAppendixMarkdown,
+  buildNotebookTocMarkdown,
   diagnosticGroupsMarkdown,
   escapeMdCell,
   evidenceLine,
   formatNumber,
   jsonCodeCell,
   markupCell,
+  type NotebookTocEntry,
   type SaveAiAnalysisAsNotebookResult,
 } from "./performanceTuningAiNotebook";
 
@@ -28,19 +30,112 @@ import {
 // Reuses that file's engine-agnostic helpers (NotebookCellData construction,
 // diagnostic-group/analysis markdown, the JSON appendix framing) rather than
 // duplicating them - see each import's origin for why it's safe to share.
-// Cell order matches §13 exactly: Overview/Target (+ the static query-flow
-// diagram, folded in here rather than its own cell since - unlike RDB's
-// per-query ER diagram - it is the same illustrative shape for every
-// DynamoDB statement) → Performance snapshot → Collection issues →
-// Access pattern → Table/index definition → Observed request → CloudWatch
-// metrics → AI Analysis → Appendix: Raw metrics → Full context JSON/AI
-// request messages/AI analysis JSON.
+// The saved report is intentionally conclusion-first for beginners: TOC →
+// overview/target/collection status → summary and recommendations → detailed
+// DynamoDB evidence → appendices.  Query flow is generated from this exact
+// Context rather than using a fixed illustrative diagram.
 
-const QUERY_FLOW_MERMAID = `flowchart LR
-  Request["PartiQL SELECT / Query"] --> Target["Table or Index"]
-  Target --> Key["Partition/Sort key condition"]
-  Key --> Filter["Post-read filter"]
-  Filter --> Result["Returned items"]`;
+function escapeMermaidText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function mermaidCard(title: string, details: string[]): string {
+  return [title, ...details].map(escapeMermaidText).join("<br/>");
+}
+
+function accessPathLabel(path: DynamoDbPerformanceTuningContext["accessPattern"]["accessPath"]): string {
+  switch (path) {
+    case "tableQuery":
+      return "Table Query";
+    case "indexQuery":
+      return "Index Query";
+    case "tableScan":
+      return "Full table Scan";
+    case "indexScan":
+      return "Full index Scan";
+    default:
+      return "Access path unresolved";
+  }
+}
+
+/** Builds a statement-specific, evidence-aware DynamoDB read funnel. */
+export function buildDynamoDbQueryFlowMermaid(context: DynamoDbPerformanceTuningContext): string {
+  const { accessPattern, observation, table } = context;
+  const requestKind = context.statement.language === "partiql" ? "PartiQL SELECT" : "Native Query";
+  const targetDetails = [context.service.indexName ? `${accessPattern.indexType ?? "Index"} target` : "Table target"];
+  if (table.itemCount?.value !== undefined) {
+    targetDetails.push(`Approx. ${formatNumber(table.itemCount.value)} items (AWS estimate)`);
+  }
+
+  const keyConditions: string[] = [];
+  if (accessPattern.partitionKey?.conditionPresent) {
+    keyConditions.push(
+      `PK ${accessPattern.partitionKey.attributeName} ${accessPattern.partitionKey.operator ?? "="}`,
+    );
+  } else {
+    keyConditions.push("No partition-key equality");
+  }
+  if (accessPattern.sortKey?.conditionPresent) {
+    keyConditions.push(`SK ${accessPattern.sortKey.attributeName} ${accessPattern.sortKey.operator ?? "condition"}`);
+  }
+
+  const filterDetails = accessPattern.postReadFilter.present
+    ? [
+        "Post-read filter",
+        accessPattern.postReadFilter.attributes.length > 0
+          ? accessPattern.postReadFilter.attributes.join(", ")
+          : "Attributes unresolved",
+      ]
+    : ["No post-read filter"];
+
+  const resultDetails: string[] = [
+    observation?.returnedItemCount !== undefined
+      ? `${formatNumber(observation.returnedItemCount)} items returned`
+      : "Returned items not measured",
+  ];
+  const capacity = observation?.consumedCapacity;
+  if (capacity) {
+    resultDetails.push(`Consumed Capacity: ${formatCapacity(capacity)} CU`);
+  }
+  if (observation?.clientElapsedTimeMs !== undefined) {
+    resultDetails.push(`Client time: ${formatNumber(observation.clientElapsedTimeMs)} ms`);
+  }
+  if (observation?.bounded) {
+    resultDetails.push("Single bounded response");
+  }
+
+  const evaluatedLabel = observation?.scannedItemCount !== undefined
+    ? `${formatNumber(observation.scannedItemCount)} evaluated`
+    : observation && context.statement.language === "partiql"
+      ? "Evaluated count unavailable in PartiQL"
+      : "Evaluation not measured";
+  const returnedLabel = observation?.returnedItemCount !== undefined
+    ? `${formatNumber(observation.returnedItemCount)} returned${
+        observation.filterPassRate !== undefined ? ` (${(observation.filterPassRate * 100).toFixed(2)}% pass)` : ""
+      }`
+    : "Return count not measured";
+
+  return [
+    "flowchart LR",
+    // Mermaid 11's HTML renderer treats a leading `1. ` as a Markdown
+    // ordered-list marker and replaces the whole node with "Unsupported
+    // markdown: list". Prefixing the number keeps the same visible sequence
+    // while remaining portable between VS Code's and the HTML renderer.
+    `  Request["${mermaidCard("Step 1: Request", [requestKind])}"]`,
+    `  Target["${mermaidCard(`Step 2: Target: ${targetRef(context)}`, targetDetails)}"]`,
+    `  Access["${mermaidCard("Step 3: Key access", [accessPathLabel(accessPattern.accessPath)])}"]`,
+    `  Filter["${mermaidCard("Step 4: Filter", filterDetails)}"]`,
+    `  Result["${mermaidCard("Step 5: Result", resultDetails)}"]`,
+    `  Request -->|"${escapeMermaidText(context.service.indexName ? "Index request" : "Table request")}"| Target`,
+    `  Target -->|"${escapeMermaidText(keyConditions.join(" · "))}"| Access`,
+    `  Access -->|"${escapeMermaidText(evaluatedLabel)}"| Filter`,
+    `  Filter -->|"${escapeMermaidText(returnedLabel)}"| Result`,
+  ].join("\n");
+}
 
 function formatCapacity(c: DynamoDbCapacityBreakdown): string {
   const parts: string[] = [];
@@ -69,7 +164,11 @@ function buildOverviewMarkdown(
   analysis: PerformanceTuningAiAnalysisResult,
 ): string {
   const lines: string[] = [];
-  lines.push("# DynamoDB Performance Tuning AI Analysis");
+  lines.push("## 1. Overview");
+  lines.push("");
+  lines.push(
+    "_This report analyzes one DynamoDB read and keeps the detailed access, observation, and CloudWatch evidence after the summary for verification._",
+  );
   lines.push("");
   lines.push("| Item | Detail |");
   lines.push("|---|---|");
@@ -85,28 +184,34 @@ function buildOverviewMarkdown(
   );
   lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
   lines.push(`| Confidence | ${analysis.confidence} |`);
-  lines.push("");
-  lines.push("## Target request");
-  lines.push("");
+  return lines.join("\n");
+}
+
+function buildTargetRequestMarkdown(context: DynamoDbPerformanceTuningContext): string {
+  const lines = ["## 2. Target request", ""];
   if (context.statement.text) {
     lines.push("```sql", context.statement.text, "```");
   } else {
     lines.push(`Native Query on ${escapeMdCell(targetRef(context))}. See Access pattern below for the resolved key condition/filter/projection.`);
   }
-  lines.push("");
-  lines.push("## Query flow");
-  lines.push("");
-  lines.push(
-    "_DynamoDB has no query optimizer or execution plan - unlike RDB, this is a fixed illustration of how every DynamoDB read is shaped, not a diagram specific to this statement. See Access pattern below for this statement's actual key condition/filter._",
-  );
-  lines.push("");
-  lines.push("```mermaid", QUERY_FLOW_MERMAID, "```");
   return lines.join("\n");
+}
+
+function buildQueryFlowMarkdown(context: DynamoDbPerformanceTuningContext): string {
+  return [
+    "## 5. Query flow",
+    "",
+    "_This is a statement-specific read flow, not an optimizer execution plan. Target item count is an AWS approximation; evaluated/returned counts, Capacity, and time come from one observation only._",
+    "",
+    "```mermaid",
+    buildDynamoDbQueryFlowMermaid(context),
+    "```",
+  ].join("\n");
 }
 
 export function buildDynamoDbPerformanceSnapshotMarkdown(summary: DynamoDbPerformanceTuningHumanSummary): string {
   const lines = [
-    "## Performance snapshot",
+    "### 4.1. Performance snapshot",
     "",
     "_Deterministic summaries of collected DynamoDB facts; these are separate from the AI analysis._",
     "",
@@ -114,7 +219,7 @@ export function buildDynamoDbPerformanceSnapshotMarkdown(summary: DynamoDbPerfor
     "|---|---|---|---|---|",
     `| ${summary.profile.operation} | ${summary.profile.accessPath}${summary.profile.confidence === "unknown" ? " (unresolved)" : ""} | ${escapeMdCell(summary.profile.targetRef)} | ${summary.profile.evidence} | ${summary.profile.collectionStatus} |`,
     "",
-    "### Observed signals",
+    "#### 4.1.1. Observed signals",
     "",
     "| Level | Signal | Observation | Raw data |",
     "|---|---|---|---|",
@@ -128,8 +233,8 @@ export function buildDynamoDbPerformanceSnapshotMarkdown(summary: DynamoDbPerfor
 }
 
 function buildDiagnosticSections(context: DynamoDbPerformanceTuningContext): {
-  collectionIssues?: string;
-  information?: string;
+  collectionIssues: string;
+  information: string;
 } {
   const groups = buildDynamoDbPerformanceTuningDiagnosticGroups(
     context.collection.diagnostics,
@@ -139,24 +244,34 @@ function buildDiagnosticSections(context: DynamoDbPerformanceTuningContext): {
   const information = groups.filter((group) => group.severity === "info");
 
   return {
-    collectionIssues: issues.length > 0
-      ? ["## Collection issues", "", ...diagnosticGroupsMarkdown(issues)].join("\n")
-      : undefined,
+    collectionIssues: [
+      "## 3. Collection status",
+      "",
+      `**Status:** ${context.collection.status}`,
+      "",
+      ...(issues.length > 0
+        ? diagnosticGroupsMarkdown(issues)
+        : ["_No collection issues were reported._"]),
+    ].join("\n"),
     information: information.length > 0
       ? [
-          "## Information",
+          "## 10. Additional information",
           "",
           "_The items below describe access-pattern/collection characteristics. On their own, they don't indicate a confirmed performance problem — see each item's technical details._",
           "",
           ...diagnosticGroupsMarkdown(information),
         ].join("\n")
-      : undefined,
+      : [
+          "## 10. Additional information",
+          "",
+          "_No additional access-pattern or collection information was reported._",
+        ].join("\n"),
   };
 }
 
 export function buildAccessPatternMarkdown(context: DynamoDbPerformanceTuningContext): string {
   const { accessPattern } = context;
-  const lines = ["## Access pattern", ""];
+  const lines = ["## 6. Access pattern", ""];
   if (accessPattern.confidence === "unknown") {
     lines.push(
       "_This statement's access path could not be safely classified. Treat the read cost as unknown._",
@@ -210,7 +325,7 @@ export function buildAccessPatternMarkdown(context: DynamoDbPerformanceTuningCon
 
 export function buildTableDefinitionMarkdown(context: DynamoDbPerformanceTuningContext): string {
   const { table } = context;
-  const lines = ["## Table and index definition", "", "| Field | Value |", "|---|---|"];
+  const lines = ["## 8. Table and index information", "", "| Field | Value |", "|---|---|"];
   lines.push(`| Billing mode | ${table.billingMode} |`);
   lines.push(
     `| Partition key | ${table.keySchema.partitionKey.attributeName} (${table.keySchema.partitionKey.attributeType}) |`,
@@ -232,7 +347,7 @@ export function buildTableDefinitionMarkdown(context: DynamoDbPerformanceTuningC
   if (allIndexes.length > 0) {
     lines.push(
       "",
-      "### Indexes",
+      "### 8.1. Indexes",
       "",
       "| Name | Type | Partition key | Sort key | Projection |",
       "|---|---|---|---|---|",
@@ -256,7 +371,7 @@ export function buildTableDefinitionMarkdown(context: DynamoDbPerformanceTuningC
 }
 
 export function buildObservedRequestMarkdown(context: DynamoDbPerformanceTuningContext): string {
-  const lines = ["## Observed request", ""];
+  const lines = ["## 7. Observed measurements", ""];
   const observation = context.observation;
   if (!observation) {
     lines.push("_No read has been observed for this exact statement yet._");
@@ -277,6 +392,9 @@ export function buildObservedRequestMarkdown(context: DynamoDbPerformanceTuningC
   if (observation.consumedCapacity) {
     lines.push(`| Consumed Capacity | ${formatCapacity(observation.consumedCapacity)} |`);
   }
+  if (observation.clientElapsedTimeMs !== undefined) {
+    lines.push(`| Client elapsed time | ${formatNumber(observation.clientElapsedTimeMs)} ms |`);
+  }
   lines.push(`| Request / retry count | ${observation.requestCount ?? "-"} / ${observation.retryCount ?? "-"} |`);
   if (observation.bounded) {
     lines.push(
@@ -292,7 +410,7 @@ function seriesScopeLabel(series: NonNullable<DynamoDbPerformanceTuningContext["
 }
 
 export function buildCloudWatchMarkdown(context: DynamoDbPerformanceTuningContext): string {
-  const lines = ["## CloudWatch metrics", ""];
+  const lines = ["## 9. CloudWatch metrics", ""];
   const cw = context.cloudWatch;
   if (!cw) {
     lines.push("_CloudWatch metrics were not collected._");
@@ -323,14 +441,19 @@ export function buildCloudWatchMarkdown(context: DynamoDbPerformanceTuningContex
 // "Appendix: Raw metrics" (§13 item 9) - the full per-datapoint series
 // behind the summarized (latest/max only) table above, kept as its own,
 // separate, later cell so the main CloudWatch section stays short.
-function buildRawMetricsAppendixMarkdown(context: DynamoDbPerformanceTuningContext): string | undefined {
+function buildRawMetricsAppendixMarkdown(context: DynamoDbPerformanceTuningContext): string {
   const cw = context.cloudWatch;
   if (!cw || cw.series.length === 0) {
-    return undefined;
+    return [
+      "## Appendix A. Raw CloudWatch metrics",
+      "",
+      "_No raw CloudWatch datapoints were collected._",
+    ].join("\n");
   }
-  const lines = ["## Appendix: Raw metrics", "", "_Full CloudWatch datapoints behind the summarized table above._", ""];
+  const lines = ["## Appendix A. Raw CloudWatch metrics", "", "_Full CloudWatch datapoints behind the summarized table above._", ""];
+  let subsection = 1;
   cw.series.forEach((s) => {
-    lines.push(`### ${escapeMdCell(s.metricName)} (${s.statistic}) - ${escapeMdCell(seriesScopeLabel(s))}`, "");
+    lines.push(`### A.${subsection++}. ${escapeMdCell(s.metricName)} (${s.statistic}) - ${escapeMdCell(seriesScopeLabel(s))}`, "");
     if (s.noData || s.timestamps.length === 0) {
       lines.push("_No datapoints for this window._", "");
       return;
@@ -370,40 +493,54 @@ export function buildDynamoDbAiAnalysisNotebookCells(
   context: DynamoDbPerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult,
 ): NotebookCellData[] {
-  const cells: NotebookCellData[] = [
-    markupCell(buildOverviewMarkdown(context, analysis)),
-    markupCell(buildDynamoDbPerformanceSnapshotMarkdown(buildDynamoDbPerformanceTuningHumanSummary(context))),
+  const tocEntries: NotebookTocEntry[] = [
+    { label: "1. Overview", anchor: "1-overview" },
+    { label: "2. Target request", anchor: "2-target-request" },
+    { label: "3. Collection status", anchor: "3-collection-status" },
+    { label: "4. Summary and recommendations", anchor: "4-summary-and-recommendations" },
+    { label: "5. Query flow", anchor: "5-query-flow" },
+    { label: "6. Access pattern", anchor: "6-access-pattern" },
+    { label: "7. Observed measurements", anchor: "7-observed-measurements" },
+    { label: "8. Table and index information", anchor: "8-table-and-index-information" },
+    { label: "9. CloudWatch metrics", anchor: "9-cloudwatch-metrics" },
+    { label: "10. Additional information", anchor: "10-additional-information" },
+    { label: "Appendix A. Raw CloudWatch metrics", anchor: "appendix-a-raw-cloudwatch-metrics" },
+    { label: "Appendix B. Raw data", anchor: "appendix-b-raw-data" },
   ];
-
   const diagnosticSections = buildDiagnosticSections(context);
-  if (diagnosticSections.collectionIssues) {
-    cells.push(markupCell(diagnosticSections.collectionIssues));
-  }
-
-  cells.push(
+  const cells: NotebookCellData[] = [
+    markupCell(
+      buildNotebookTocMarkdown(
+        "DynamoDB Performance Tuning AI Analysis",
+        tocEntries,
+        context.collection.status,
+      ),
+      { excludeFromHtml: true },
+    ),
+    markupCell(buildOverviewMarkdown(context, analysis)),
+    markupCell(buildTargetRequestMarkdown(context)),
+    markupCell(diagnosticSections.collectionIssues),
+    markupCell(
+      [
+        "## 4. Summary and recommendations",
+        "",
+        buildDynamoDbPerformanceSnapshotMarkdown(buildDynamoDbPerformanceTuningHumanSummary(context)),
+        "",
+        buildAnalysisMarkdown(analysis),
+      ].join("\n"),
+    ),
+    markupCell(buildQueryFlowMarkdown(context)),
     markupCell(buildAccessPatternMarkdown(context)),
-    markupCell(buildTableDefinitionMarkdown(context)),
     markupCell(buildObservedRequestMarkdown(context)),
+    markupCell(buildTableDefinitionMarkdown(context)),
     markupCell(buildCloudWatchMarkdown(context)),
-  );
-
-  if (diagnosticSections.information) {
-    cells.push(markupCell(diagnosticSections.information));
-  }
-
-  cells.push(markupCell(buildAnalysisMarkdown(analysis)));
-
-  const rawMetricsAppendix = buildRawMetricsAppendixMarkdown(context);
-  if (rawMetricsAppendix) {
-    cells.push(markupCell(rawMetricsAppendix));
-  }
-
-  cells.push(
-    markupCell(buildJsonAppendixMarkdown()),
+    markupCell(diagnosticSections.information),
+    markupCell(buildRawMetricsAppendixMarkdown(context)),
+    markupCell(buildJsonAppendixMarkdown("Appendix B")),
     jsonCodeCell(JSON.stringify(context, null, 2), "Full context JSON"),
     jsonCodeCell(buildAiRequestMessagesJson(context, analysis), "AI request messages"),
     jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON"),
-  );
+  ];
   return cells;
 }
 

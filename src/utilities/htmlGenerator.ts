@@ -236,6 +236,12 @@ const createHtml = async (
   options: CreateHtmlOptionsParams
 ): Promise<string> => {
   const { isCellOrigin } = options;
+  // A generated DBN has an in-notebook TOC for easier reading. HTML already
+  // supplies its own navigation panel, so omit cells explicitly marked as
+  // DBN-only to avoid showing two TOCs.
+  const renderedCells = cells.filter(
+    (cell) => !(cell.metadata as CellMeta | undefined)?.excludeFromHtml
+  );
   let htmlContents: string[] = [];
   let errorMessage = "";
   const markdownValues: MarkdownValues = {};
@@ -253,7 +259,7 @@ const createHtml = async (
     // TOC
     if (outputCondig.html.displayToc) {
       htmlContents.push(`  <p class="panel-heading" style="padding:10px">TOC</p>`);
-      cells.forEach((cell, idx) => {
+      renderedCells.forEach((cell, idx) => {
         htmlContents.push(
           `  <a class="panel-block cellIdx${idx}" href="#cell${
             idx + 1
@@ -268,7 +274,7 @@ const createHtml = async (
 
     // CONTENTS
     htmlContents = [];
-    cells.forEach((cell, idx) => {
+    renderedCells.forEach((cell, idx) => {
       const cellMeta: CellMeta = cell.metadata;
       const cellLabel = cellMeta.cellLabel;
       const cellTitle = `${isCellOrigin ? "CELL" : "No"}${idx + 1}`;
@@ -562,7 +568,7 @@ const createHtml = async (
     htmlContents.push(`<script>
   var markdownValues = ${JSON.stringify(markdownValues)};
   var chartValues = ${JSON.stringify(chartValues)};
-  var numOfContents = ${cells.length};
+  var numOfContents = ${renderedCells.length};
   </script>`);
     reportText = reportText.replace(/<!-- __CUSTOM_SCRIPT__ -->/, htmlContents.join("\n"));
 
