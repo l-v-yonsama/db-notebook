@@ -123,8 +123,8 @@ function buildObservationSignal(context: DynamoDbPerformanceTuningContext): Dyna
     };
   }
   const parts = [`returned ${numberText(observation.returnedItemCount ?? 0)} item(s)`];
-  if (observation.scannedItemCount !== undefined) {
-    parts.push(`scanned ${numberText(observation.scannedItemCount)}`);
+  if (observation.evaluatedItemCount !== undefined) {
+    parts.push(`evaluated ${numberText(observation.evaluatedItemCount)}`);
     if (observation.filterPassRate !== undefined) {
       parts.push(`a ${percentText(observation.filterPassRate)} pass rate`);
     }

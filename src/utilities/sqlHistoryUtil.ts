@@ -1,4 +1,5 @@
-import type { SQLHistory, SQLHistoryPerformance } from "../types/SQLHistory";
+import type { RdhDynamoDbSummary } from "@l-v-yonsama/rdh";
+import type { SQLHistory, SQLHistoryDynamoDbPerformance, SQLHistoryPerformance } from "../types/SQLHistory";
 import type { SQLMode } from "../types/Notebook";
 
 export type StoredSQLHistory = SQLHistory & {
@@ -185,6 +186,13 @@ export const migrateStoredSQLHistory = (stored: StoredSQLHistory): SQLHistory | 
   const { sqlMode: _legacySqlMode, ...history } = stored;
   return {
     ...history,
+    // Native Query history existed briefly before producer provenance was
+    // persisted. During this unreleased development period DynamoQueryPanel
+    // was its only producer, so those entries can be upgraded unambiguously.
+    request:
+      history.request?.kind === "dynamodbQuery"
+        ? { ...history.request, origin: history.request.origin ?? "dynamoQueryPanel" }
+        : history.request,
     performance: migrateLegacyPerformance(history),
   };
 };
@@ -213,48 +221,107 @@ const mergeCapacity = (
   };
 };
 
-// Folds a new execution's elapsed time (and, additively, Capacity) into the
-// previous entry's stats. Runs without a measurable duration (e.g. errors)
-// leave the elapsed-time aggregates untouched, so failed re-runs don't skew
-// avg/max; the Capacity aggregates follow the same rule independently via
-// mergeCapacity().
+// Undefined never overrides a defined min/max - only two defined values are
+// ever compared. Mirrors mergeCapacity's "leave untouched unless reported"
+// rule, applied to a min/max pair instead of a running total.
+function minOptional(base: number | undefined, next: number | undefined): number | undefined {
+  if (next === undefined) {
+    return base;
+  }
+  return base === undefined ? next : Math.min(base, next);
+}
+function maxOptional(base: number | undefined, next: number | undefined): number | undefined {
+  if (next === undefined) {
+    return base;
+  }
+  return base === undefined ? next : Math.max(base, next);
+}
+
+// Folds one execution's DynamoDB read-shape evidence into the rolling
+// aggregate (design doc §7.3). `dynamoDb` undefined (any non-AWS history, or
+// a failed retry with no summary at all) leaves `base` completely untouched -
+// mirrors mergeCapacity/the elapsed-time rule above. evaluatedItemCount is
+// only ever defined for a native Query/Scan sample (never PartiQL) - see
+// RdhDynamoDbSummary's own doc comment - so evaluatedCountSampleCount can be
+// smaller than observationSampleCount for a mixed-mode history.
+function mergeDynamoDbPerformance(
+  base: SQLHistoryDynamoDbPerformance | undefined,
+  dynamoDb: RdhDynamoDbSummary | undefined
+): SQLHistoryDynamoDbPerformance | undefined {
+  if (!dynamoDb) {
+    return base;
+  }
+  const { returnedItemCount, evaluatedItemCount } = dynamoDb;
+  const filterPassRate =
+    evaluatedItemCount !== undefined && evaluatedItemCount > 0 && returnedItemCount !== undefined
+      ? returnedItemCount / evaluatedItemCount
+      : undefined;
+
+  return {
+    observationSampleCount: (base?.observationSampleCount ?? 0) + 1,
+    evaluatedCountSampleCount: (base?.evaluatedCountSampleCount ?? 0) + (evaluatedItemCount !== undefined ? 1 : 0),
+    totalReturnedItemCount: (base?.totalReturnedItemCount ?? 0) + (returnedItemCount ?? 0),
+    totalEvaluatedItemCount: (base?.totalEvaluatedItemCount ?? 0) + (evaluatedItemCount ?? 0),
+    // Always this execution's own value (even undefined) - never a stale
+    // carry-over from an earlier sample.
+    lastReturnedItemCount: returnedItemCount,
+    lastEvaluatedItemCount: evaluatedItemCount,
+    minFilterPassRate: minOptional(base?.minFilterPassRate, filterPassRate),
+    maxFilterPassRate: maxOptional(base?.maxFilterPassRate, filterPassRate),
+    lastFilterPassRate: filterPassRate,
+    boundedObservationCount: (base?.boundedObservationCount ?? 0) + (dynamoDb.continuationTokenPresent === true ? 1 : 0),
+  };
+}
+
+// Folds a new execution's elapsed time (and, additively, Capacity/DynamoDB
+// read-shape evidence) into the previous entry's stats. Runs without a
+// measurable duration (e.g. errors) leave the elapsed-time aggregates
+// untouched, so failed re-runs don't skew avg/max; the Capacity and
+// DynamoDB aggregates follow the same rule independently via
+// mergeCapacity()/mergeDynamoDbPerformance().
 export const mergeSQLHistoryPerformance = (
   previous: SQLHistory,
   elapsedTimeMilli: number | undefined,
-  capacityUnits?: number
+  capacityUnits?: number,
+  dynamoDb?: RdhDynamoDbSummary
 ): SQLHistoryPerformance => {
   const base = migrateLegacyPerformance(previous);
   const capacity = mergeCapacity(base, capacityUnits);
-  if (elapsedTimeMilli === undefined) {
-    return { ...base, ...capacity };
-  }
-  return {
-    sampleCount: base.sampleCount + 1,
-    totalElapsedTimeMilli: base.totalElapsedTimeMilli + elapsedTimeMilli,
-    maxElapsedTimeMilli: Math.max(base.maxElapsedTimeMilli, elapsedTimeMilli),
-    lastElapsedTimeMilli: elapsedTimeMilli,
-    ...capacity,
-  };
+  const dynamoDbPerformance = mergeDynamoDbPerformance(base.dynamoDb, dynamoDb);
+  const merged =
+    elapsedTimeMilli === undefined
+      ? { ...base, ...capacity }
+      : {
+          sampleCount: base.sampleCount + 1,
+          totalElapsedTimeMilli: base.totalElapsedTimeMilli + elapsedTimeMilli,
+          maxElapsedTimeMilli: Math.max(base.maxElapsedTimeMilli, elapsedTimeMilli),
+          lastElapsedTimeMilli: elapsedTimeMilli,
+          ...capacity,
+        };
+  return dynamoDbPerformance ? { ...merged, dynamoDb: dynamoDbPerformance } : merged;
 };
 
 export const createInitialSQLHistoryPerformance = (
   elapsedTimeMilli: number | undefined,
-  capacityUnits?: number
+  capacityUnits?: number,
+  dynamoDb?: RdhDynamoDbSummary
 ): SQLHistoryPerformance => {
   const capacity =
     capacityUnits !== undefined
       ? { capacitySampleCount: 1, totalCapacityUnits: capacityUnits, maxCapacityUnits: capacityUnits, lastCapacityUnits: capacityUnits }
       : {};
-  if (elapsedTimeMilli === undefined) {
-    return { ...EMPTY_PERFORMANCE, ...capacity };
-  }
-  return {
-    sampleCount: 1,
-    totalElapsedTimeMilli: elapsedTimeMilli,
-    maxElapsedTimeMilli: elapsedTimeMilli,
-    lastElapsedTimeMilli: elapsedTimeMilli,
-    ...capacity,
-  };
+  const dynamoDbPerformance = mergeDynamoDbPerformance(undefined, dynamoDb);
+  const initial =
+    elapsedTimeMilli === undefined
+      ? { ...EMPTY_PERFORMANCE, ...capacity }
+      : {
+          sampleCount: 1,
+          totalElapsedTimeMilli: elapsedTimeMilli,
+          maxElapsedTimeMilli: elapsedTimeMilli,
+          lastElapsedTimeMilli: elapsedTimeMilli,
+          ...capacity,
+        };
+  return dynamoDbPerformance ? { ...initial, dynamoDb: dynamoDbPerformance } : initial;
 };
 
 export const averageElapsedTimeMilli = (performance: SQLHistoryPerformance): number =>

@@ -233,3 +233,158 @@ describe("StateStorage.addSQLHistory performance aggregation", () => {
     expect(list[0].sqlDoc).toBe("select 50");
   });
 });
+
+describe("StateStorage.addSQLHistory native Query (dynamodbQuery) identity", () => {
+  const dynamoRequest = (structuralKey: string, limit: number) => ({
+    kind: "dynamodbQuery" as const,
+    origin: "dynamoQueryPanel" as const,
+    structuralKey,
+    displayText: "DynamoDB Query orders\nKey: #pk = :pk",
+    input: {
+      TableName: "orders",
+      KeyConditionExpression: "#pk = :pk",
+      ExpressionAttributeValues: { ":pk": { S: `v-${limit}` } },
+      Limit: limit,
+    },
+  });
+
+  it("uses summary.dynamoDb as the sole DynamoDB Capacity source", async () => {
+    const stateStorage = createStateStorage();
+
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "",
+      request: dynamoRequest("capacity-source", 10),
+      summary: {
+        elapsedTimeMilli: 10,
+        capacityUnits: 99,
+        dynamoDb: {
+          apiOperation: "Query",
+          consumedCapacity: { totalCapacityUnits: 2.5 },
+        },
+      } as any,
+      status: "success",
+    });
+
+    const [history] = await stateStorage.getSQLHistoryList();
+    expect(history.performance?.totalCapacityUnits).toBe(2.5);
+    expect(history.performance?.lastCapacityUnits).toBe(2.5);
+  });
+
+  it("merges repeated executions with the same structuralKey into one entry, even with an empty sqlDoc", async () => {
+    const stateStorage = createStateStorage();
+
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "",
+      request: dynamoRequest("k1", 1),
+      summary: { elapsedTimeMilli: 10 } as any,
+      status: "success",
+    });
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "",
+      request: dynamoRequest("k1", 1),
+      summary: { elapsedTimeMilli: 20 } as any,
+      status: "success",
+    });
+
+    const list = await stateStorage.getSQLHistoryList();
+    expect(list).toHaveLength(1);
+    expect(list[0].performance?.sampleCount).toBe(2);
+  });
+
+  it("treats a different structuralKey as a separate entry, even with identical sqlDoc text", async () => {
+    const stateStorage = createStateStorage();
+    const sameDisplayText = "DynamoDB Query orders\nKey: #pk = :pk";
+
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: sameDisplayText,
+      request: dynamoRequest("k1", 1),
+      summary: { elapsedTimeMilli: 10 } as any,
+      status: "success",
+    });
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: sameDisplayText,
+      request: dynamoRequest("k2", 1),
+      summary: { elapsedTimeMilli: 10 } as any,
+      status: "success",
+    });
+
+    const list = await stateStorage.getSQLHistoryList();
+    expect(list).toHaveLength(2);
+  });
+
+  it("does not collide with an unrelated sql-kind history sharing the same sqlDoc text", async () => {
+    const stateStorage = createStateStorage();
+    const sharedText = "DynamoDB Query orders\nKey: #pk = :pk";
+
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: sharedText,
+      summary: { elapsedTimeMilli: 5 } as any,
+      status: "success",
+    });
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: sharedText,
+      request: dynamoRequest("k1", 1),
+      summary: { elapsedTimeMilli: 10 } as any,
+      status: "success",
+    });
+
+    const list = await stateStorage.getSQLHistoryList();
+    expect(list).toHaveLength(2);
+  });
+
+  it("keeps the latest real input on a successful re-run", async () => {
+    const stateStorage = createStateStorage();
+
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "",
+      request: dynamoRequest("k1", 1),
+      summary: { elapsedTimeMilli: 10 } as any,
+      status: "success",
+    });
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "",
+      request: dynamoRequest("k1", 2),
+      summary: { elapsedTimeMilli: 10 } as any,
+      status: "success",
+    });
+
+    const list = await stateStorage.getSQLHistoryList();
+    expect(list).toHaveLength(1);
+    const req = list[0].request;
+    expect(req?.kind === "dynamodbQuery" && req.input.Limit).toBe(2);
+  });
+
+  it("a failed re-run keeps the prior successful input/summary and only records the error", async () => {
+    const stateStorage = createStateStorage();
+
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "",
+      request: dynamoRequest("k1", 1),
+      summary: { elapsedTimeMilli: 10, selectedRows: 5 } as any,
+      status: "success",
+    });
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "",
+      request: dynamoRequest("k1", 1),
+      status: "error",
+      errorMessage: "ProvisionedThroughputExceededException",
+    });
+
+    const list = await stateStorage.getSQLHistoryList();
+    expect(list).toHaveLength(1);
+    expect(list[0].status).toBe("success");
+    expect(list[0].summary?.selectedRows).toBe(5);
+    expect(list[0].lastErrorMessage).toBe("ProvisionedThroughputExceededException");
+  });
+});

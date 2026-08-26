@@ -34,7 +34,11 @@ import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ComponentName } from "./ComponentName";
 import type { DBDumpInputParams, DBDumpSettingsUIParams } from "./DBDumpParams";
 import type { DBRestoreInputParams, DBRestoreSettingsUIParams } from "./DBRestoreParams";
-import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
+import type {
+  DynamoQueryFilter,
+  DynamoQueryProjectionConstraintView,
+  DynamoQueryProjectionMode,
+} from "./DynamoDBConditionParams";
 import type { DynamoDbPerformanceTuningHumanSummary } from "./DynamoDbPerformanceTuningHumanSummary";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
@@ -223,6 +227,10 @@ export type DynamoQueryPanelEventData = BaseMessageEventData<
       sortDesc: boolean;
       filters: DynamoQueryFilter[];
       columnItems: { value: string | number; label: string }[];
+      projectionMode: DynamoQueryProjectionMode;
+      projectedAttributes: string[];
+      consistentRead: boolean;
+      projectionConstraint: DynamoQueryProjectionConstraintView;
     };
     setPreviewInput?: {
       previewInput: string;
@@ -557,7 +565,8 @@ export type DynamoDbAccessPatternViewModel = {
   postReadFilterText: string;
   projectionText: string;
   consistentReadLabel: string;
-  limitText?: string;
+  apiLimitText?: string;
+  resultItemLimitText?: string;
   scanDirectionLabel?: string;
 };
 

@@ -24,9 +24,12 @@ export function toDynamoDbQueryAnalysisInput(input: QueryItemsAtClientInputParam
     keyConditionExpression: input.KeyConditionExpression,
     filterExpression: input.FilterExpression,
     projectionExpression: input.ProjectionExpression,
+    select: input.Select,
     expressionAttributeNames: input.ExpressionAttributeNames,
     consistentRead: input.ConsistentRead,
     scanIndexForward: input.ScanIndexForward,
-    limit: input.Limit,
+    // queryItemsAtClient treats Limit as the cap on items retained across
+    // its pagination loop, not as a raw per-request Query API Limit.
+    resultItemLimit: input.Limit,
   };
 }

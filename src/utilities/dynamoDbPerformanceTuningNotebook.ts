@@ -108,8 +108,8 @@ export function buildDynamoDbQueryFlowMermaid(context: DynamoDbPerformanceTuning
     resultDetails.push("Single bounded response");
   }
 
-  const evaluatedLabel = observation?.scannedItemCount !== undefined
-    ? `${formatNumber(observation.scannedItemCount)} evaluated`
+  const evaluatedLabel = observation?.evaluatedItemCount !== undefined
+    ? `${formatNumber(observation.evaluatedItemCount)} evaluated`
     : observation && context.statement.language === "partiql"
       ? "Evaluated count unavailable in PartiQL"
       : "Evaluation not measured";
@@ -308,14 +308,19 @@ export function buildAccessPatternMarkdown(context: DynamoDbPerformanceTuningCon
   );
   lines.push(
     `| Projection | ${
-      accessPattern.projection.allAttributes
-        ? "All attributes"
-        : escapeMdCell(accessPattern.projection.attributes.join(", ") || "Specific (not resolved)")
+      accessPattern.projection.mode === "allAttributes" || accessPattern.projection.allAttributes
+        ? "All table attributes"
+        : accessPattern.projection.mode === "allProjectedAttributes"
+          ? "All projected index attributes"
+          : escapeMdCell(accessPattern.projection.attributes.join(", ") || "Specific (not resolved)")
     } |`,
   );
   lines.push(`| Consistency | ${accessPattern.consistentRead} |`);
   if (accessPattern.limit !== undefined) {
-    lines.push(`| Limit | ${accessPattern.limit} |`);
+    lines.push(`| DynamoDB API Limit | ${accessPattern.limit} |`);
+  }
+  if (accessPattern.resultItemLimit !== undefined) {
+    lines.push(`| Max returned items | ${accessPattern.resultItemLimit} |`);
   }
   if (accessPattern.scanForward !== undefined) {
     lines.push(`| Scan direction | ${accessPattern.scanForward ? "Forward" : "Backward"} |`);
@@ -383,8 +388,8 @@ export function buildObservedRequestMarkdown(context: DynamoDbPerformanceTuningC
     lines.push(`| Observed at | ${observation.observedAt} |`);
   }
   lines.push(`| Returned items | ${observation.returnedItemCount ?? "-"} |`);
-  if (observation.scannedItemCount !== undefined) {
-    lines.push(`| Scanned items | ${observation.scannedItemCount} |`);
+  if (observation.evaluatedItemCount !== undefined) {
+    lines.push(`| Evaluated items | ${observation.evaluatedItemCount} |`);
   }
   if (observation.filterPassRate !== undefined) {
     lines.push(`| Filter pass rate | ${(observation.filterPassRate * 100).toFixed(2)}% |`);

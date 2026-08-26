@@ -10,7 +10,7 @@ function pattern(overrides: Partial<DynamoDbAccessPattern> = {}): DynamoDbAccess
     tableName: "orders",
     partitionKey: { attributeName: "pk", operator: "=", conditionPresent: true },
     postReadFilter: { present: false, attributes: [] },
-    projection: { allAttributes: true, attributes: [] },
+    projection: { mode: "allAttributes", allAttributes: true, attributes: [] },
     consistentRead: "eventual",
     ...overrides,
   };
@@ -27,9 +27,10 @@ describe("buildDynamoDbAccessPatternViewModel", () => {
       partitionKeyText: "pk =",
       sortKeyText: undefined,
       postReadFilterText: "None",
-      projectionText: "All attributes",
+      projectionText: "All table attributes",
       consistentReadLabel: "Eventually consistent",
-      limitText: undefined,
+      apiLimitText: undefined,
+      resultItemLimitText: undefined,
       scanDirectionLabel: undefined,
     });
   });
@@ -70,14 +71,21 @@ describe("buildDynamoDbAccessPatternViewModel", () => {
 
   it("lists projected attributes, and falls back when the parser couldn't resolve them", () => {
     const specific = buildDynamoDbAccessPatternViewModel(
-      pattern({ projection: { allAttributes: false, attributes: ["pk", "total"] } }),
+      pattern({ projection: { mode: "specific", allAttributes: false, attributes: ["pk", "total"] } }),
     );
     expect(specific.projectionText).toBe("pk, total");
 
     const unresolved = buildDynamoDbAccessPatternViewModel(
-      pattern({ projection: { allAttributes: false, attributes: [] } }),
+      pattern({ projection: { mode: "specific", allAttributes: false, attributes: [] } }),
     );
     expect(unresolved.projectionText).toBe("Specific attributes (not resolved)");
+  });
+
+  it("distinguishes an index target's default projected attributes from all table attributes", () => {
+    const view = buildDynamoDbAccessPatternViewModel(
+      pattern({ projection: { mode: "allProjectedAttributes", allAttributes: false, attributes: [] } }),
+    );
+    expect(view.projectionText).toBe("All projected index attributes");
   });
 
   it("includes the index type and name in targetRef and labels an index Query/Scan distinctly", () => {
@@ -109,8 +117,11 @@ describe("buildDynamoDbAccessPatternViewModel", () => {
   });
 
   it("formats limit and scan direction only when present", () => {
-    const forward = buildDynamoDbAccessPatternViewModel(pattern({ limit: 25, scanForward: true }));
-    expect(forward.limitText).toBe("25");
+    const forward = buildDynamoDbAccessPatternViewModel(
+      pattern({ limit: 25, resultItemLimit: 100, scanForward: true }),
+    );
+    expect(forward.apiLimitText).toBe("25");
+    expect(forward.resultItemLimitText).toBe("100");
     expect(forward.scanDirectionLabel).toBe("Forward");
 
     const backward = buildDynamoDbAccessPatternViewModel(pattern({ scanForward: false }));

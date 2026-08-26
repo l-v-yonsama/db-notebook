@@ -23,6 +23,7 @@ import {
   FOCUS_SQL_HISTORIES_FILTER,
   HISTORY_VIEW_ID,
   NOTEBOOK_TYPE,
+  OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY,
   OPEN_MDH_VIEWER,
   OPEN_SQL_HISTORIES_AS_NOTEBOOK,
   OPEN_SQL_HISTORY,
@@ -36,9 +37,11 @@ import {
   AwsDriver,
   ConnectionSetting,
   DBType,
+  DbDynamoTable,
   DynamoDbWorkloadContext,
   RDSBaseDriver,
   RdsDatabase,
+  ResourceType,
   SelectedStatementStatistics,
   estimateBindParameters,
   normalizeQuery,
@@ -55,12 +58,15 @@ import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utiliti
 import { existsFileOnWorkspace } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { readCodeResolverFile, readRuleFile } from "../../utilities/notebookUtil";
+import { buildObservationFromHistory } from "../../utilities/dynamoDbHistoryObservation";
+import type { DynamoDbPerformanceTuningPreviewRequest } from "../../utilities/dynamoDbPerformanceTuningPreview";
 import {
   openDynamoDbPerformanceTuningPreview,
   openPerformanceTuningPreview,
 } from "../../utilities/performanceTuningBindConfirmation";
 import { averageCapacityUnits, averageElapsedTimeMilli } from "../../utilities/sqlHistoryUtil";
 import { HistoryTreeProvider } from "./HistoryTreeProvider";
+import { DynamoQueryPanel } from "../../panels/DynamoQueryPanel";
 
 type HistoryTreeParams = {
   context: ExtensionContext;
@@ -116,20 +122,63 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     );
   };
 
+  // native Query history is never turned into a `sql`-language cell - its
+  // sqlDoc is a value-free description text, not PartiQL/SQL (design doc
+  // §8.3). A dedicated 2-cell shape instead: a provenance Markdown cell (its
+  // own wording, since it can show DynamoDB's item count) followed by a JSON
+  // cell with the real, value-ful input for reproduction/inspection - never
+  // presented as directly executable from the Notebook (that stays the
+  // History "Execute" command's and the Query Panel's job).
+  const createDynamoQueryMarkdownCellByHistory = (history: SQLHistory) => {
+    const parts = [history.connectionName];
+    if (history.executedAt) {
+      parts.push(dayjs(history.executedAt).format("YYYY-MM-DD HH:mm"));
+    }
+    if (history.status === "error") {
+      parts.push("error");
+    } else {
+      const returnedItemCount =
+        history.summary?.dynamoDb?.returnedItemCount ?? history.summary?.selectedRows;
+      if (returnedItemCount !== undefined) {
+        parts.push(`${returnedItemCount} ${returnedItemCount === 1 ? "item" : "items"}`);
+      }
+    }
+    return new NotebookCellData(
+      NotebookCellKind.Markup,
+      `_From SQL history (DynamoDB native Query): ${parts.join(" ・ ")}_`,
+      "markdown"
+    );
+  };
+
+  const createDynamoQueryJsonCellByHistory = (history: SQLHistory) => {
+    const input = history.request?.kind === "dynamodbQuery" ? history.request.input : {};
+    return new NotebookCellData(NotebookCellKind.Code, JSON.stringify(input, null, 2), "json");
+  };
+
+  const createNotebookCellsForHistory = (history: SQLHistory): NotebookCellData[] => {
+    if (history.request?.kind === "dynamodbQuery") {
+      return [createDynamoQueryMarkdownCellByHistory(history), createDynamoQueryJsonCellByHistory(history)];
+    }
+    const cells: NotebookCellData[] = [];
+    if (history.variables && Object.keys(history.variables).length > 0) {
+      cells.push(
+        new NotebookCellData(NotebookCellKind.Code, JSON.stringify(history.variables, null, 2), "json")
+      );
+    }
+    cells.push(createNotebookSqlCellByHistory(history));
+    return cells;
+  };
+
   const createNotebookCellsByHistories = (histories: SQLHistory[]): NotebookCellData[] => {
     const cells: NotebookCellData[] = [];
     for (const history of histories) {
-      cells.push(createProvenanceMarkdownCellByHistory(history));
-      if (history.variables && Object.keys(history.variables).length > 0) {
-        cells.push(
-          new NotebookCellData(
-            NotebookCellKind.Code,
-            JSON.stringify(history.variables, null, 2),
-            "json"
-          )
-        );
+      // The DynamoDB markdown cell above already carries the same
+      // provenance role as createProvenanceMarkdownCellByHistory() - adding
+      // both would duplicate it.
+      if (history.request?.kind !== "dynamodbQuery") {
+        cells.push(createProvenanceMarkdownCellByHistory(history));
       }
-      cells.push(createNotebookSqlCellByHistory(history));
+      cells.push(...createNotebookCellsForHistory(history));
     }
     return cells;
   };
@@ -172,19 +221,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   });
 
   registerDisposableCommand(OPEN_SQL_HISTORY, async (history: SQLHistory) => {
-    const cells: NotebookCellData[] = [];
-    if (history.variables && Object.keys(history.variables).length > 0) {
-      cells.push(
-        new NotebookCellData(
-          NotebookCellKind.Code,
-          JSON.stringify(history.variables, null, 2),
-          "json"
-        )
-      );
-    }
-
-    cells.push(createNotebookSqlCellByHistory(history));
-
+    const cells = createNotebookCellsForHistory(history);
     commands.executeCommand(CREATE_NEW_NOTEBOOK, cells);
   });
 
@@ -247,12 +284,125 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     historyTreeProvider.setSortOrder("recent");
   });
 
+  registerDisposableCommand(OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY, async (history: SQLHistory) => {
+    const request = history.request;
+    if (request?.kind !== "dynamodbQuery" || request.origin !== "dynamoQueryPanel") {
+      showWindowErrorMessage("This history entry was not created by Dynamo Query Panel.");
+      return;
+    }
+    const tableName = request.input.TableName;
+    if (!tableName) {
+      showWindowErrorMessage("The saved DynamoDB Query does not contain a table name.");
+      return;
+    }
+
+    const findTable = (databases: ReturnType<StateStorage["getResourceByName"]>) =>
+      databases
+        ?.flatMap((database) =>
+          database.findChildren<DbDynamoTable>({ resourceType: ResourceType.DynamoTable })
+        )
+        .find((table) => table.name === tableName);
+
+    let databases = stateStorage.getResourceByName(history.connectionName);
+    let tableRes = findTable(databases);
+    if (!tableRes) {
+      // Refresh a stale cached resource tree once so a recently recreated
+      // table can be opened without requiring a manual tree refresh first.
+      const loaded = await stateStorage.loadResource(
+        history.connectionName,
+        databases !== undefined,
+        true
+      );
+      if (!loaded.ok || !loaded.result) {
+        showWindowErrorMessage(
+          loaded.message || `Could not load DynamoDB resources for ${history.connectionName}.`
+        );
+        return;
+      }
+      databases = loaded.result.db;
+      tableRes = findTable(databases);
+    }
+    if (!tableRes) {
+      showWindowErrorMessage(
+        `DynamoDB table '${tableName}' was not found in connection '${history.connectionName}'.`
+      );
+      return;
+    }
+
+    try {
+      await DynamoQueryPanel.render(context.extensionUri, tableRes, request.input);
+    } catch (error) {
+      showWindowErrorMessage(error);
+    }
+  });
+
+  // native Query re-execution (design doc §8.2) - never routed through
+  // normalizeQuery()/createRDSDriver()/requestSql(): sqlDoc is a value-free
+  // description text for this kind, not PartiQL/SQL, and the real, re-
+  // executable request already lives in history.request.input.
+  const executeDynamoQueryHistory = async (
+    connectionSetting: ConnectionSetting,
+    history: SQLHistory,
+    request: Extract<NonNullable<SQLHistory["request"]>, { kind: "dynamodbQuery" }>
+  ): Promise<void> => {
+    log(`${PREFIX} native Query:` + JSON.stringify(request.input));
+
+    const { ok, message, result } = await window.withProgress(
+      { location: ProgressLocation.Notification, cancellable: false },
+      async (progress) => {
+        progress.report({ message: `Execute DynamoDB Query: ${request.displayText}`, increment: 50 });
+        const r = await workflow<AwsDriver, ResultSetData>(
+          connectionSetting,
+          async (driver) => driver.dynamoClient.queryItemsAtClient(request.input),
+          true
+        );
+        progress.report({ message: `Completed.`, increment: 50 });
+        return r;
+      }
+    );
+
+    if (ok && result) {
+      const commandParam: MdhViewParams = {
+        title: result.meta.tableName ?? "History",
+        list: [result],
+      };
+      commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+
+      await stateStorage.addSQLHistory({
+        connectionName: history.connectionName,
+        sqlDoc: request.displayText,
+        request,
+        meta: result.meta,
+        summary: result.summary,
+        executedAt: Date.now(),
+        status: "success",
+      });
+    } else {
+      showWindowErrorMessage(`Execute query Error: ${message}`);
+
+      await stateStorage.addSQLHistory({
+        connectionName: history.connectionName,
+        sqlDoc: request.displayText,
+        request,
+        executedAt: Date.now(),
+        status: "error",
+        errorMessage: message,
+      });
+    }
+    historyTreeProvider.refresh(true);
+  };
+
   registerDisposableCommand(EXECUTE_SQL_HISTORY, async (history: SQLHistory) => {
     const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
     if (!connectionSetting) {
       showWindowErrorMessage("Missing connection " + history.connectionName);
       await stateStorage.deleteSQLHistoryByID(history.id);
       historyTreeProvider.refresh(true);
+      return;
+    }
+
+    if (history.request?.kind === "dynamodbQuery") {
+      await executeDynamoQueryHistory(connectionSetting, history, history.request);
       return;
     }
 
@@ -391,26 +541,54 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     connectionSetting: ConnectionSetting,
     history: SQLHistory
   ): Promise<void> => {
-    // normalizeQuery() converts db-notebook's canonical `:name` bind syntax
-    // into DynamoDB PartiQL's `?` positional markers - the same conversion
-    // EXECUTE_SQL_HISTORY above needs, and required regardless of whether
-    // every marker's value happens to be known: eligibility for Run Observed
-    // Read is decided later, driver-side, purely from whether the resulting
-    // *text* still contains a `?` (§7.1/§7.4).
-    const driver = await createSQLSupportDriver<AwsDriver>(connectionSetting, true);
-    const toPositionedParameter = driver.isPositionedParameterAvailable();
-    const toPositionalCharacter = driver.getPositionalCharacter();
-    const nativeSql = normalizeQuery({
-      query: history.sqlDoc,
-      toPositionedParameter,
-      toPositionalCharacter,
-    }).query;
+    // native Query history (design doc §8.4) carries its own real, value-ful
+    // input already - never routed through normalizeQuery() (sqlDoc is a
+    // value-free description text for this kind, not PartiQL). Preview's own
+    // static collection path (startDynamoDbPerformanceTuningPreview.ts)
+    // further strips this down to the values-free
+    // DynamoDbQueryAnalysisInput mirror the Context/AI actually receive -
+    // ExpressionAttributeValues never reach either from here.
+    let request: DynamoDbPerformanceTuningPreviewRequest["statement"]["request"];
+    if (history.request?.kind === "dynamodbQuery") {
+      request = { kind: "query", input: history.request.input };
+    } else {
+      // normalizeQuery() converts db-notebook's canonical `:name` bind
+      // syntax into DynamoDB PartiQL's `?` positional markers - the same
+      // conversion EXECUTE_SQL_HISTORY above needs, and required regardless
+      // of whether every marker's value happens to be known: eligibility for
+      // Run Observed Read is decided later, driver-side, purely from
+      // whether the resulting *text* still contains a `?` (§7.1/§7.4).
+      const driver = await createSQLSupportDriver<AwsDriver>(connectionSetting, true);
+      const toPositionedParameter = driver.isPositionedParameterAvailable();
+      const toPositionalCharacter = driver.getPositionalCharacter();
+      const nativeSql = normalizeQuery({
+        query: history.sqlDoc,
+        toPositionedParameter,
+        toPositionalCharacter,
+      }).query;
+      request = { kind: "partiql", text: nativeSql };
+    }
 
     // SQL History's rolling Capacity/timing aggregate for this exact
     // statement (sqlHistoryUtil.ts) - the DynamoDB counterpart of the RDB
     // branch's `statistics` below, folded into the collected Context as
     // workload evidence (§6.5) rather than a separate statement-statistics
     // surface (DynamoDB has none to route through - design doc §5.1).
+    // lastReturnedItemCount/lastEvaluatedItemCount are sourced from
+    // summary.dynamoDb (the DynamoDB API evidence's single source of truth
+    // as of the query-panel-history-performance plan §5.4) - selectedRows
+    // stays as the fallback for an older history entry saved before
+    // summary.dynamoDb existed.
+    //
+    // readObservationSampleCount..boundedObservationCount (§9.2) are the
+    // rolling multi-execution aggregate across repeated runs of this exact
+    // structure (performance.dynamoDb, built in StateStorage.addSQLHistory
+    // via sqlHistoryUtil's mergeDynamoDbPerformance) - a different, wider-
+    // but-shallower degree of evidence than `previousObservation` below
+    // (one specific recent execution). weightedFilterPassRate is derived
+    // here from the aggregate's own totals (design doc §7.3: "weighted pass
+    // rate は保存せず...から算出する"), never averaged from per-sample rates.
+    const dynamoDbPerf = history.performance?.dynamoDb;
     const workload: DynamoDbWorkloadContext | undefined = history.performance
       ? {
           executionCount: history.performance.sampleCount,
@@ -423,17 +601,35 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
           averageCapacityUnits: averageCapacityUnits(history.performance),
           maxCapacityUnits: history.performance.maxCapacityUnits,
           lastCapacityUnits: history.performance.lastCapacityUnits,
-          lastReturnedItemCount: history.summary?.selectedRows,
-          lastScannedItemCount: history.summary?.scannedRows,
+          lastReturnedItemCount: history.summary?.dynamoDb?.returnedItemCount ?? history.summary?.selectedRows,
+          lastEvaluatedItemCount: history.summary?.dynamoDb?.evaluatedItemCount,
           source: "sqlHistory",
           lastExecutedAt: history.executedAt ? new Date(history.executedAt).toISOString() : undefined,
+          readObservationSampleCount: dynamoDbPerf?.observationSampleCount,
+          evaluatedCountSampleCount: dynamoDbPerf?.evaluatedCountSampleCount,
+          totalReturnedItemCount: dynamoDbPerf?.totalReturnedItemCount,
+          totalEvaluatedItemCount: dynamoDbPerf?.totalEvaluatedItemCount,
+          weightedFilterPassRate:
+            dynamoDbPerf && dynamoDbPerf.totalEvaluatedItemCount > 0
+              ? dynamoDbPerf.totalReturnedItemCount / dynamoDbPerf.totalEvaluatedItemCount
+              : undefined,
+          minFilterPassRate: dynamoDbPerf?.minFilterPassRate,
+          maxFilterPassRate: dynamoDbPerf?.maxFilterPassRate,
+          lastFilterPassRate: dynamoDbPerf?.lastFilterPassRate,
+          boundedObservationCount: dynamoDbPerf?.boundedObservationCount,
         }
       : undefined;
+
+    // The latest single execution's own read evidence (design doc §9.1) -
+    // Observation and Workload are deliberately kept distinct (one recent
+    // execution vs. a rolling multi-sample aggregate), never merged into one
+    // value.
+    const previousObservation = buildObservationFromHistory(history);
 
     const result = await openDynamoDbPerformanceTuningPreview({
       extensionUri: context.extensionUri,
       connectionSetting,
-      statement: { source: "sqlHistory", request: { kind: "partiql", text: nativeSql } },
+      statement: { source: "sqlHistory", request, previousObservation },
       workload,
     });
 

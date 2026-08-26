@@ -33,7 +33,7 @@ function buildContext(overrides: Partial<DynamoDbPerformanceTuningContext> = {})
       tableName: "orders",
       partitionKey: { attributeName: "pk", operator: "=", conditionPresent: true },
       postReadFilter: { present: false, attributes: [] },
-      projection: { allAttributes: true, attributes: [] },
+      projection: { mode: "allAttributes", allAttributes: true, attributes: [] },
       consistentRead: "eventual",
     },
     table: {
@@ -141,7 +141,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
       buildContext({
         statement: {
           language: "dynamodb-query",
-          source: "dynamoQueryPanel",
+          source: "sqlHistory",
           kind: "query",
           observationEligibility: { allowed: true },
         },
@@ -224,7 +224,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
           ...base.statement,
           language: "dynamodb-query",
           text: undefined,
-          source: "dynamoQueryPanel",
+          source: "sqlHistory",
           kind: "query",
         },
         accessPattern: {
@@ -239,7 +239,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
         observation: {
           source: "observedRead",
           returnedItemCount: 25,
-          scannedItemCount: 100,
+          evaluatedItemCount: 100,
           filterPassRate: 0.25,
           consumedCapacity: { capacityUnits: 1.5, readCapacityUnits: 1.5 },
           clientElapsedTimeMs: 42,

@@ -27,7 +27,7 @@ function context(overrides: Partial<DynamoDbPerformanceTuningContext> = {}): Dyn
       tableName: "orders",
       partitionKey: { attributeName: "pk", operator: "=", conditionPresent: true },
       postReadFilter: { present: false, attributes: [] },
-      projection: { allAttributes: true, attributes: [] },
+      projection: { mode: "allAttributes", allAttributes: true, attributes: [] },
       consistentRead: "eventual",
     },
     table: {
@@ -80,7 +80,7 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
         tableName: "orders",
         partitionKey: { attributeName: "pk", conditionPresent: false },
         postReadFilter: { present: true, attributes: ["status"] },
-        projection: { allAttributes: true, attributes: [] },
+        projection: { mode: "allAttributes", allAttributes: true, attributes: [] },
         consistentRead: "eventual",
       },
     });
@@ -99,7 +99,7 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
         confidence: "unknown",
         tableName: "orders",
         postReadFilter: { present: false, attributes: [] },
-        projection: { allAttributes: true, attributes: [] },
+        projection: { mode: "allAttributes", allAttributes: true, attributes: [] },
         consistentRead: "unknown",
       },
     });
@@ -126,7 +126,7 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
         indexType: "GSI",
         partitionKey: { attributeName: "country", operator: "=", conditionPresent: true },
         postReadFilter: { present: false, attributes: [] },
-        projection: { allAttributes: true, attributes: [] },
+        projection: { mode: "allAttributes", allAttributes: true, attributes: [] },
         consistentRead: "eventual",
       },
     });
@@ -174,12 +174,12 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
     expect(signal?.summary).toContain("bounded");
   });
 
-  it("includes scanned count and pass rate for a native Query observation", () => {
+  it("includes evaluated count and pass rate for a native Query observation", () => {
     const value = context({
       observation: {
         source: "sqlHistory",
         returnedItemCount: 2,
-        scannedItemCount: 20,
+        evaluatedItemCount: 20,
         filterPassRate: 0.1,
         requestCount: 1,
         retryCount: 0,
@@ -187,7 +187,7 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
       },
     });
     const signal = buildDynamoDbPerformanceTuningHumanSummary(value).signals.find((s) => s.kind === "observation");
-    expect(signal?.summary).toContain("scanned 20");
+    expect(signal?.summary).toContain("evaluated 20");
     expect(signal?.summary).toContain("10%");
     expect(signal?.summary).toContain("prior SQL History execution");
   });

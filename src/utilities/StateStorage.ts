@@ -382,21 +382,54 @@ export class StateStorage {
     }
     const list = await this.getSQLHistoryList();
 
-    const newTrimedSql = history.sqlDoc.trim();
-    const sameHistoryIndex = list.findIndex(
-      (it) => it.sqlDoc.trim() === newTrimedSql && it.connectionName === history.connectionName
-    );
+    // Identity: a native Query history entry is identified by its
+    // structural key (design doc §4.2), never by sqlDoc - sqlDoc is only a
+    // value-free description text for this kind, and a real native Query
+    // request has no equivalent of "trimmed SQL text" to compare. Every
+    // other kind (including entries with no `request` at all, which predate
+    // this field) keeps the existing sqlDoc+connectionName identity
+    // unchanged.
+    const dynamoRequest = history.request?.kind === "dynamodbQuery" ? history.request : undefined;
+    const sameHistoryIndex = dynamoRequest
+      ? list.findIndex(
+          (it) =>
+            it.request?.kind === "dynamodbQuery" &&
+            it.request.structuralKey === dynamoRequest.structuralKey &&
+            it.connectionName === history.connectionName
+        )
+      : (() => {
+          const newTrimedSql = history.sqlDoc.trim();
+          return list.findIndex(
+            (it) =>
+              it.request?.kind !== "dynamodbQuery" &&
+              it.sqlDoc.trim() === newTrimedSql &&
+              it.connectionName === history.connectionName
+          );
+        })();
 
     // Re-running the same SQL+connection moves it to the front (LRU), so a
     // frequently re-measured query survives the cap below instead of being
     // evicted by unrelated one-off queries while sitting at its old position.
     const isNew = sameHistoryIndex < 0;
+    // DynamoDB API telemetry is namespaced under summary.dynamoDb and that
+    // object is its sole source of truth. Do not silently fall back to the
+    // generic display-oriented capacityUnits when a DynamoDB summary exists;
+    // a disagreement would otherwise corrupt the history aggregate. The
+    // generic field remains available for non-DynamoDB producers.
+    const capacityUnits = history.summary?.dynamoDb
+      ? history.summary.dynamoDb.consumedCapacity?.totalCapacityUnits
+      : history.summary?.capacityUnits;
     const performance = isNew
-      ? createInitialSQLHistoryPerformance(history.summary?.elapsedTimeMilli, history.summary?.capacityUnits)
+      ? createInitialSQLHistoryPerformance(
+          history.summary?.elapsedTimeMilli,
+          capacityUnits,
+          history.summary?.dynamoDb
+        )
       : mergeSQLHistoryPerformance(
           list[sameHistoryIndex],
           history.summary?.elapsedTimeMilli,
-          history.summary?.capacityUnits
+          capacityUnits,
+          history.summary?.dynamoDb
         );
     const previous = isNew ? undefined : list[sameHistoryIndex];
     if (previous) {

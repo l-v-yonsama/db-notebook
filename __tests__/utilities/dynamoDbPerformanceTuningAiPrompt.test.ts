@@ -24,7 +24,7 @@ function context(overrides: Partial<DynamoDbPerformanceTuningContext> = {}): Dyn
       tableName: "orders",
       partitionKey: { attributeName: "pk", operator: "=", conditionPresent: true },
       postReadFilter: { present: false, attributes: [] },
-      projection: { allAttributes: true, attributes: [] },
+      projection: { mode: "allAttributes", allAttributes: true, attributes: [] },
       consistentRead: "eventual",
     },
     table: {
@@ -66,7 +66,7 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     const value = context({
       statement: {
         language: "dynamodb-query",
-        source: "dynamoQueryPanel",
+        source: "sqlHistory",
         kind: "query",
         observationEligibility: { allowed: true },
       },
@@ -142,6 +142,30 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
     expect(assistant).toContain("storage cost and write amplification");
     expect(assistant).toContain("not claim a specific RCU/WCU savings number");
+  });
+
+  it("instructs the model that an LSI cannot be added to an existing table, and non-projected LSI attributes may need a base-table fetch", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain("can only be defined when the table is first created");
+    expect(assistant).toContain("never suggest adding one to an existing table");
+    expect(assistant).toContain("extra fetch from the base table");
+  });
+
+  it("instructs the model not to call evaluatedItemCount a full table scan count, and to flag low returned/evaluated as filter inefficiency", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain('"evaluatedItemCount"');
+    expect(assistant).toContain("\"the number of items in a full table scan\"");
+    expect(assistant).toContain("low filterPassRate");
+  });
+
+  it("instructs the model not to treat a bounded/unknown observation as complete, and to flag workload sample skew", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain('observation.completeness: "bounded"');
+    expect(assistant).toContain('observation.completeness: "unknown"');
+    expect(assistant).toContain("never present either as if it were \"complete\"");
+    expect(assistant).toContain("minFilterPassRate");
+    expect(assistant).toContain("maxFilterPassRate");
+    expect(assistant).toContain("skew across the different key/tenant values");
   });
 
   it("instructs the model never to conclude a hot partition without explicit evidence", () => {

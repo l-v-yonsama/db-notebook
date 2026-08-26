@@ -99,8 +99,7 @@ export type ActionCommand =
   | AnalyzePerformanceTuningWithAiActionCommand
   | SaveAiAnalysisAsNotebookActionCommand
   | RunActualPlanActionCommand
-  | RunObservedDynamoDbReadActionCommand
-  | PreviewDynamoDbPerformanceTuningActionCommand;
+  | RunObservedDynamoDbReadActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -176,13 +175,6 @@ export type RunActualPlanActionCommand = BaseActionCommand<"runActualPlan">;
 // either). The confirmation gate is host-side (window.showWarningMessage,
 // modal) - see PerformanceTuningPreviewPanel.ts's runObservedRead().
 export type RunObservedDynamoDbReadActionCommand = BaseActionCommand<"runObservedRead">;
-
-// Sent by DynamoQueryPanel.vue's "Preview Performance" button - see
-// src/panels/DynamoQueryPanel.ts. No params: the host panel already holds
-// its own current query state (tableRes/queryInput) as instance state, the
-// same reason ok()/updateOptions() already send only a preview flag rather
-// than re-deriving the query server-side.
-export type PreviewDynamoDbPerformanceTuningActionCommand = BaseActionCommand<"previewDynamoDbPerformanceTuning">;
 
 export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
 export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;

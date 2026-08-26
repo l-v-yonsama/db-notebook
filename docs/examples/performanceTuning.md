@@ -162,9 +162,13 @@ For a DynamoDB context, `engine` is `dynamodb`, and the plan-oriented sections a
   projection, and consistency.
 - `table` — Capacity mode, key schema, LSI/GSI definitions, TTL, and, when monitoring collection is
   enabled, Contributor Insights status.
-- `workload` — the rolling timing, item-count, and Consumed Capacity summary from matching history.
-- `observation` — one previously observed or user-confirmed read; check `bounded` before treating it
-  as representative of the full result.
+- `workload` — the rolling timing, item-count, and Consumed Capacity summary from matching history,
+  including (when the sample includes a native `Query`/`Scan`) the min/max/last filter pass rate
+  across those samples.
+- `observation` — the most recent observed or user-confirmed read; check `completeness` (`complete`,
+  `bounded`, or `unknown`) before treating it as representative of the full result — only `complete`
+  means so. `bounded` is kept alongside it for backward compatibility (`true` for both `bounded` and
+  `unknown`).
 - `cloudWatch` — table/index/operation-level time series when CloudWatch monitoring is collected. A
   series with `noData: true` is missing data, not measured zero activity.
 
@@ -205,13 +209,19 @@ measurement — it's shown even before any request is sent to DynamoDB.
 
 ### 7.2. Start a preview
 
-Open the DynamoDB performance tuning preview from any of three places:
+Open the DynamoDB performance tuning preview from either of these places:
 
-- **SQL History**, for a previously-run PartiQL statement on a DynamoDB connection.
+- **SQL History**, for a previously-run PartiQL statement, or a native `Query` executed from the
+  Dynamo Query Panel — every Panel execution (success or failure) is saved to SQL History
+  automatically, shown with item-based wording and no SQL syntax attached (its history entry has no
+  equivalent of a runnable SQL cell). Repeating the exact same table/index/key-condition/filter/
+  Projection/consistency structure with different values merges into one history entry rather than
+  creating a new one each time.
 - An **executed Notebook cell** running PartiQL against a DynamoDB connection (same entry point as
   SQL History — the cell's toolbar reuses its own most recent matching history entry).
-- The **Dynamo Query Panel**'s `Preview Performance` button, for the native `Query` you've built
-  there with the panel's own partition/sort key and filter fields.
+Opening the preview from a SQL History entry (PartiQL or native `Query`) also carries over that
+entry's most recent execution as observed evidence automatically — see **Observed request** in 7.3
+and **Query flow** in 7.3 — without needing to run `Run Observed Read` again.
 
 Unlike the SQL path, this never asks for bind values first: the preview never reads item data, so
 no value is needed to open it. If the PartiQL text still has an unresolved `?` placeholder (for
@@ -226,7 +236,8 @@ the execution plan:
 
 - **Performance snapshot** — access-path certainty, a rolling Capacity/timing trend from prior
   executions of this exact statement (when available), whether any read has been observed yet, and
-  recent throttling activity.
+  recent throttling activity. `Evidence: Observed read` appears once either `Run Observed Read` (7.4)
+  or a matching SQL History execution supplies one.
 - **Collection issues** and **Information** — the same two-tier diagnostics pattern as SQL,
   covering things like a permission failure on `DescribeTable`/`GetMetricData`, or that the
   context was shortened to fit the size limit.
@@ -239,7 +250,9 @@ the execution plan:
 - **Table and index definition** — key schema, Capacity mode, approximate item count/size, TTL
   status, and every LSI/GSI's own key schema and projection.
 - **Observed request** — empty until a read has actually been observed (7.4), or carries over
-  evidence from a matching SQL History execution.
+  evidence from a matching SQL History execution. A history-sourced observation whose result was cut
+  short (a continuation key remained, or an older saved entry doesn't record that status at all) is
+  never presented as the statement's complete result.
 - **CloudWatch window metrics** — when monitoring collection is enabled, the last hour's Consumed
   Capacity/throttle time series for the table/index/operation. This is *table-wide*, not scoped to
   this one statement — see 7.6.
@@ -256,7 +269,7 @@ issues** with the relevant action and technical details.
 ### 7.4. Run Observed Read
 
 `Run Observed Read` sends the statement once for real — the first response only, capped at 100
-evaluated items — to measure its actual Consumed Capacity, returned/scanned item counts, and (for a
+evaluated items — to measure its actual Consumed Capacity, returned/evaluated item counts, and (for a
 native `Query`) filter pass rate. A response can return zero matching items and still include a
 continuation marker when unevaluated items may remain; later pages are not fetched and are not
 guaranteed to contain a match. Running the observation again starts over from the beginning rather
@@ -302,3 +315,13 @@ These hold regardless of what the AI analysis suggests:
 - Contributor Insights' own key report is never fetched (only its enabled/disabled status) — the
   underlying key values can be sensitive, and a PartiQL request isn't covered by Contributor
   Insights in the first place.
+- A Local Secondary Index can only be defined when its table is created — it can't be added later,
+  unlike a Global Secondary Index.
+- Querying a Local Secondary Index for an attribute outside its own projection may fetch that
+  attribute from the base table, adding latency/Capacity beyond the index Query alone; a Global
+  Secondary Index can never do this — it simply can't return a non-projected attribute at all, and
+  can't use a strongly consistent read either.
+- A `workload` aggregate built from SQL History is the sample of this exact statement's executions
+  that happen to be saved locally — not a random or complete sample of every partition/key value the
+  statement has ever run against; a wide spread between its minimum and maximum filter pass rate
+  points at that skew, not at a single "typical" rate.

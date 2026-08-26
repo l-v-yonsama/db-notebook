@@ -70,6 +70,7 @@ export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 export const REFRESH_SQL_HISTORIES = `${EXTENSION_NAME}.refresh-sql-histories`;
 export const DELETE_ALL_SQL_HISTORY = `${EXTENSION_NAME}.delete-all-sql-histories`;
 export const EXECUTE_SQL_HISTORY = `${EXTENSION_NAME}.histories.execute`;
+export const OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY = `${EXTENSION_NAME}.histories.openDynamoQueryPanel`;
 export const START_PERFORMANCE_TUNING_FROM_HISTORY = `${EXTENSION_NAME}.histories.startPerformanceTuning`;
 export const OPEN_SQL_HISTORY = `${EXTENSION_NAME}.histories.open`;
 export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;

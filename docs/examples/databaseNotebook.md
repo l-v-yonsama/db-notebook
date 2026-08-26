@@ -11,6 +11,7 @@ This page shows an example of the use of the VS code extension "Database Noteboo
   - 2.1. [Inserting parent and child records in the same transaction](#21-inserting-parent-and-child-records-in-the-same-transaction)
 - 3. [Multi-language flow: SQL → JavaScript → Markdown](#3-multi-language-flow-sql--javascript--markdown)
 - 4. [DynamoDB Query Result](#4-dynamodb-query-result)
+  - 4.1. [Dynamo Query Panel: Projection, consistent read, and SQL History](#41-dynamo-query-panel-projection-consistent-read-and-sql-history)
 
 ## 1. Query examples
 
@@ -248,3 +249,40 @@ A few things about this line are easy to misread:
   `LIMIT` cutting off before DynamoDB ran out of items) — there's no "fetch next page" action in the
   Notebook today, so this is a signal to add/raise a `LIMIT` or narrow the key condition rather than
   an indication anything went wrong.
+
+### 4.1. Dynamo Query Panel: Projection, consistent read, and SQL History
+
+Open the Dynamo Query Panel from a table's resource-tree context menu. Beyond the target
+(table/LSI/GSI), partition/sort key, sort direction, and filter expressions already covered above,
+it also has:
+
+- **Returned attributes (Projection)** — `Default for target` (leaves `Select`/`ProjectionExpression`
+  unset, so DynamoDB returns every attribute for a table or every projected attribute for an index),
+  `Specific attributes` (an explicit list, aliased automatically so a reserved word or a name with
+  spaces/symbols is never interpolated as-is), or, LSI only, `All table attributes`
+  (`Select: "ALL_ATTRIBUTES"`). A narrower Projection reduces the returned payload — for a table
+  Query it does **not** reduce Read Capacity, since the same items are still read. Choosing an
+  attribute the target index doesn't itself project is marked with a warning: on an LSI it's still
+  allowed (DynamoDB may fetch it from the base table, adding latency/Capacity), while a GSI simply
+  can't return it and the panel won't let you select it.
+- **Strongly consistent read** — available for the table or an LSI, always off (and disabled) for a
+  GSI, which can't use one at all. Switching the target to a GSI clears both the checkbox and any
+  Projection selection it made invalid, on the host side, not only in the panel's own UI.
+- **Max returned items** — the renamed `Limit` field. The panel may issue more than one `Query`
+  request; this caps the items kept in the combined result, not a single request's own `Limit`
+  parameter or how many items DynamoDB evaluates across every request it makes.
+
+Every execution — successful or failed — is saved to **SQL History** automatically, labeled with an
+item count instead of a row count and no attached SQL (there is nothing equivalent to run as a SQL
+cell; its Notebook entry is a Markdown provenance cell plus a JSON cell showing the reproducible
+request instead). Re-running the same table/index/key-condition/filter/Projection/consistency
+structure with different partition/sort key values merges into that one history entry — the newest
+values are kept for `Execute`, but never shown in the entry's label, tooltip, or **Performance
+Tuning** preview (see [Performance Tuning Guide](performanceTuning.md#7-dynamodb)). A failed re-run
+never overwrites the prior successful result; only its error is recorded alongside it.
+
+For a native Query entry created by this panel, choose **Open in Dynamo Query Panel** from SQL
+History (or use its edit icon). The panel restores the recorded table/LSI/GSI target, maximum item
+count, partition and sort-key conditions, sort direction, filters, Projection, and consistent-read
+choice. The restored values can be edited and executed as a new Query; if the recorded table or
+index no longer exists, the panel reports that mismatch instead of silently switching targets.

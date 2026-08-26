@@ -159,7 +159,8 @@ const seriesMax = (values: number[]): number | string => (values.length > 0 ? Ma
         <tr><th>Post-read filter</th><td>{{ data.accessPattern.postReadFilterText }}</td></tr>
         <tr><th>Projection</th><td>{{ data.accessPattern.projectionText }}</td></tr>
         <tr><th>Consistency</th><td>{{ data.accessPattern.consistentReadLabel }}</td></tr>
-        <tr v-if="data.accessPattern.limitText"><th>Limit</th><td>{{ data.accessPattern.limitText }}</td></tr>
+        <tr v-if="data.accessPattern.apiLimitText"><th>DynamoDB API Limit</th><td>{{ data.accessPattern.apiLimitText }}</td></tr>
+        <tr v-if="data.accessPattern.resultItemLimitText"><th>Max returned items</th><td>{{ data.accessPattern.resultItemLimitText }}</td></tr>
         <tr v-if="data.accessPattern.scanDirectionLabel"><th>Scan direction</th><td>{{ data.accessPattern.scanDirectionLabel }}</td></tr>
       </tbody>
     </table>
@@ -227,7 +228,7 @@ const seriesMax = (values: number[]): number | string => (values.length > 0 ? Ma
           <tr><th>Source</th><td>{{ context.observation.source }}</td></tr>
           <tr v-if="context.observation.observedAt"><th>Observed at</th><td>{{ context.observation.observedAt }}</td></tr>
           <tr><th>Returned items</th><td>{{ context.observation.returnedItemCount ?? "-" }}</td></tr>
-          <tr v-if="context.observation.scannedItemCount !== undefined"><th>Scanned items</th><td>{{ context.observation.scannedItemCount }}</td></tr>
+          <tr v-if="context.observation.evaluatedItemCount !== undefined"><th>Evaluated items</th><td>{{ context.observation.evaluatedItemCount }}</td></tr>
           <tr v-if="context.observation.filterPassRate !== undefined"><th>Filter pass rate</th><td>{{ formatPercent(context.observation.filterPassRate) }}</td></tr>
           <tr v-if="context.observation.consumedCapacity"><th>Consumed Capacity</th><td>{{ formatCapacity(context.observation.consumedCapacity) }}</td></tr>
           <tr><th>Request / retry count</th><td>{{ context.observation.requestCount ?? "-" }} / {{ context.observation.retryCount ?? "-" }}</td></tr>

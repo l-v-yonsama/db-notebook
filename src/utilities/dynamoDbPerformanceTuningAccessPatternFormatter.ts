@@ -73,8 +73,13 @@ function postReadFilterText(filter: DynamoDbAccessPattern["postReadFilter"]): st
 }
 
 function projectionText(projection: DynamoDbAccessPattern["projection"]): string {
-  if (projection.allAttributes) {
-    return "All attributes";
+  // allAttributes fallback keeps previously saved preview notebooks (created
+  // before projection.mode existed) readable.
+  if (projection.mode === "allAttributes" || projection.allAttributes) {
+    return "All table attributes";
+  }
+  if (projection.mode === "allProjectedAttributes") {
+    return "All projected index attributes";
   }
   return projection.attributes.length > 0
     ? projection.attributes.join(", ")
@@ -106,7 +111,8 @@ export function buildDynamoDbAccessPatternViewModel(
     postReadFilterText: postReadFilterText(pattern.postReadFilter),
     projectionText: projectionText(pattern.projection),
     consistentReadLabel: consistentReadLabel(pattern.consistentRead),
-    limitText: pattern.limit !== undefined ? String(pattern.limit) : undefined,
+    apiLimitText: pattern.limit !== undefined ? String(pattern.limit) : undefined,
+    resultItemLimitText: pattern.resultItemLimit !== undefined ? String(pattern.resultItemLimit) : undefined,
     scanDirectionLabel:
       pattern.scanForward === undefined ? undefined : pattern.scanForward ? "Forward" : "Backward",
   };

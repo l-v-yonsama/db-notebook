@@ -7,6 +7,7 @@ import {
   createInitialSQLHistoryPerformance,
   isSQLHistoryTarget,
   mergeSQLHistoryPerformance,
+  migrateStoredSQLHistory,
 } from "../../src/utilities/sqlHistoryUtil";
 
 const baseHistory = (overrides: Partial<SQLHistory> = {}): SQLHistory => ({
@@ -174,6 +175,132 @@ describe("Capacity aggregation (DynamoDB)", () => {
   });
 });
 
+describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
+  it("createInitialSQLHistoryPerformance: with no dynamoDb arg, the result has no dynamoDb key at all", () => {
+    const result = createInitialSQLHistoryPerformance(120, 2.5);
+    expect(result).not.toHaveProperty("dynamoDb");
+  });
+
+  it("createInitialSQLHistoryPerformance: a native Query summary seeds observationSampleCount/evaluatedCountSampleCount", () => {
+    const result = createInitialSQLHistoryPerformance(120, 2.5, {
+      apiOperation: "Query",
+      returnedItemCount: 5,
+      evaluatedItemCount: 20,
+      continuationTokenPresent: false,
+    });
+    expect(result.dynamoDb).toEqual({
+      observationSampleCount: 1,
+      evaluatedCountSampleCount: 1,
+      totalReturnedItemCount: 5,
+      totalEvaluatedItemCount: 20,
+      lastReturnedItemCount: 5,
+      lastEvaluatedItemCount: 20,
+      minFilterPassRate: 0.25,
+      maxFilterPassRate: 0.25,
+      lastFilterPassRate: 0.25,
+      boundedObservationCount: 0,
+    });
+  });
+
+  it("a PartiQL summary (evaluatedItemCount undefined) counts observationSampleCount but not evaluatedCountSampleCount", () => {
+    const result = createInitialSQLHistoryPerformance(120, undefined, {
+      apiOperation: "ExecuteStatement",
+      returnedItemCount: 3,
+    });
+    expect(result.dynamoDb).toEqual({
+      observationSampleCount: 1,
+      evaluatedCountSampleCount: 0,
+      totalReturnedItemCount: 3,
+      totalEvaluatedItemCount: 0,
+      lastReturnedItemCount: 3,
+      lastEvaluatedItemCount: undefined,
+      minFilterPassRate: undefined,
+      maxFilterPassRate: undefined,
+      lastFilterPassRate: undefined,
+      boundedObservationCount: 0,
+    });
+  });
+
+  it("mergeSQLHistoryPerformance: sums returned/evaluated across repeated native Query samples and tracks min/max pass rate", () => {
+    const previous = baseHistory({
+      performance: {
+        sampleCount: 1,
+        totalElapsedTimeMilli: 100,
+        maxElapsedTimeMilli: 100,
+        lastElapsedTimeMilli: 100,
+        dynamoDb: {
+          observationSampleCount: 1,
+          evaluatedCountSampleCount: 1,
+          totalReturnedItemCount: 5,
+          totalEvaluatedItemCount: 20,
+          lastReturnedItemCount: 5,
+          lastEvaluatedItemCount: 20,
+          minFilterPassRate: 0.25,
+          maxFilterPassRate: 0.25,
+          lastFilterPassRate: 0.25,
+          boundedObservationCount: 0,
+        },
+      },
+    });
+    const result = mergeSQLHistoryPerformance(previous, 50, undefined, {
+      apiOperation: "Query",
+      returnedItemCount: 90,
+      evaluatedItemCount: 100,
+      continuationTokenPresent: true,
+    });
+    expect(result.dynamoDb).toEqual({
+      observationSampleCount: 2,
+      evaluatedCountSampleCount: 2,
+      totalReturnedItemCount: 95,
+      totalEvaluatedItemCount: 120,
+      lastReturnedItemCount: 90,
+      lastEvaluatedItemCount: 100,
+      minFilterPassRate: 0.25,
+      maxFilterPassRate: 0.9,
+      lastFilterPassRate: 0.9,
+      boundedObservationCount: 1,
+    });
+  });
+
+  it("mergeSQLHistoryPerformance: a failed retry with no summary leaves the DynamoDB aggregate untouched", () => {
+    const previous = baseHistory({
+      performance: {
+        sampleCount: 1,
+        totalElapsedTimeMilli: 100,
+        maxElapsedTimeMilli: 100,
+        lastElapsedTimeMilli: 100,
+        dynamoDb: {
+          observationSampleCount: 1,
+          evaluatedCountSampleCount: 1,
+          totalReturnedItemCount: 5,
+          totalEvaluatedItemCount: 20,
+          lastReturnedItemCount: 5,
+          lastEvaluatedItemCount: 20,
+          minFilterPassRate: 0.25,
+          maxFilterPassRate: 0.25,
+          lastFilterPassRate: 0.25,
+          boundedObservationCount: 0,
+        },
+      },
+    });
+    const result = mergeSQLHistoryPerformance(previous, undefined, undefined, undefined);
+    expect(result.dynamoDb).toEqual(previous.performance!.dynamoDb);
+  });
+
+  it("mergeSQLHistoryPerformance: a non-AWS history never gains a dynamoDb key", () => {
+    const previous = baseHistory({
+      performance: {
+        sampleCount: 1,
+        totalElapsedTimeMilli: 100,
+        maxElapsedTimeMilli: 100,
+        lastElapsedTimeMilli: 100,
+      },
+    });
+    const result = mergeSQLHistoryPerformance(previous, 50);
+    expect(result).not.toHaveProperty("dynamoDb");
+  });
+});
+
 describe("averageCapacityUnits", () => {
   it("capacitySampleCountが0または未設定ならundefinedを返す", () => {
     expect(
@@ -254,5 +381,30 @@ describe("SQL History target classification", () => {
   it("旧sqlModeとplan metadataでもExplain系を除外する", () => {
     expect(isSQLHistoryTarget({ sqlDoc: "select 1", sqlMode: "Explain" })).toBe(false);
     expect(isSQLHistoryTarget({ sqlDoc: "select 1", meta: { type: "analyze" } })).toBe(false);
+  });
+});
+
+describe("migrateStoredSQLHistory", () => {
+  it("adds DynamoQueryPanel provenance to native Query history saved before origin existed", () => {
+    const migrated = migrateStoredSQLHistory({
+      id: "legacy-native-query",
+      connectionName: "dynamo",
+      sqlDoc: "DynamoDB Query orders",
+      request: {
+        kind: "dynamodbQuery",
+        input: {
+          TableName: "orders",
+          KeyConditionExpression: "#pk = :pk",
+          ExpressionAttributeValues: { ":pk": { S: "T#001" } },
+        },
+        structuralKey: "key",
+        displayText: "DynamoDB Query orders",
+      } as any,
+    });
+
+    expect(migrated?.request).toMatchObject({
+      kind: "dynamodbQuery",
+      origin: "dynamoQueryPanel",
+    });
   });
 });

@@ -3,6 +3,7 @@ import {
   ConnectionSetting,
   DynamoDbPerformanceTuningCapabilities,
   DynamoDbPerformanceTuningContext,
+  DynamoDbReadObservation,
   DynamoDbWorkloadContext,
   QueryItemsAtClientInputParams,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -19,14 +20,13 @@ import { toDynamoDbQueryAnalysisInput } from "./dynamoDbQueryAnalysisInput";
 export type DynamoDbPerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
   statement: {
-    source: "sqlHistory" | "editor" | "dynamoQueryPanel";
+    source: "sqlHistory" | "editor";
     request:
       | { kind: "partiql"; text: string }
-      // Dynamo Query Panel's "Preview Performance" button - `input` is the
-      // *real* value-ful query (QueryItemsAtClientInputParams *is* the AWS
+      // A native Query selected from SQL History retains the *real*,
+      // value-ful query input (QueryItemsAtClientInputParams *is* the AWS
       // SDK's QueryCommandInput, a bare type alias in db-drivers - see
-      // AwsDynamoServiceClient.ts), the same object DynamoQueryPanel.ts
-      // already builds to actually execute the query. Kept real (not
+      // AwsDynamoServiceClient.ts). Kept real (not
       // pre-stripped) here, call-scoped only and never persisted/logged,
       // mirroring RDB's own PerformanceTuningPreviewRequest.plan.binds - see
       // startDynamoDbPerformanceTuningPreview() below for where the
@@ -35,11 +35,21 @@ export type DynamoDbPerformanceTuningPreviewRequest = {
       // where the real object is used directly (Run Observed Read genuinely
       // needs real ExpressionAttributeValues to execute).
       | { kind: "query"; input: QueryItemsAtClientInputParams };
+    // The most recent execution's read evidence for this exact statement
+    // (design doc §8.4/§9.1) - e.g. dynamoDbHistoryObservation.ts's
+    // buildObservationFromHistory(), built from SQL History's
+    // summary.dynamoDb, values-free by construction (it never derives from
+    // ExpressionAttributeValues). Optional, since an editor/Notebook-cell
+    // preview may have no matching prior execution. Passed straight through to the driver's own
+    // statement.previousObservation, which folds it into
+    // DynamoDbPerformanceTuningContext.observation unless a fresh Run
+    // Observed Read (executeOnce mode) replaces it.
+    previousObservation?: DynamoDbReadObservation;
   };
   // SQL History's rolling Capacity/timing aggregate for this exact statement
   // (sqlHistoryUtil.ts's mergeSQLHistoryPerformance/averageCapacityUnits) -
-  // optional, since an editor/Notebook-cell/Dynamo-Query-Panel-originated
-  // preview has no prior history to aggregate.
+  // optional, since an editor/Notebook-cell preview may have no prior
+  // history to aggregate.
   workload?: DynamoDbWorkloadContext;
 };
 
@@ -62,8 +72,8 @@ const UNAVAILABLE_DYNAMODB_CAPABILITIES: DynamoDbPerformanceTuningCapabilities =
   observedRead: { available: false },
 };
 
-// Shared by SQL History and (once wired) the executed-Notebook-cell/Dynamo
-// Query Panel entry points, mirroring startPerformanceTuningPreview()'s own
+// Shared by SQL History and the executed-Notebook-cell entry point,
+// mirroring startPerformanceTuningPreview()'s own
 // role for RDB.
 export async function startDynamoDbPerformanceTuningPreview(
   params: StartDynamoDbPerformanceTuningPreviewParams
@@ -110,7 +120,14 @@ export async function startDynamoDbPerformanceTuningPreview(
               ? statement.request
               : { kind: "query" as const, input: toDynamoDbQueryAnalysisInput(statement.request.input) };
           const contextResult = await driver.getDynamoDbPerformanceTuningContext(
-            { statement: { source: statement.source, request: staticRequest, workload } },
+            {
+              statement: {
+                source: statement.source,
+                request: staticRequest,
+                workload,
+                previousObservation: statement.previousObservation,
+              },
+            },
             { signal: controller.signal }
           );
           if (!contextResult.ok || !contextResult.result) {

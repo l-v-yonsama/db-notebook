@@ -6,6 +6,7 @@ import { abbr } from "@l-v-yonsama/rdh";
 import { SQLHistory } from "../../types/SQLHistory";
 import { formatDuration } from "../toolActivity/ToolActivityTreeProvider";
 import { averageElapsedTimeMilli } from "../../utilities/sqlHistoryUtil";
+import { toDynamoDbQueryAnalysisInput } from "../../utilities/dynamoDbQueryAnalysisInput";
 import { log } from "../../utilities/logger";
 
 const PREFIX = "[HistoryTreeProvider]";
@@ -94,7 +95,16 @@ export class SQLHistoryItem extends vscode.TreeItem {
       vscode.TreeItemCollapsibleState.None
     );
 
-    this.contextValue = resource.status === "error" ? "sqlHistoryError" : "sqlHistorySuccess";
+    const isDynamoQueryPanelHistory =
+      resource.request?.kind === "dynamodbQuery" &&
+      resource.request.origin === "dynamoQueryPanel";
+    this.contextValue = isDynamoQueryPanelHistory
+      ? resource.status === "error"
+        ? "sqlHistoryDynamoQueryPanelError"
+        : "sqlHistoryDynamoQueryPanelSuccess"
+      : resource.status === "error"
+        ? "sqlHistoryError"
+        : "sqlHistorySuccess";
 
     const descriptionParts = [resource.connectionName];
 
@@ -102,8 +112,19 @@ export class SQLHistoryItem extends vscode.TreeItem {
       descriptionParts.push(dayjs(resource.executedAt).format("MM/DD HH:mm"));
     }
 
+    const isDynamoQuery = resource.request?.kind === "dynamodbQuery";
+
     if (resource.status === "error") {
       descriptionParts.push("Error");
+    } else if (isDynamoQuery) {
+      // native Query results are "items", never "rows" (design doc §8.1) -
+      // DynamoDB's own vocabulary, and distinct from the generic RDH row
+      // count SQL/PartiQL history already shows above.
+      const returnedItemCount =
+        resource.summary?.dynamoDb?.returnedItemCount ?? resource.summary?.selectedRows;
+      if (returnedItemCount !== undefined) {
+        descriptionParts.push(returnedItemCount === 1 ? "1 item" : `${returnedItemCount} items`);
+      }
     } else if (resource.meta?.type === "select" && resource.summary?.selectedRows !== undefined) {
       if (resource.summary?.selectedRows === 1) {
         descriptionParts.push(`1 row`);
@@ -145,7 +166,25 @@ export class SQLHistoryItem extends vscode.TreeItem {
       this.iconPath = new vscode.ThemeIcon("pass");
     }
 
-    let tooltipMarkdown = "```sql\n" + resource.sqlDoc + "\n```";
+    // native Query history's sqlDoc is a value-free description text, not
+    // SQL - an ```sql fence would mislabel it (design doc §8.1). Its
+    // structural (values-free) query shape is shown as JSON underneath
+    // instead of the raw request, which would leak ExpressionAttributeValues
+    // into the tooltip (design doc §4.2).
+    let tooltipMarkdown = isDynamoQuery
+      ? "```text\n" + resource.sqlDoc + "\n```"
+      : "```sql\n" + resource.sqlDoc + "\n```";
+    if (isDynamoQuery && resource.request?.kind === "dynamodbQuery") {
+      try {
+        tooltipMarkdown +=
+          "\n\n```json\n" +
+          JSON.stringify(toDynamoDbQueryAnalysisInput(resource.request.input), null, 2) +
+          "\n```";
+      } catch {
+        // Malformed/incomplete stored input (should not happen for an entry
+        // this feature itself saved) - the sqlDoc text above is still shown.
+      }
+    }
     if (resource.status === "error" && resource.errorMessage) {
       tooltipMarkdown += "\n\n---\n**Error**\n```\n" + resource.errorMessage + "\n```";
     }

@@ -5,6 +5,8 @@ import {
   type DynamoDBConditionParams,
   type DynamoQueryFilter,
   type DynamoQueryPanelEventData,
+  type DynamoQueryProjectionConstraintView,
+  type DynamoQueryProjectionMode,
   type UpdateTextDocumentActionCommand
 } from "@/utilities/vscode";
 import {
@@ -66,6 +68,71 @@ const columnItems = ref([] as DropdownItem[]);
 const filters = ref([] as DynamoQueryFilter[]);
 const target = ref("");
 
+const projectionMode = ref<DynamoQueryProjectionMode>("default");
+const projectedAttributes = ref<string[]>([]);
+const consistentRead = ref(false);
+const projectionConstraint = ref<DynamoQueryProjectionConstraintView>({
+  availableAttributes: [],
+  projectedAttributes: [],
+  allowAllTableAttributesOption: false,
+  restrictToProjected: false,
+  consistentReadAllowed: true,
+});
+
+const projectionModeItems = computed((): DropdownItem[] => {
+  const items: DropdownItem[] = [
+    { label: "Default for target", value: "default" },
+    { label: "Specific attributes", value: "specific" },
+  ];
+  if (projectionConstraint.value.allowAllTableAttributesOption) {
+    items.push({ label: "All table attributes", value: "allTableAttributes" });
+  }
+  return items;
+});
+
+// Whether `attr` is unselectable in the "Specific attributes" list - only
+// ever true for a GSI with a known KEYS_ONLY/INCLUDE Projection (design doc
+// §6.1's GSI rule: a non-projected attribute can't be fetched at all).
+const isAttributeSelectable = (attr: string): boolean => {
+  if (!projectionConstraint.value.restrictToProjected) {
+    return true;
+  }
+  return projectionConstraint.value.projectedAttributes?.includes(attr) ?? false;
+};
+
+// LSI-only advisory: true when `attr` is selectable but not part of the
+// target's own Projection, meaning DynamoDB may need an extra base-table
+// fetch (latency/Capacity) to return it (design doc §6.1/§14).
+const isAttributeNonProjected = (attr: string): boolean => {
+  const projected = projectionConstraint.value.projectedAttributes;
+  if (projected === undefined) {
+    return false;
+  }
+  return !projected.includes(attr);
+};
+
+const projectionHasNonProjectedSelection = computed(
+  () => projectionMode.value === "allTableAttributes"
+    ? projectionConstraint.value.allowAllTableAttributesOption &&
+      projectionConstraint.value.projectedAttributes !== undefined &&
+      projectionConstraint.value.projectedAttributes.length < projectionConstraint.value.availableAttributes.length
+    : projectionMode.value === "specific" && projectedAttributes.value.some(isAttributeNonProjected)
+);
+
+const projectionMetadataUnknown = computed(
+  () => projectionConstraint.value.projectedAttributes === undefined
+);
+
+const toggleProjectedAttribute = (attr: string, checked: boolean) => {
+  const idx = projectedAttributes.value.indexOf(attr);
+  if (checked && idx < 0) {
+    projectedAttributes.value.push(attr);
+  } else if (!checked && idx >= 0) {
+    projectedAttributes.value.splice(idx, 1);
+  }
+  ok(true);
+};
+
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
 const resetSpPaneWrapperHeight = () => {
@@ -84,7 +151,10 @@ onMounted(() => {
   setTimeout(resetSpPaneWrapperHeight, 200);
 });
 
-const executable = computed(() => pkValue.value.length > 0);
+const projectionSelectionValid = computed(
+  () => projectionMode.value !== "specific" || projectedAttributes.value.length > 0
+);
+const executable = computed(() => pkValue.value.length > 0 && projectionSelectionValid.value);
 
 const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): Promise<void> => {
   if (v === undefined) {
@@ -108,6 +178,10 @@ const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): 
   previewInput.value = v.previewInput;
   targetItems.value.splice(0, targetItems.value.length);
   columnItems.value.splice(0, columnItems.value.length);
+  projectionMode.value = v.projectionMode;
+  projectedAttributes.value.splice(0, projectedAttributes.value.length, ...v.projectedAttributes);
+  consistentRead.value = v.consistentRead;
+  projectionConstraint.value = v.projectionConstraint;
 
   await nextTick();
 
@@ -153,16 +227,6 @@ const cancel = () => {
     params: {},
   });
 };
-// "Preview Performance" (design doc §11.3) - the host already holds this
-// panel's current query state (tableRes/queryInput) from the last "ok"
-// message, the same reason Execute above sends no query details either -
-// see DynamoQueryPanel.ts's own "previewDynamoDbPerformanceTuning" handler.
-const previewPerformanceTuning = () => {
-  vscode.postCommand({
-    command: "previewDynamoDbPerformanceTuning",
-    params: {},
-  });
-};
 const ok = (preview: boolean) => {
   const params: DynamoDBConditionParams = {
     target: target.value,
@@ -172,6 +236,9 @@ const ok = (preview: boolean) => {
     sortDesc: sortDesc.value,
     filters: JSON.parse(JSON.stringify(filters.value ?? [])),
     limit: limit.value === "" ? 100 : Number(limit.value),
+    projectionMode: projectionMode.value,
+    projectedAttributes: JSON.parse(JSON.stringify(projectedAttributes.value ?? [])),
+    consistentRead: consistentRead.value,
     preview
   };
 
@@ -226,18 +293,15 @@ defineExpose({
         <span id="tableName">{{ tableName }}</span>
         <label for="numOfRows">Estimated items:</label>
         <span id="numOfRows">{{ numOfRows }}</span>
-        <label for="limit">Limit:</label>
+        <label for="limit">Max returned items:</label>
         <VsCodeTextField id="limit" v-model="limit" :min="0" :max="limitMax" style="width: 100px" type="number"
-          title="number of rows returned" placeholder="number of rows returned" @change="updateTextDocument()">
+          title="The panel may issue multiple Query requests. This limit caps items retained in the result, not the total number of items DynamoDB may evaluate across all requests."
+          placeholder="max returned items" @change="updateTextDocument()">
         </VsCodeTextField>
         <label for="target">Table or Index:</label>
         <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="width:200px"
           @change="updateOptions()" />
       </template>
-      <VsCodeButton appearance="secondary" :disabled="!executable" @click="previewPerformanceTuning"
-        title="Preview this query's DynamoDB performance tuning context (static analysis - no items are read)">
-        <fa icon="magnifying-glass-chart" />Preview Performance
-      </VsCodeButton>
       <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute">
         <fa icon="check" />Execute
       </VsCodeButton>
@@ -250,7 +314,7 @@ defineExpose({
               <span style="margin-right: 30px">Key conditions</span>
             </legend>
             <div>
-              <label for="pk">Partial key ({{ pkName }} [{{ pkAttr }}] ):</label>
+              <label for="pk">Partition key ({{ pkName }} [{{ pkAttr }}] ):</label>
               <VsCodeDropdown v-model="pkOpe" :items="ONLY_EQUAL_OPERATORS" style="width:160px" />
               <VsCodeTextField id="pk" v-model="pkValue" style="width: 200px" @change="updateTextDocument()"
                 :required="true" :change-on-mouseout="true">
@@ -268,6 +332,55 @@ defineExpose({
               <VsCodeCheckbox v-model="sortDesc" @change="ok(true)"
                 style="margin-left: 8px; font-size: small; opacity: 0.7;">Sort descending order</VsCodeCheckbox>
             </div>
+            <div>
+              <label for="consistentRead">Read consistency:</label>
+              <VsCodeCheckbox id="consistentRead" v-model="consistentRead"
+                :disabled="!projectionConstraint.consistentReadAllowed" @change="ok(true)"
+                :title="projectionConstraint.consistentReadAllowed ? 'Use a strongly consistent read (table/LSI only)' : 'A GSI cannot use a strongly consistent read'">
+                Strongly consistent read
+              </VsCodeCheckbox>
+            </div>
+          </fieldset>
+          <fieldset class="conditions">
+            <legend>
+              <span>Returned attributes (Projection)</span>
+            </legend>
+            <div>
+              <label for="projectionMode">Mode:</label>
+              <VsCodeDropdown id="projectionMode" v-model="projectionMode" :items="projectionModeItems"
+                style="width:220px" @change="updateOptions()" />
+            </div>
+            <div v-if="projectionMode === 'specific'" class="projection-attributes">
+              <label>Attributes:</label>
+              <span v-for="attr in projectionConstraint.availableAttributes" :key="attr" class="projection-attribute">
+                <VsCodeCheckbox :model-value="projectedAttributes.includes(attr)"
+                  :disabled="!isAttributeSelectable(attr)"
+                  :title="!isAttributeSelectable(attr) ? 'Not projected onto this GSI - cannot be returned by this Query.' : (isAttributeNonProjected(attr) ? 'Not projected onto this LSI - returning it may require an extra base-table fetch (added latency/Capacity).' : '')"
+                  @change="(checked: boolean) => toggleProjectedAttribute(attr, checked)">
+                  {{ attr }}<span v-if="isAttributeSelectable(attr) && isAttributeNonProjected(attr)"
+                    class="projection-warning-mark">*</span>
+                </VsCodeCheckbox>
+              </span>
+              <p v-if="projectionMetadataUnknown" class="hint">
+                *Projection metadata for this target is unknown (e.g. a custom endpoint) - these constraints could
+                not be verified.
+              </p>
+              <p v-else-if="projectionHasNonProjectedSelection" class="hint">
+                *Not projected onto this index - DynamoDB may need an extra base-table fetch to return it, adding
+                latency/Capacity.
+              </p>
+              <p v-if="projectedAttributes.length === 0" class="hint">
+                Select at least one attribute before previewing or executing this Query.
+              </p>
+            </div>
+            <p v-else-if="projectionMode === 'allTableAttributes' && projectionHasNonProjectedSelection" class="hint">
+              This LSI does not project every known table attribute. Returning all table attributes may require
+              extra base-table fetches, adding latency and Capacity.
+            </p>
+            <p class="hint">
+              Projection reduces the returned payload; for a table Query it does not by itself reduce Read Capacity,
+              since the same items are still read.
+            </p>
           </fieldset>
           <fieldset class="filter">
             <legend>
@@ -376,6 +489,35 @@ section.DynamoQueryPanel {
 
       fieldset.filter {
         margin-top: 10px;
+      }
+
+      .projection-attributes {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+
+        label {
+          min-width: auto !important;
+          margin-right: 6px;
+        }
+      }
+
+      .projection-attribute {
+        margin-right: 14px;
+        margin-bottom: 4px;
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .projection-warning-mark {
+        color: var(--vscode-charts-yellow, orange);
+        margin-left: 2px;
+      }
+
+      p.hint {
+        margin: 4px 0;
+        font-size: small;
+        opacity: 0.7;
       }
 
       p.preview {
