@@ -78,6 +78,11 @@ function buildAnalysis(
   };
 }
 
+const writtenNotebook = (): { cells: Array<{ value: string; metadata?: { cellLabel?: string } }> } => {
+  const [, bytes] = (workspace.fs.writeFile as Mock).mock.calls[0];
+  return JSON.parse(Buffer.from(bytes as Uint8Array).toString("utf8"));
+};
+
 type BuiltCell = ReturnType<typeof buildDynamoDbAiAnalysisNotebookCells>[number];
 
 function findCell(cells: BuiltCell[], text: string): BuiltCell {
@@ -94,7 +99,7 @@ function findJsonCell(cells: BuiltCell[], label: string): BuiltCell {
 
 describe("buildDynamoDbAiAnalysisNotebookCells", () => {
   it("builds a numbered, TOC-first report with summary chapter 4, detailed evidence, appendices, and JSON cells", () => {
-    const cells = buildDynamoDbAiAnalysisNotebookCells(buildContext(), buildAnalysis());
+    const cells = buildDynamoDbAiAnalysisNotebookCells(buildContext(), { analysis: buildAnalysis() });
 
     expect(cells).toHaveLength(16);
     expect(cells[0].kind).toBe(NotebookCellKind.Markup);
@@ -147,7 +152,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
         },
         service: { provider: "AWS", service: "DynamoDB", endpointKind: "aws", tableName: "orders", indexName: "iCountry" },
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
     expect(cells[2].value).not.toContain("```sql");
     expect(cells[2].value).toContain("Native Query on orders (index iCountry)");
@@ -174,7 +179,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
           ],
         },
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
     const values = cells.map((c) => c.value);
     const overviewIndex = values.findIndex((v) => v.includes("## 1. Overview"));
@@ -204,7 +209,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
           boundDescription: "Limited to a single API response by Run Observed Read.",
         },
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
     const observedCell = findCell(cells, "## 7. Observed measurements");
     expect(observedCell.value).toContain("| Returned items | 3 |");
@@ -246,7 +251,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
           bounded: true,
         },
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
 
     const flow = findCell(cells, "## 5. Query flow").value;
@@ -258,7 +263,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
   });
 
   it("keeps Appendix A stable and fills it with raw datapoints when CloudWatch series exist", () => {
-    const withoutSeries = buildDynamoDbAiAnalysisNotebookCells(buildContext(), buildAnalysis());
+    const withoutSeries = buildDynamoDbAiAnalysisNotebookCells(buildContext(), { analysis: buildAnalysis() });
     expect(findCell(withoutSeries, "## Appendix A. Raw CloudWatch metrics").value).toContain(
       "No raw CloudWatch datapoints were collected",
     );
@@ -280,7 +285,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
           ],
         },
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
     const appendixCell = findCell(withSeries, "## Appendix A. Raw CloudWatch metrics");
     expect(appendixCell.value).toContain("ConsumedReadCapacityUnits");
@@ -294,13 +299,32 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
   it("rebuilds the AI request messages using the DynamoDB prompt builder, with the language option from the original analysis", () => {
     const cells = buildDynamoDbAiAnalysisNotebookCells(
       buildContext(),
-      buildAnalysis({
+      { analysis: buildAnalysis({
         request: { promptFormatVersion: 1, translateResponse: true, language: "ja", contextDetail: "full" },
-      }),
+      }) },
     );
     const request = JSON.parse(findJsonCell(cells, "AI request messages").value);
     expect(request.messages[0].content).toContain("following language: ja");
     expect(request.messages[1].content).toContain("SELECT * FROM orders WHERE pk = 'tenant#42'");
+  });
+
+  it("records the estimated model token usage in the overview and request metadata", () => {
+    const analysis = buildAnalysis({
+      request: {
+        promptFormatVersion: 1,
+        translateResponse: false,
+        language: "en",
+        contextDetail: "full",
+        tokenUsage: { inputTokens: 12_345, maxInputTokens: 32_000, safetyMargin: 128 },
+      },
+    });
+    const cells = buildDynamoDbAiAnalysisNotebookCells(buildContext(), { analysis });
+
+    expect(cells[1].value).toContain("| Estimated AI input | 12,345 / 32,000 tokens (38.6%) |");
+    expect(cells[1].value).toContain("| Token safety margin | 128 tokens |");
+    expect(JSON.parse(findJsonCell(cells, "AI request messages").value)).toMatchObject({
+      tokenUsage: { inputTokens: 12_345, maxInputTokens: 32_000, safetyMargin: 128 },
+    });
   });
 });
 
@@ -313,10 +337,20 @@ describe("saveDynamoDbAiAnalysisAsNotebook", () => {
     });
   });
 
+  it("refuses to save a report with neither an analysis nor a comparison", async () => {
+    const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), {});
+
+    expect(result).toEqual({
+      ok: false,
+      message: "There is no AI analysis or baseline comparison to save.",
+    });
+    expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+  });
+
   it("returns ok:false and writes nothing when no workspace folder is open", async () => {
     setWorkspaceFolders(undefined);
 
-    const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), buildAnalysis());
+    const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), { analysis: buildAnalysis() });
 
     expect(result.ok).toBe(false);
     expect(workspace.fs.writeFile).not.toHaveBeenCalled();
@@ -332,7 +366,7 @@ describe("saveDynamoDbAiAnalysisAsNotebook", () => {
 
     const result = await saveDynamoDbAiAnalysisAsNotebook(
       leaking as unknown as DynamoDbPerformanceTuningContext,
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
 
     expect(result.ok).toBe(false);
@@ -343,7 +377,7 @@ describe("saveDynamoDbAiAnalysisAsNotebook", () => {
   });
 
   it("creates the reports/performance-tuning directory and writes the notebook there, named after the table", async () => {
-    const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), buildAnalysis());
+    const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), { analysis: buildAnalysis() });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -358,6 +392,9 @@ describe("saveDynamoDbAiAnalysisAsNotebook", () => {
     expect((dirUri as Uri).fsPath.replace(/\\/g, "/")).toBe("/workspace/reports/performance-tuning");
 
     expect(workspace.fs.writeFile).toHaveBeenCalledTimes(1);
+    const written = writtenNotebook();
+    expect(written.cells.some((cell) => cell.metadata?.cellLabel === "AI analysis JSON")).toBe(true);
+    expect(written.cells.some((cell) => cell.value.includes("This statement performs a full table scan."))).toBe(true);
     expect(workspace.openNotebookDocument).toHaveBeenCalledTimes(1);
     expect(window.showNotebookDocument).toHaveBeenCalledWith(expect.anything(), { viewColumn: 2 });
   });
@@ -365,7 +402,7 @@ describe("saveDynamoDbAiAnalysisAsNotebook", () => {
   it("picks a different filename when the timestamped path already exists", async () => {
     (workspace.fs.stat as Mock).mockResolvedValueOnce({} as never);
 
-    const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), buildAnalysis());
+    const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), { analysis: buildAnalysis() });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {

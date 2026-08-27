@@ -43,7 +43,15 @@ import type {
 import type { DynamoDbPerformanceTuningHumanSummary } from "./DynamoDbPerformanceTuningHumanSummary";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
-import type { PerformanceTuningAiAnalysisResult } from "./PerformanceTuningAiAnalysis";
+import type {
+  PerformanceTuningAiAnalysisResult,
+  PerformanceTuningAiTokenUsage,
+} from "./PerformanceTuningAiAnalysis";
+import type {
+  BaselineSourceInfo,
+  ComparisonAiInputDetail,
+  PerformanceTuningComparisonEvidence,
+} from "./PerformanceTuningComparison";
 import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSummary";
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { RecordRule } from "./RecordRule";
@@ -577,6 +585,12 @@ export type DynamoDbAccessPatternViewModel = {
 export type PerformanceTuningAiAnalysisViewState = {
   status: "idle" | "running" | "success" | "error";
   result?: PerformanceTuningAiAnalysisResult;
+  // Preflight estimate for the request being sent, or the smallest attempted
+  // request when fitting failed. A successful result persists the same data
+  // under result.request.tokenUsage for Notebook reproducibility.
+  tokenUsage?: PerformanceTuningAiTokenUsage;
+  contextDetail?: "full" | "compact";
+  comparisonDetail?: ComparisonAiInputDetail;
   errorMessage?: string;
   // Only set when status is "error" and the failure was a JSON.parse()
   // failure on the model's own reply - kept so a malformed response is never
@@ -585,11 +599,40 @@ export type PerformanceTuningAiAnalysisViewState = {
   savedNotebookRelativePath?: string;
 };
 
+/**
+ * Baseline comparison state for the Preview
+ * (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
+ * §12). Tagged the same way PerformanceTuningAiAnalysisViewState is, and for
+ * the same reason: a half-set selection plus a stale evidence would render as
+ * a comparison that is not actually the one on screen.
+ *
+ * Every section of the comparison renders from `evidence` alone, with no AI
+ * involved - "AI 分析前から全セクションを表示可能にする" (§12).
+ */
+export type PerformanceTuningComparisonViewState = {
+  status: "idle" | "loading" | "ready" | "error";
+  // Both set together whenever status is "ready".
+  baseline?: BaselineSourceInfo;
+  evidence?: PerformanceTuningComparisonEvidence;
+  // A load/selection failure. The previous selection is deliberately kept on
+  // screen when this happens, so a mistaken pick never silently drops a
+  // working comparison (§17.5).
+  errorMessage?: string;
+  // True when an AI analysis result currently on screen was produced under a
+  // different baseline than the one now selected. The Preview must then say
+  // so rather than presenting the old text as an analysis of the new
+  // comparison (§12).
+  analysisStale?: boolean;
+};
+
 // Common to both engines' AI/full-JSON shell fields (2026-08-24 follow-up,
-// DynamoDB support) - factored out only to avoid repeating these seven
-// fields' doc comments twice, not exposed/used as a type on its own anywhere
-// else.
+// DynamoDB support) - factored out only to avoid repeating these fields' doc
+// comments twice, not exposed/used as a type on its own anywhere else.
 type PerformanceTuningPreviewShellFields = {
+  // Baseline comparison (§12). Always present, `status: "idle"` when no
+  // baseline has been selected - the section then renders as the
+  // "Compare with Baseline..." affordance alone.
+  comparison: PerformanceTuningComparisonViewState;
   // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
   // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
   jsonHtml: string;
@@ -690,11 +733,22 @@ export type DynamoDbPerformanceTuningInitializeViewModel = PerformanceTuningPrev
 };
 
 export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "analysis-update",
+  BaseMessageEventDataCommand | "analysis-update" | "comparison-update",
   "PerformanceTuningPreviewPanel",
   {
     initialize?: RelationalPerformanceTuningInitializeViewModel | DynamoDbPerformanceTuningInitializeViewModel;
     analysis?: PerformanceTuningAiAnalysisViewState;
+    // Sent on its own by "comparison-update" whenever a baseline is selected,
+    // changed, cleared, or the Current Context was re-collected underneath an
+    // existing selection (§16 Phase 2).
+    comparison?: PerformanceTuningComparisonViewState;
+    // Rebuilt and re-sent alongside a "comparison-update" because "Copy
+    // Prompt for Other AI" is precomputed host-side: selecting or clearing a
+    // baseline changes what that prompt has to contain, and §13.2 requires
+    // the external-AI path to carry the same Comparison Input as the Copilot
+    // one. Same two fields as the initialize payload's.
+    plainTextPrompt?: string;
+    translatedPlainTextPrompt?: string;
   }
 >;
 

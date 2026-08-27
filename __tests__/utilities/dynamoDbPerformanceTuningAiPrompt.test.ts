@@ -49,6 +49,52 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     expect(user).toContain(JSON.stringify(value, null, 2));
   });
 
+  it("compacts raw CloudWatch arrays and diagnostic prose only for compact AI input", () => {
+    const value = context({
+      cloudWatch: {
+        window: { startTime: "2026-08-27T00:00:00Z", endTime: "2026-08-27T00:02:00Z", periodSeconds: 60 },
+        series: [
+          {
+            metricName: "ConsumedReadCapacityUnits",
+            statistic: "Sum",
+            unit: "Count",
+            scope: "table",
+            timestamps: ["t0", "t1"],
+            values: [2, 5],
+            noData: false,
+            source: "AWS/DynamoDB",
+          },
+        ],
+      },
+      collection: {
+        collectedAt: "2026-08-24T00:00:00.000Z",
+        status: "complete",
+        diagnostics: [
+          {
+            code: "DYNAMODB_CLOUDWATCH_NO_DATA",
+            severity: "info",
+            affectsCompleteness: false,
+            scope: "cloudWatchMetrics",
+            message: "verbose diagnostic text that is not needed in compact input",
+            tableName: "orders",
+            metricName: "SystemErrors",
+          },
+        ],
+        unavailableSections: [],
+      },
+    });
+
+    const { user } = buildDynamoDbAiAnalysisPrompt(value, { contextDetail: "compact" });
+    expect(user).not.toContain("verbose diagnostic text");
+    expect(user).not.toContain('"timestamps"');
+    expect(user).not.toContain('"values"');
+    expect(user).toContain('"datapointCount": 2');
+    expect(user).toContain('"latest": 5');
+    expect(user).toContain('"max": 5');
+    expect(user).toContain('"windowSum": 7');
+    expect(user).toContain("DYNAMODB_CLOUDWATCH_NO_DATA");
+  });
+
   it("does not mask literals in the statement text (matches the RDB no-masking policy)", () => {
     const value = context({
       statement: {

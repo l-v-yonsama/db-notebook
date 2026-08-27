@@ -99,7 +99,9 @@ export type ActionCommand =
   | AnalyzePerformanceTuningWithAiActionCommand
   | SaveAiAnalysisAsNotebookActionCommand
   | RunActualPlanActionCommand
-  | RunObservedDynamoDbReadActionCommand;
+  | RunObservedDynamoDbReadActionCommand
+  | SelectPerformanceTuningBaselineActionCommand
+  | ClearPerformanceTuningBaselineActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -175,6 +177,21 @@ export type RunActualPlanActionCommand = BaseActionCommand<"runActualPlan">;
 // either). The confirmation gate is host-side (window.showWarningMessage,
 // modal) - see PerformanceTuningPreviewPanel.ts's runObservedRead().
 export type RunObservedDynamoDbReadActionCommand = BaseActionCommand<"runObservedRead">;
+
+// "Compare with Baseline..." / "Change Baseline..."
+// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
+// §6.1). No params: the file itself is picked by a host-side
+// window.showOpenDialog(), never by a path the webview types or sends, and
+// the Current Context is already host state. Both entry points send the same
+// command - "change" is just "select" over an existing selection.
+export type SelectPerformanceTuningBaselineActionCommand =
+  BaseActionCommand<"selectPerformanceTuningBaseline">;
+
+// "Clear Baseline" (§6.1). Drops the selection and the comparison built from
+// it; the Current Context and its own AI analysis state are untouched apart
+// from the staleness flag the host recomputes (§12).
+export type ClearPerformanceTuningBaselineActionCommand =
+  BaseActionCommand<"clearPerformanceTuningBaseline">;
 
 export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
 export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;

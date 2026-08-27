@@ -1,5 +1,9 @@
 import type { DynamoDbPerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { PerformanceTuningAiPrompt, BuildAiAnalysisPromptOptions } from "./performanceTuningAiPrompt";
+import {
+  buildComparisonInstructions,
+  type ComparisonAiInput,
+} from "./performanceTuningComparisonAiInput";
 
 // DynamoDB counterpart of performanceTuningAiPrompt.ts. Deliberately its own
 // prompt text, not a reuse of the RDB one with a few words swapped - DynamoDB
@@ -96,8 +100,16 @@ If nothing actionable was found, say so plainly instead of forcing a recommendat
 
 // Shared by buildDynamoDbAiAnalysisPrompt() and buildDynamoDbPlainTextAnalysisPrompt(),
 // same reasoning as performanceTuningAiPrompt.ts's own buildContextSection().
-function buildContextSection(context: DynamoDbPerformanceTuningContext): string {
-  const contextJson = JSON.stringify(context, null, 2);
+function buildContextSection(
+  context: DynamoDbPerformanceTuningContext,
+  comparison?: ComparisonAiInput,
+  contextDetail: "full" | "compact" = "full",
+): string {
+  const contextJson = JSON.stringify(
+    contextDetail === "compact" ? buildCompactDynamoDbAiAnalysisContext(context) : context,
+    null,
+    2,
+  );
   const targetLines = context.statement.text
     ? ["# Target PartiQL statement", "", "```sql", context.statement.text, "```", ""]
     : [
@@ -131,14 +143,30 @@ function buildContextSection(context: DynamoDbPerformanceTuningContext): string 
     contextJson,
     "```",
     "",
+    // Appended after the Current context, so the model reads what is on
+    // screen now first and the comparison as commentary on it (§13.1).
+    ...(comparison
+      ? [
+          "# Comparison input (JSON)",
+          "",
+          "```json",
+          JSON.stringify(comparison, null, 2),
+          "```",
+          "",
+        ]
+      : []),
   ].join("\n");
 }
 
 export function buildDynamoDbAiAnalysisPrompt(
   context: DynamoDbPerformanceTuningContext,
-  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language"> = {},
+  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language" | "contextDetail" | "comparison"> = {},
 ): PerformanceTuningAiPrompt {
-  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT, "", RESPONSE_FORMAT_INSTRUCTIONS];
+  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT];
+  if (options.comparison) {
+    assistantParts.push("", buildComparisonInstructions("dynamodb"));
+  }
+  assistantParts.push("", RESPONSE_FORMAT_INSTRUCTIONS);
   if (options.translateResponse && options.language) {
     assistantParts.push(
       "",
@@ -150,24 +178,85 @@ export function buildDynamoDbAiAnalysisPrompt(
     );
   }
   const assistant = [...assistantParts, ""].join("\n");
-  return { assistant, user: buildContextSection(context) };
+  return {
+    assistant,
+    user: buildContextSection(context, options.comparison, options.contextDetail),
+  };
+}
+
+/**
+ * AI-only projection used after the full DynamoDB context does not fit the
+ * selected model. The saved Full Context JSON remains untouched. Raw
+ * CloudWatch arrays become aggregates, and verbose diagnostic prose becomes
+ * stable identifiers; these are the two largest repetitive parts while all
+ * access-pattern, table/index, workload, and observation evidence stays.
+ */
+export function buildCompactDynamoDbAiAnalysisContext(
+  context: DynamoDbPerformanceTuningContext,
+): Record<string, unknown> {
+  const cloudWatch = context.cloudWatch
+    ? {
+        window: context.cloudWatch.window,
+        series: context.cloudWatch.series.map((series) => {
+          const latestIndex = series.values.length - 1;
+          return {
+            metricName: series.metricName,
+            statistic: series.statistic,
+            unit: series.unit,
+            scope: series.scope,
+            indexName: series.indexName,
+            operation: series.operation,
+            noData: series.noData,
+            source: series.source,
+            datapointCount: series.values.length,
+            latestTimestamp: latestIndex >= 0 ? series.timestamps[latestIndex] : undefined,
+            latest: latestIndex >= 0 ? series.values[latestIndex] : undefined,
+            min: series.values.length > 0 ? Math.min(...series.values) : undefined,
+            max: series.values.length > 0 ? Math.max(...series.values) : undefined,
+            windowSum: series.statistic.toLowerCase() === "sum" && series.values.length > 0
+              ? series.values.reduce((total, value) => total + value, 0)
+              : undefined,
+          };
+        }),
+      }
+    : undefined;
+
+  return {
+    ...context,
+    ...(cloudWatch ? { cloudWatch } : {}),
+    collection: {
+      ...context.collection,
+      diagnostics: context.collection.diagnostics.map((diagnostic) => ({
+        code: diagnostic.code,
+        severity: diagnostic.severity,
+        affectsCompleteness: diagnostic.affectsCompleteness,
+        scope: diagnostic.scope,
+        tableName: diagnostic.tableName,
+        indexName: diagnostic.indexName,
+        metricName: diagnostic.metricName,
+      })),
+    },
+  };
 }
 
 // "Copy Prompt for Other AI" toolbar action - same rationale as
 // performanceTuningAiPrompt.ts's buildPlainTextAnalysisPrompt().
 export function buildDynamoDbPlainTextAnalysisPrompt(
   context: DynamoDbPerformanceTuningContext,
-  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language"> = {},
+  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language" | "comparison"> = {},
 ): string {
   const translationInstruction = options.translateResponse && options.language
     ? `Answer all human-readable prose in the following language: ${options.language}. Do not translate PartiQL code or database identifiers.`
     : undefined;
   return [
     ASSISTANT_ANALYSIS_PROMPT,
+    // Same Comparison Input and instructions as the Copilot path - §13.2
+    // rules out giving the external path two full contexts instead.
+    ...(options.comparison ? ["", buildComparisonInstructions("dynamodb")] : []),
     "",
     PLAIN_TEXT_RESPONSE_INSTRUCTIONS,
     ...(translationInstruction ? ["", translationInstruction] : []),
     "",
-    buildContextSection(context),
+    buildContextSection(context, options.comparison),
   ].join("\n");
 }

@@ -23,8 +23,15 @@ import {
   jsonCodeCell,
   markupCell,
   type NotebookTocEntry,
+  type PerformanceTuningReportInput,
   type SaveAiAnalysisAsNotebookResult,
 } from "./performanceTuningAiNotebook";
+import type { ComparisonAiInput } from "./performanceTuningComparisonAiInput";
+import {
+  buildComparisonJsonAppendixMarkdown,
+  buildComparisonMarkdown,
+  type PerformanceTuningComparisonReportInput,
+} from "./performanceTuningComparisonReport";
 
 // DynamoDB counterpart of performanceTuningAiNotebook.ts (design doc §13).
 // Reuses that file's engine-agnostic helpers (NotebookCellData construction,
@@ -161,7 +168,7 @@ function targetRef(context: DynamoDbPerformanceTuningContext): string {
 
 function buildOverviewMarkdown(
   context: DynamoDbPerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult,
+  analysis: PerformanceTuningAiAnalysisResult | undefined,
 ): string {
   const lines: string[] = [];
   lines.push("## 1. Overview");
@@ -178,12 +185,28 @@ function buildOverviewMarkdown(
   }
   lines.push(`| Collected at | ${context.collection.collectedAt} |`);
   lines.push(`| Collection status | ${context.collection.status} |`);
-  lines.push(`| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`);
-  lines.push(
-    `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact" : "Full"} |`,
-  );
-  lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
-  lines.push(`| Confidence | ${analysis.confidence} |`);
+  // A comparison-only report is saved without ever running an AI analysis
+  // (comparison implementation plan §14).
+  if (analysis) {
+    lines.push(`| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`);
+    lines.push(
+      `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact" : "Full"} |`,
+    );
+    const tokenUsage = analysis.request?.tokenUsage;
+    if (tokenUsage) {
+      const percentage = tokenUsage.maxInputTokens > 0
+        ? `${((tokenUsage.inputTokens / tokenUsage.maxInputTokens) * 100).toFixed(1)}%`
+        : "-";
+      lines.push(
+        `| Estimated AI input | ${formatNumber(tokenUsage.inputTokens)} / ${formatNumber(tokenUsage.maxInputTokens)} tokens (${percentage}) |`,
+      );
+      lines.push(`| Token safety margin | ${formatNumber(tokenUsage.safetyMargin)} tokens |`);
+    }
+    lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
+    lines.push(`| Confidence | ${analysis.confidence} |`);
+  } else {
+    lines.push("| AI analysis | Not run - this report contains collected evidence only |");
+  }
   return lines.join("\n");
 }
 
@@ -473,16 +496,21 @@ function buildRawMetricsAppendixMarkdown(context: DynamoDbPerformanceTuningConte
 function buildAiRequestMessagesJson(
   context: DynamoDbPerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult,
+  comparisonInput: ComparisonAiInput | undefined,
 ): string {
   const request = analysis.request;
   const prompt = buildDynamoDbAiAnalysisPrompt(context, {
     translateResponse: request?.translateResponse,
     language: request?.language,
+    contextDetail: request?.contextDetail,
+    comparison: comparisonInput,
   });
   return JSON.stringify(
     {
       promptFormatVersion: request?.promptFormatVersion ?? 1,
       model: analysis.model,
+      ...(request?.tokenUsage ? { tokenUsage: request.tokenUsage } : {}),
+      ...(request?.comparison ? { comparison: request.comparison } : {}),
       messages: [
         { role: "assistant", content: prompt.assistant },
         { role: "user", content: prompt.user },
@@ -496,8 +524,9 @@ function buildAiRequestMessagesJson(
 /** Pure cell-construction step (§13) - kept separate from the write/open I/O below for unit testing. */
 export function buildDynamoDbAiAnalysisNotebookCells(
   context: DynamoDbPerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult,
+  input: PerformanceTuningReportInput,
 ): NotebookCellData[] {
+  const { analysis, comparison } = input;
   const tocEntries: NotebookTocEntry[] = [
     { label: "1. Overview", anchor: "1-overview" },
     { label: "2. Target request", anchor: "2-target-request" },
@@ -509,14 +538,24 @@ export function buildDynamoDbAiAnalysisNotebookCells(
     { label: "8. Table and index information", anchor: "8-table-and-index-information" },
     { label: "9. CloudWatch metrics", anchor: "9-cloudwatch-metrics" },
     { label: "10. Additional information", anchor: "10-additional-information" },
+    // Appended, not inserted - see the RDB builder's own comment on why the
+    // existing chapters keep their numbers.
+    ...(comparison
+      ? [{ label: "11. Comparison with baseline", anchor: "11-comparison-with-baseline" }]
+      : []),
     { label: "Appendix A. Raw CloudWatch metrics", anchor: "appendix-a-raw-cloudwatch-metrics" },
     { label: "Appendix B. Raw data", anchor: "appendix-b-raw-data" },
+    ...(comparison
+      ? [{ label: "Appendix C. Comparison raw data", anchor: "appendix-c-comparison-raw-data" }]
+      : []),
   ];
   const diagnosticSections = buildDiagnosticSections(context);
   const cells: NotebookCellData[] = [
     markupCell(
       buildNotebookTocMarkdown(
-        "DynamoDB Performance Tuning AI Analysis",
+        comparison
+          ? "DynamoDB Performance Tuning Comparison Report"
+          : "DynamoDB Performance Tuning AI Analysis",
         tocEntries,
         context.collection.status,
       ),
@@ -540,11 +579,42 @@ export function buildDynamoDbAiAnalysisNotebookCells(
     markupCell(buildTableDefinitionMarkdown(context)),
     markupCell(buildCloudWatchMarkdown(context)),
     markupCell(diagnosticSections.information),
+    ...(comparison
+      ? [
+          markupCell(
+            buildComparisonMarkdown(
+              comparison.evidence,
+              comparison.evidence.source.baseline.fileName,
+              { section: "11" },
+            ),
+          ),
+        ]
+      : []),
     markupCell(buildRawMetricsAppendixMarkdown(context)),
     markupCell(buildJsonAppendixMarkdown("Appendix B")),
     jsonCodeCell(JSON.stringify(context, null, 2), "Full context JSON"),
-    jsonCodeCell(buildAiRequestMessagesJson(context, analysis), "AI request messages"),
-    jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON"),
+    ...(analysis
+      ? [
+          jsonCodeCell(
+            buildAiRequestMessagesJson(context, analysis, input.analysisComparisonInput),
+            "AI request messages",
+          ),
+          jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON"),
+        ]
+      : []),
+    ...(comparison
+      ? [
+          markupCell(buildComparisonJsonAppendixMarkdown("Appendix C")),
+          jsonCodeCell(JSON.stringify(comparison.evidence, null, 2), "Comparison Evidence JSON"),
+          jsonCodeCell(
+            JSON.stringify(comparison.baselineContext, null, 2),
+            "Baseline Full context JSON",
+          ),
+          // Duplicates the unprefixed cell above on purpose - see the RDB
+          // builder's own comment on this pair (§6.2, §14).
+          jsonCodeCell(JSON.stringify(context, null, 2), "Current Full context JSON"),
+        ]
+      : []),
   ];
   return cells;
 }
@@ -566,13 +636,19 @@ const REPORTS_SUBPATH = ["reports", "performance-tuning"] as const;
  */
 export async function saveDynamoDbAiAnalysisAsNotebook(
   context: DynamoDbPerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult,
+  input: PerformanceTuningReportInput,
 ): Promise<SaveAiAnalysisAsNotebookResult> {
   const violations = validateDynamoDbPerformanceTuningContext(context);
   if (violations.length > 0) {
     return {
       ok: false,
       message: `Refusing to save: the collected context failed validation (${violations.join("; ")}).`,
+    };
+  }
+  if (!input.analysis && !input.comparison) {
+    return {
+      ok: false,
+      message: "There is no AI analysis or baseline comparison to save.",
     };
   }
 
@@ -598,7 +674,7 @@ export async function saveDynamoDbAiAnalysisAsNotebook(
     targetUri = Uri.joinPath(dirUri, filename);
   }
 
-  const cells = buildDynamoDbAiAnalysisNotebookCells(context, analysis);
+  const cells = buildDynamoDbAiAnalysisNotebookCells(context, input);
   await writeNotebookFile(cells, targetUri);
   await openNotebookFile(targetUri, { viewColumn: ViewColumn.Two });
 

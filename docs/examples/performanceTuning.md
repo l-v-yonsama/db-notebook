@@ -18,13 +18,19 @@ connection. Where supported, you can run the statement once to collect actual me
 - 5. [Analyze with AI](#5-analyze-with-ai)
 - 6. [Save and share the analysis](#6-save-and-share-the-analysis)
   - 6.1. [Full Context JSON](#61-full-context-json)
-- 7. [DynamoDB](#7-dynamodb)
-  - 7.1. [How DynamoDB differs from SQL here](#71-how-dynamodb-differs-from-sql-here)
-  - 7.2. [Start a preview](#72-start-a-preview)
-  - 7.3. [Read the preview](#73-read-the-preview)
-  - 7.4. [Run Observed Read](#74-run-observed-read)
-  - 7.5. [Analyze with AI and save the analysis](#75-analyze-with-ai-and-save-the-analysis)
-  - 7.6. [Constraints to keep in mind](#76-constraints-to-keep-in-mind)
+- 7. [Compare against a baseline](#7-compare-against-a-baseline)
+  - 7.1. [Select a baseline](#71-select-a-baseline)
+  - 7.2. [Read the comparison](#72-read-the-comparison)
+  - 7.3. [When a comparison is refused or qualified](#73-when-a-comparison-is-refused-or-qualified)
+  - 7.4. [Comparison and AI analysis](#74-comparison-and-ai-analysis)
+  - 7.5. [Save a comparison report](#75-save-a-comparison-report)
+- 8. [DynamoDB](#8-dynamodb)
+  - 8.1. [How DynamoDB differs from SQL here](#81-how-dynamodb-differs-from-sql-here)
+  - 8.2. [Start a preview](#82-start-a-preview)
+  - 8.3. [Read the preview](#83-read-the-preview)
+  - 8.4. [Run Observed Read](#84-run-observed-read)
+  - 8.5. [Analyze with AI and save the analysis](#85-analyze-with-ai-and-save-the-analysis)
+  - 8.6. [Constraints to keep in mind](#86-constraints-to-keep-in-mind)
 
 ## 1. Overview
 
@@ -187,9 +193,129 @@ The Full Context JSON remains complete in the notebook even if a large RDB vendo
 be omitted from a compact AI request. Use **AI request messages** to see the exact prompt and context
 projection sent to the selected model.
 
-## 7. DynamoDB
+## 7. Compare against a baseline
 
-### 7.1. How DynamoDB differs from SQL here
+Once you have saved a report for a statement, you can reopen the preview after making a change and
+compare the two side by side. The comparison is computed by the extension from the two collected
+contexts, so every figure in it is available before — and without — any AI analysis.
+
+This works for both engines: RDB reports compare against RDB reports, and DynamoDB against DynamoDB.
+
+### 7.1. Select a baseline
+
+In the **Comparison with baseline** section of the preview, select `Compare with Baseline…` and pick
+a saved `.dbn`. The dialog opens in `reports/performance-tuning/` and remembers the last folder you
+picked for the rest of the session.
+
+The baseline file is read once, read-only, and never written back. The context it contains is kept
+as a snapshot, so a comparison already on screen — or already saved into a report — stays
+reproducible even if that file is later moved, edited, or deleted.
+
+Use `Change Baseline…` to pick a different report and `Clear Baseline` to stop comparing.
+
+If the selected file is not a saved performance tuning report, the comparison is refused with a
+reason, and the baseline you already had stays selected.
+
+### 7.2. Read the comparison
+
+- **Comparability** states whether the two sides can be compared at all, followed by the specific
+  notes behind that verdict.
+- **Key changes** lists the largest comparable movements, best first.
+- **Request changes** shows the two statements and a line diff. For a native DynamoDB Query, which
+  has no statement text, the request structure is diffed instead.
+- **Access path changes** shows how each table is reached (RDB) or how the read is routed
+  (DynamoDB), plus the engine properties that differ.
+- **Index changes** lists index definitions seen on one side and not the other, kept separate from
+  which indexes the statement actually used.
+- **Metric comparison** is the full table: metric, baseline, current, change, assessment.
+- **Advanced details: Comparison Evidence JSON** is the complete, unrounded computation, including
+  the baseline's file name, path at selection time, and the SHA-256 of its context.
+
+Improvement, regression, no change, and "not comparable" are always labelled with both an icon and
+text, never color alone.
+
+### 7.3. When a comparison is refused or qualified
+
+Two reports collected at different times are not a controlled experiment, so the comparison states
+what it can and cannot support:
+
+- **Not comparable** — the two sides target different engines, vendors, databases, or tables, or
+  their statement kinds differ. No improvement percentage is shown at all: every metric is reported
+  as not comparable, and only the raw values from each side remain.
+- **Partially comparable** — something changed that qualifies the numbers: the statement itself, the
+  set of tables read, an estimate-only side paired with a measured one, a partial collection, a
+  large gap in optimizer-statistics freshness, a different environment, or (DynamoDB) an observation
+  that was bounded on only one side, two observations cut off at different points, or a differently
+  shaped CloudWatch window.
+
+When the two sides came from different environments — a different `environment` label on a
+relational connection, or DynamoDB Local/LocalStack against real AWS — timings and host I/O counters
+are reported as not comparable, because they measure the machine as much as the statement. Row
+counts, item counts, and consumed capacity still compare.
+
+A table that the plan reaches through more than one step (a self join, for example) has no
+one-to-one correspondence between the two collections, so its per-table metrics are reported as not
+comparable rather than pairing an arbitrary step from each side.
+- **Comparable, with notes** — data volume, cache state, and concurrent load still differ between
+  two collection times; CloudWatch still aggregates other traffic; DynamoDB item counts and table
+  sizes are still approximate.
+
+Individual metrics carry their own verdict too. A metric the extension declines to compare still
+shows both raw values, but never a rate of change and never an improvement figure. Percentage points
+are used where subtracting two rates is the honest figure, instead of a percent change of a percent.
+
+An index seen on one side and not the other is reported as an observation, not as a record of
+someone creating or dropping it.
+
+### 7.4. Comparison and AI analysis
+
+When a baseline is selected, `Analyze with AI` and `Copy Prompt for Other AI` both include a
+comparison input alongside the current context. The baseline's full context is never sent: the input
+carries the two statements, the structural differences, the already-computed numbers, and the
+per-metric comparability decisions.
+
+The model is instructed not to recompute those figures, not to derive an improvement from a metric
+marked not comparable, and not to treat a snapshot difference as a proven cause. Any AI analysis text
+inside the baseline report is deliberately not sent.
+
+If the request does not fit the selected model's input window, it is reduced in a fixed order — the
+current context first, then the request diff (both statements are always kept), then the collection
+differences. What was left out is recorded in the saved analysis rather than dropped silently. If it
+still does not fit, the analysis is not started and the required and available token counts are
+reported.
+
+Changing or clearing the baseline marks an AI result already on screen as stale, with a prompt to run
+the analysis again, rather than presenting it as commentary on the new comparison. This includes
+changing the baseline while an analysis is still running: the result is recorded against the baseline
+it was actually sent with, not whichever one happens to be selected when the response arrives.
+
+### 7.5. Save a comparison report
+
+`Save as Notebook` is available as soon as a baseline is selected, whether or not you have run an AI
+analysis. If the analysis on screen is marked stale, it is left out of the saved report and a
+comparison-only report is written instead — mixing an analysis of one baseline with a comparison
+against another would misrepresent both. Run `Analyze with AI` again to include it.
+
+A comparison report adds:
+
+- **Comparison with baseline** — summary, key changes, request changes, access path changes, index
+  and schema changes, the metric table, comparability notes, and the baseline source.
+- **Comparison Evidence JSON** — every figure above, unrounded.
+- **Baseline Full context JSON** and **Current Full context JSON** — the two contexts the comparison
+  was computed from.
+
+Because both contexts are stored in the report itself, it stays readable after the original baseline
+file is gone. The existing **Full context JSON** cell is still written unchanged, so tools built
+against earlier reports keep working; selecting a comparison report as a baseline later resolves the
+**Current** context, not the older baseline it was compared against.
+
+Comparison contexts use `formatVersion: 1`, and a report whose context declares any other version is
+refused rather than read optimistically, so a future format change cannot be silently misread by this
+version of the extension.
+
+## 8. DynamoDB
+
+### 8.1. How DynamoDB differs from SQL here
 
 DynamoDB has no query optimizer and no execution plan, so the preview shows a different kind of
 evidence instead:
@@ -207,7 +333,7 @@ an equality (or `IN`) test on the target table's or index's partition key. Anyth
 `Scan` of that table or index. This is a deterministic fact about the statement as written, not a
 measurement — it's shown even before any request is sent to DynamoDB.
 
-### 7.2. Start a preview
+### 8.2. Start a preview
 
 Open the DynamoDB performance tuning preview from either of these places:
 
@@ -229,7 +355,7 @@ example, a SQL History entry Database Notebook couldn't fully resolve from its r
 the preview still opens normally — only `Run Observed Read` (7.4) is disabled for that statement,
 with the reason shown next to the button.
 
-### 7.3. Read the preview
+### 8.3. Read the preview
 
 The layout mirrors the SQL preview's shape (3 above), with DynamoDB-specific sections in place of
 the execution plan:
@@ -266,7 +392,7 @@ suggest an IAM permission change solely because of this expected skip. On a real
 with CloudWatch selected, an actual collection failure continues to appear under **Collection
 issues** with the relevant action and technical details.
 
-### 7.4. Run Observed Read
+### 8.4. Run Observed Read
 
 `Run Observed Read` sends the statement once for real — the first response only, capped at 100
 evaluated items — to measure its actual Consumed Capacity, returned/evaluated item counts, and (for a
@@ -281,7 +407,7 @@ PartiQL statement with an unresolved `?` placeholder (7.2), or when this connect
 hasn't been verified to allow it yet — an `AccessDenied` only ever surfaces after you confirm the
 run, never as a pre-flight guess.
 
-### 7.5. Analyze with AI and save the analysis
+### 8.5. Analyze with AI and save the analysis
 
 `Analyze with AI` and `Copy Prompt for Other AI` work the same way as for SQL (5 above), with a
 DynamoDB-specific prompt: it distinguishes the static access-path classification from a one-off
@@ -298,7 +424,7 @@ analysis JSON. When monitoring collection is outside the connection's configured
 CloudWatch section and raw-metrics appendix remain in the notebook and state that metrics or
 datapoints were not collected.
 
-### 7.6. Constraints to keep in mind
+### 8.6. Constraints to keep in mind
 
 These hold regardless of what the AI analysis suggests:
 

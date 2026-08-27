@@ -82,6 +82,11 @@ function findJsonCell(cells: BuiltCell[], label: string): BuiltCell {
   return cell!;
 }
 
+const writtenNotebook = (): { cells: Array<{ value: string; metadata?: { cellLabel?: string } }> } => {
+  const [, bytes] = (workspace.fs.writeFile as Mock).mock.calls[0];
+  return JSON.parse(Buffer.from(bytes as Uint8Array).toString("utf8"));
+};
+
 describe("buildAiAnalysisNotebookFilename", () => {
   it("sanitizes non-alphanumeric characters in the database name and embeds a timestamp", () => {
     const now = new Date(2026, 7, 18, 9, 5, 3); // 2026-08-18 09:05:03 local
@@ -99,7 +104,7 @@ describe("buildAiAnalysisNotebookFilename", () => {
 
 describe("buildAiAnalysisNotebookCells", () => {
   it("builds a numbered, TOC-first beginner report with summary chapter 4 and reproducibility JSON cells", () => {
-    const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
+    const cells = buildAiAnalysisNotebookCells(buildContext(), { analysis: buildAnalysis() });
 
     expect(cells).toHaveLength(12);
     expect(cells[0].kind).toBe(NotebookCellKind.Markup);
@@ -156,9 +161,28 @@ describe("buildAiAnalysisNotebookCells", () => {
     const analysis = buildAnalysis({
       request: { promptFormatVersion: 1, translateResponse: false, language: "en", contextDetail: "compact" },
     });
-    expect(buildAiAnalysisNotebookCells(buildContext(), analysis)[1].value).toContain(
+    expect(buildAiAnalysisNotebookCells(buildContext(), { analysis })[1].value).toContain(
       "Compact (raw vendor artifacts omitted for model limit)"
     );
+  });
+
+  it("records the estimated model token usage in the overview and request metadata", () => {
+    const analysis = buildAnalysis({
+      request: {
+        promptFormatVersion: 1,
+        translateResponse: false,
+        language: "en",
+        contextDetail: "full",
+        tokenUsage: { inputTokens: 43_210, maxInputTokens: 64_000, safetyMargin: 128 },
+      },
+    });
+    const cells = buildAiAnalysisNotebookCells(buildContext(), { analysis });
+
+    expect(cells[1].value).toContain("| Estimated AI input | 43,210 / 64,000 tokens (67.5%) |");
+    expect(cells[1].value).toContain("| Token safety margin | 128 tokens |");
+    expect(JSON.parse(findJsonCell(cells, "AI request messages").value)).toMatchObject({
+      tokenUsage: { inputTokens: 43_210, maxInputTokens: 64_000, safetyMargin: 128 },
+    });
   });
 
   it("places collection status before chapter 4 and detailed information after the execution plan", () => {
@@ -199,7 +223,7 @@ describe("buildAiAnalysisNotebookCells", () => {
         },
         planTableMappings: [{ planNodeId: "n0", tableName: "orders" }],
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
 
     const values = cells.map((cell) => cell.value);
@@ -254,7 +278,7 @@ describe("buildAiAnalysisNotebookCells", () => {
           },
         ],
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
 
     const structureCell = findCell(cells, "## 5. Query structure");
@@ -270,7 +294,7 @@ describe("buildAiAnalysisNotebookCells", () => {
   it("renders possibleDuplicateOfIndex in its own recommendations-table column when set, and '-' when absent", () => {
     const withDuplicate = buildAiAnalysisNotebookCells(
       buildContext(),
-      buildAnalysis({
+      { analysis: buildAnalysis({
         recommendations: [
           {
             title: "Add an index on category",
@@ -281,13 +305,13 @@ describe("buildAiAnalysisNotebookCells", () => {
             possibleDuplicateOfIndex: "idx_products_category",
           },
         ],
-      })
+      }) }
     );
     const analysisCell = findCell(withDuplicate, "### 4.4. Recommendations");
     expect(analysisCell.value).toContain("Possible duplicate");
     expect(analysisCell.value).toContain("`idx_products_category`");
 
-    const withoutDuplicate = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
+    const withoutDuplicate = buildAiAnalysisNotebookCells(buildContext(), { analysis: buildAnalysis() });
     // The default fixture's recommendation has no possibleDuplicateOfIndex -
     // its table row must still render a "-" placeholder cell, not an empty one.
     expect(findCell(withoutDuplicate, "### 4.4. Recommendations").value).toMatch(/\| Add an index on tenant_id \|.*\| - \|/);
@@ -296,7 +320,7 @@ describe("buildAiAnalysisNotebookCells", () => {
   it("renders 'No findings/recommendations were reported' placeholders instead of empty tables", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext(),
-      buildAnalysis({ findings: [], recommendations: [] })
+      { analysis: buildAnalysis({ findings: [], recommendations: [] }) }
     );
     expect(findCell(cells, "### 4.3. Findings").value).toContain("No findings were reported");
     expect(findCell(cells, "### 4.4. Recommendations").value).toContain("No recommendations were reported");
@@ -305,9 +329,9 @@ describe("buildAiAnalysisNotebookCells", () => {
   it("rebuilds the saved request with the language option used by the original analysis", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext(),
-      buildAnalysis({
+      { analysis: buildAnalysis({
         request: { promptFormatVersion: 1, translateResponse: true, language: "ja", contextDetail: "full" },
-      })
+      }) }
     );
     const request = JSON.parse(findJsonCell(cells, "AI request messages").value);
     expect(request.messages[0].content).toContain("following language: ja");
@@ -328,9 +352,9 @@ describe("buildAiAnalysisNotebookCells", () => {
     });
     const cells = buildAiAnalysisNotebookCells(
       context,
-      buildAnalysis({
+      { analysis: buildAnalysis({
         request: { promptFormatVersion: 1, translateResponse: false, language: "en", contextDetail: "compact" },
-      })
+      }) }
     );
     const fullContext = findJsonCell(cells, "Full context JSON").value;
     const request = JSON.parse(findJsonCell(cells, "AI request messages").value);
@@ -341,7 +365,7 @@ describe("buildAiAnalysisNotebookCells", () => {
   });
 
   it("keeps the numbered execution-plan chapter with a no-data explanation when no plan was collected", () => {
-    const cells = buildAiAnalysisNotebookCells(buildContext(), buildAnalysis());
+    const cells = buildAiAnalysisNotebookCells(buildContext(), { analysis: buildAnalysis() });
     expect(findCell(cells, "## 6. Execution plan").value).toContain(
       "No execution plan or table-mapping evidence was collected",
     );
@@ -364,7 +388,7 @@ describe("buildAiAnalysisNotebookCells", () => {
         },
         planTableMappings: [{ planNodeId: "n0", tableName: "orders", estimatedRows: 50 }],
       }),
-      buildAnalysis()
+      { analysis: buildAnalysis() }
     );
 
     expect(cells).toHaveLength(12);
@@ -380,7 +404,7 @@ describe("buildAiAnalysisNotebookCells", () => {
   it("still adds the execution plan cell for table mappings alone, with no normalizedPlan", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext({ planTableMappings: [{ planNodeId: "n0", tableName: "orders" }] }),
-      buildAnalysis()
+      { analysis: buildAnalysis() }
     );
     expect(cells).toHaveLength(12);
     const executionPlanCell = findCell(cells, "## 6. Execution plan");
@@ -395,7 +419,7 @@ describe("buildAiAnalysisNotebookCells", () => {
           { planNodeId: "n0", tableName: "orders", estimatedRows: 50, actualRows: 37, rowEstimateRatio: 0.74 },
         ],
       }),
-      buildAnalysis()
+      { analysis: buildAnalysis() }
     );
     const executionPlanCell = findCell(cells, "## 6. Execution plan");
     expect(executionPlanCell.value).toContain("| Table | Index | Est. rows | Actual rows | Actual/est. ratio | Access fraction | Filter pass rate | Columns used |");
@@ -409,7 +433,7 @@ describe("buildAiAnalysisNotebookCells", () => {
           { planNodeId: "n0", tableName: "customers", estimatedRows: 30000, actualRows: 1, rowEstimateRatio: 1 / 30000 },
         ],
       }),
-      buildAnalysis()
+      { analysis: buildAnalysis() }
     );
     expect(findCell(cells, "## 6. Execution plan").value).toContain("0.0000333x");
   });
@@ -428,7 +452,7 @@ describe("buildAiAnalysisNotebookCells", () => {
         },
         planTableMappings: [{ planNodeId: "n0", tableName: "orders" }],
       }),
-      buildAnalysis()
+      { analysis: buildAnalysis() }
     );
     const executionPlanCell = findCell(cells, "## 6. Execution plan");
     expect(executionPlanCell.value).toContain("Actual execution plan (EXPLAIN ANALYZE)");
@@ -448,7 +472,7 @@ describe("buildAiAnalysisNotebookCells", () => {
         },
         planTableMappings: [{ planNodeId: "n0", tableName: "orders" }],
       }),
-      buildAnalysis(),
+      { analysis: buildAnalysis() },
     );
     const executionPlan = findCell(cells, "## 6. Execution plan").value;
     expect(executionPlan.indexOf("Actual execution plan")).toBeLessThan(
@@ -468,7 +492,7 @@ describe("buildAiAnalysisNotebookCells", () => {
           actualPlan: { source: "EXPLAIN ANALYZE", format: "text", content: "-> Table scan on orders" },
         },
       }),
-      buildAnalysis()
+      { analysis: buildAnalysis() }
     );
     expect(cells).toHaveLength(12);
     const executionPlanCell = findCell(cells, "## 6. Execution plan");
@@ -486,17 +510,27 @@ describe("saveAiAnalysisAsNotebook", () => {
     });
   });
 
+  it("refuses to save a report with neither an analysis nor a comparison", async () => {
+    const result = await saveAiAnalysisAsNotebook(buildContext(), {});
+
+    expect(result).toEqual({
+      ok: false,
+      message: "There is no AI analysis or baseline comparison to save.",
+    });
+    expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+  });
+
   it("returns ok:false and writes nothing when no workspace folder is open", async () => {
     setWorkspaceFolders(undefined);
 
-    const result = await saveAiAnalysisAsNotebook(buildContext(), buildAnalysis());
+    const result = await saveAiAnalysisAsNotebook(buildContext(), { analysis: buildAnalysis() });
 
     expect(result.ok).toBe(false);
     expect(workspace.fs.writeFile).not.toHaveBeenCalled();
   });
 
   it("creates the reports/performance-tuning directory and writes the notebook there", async () => {
-    const result = await saveAiAnalysisAsNotebook(buildContext(), buildAnalysis());
+    const result = await saveAiAnalysisAsNotebook(buildContext(), { analysis: buildAnalysis() });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -511,6 +545,9 @@ describe("saveAiAnalysisAsNotebook", () => {
     expect((dirUri as Uri).fsPath.replace(/\\/g, "/")).toBe("/workspace/reports/performance-tuning");
 
     expect(workspace.fs.writeFile).toHaveBeenCalledTimes(1);
+    const written = writtenNotebook();
+    expect(written.cells.some((cell) => cell.metadata?.cellLabel === "AI analysis JSON")).toBe(true);
+    expect(written.cells.some((cell) => cell.value.includes("The query does a full scan on orders."))).toBe(true);
     const [fileUri] = (workspace.fs.writeFile as Mock).mock.calls[0];
     expect((fileUri as Uri).fsPath.replace(/\\/g, "/")).toContain(
       "/workspace/reports/performance-tuning/perf-tuning-analysis-app-"
@@ -523,7 +560,7 @@ describe("saveAiAnalysisAsNotebook", () => {
   it("picks a different filename when the timestamped path already exists", async () => {
     (workspace.fs.stat as Mock).mockResolvedValueOnce({} as never);
 
-    const result = await saveAiAnalysisAsNotebook(buildContext(), buildAnalysis());
+    const result = await saveAiAnalysisAsNotebook(buildContext(), { analysis: buildAnalysis() });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {

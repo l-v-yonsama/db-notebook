@@ -285,7 +285,7 @@ cell). Native Query history therefore does not show the generic SQL History Note
 table/index/key-condition/filter/Projection/consistency
 structure with different partition/sort key values merges into that one history entry — the newest
 values are kept for `Execute`, but never shown in the entry's label, tooltip, or **Performance
-Tuning** preview (see [Performance Tuning Guide](performanceTuning.md#7-dynamodb)). A failed re-run
+Tuning** preview (see [Performance Tuning Guide](performanceTuning.md#8-dynamodb)). A failed re-run
 never overwrites the prior successful result; only its error is recorded alongside it.
 
 For a native Query entry created by this panel, choose **Open in Dynamo Query Panel** from SQL

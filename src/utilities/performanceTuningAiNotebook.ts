@@ -15,6 +15,12 @@ import type { PerformanceTuningHumanSummary } from "../shared/PerformanceTuningH
 import type { CellMeta } from "../types/Notebook";
 import { createDirectory, existsUri } from "./fsUtil";
 import { buildAiAnalysisPrompt } from "./performanceTuningAiPrompt";
+import type { ComparisonAiInput } from "./performanceTuningComparisonAiInput";
+import {
+  buildComparisonJsonAppendixMarkdown,
+  buildComparisonMarkdown,
+  type PerformanceTuningComparisonReportInput,
+} from "./performanceTuningComparisonReport";
 import { buildPerformanceTuningDiagnosticGroups } from "./performanceTuningDiagnosticFormatter";
 import { buildPerformanceTuningHumanSummary } from "./performanceTuningHumanSummary";
 import { buildPlanTableMappingRows, formatPlanTree } from "./performanceTuningPlanFormatter";
@@ -153,7 +159,7 @@ export function formatNumber(value: number | undefined): string {
 
 function buildOverviewMarkdown(
   context: PerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult
+  analysis: PerformanceTuningAiAnalysisResult | undefined
 ): string {
   const lines: string[] = [];
   lines.push("## 1. Overview");
@@ -173,14 +179,31 @@ function buildOverviewMarkdown(
   );
   lines.push(`| Collected at | ${context.collection.collectedAt} |`);
   lines.push(`| Collection status | ${context.collection.status} |`);
-  lines.push(
-    `| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`
-  );
-  lines.push(
-    `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full"} |`
-  );
-  lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
-  lines.push(`| Confidence | ${analysis.confidence} |`);
+  // A comparison-only report is saved without ever running an AI analysis
+  // (comparison implementation plan §14), so these rows describe an AI run
+  // that may legitimately not have happened.
+  if (analysis) {
+    lines.push(
+      `| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`
+    );
+    lines.push(
+      `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full"} |`
+    );
+    const tokenUsage = analysis.request?.tokenUsage;
+    if (tokenUsage) {
+      const percentage = tokenUsage.maxInputTokens > 0
+        ? `${((tokenUsage.inputTokens / tokenUsage.maxInputTokens) * 100).toFixed(1)}%`
+        : "-";
+      lines.push(
+        `| Estimated AI input | ${formatNumber(tokenUsage.inputTokens)} / ${formatNumber(tokenUsage.maxInputTokens)} tokens (${percentage}) |`
+      );
+      lines.push(`| Token safety margin | ${formatNumber(tokenUsage.safetyMargin)} tokens |`);
+    }
+    lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
+    lines.push(`| Confidence | ${analysis.confidence} |`);
+  } else {
+    lines.push("| AI analysis | Not run - this report contains collected evidence only |");
+  }
   return lines.join("\n");
 }
 
@@ -385,7 +408,16 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
 // (PerformanceTuningAiAnalysisResult, the shared response shape for both
 // engines), no RDB-specific field, so dynamoDbPerformanceTuningNotebook.ts
 // reuses it directly.
-export function buildAnalysisMarkdown(analysis: PerformanceTuningAiAnalysisResult): string {
+export function buildAnalysisMarkdown(
+  analysis: PerformanceTuningAiAnalysisResult | undefined
+): string {
+  if (!analysis) {
+    return [
+      "### 4.2. AI summary",
+      "",
+      "_No AI analysis was run for this report. Every chapter below is deterministic evidence collected by the extension._",
+    ].join("\n");
+  }
   const lines: string[] = [];
   lines.push("### 4.2. AI summary");
   lines.push("");
@@ -515,18 +547,22 @@ export function buildJsonAppendixMarkdown(appendixLabel = "Appendix A"): string 
 
 function buildAiRequestMessagesJson(
   context: PerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult
+  analysis: PerformanceTuningAiAnalysisResult,
+  comparisonInput: ComparisonAiInput | undefined
 ): string {
   const request = analysis.request;
   const prompt = buildAiAnalysisPrompt(context, {
     translateResponse: request?.translateResponse,
     language: request?.language,
     contextDetail: request?.contextDetail,
+    comparison: comparisonInput,
   });
   return JSON.stringify(
     {
       promptFormatVersion: request?.promptFormatVersion ?? 1,
       model: analysis.model,
+      ...(request?.tokenUsage ? { tokenUsage: request.tokenUsage } : {}),
+      ...(request?.comparison ? { comparison: request.comparison } : {}),
       messages: [
         { role: "assistant", content: prompt.assistant },
         { role: "user", content: prompt.user },
@@ -537,11 +573,34 @@ function buildAiRequestMessagesJson(
   );
 }
 
+/**
+ * What a saved report covers. Both fields are optional and independent
+ * (comparison implementation plan §14): an AI analysis alone is the original
+ * report, a comparison alone is a "what changed" report saved without ever
+ * calling a model, and both together is the full report. The caller is
+ * responsible for not asking for a report with neither.
+ */
+export type PerformanceTuningReportInput = {
+  analysis?: PerformanceTuningAiAnalysisResult;
+  comparison?: PerformanceTuningComparisonReportInput;
+  // The exact Comparison Input that travelled with `analysis`'s own request,
+  // captured when that request was built. The "AI request messages" cell
+  // claims to be what was really sent, so it reproduces this verbatim instead
+  // of re-projecting `comparison.evidence` - which may have been recomputed
+  // since, against a re-collected Current side or a different baseline (§14).
+  analysisComparisonInput?: ComparisonAiInput;
+};
+
 /** Pure cell-construction step (§8.2) - kept separate from the write/open I/O below for unit testing. */
 export function buildAiAnalysisNotebookCells(
   context: PerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult
+  input: PerformanceTuningReportInput
 ): NotebookCellData[] {
+  const { analysis, comparison } = input;
+  // The comparison is appended as its own chapter rather than inserted into
+  // the middle: §14 says a comparison *adds* to the normal report, and
+  // renumbering chapters 5-7 for one variant would break the anchors every
+  // already-saved report uses.
   const tocEntries: NotebookTocEntry[] = [
     { label: "1. Overview", anchor: "1-overview" },
     { label: "2. Target SQL", anchor: "2-target-sql" },
@@ -550,12 +609,22 @@ export function buildAiAnalysisNotebookCells(
     { label: "5. Query structure", anchor: "5-query-structure" },
     { label: "6. Execution plan", anchor: "6-execution-plan" },
     { label: "7. Additional information", anchor: "7-additional-information" },
+    ...(comparison
+      ? [{ label: "8. Comparison with baseline", anchor: "8-comparison-with-baseline" }]
+      : []),
     { label: "Appendix A. Raw data", anchor: "appendix-a-raw-data" },
+    ...(comparison
+      ? [{ label: "Appendix B. Comparison raw data", anchor: "appendix-b-comparison-raw-data" }]
+      : []),
   ];
   const diagnosticSections = buildDiagnosticSections(context);
   const cells: NotebookCellData[] = [
     markupCell(
-      buildNotebookTocMarkdown("Performance Tuning AI Analysis", tocEntries, context.collection.status),
+      buildNotebookTocMarkdown(
+        comparison ? "Performance Tuning Comparison Report" : "Performance Tuning AI Analysis",
+        tocEntries,
+        context.collection.status,
+      ),
       { excludeFromHtml: true },
     ),
     markupCell(buildOverviewMarkdown(context, analysis)),
@@ -573,10 +642,43 @@ export function buildAiAnalysisNotebookCells(
     markupCell(buildQueryStructureMarkdown(context)),
     markupCell(buildExecutionPlanMarkdown(context)),
     markupCell(diagnosticSections.information),
+    ...(comparison
+      ? [
+          markupCell(
+            buildComparisonMarkdown(
+              comparison.evidence,
+              comparison.evidence.source.baseline.fileName,
+              { section: "8" },
+            ),
+          ),
+        ]
+      : []),
     markupCell(buildJsonAppendixMarkdown()),
     jsonCodeCell(JSON.stringify(context, null, 2), "Full context JSON"),
-    jsonCodeCell(buildAiRequestMessagesJson(context, analysis), "AI request messages"),
-    jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON")
+    ...(analysis
+      ? [
+          jsonCodeCell(
+            buildAiRequestMessagesJson(context, analysis, input.analysisComparisonInput),
+            "AI request messages",
+          ),
+          jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON"),
+        ]
+      : []),
+    ...(comparison
+      ? [
+          markupCell(buildComparisonJsonAppendixMarkdown("Appendix B")),
+          jsonCodeCell(JSON.stringify(comparison.evidence, null, 2), "Comparison Evidence JSON"),
+          jsonCodeCell(
+            JSON.stringify(comparison.baselineContext, null, 2),
+            "Baseline Full context JSON",
+          ),
+          // Duplicates the unprefixed cell above on purpose: existing readers
+          // keep working, and selecting this report as a baseline later
+          // resolves the Current side rather than reaching back to the older
+          // baseline (§6.2, §14).
+          jsonCodeCell(JSON.stringify(context, null, 2), "Current Full context JSON"),
+        ]
+      : []),
   ];
   return cells;
 }
@@ -591,11 +693,21 @@ export type SaveAiAnalysisAsNotebookResult =
  * analysis, and both raw JSON payloads as evidence (§8). Never appends to an
  * existing Notebook and never prompts a save dialog - both decided with the
  * user (design doc §16.1).
+ *
+ * `input` may carry an AI analysis, a baseline comparison, or both - a
+ * comparison-only report is saved without ever calling a model (comparison
+ * implementation plan §14).
  */
 export async function saveAiAnalysisAsNotebook(
   context: PerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult
+  input: PerformanceTuningReportInput
 ): Promise<SaveAiAnalysisAsNotebookResult> {
+  if (!input.analysis && !input.comparison) {
+    return {
+      ok: false,
+      message: "There is no AI analysis or baseline comparison to save.",
+    };
+  }
   const wsFolder = workspace.workspaceFolders?.[0];
   if (!wsFolder) {
     return {
@@ -618,7 +730,7 @@ export async function saveAiAnalysisAsNotebook(
     targetUri = Uri.joinPath(dirUri, filename);
   }
 
-  const cells = buildAiAnalysisNotebookCells(context, analysis);
+  const cells = buildAiAnalysisNotebookCells(context, input);
   await writeNotebookFile(cells, targetUri);
   // ViewColumn.Two, not Beside, matching cfnDiagramPreviewNotebook.ts's
   // established convention for "open a generated Notebook next to whatever

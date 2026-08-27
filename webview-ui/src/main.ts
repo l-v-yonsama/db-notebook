@@ -4,7 +4,16 @@ import {
   faArrowUp,
   faBook,
   faCheck,
+  // Baseline comparison verdicts - always rendered as icon + text, never
+  // color alone (comparison implementation plan §12).
+  faCircleArrowRight,
+  faCircleCheck,
+  faCircleExclamation,
+  faCircleInfo,
+  faCircleMinus,
   faCirclePlay,
+  faCirclePlus,
+  faCircleQuestion,
   faCircleXmark,
   faClipboard,
   faCodeCompare,
@@ -28,6 +37,7 @@ import {
   faTrash,
   faTriangleExclamation,
   faWandMagicSparkles,
+  faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import VirtualList from "@virtual-list/vue";
@@ -42,7 +52,14 @@ library.add(faArrowDown);
 library.add(faBook);
 library.add(faCheck);
 library.add(faClipboard);
+library.add(faCircleArrowRight);
+library.add(faCircleCheck);
+library.add(faCircleExclamation);
+library.add(faCircleInfo);
+library.add(faCircleMinus);
 library.add(faCirclePlay);
+library.add(faCirclePlus);
+library.add(faCircleQuestion);
 library.add(faCircleXmark);
 library.add(faCodeCompare);
 library.add(faCommentDots);
@@ -65,6 +82,7 @@ library.add(faTrash);
 library.add(faTimes);
 library.add(faTriangleExclamation);
 library.add(faWandMagicSparkles);
+library.add(faXmark);
 
 const app = createApp(App);
 app.component("Splitpanes", Splitpanes);

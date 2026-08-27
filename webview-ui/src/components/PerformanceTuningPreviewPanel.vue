@@ -9,6 +9,7 @@ import type {
   DynamoDbPerformanceTuningInitializeViewModel,
   LabelValueItem,
   PerformanceTuningAiAnalysisViewState,
+  PerformanceTuningComparisonViewState,
   PerformanceTuningPreviewPanelEventData,
   RelationalPerformanceTuningInitializeViewModel,
 } from "@/utilities/vscode";
@@ -22,6 +23,7 @@ import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
 import DynamoDbPerformanceTuningView from "./DynamoDbPerformanceTuningView.vue";
+import PerformanceTuningComparisonView from "./PerformanceTuningComparisonView.vue";
 import RelationalPerformanceTuningView from "./RelationalPerformanceTuningView.vue";
 
 const relational = ref<RelationalPerformanceTuningInitializeViewModel | undefined>(undefined);
@@ -59,12 +61,44 @@ const copyPromptForOtherAi = computed(() =>
   translateResponse.value ? translatedPlainTextPrompt.value : plainTextPrompt.value
 );
 
+// Baseline comparison (§12). Host-owned state: every transition (select,
+// change, clear, and a rebuild after the Current context was re-collected)
+// arrives as a "comparison-update", so the webview never derives it.
+const comparison = ref<PerformanceTuningComparisonViewState>({ status: "idle" });
+
 // A fresh context invalidates the previous analysis.
 const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
 const isAnalyzing = computed(() => analysis.value.status === "running");
 const analysisJson = computed(() =>
   analysis.value.result ? JSON.stringify(analysis.value.result, null, 2) : ""
 );
+const estimatedTokenUsage = computed(() => {
+  const usage = analysis.value.result?.request?.tokenUsage ?? analysis.value.tokenUsage;
+  if (!usage) {
+    return undefined;
+  }
+  const percentage = usage.maxInputTokens > 0
+    ? ((usage.inputTokens / usage.maxInputTokens) * 100).toFixed(1)
+    : "-";
+  return `${usage.inputTokens.toLocaleString()} / ${usage.maxInputTokens.toLocaleString()} tokens (${percentage}%; safety margin ${usage.safetyMargin.toLocaleString()} tokens)`;
+});
+
+const canSaveNotebook = computed(
+  () =>
+    comparison.value.status === "ready" ||
+    (analysis.value.status === "success" && !comparison.value.analysisStale)
+);
+const saveNotebookTitle = computed(() => {
+  if (!canSaveNotebook.value) {
+    return "Run Analyze with AI, or select a baseline to compare against, to save a report";
+  }
+  if (analysis.value.status !== "success" || comparison.value.analysisStale) {
+    return "Save the baseline comparison as a new Notebook under reports/performance-tuning/";
+  }
+  return comparison.value.status === "ready"
+    ? "Save the AI analysis and the baseline comparison as a new Notebook under reports/performance-tuning/"
+    : "Save the AI analysis as a new Notebook under reports/performance-tuning/";
+});
 
 // "Run Explain Analyze" (RDB) / "Run Observed Read" (DynamoDB) - one shared
 // running flag + host round trip, since the two are mutually exclusive per
@@ -120,6 +154,7 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   plainTextPrompt.value = v.plainTextPrompt;
   translatedPlainTextPrompt.value = v.translatedPlainTextPrompt;
   analysis.value = { status: "idle" };
+  comparison.value = v.comparison;
   isRunningSecondaryAction.value = false;
 };
 
@@ -132,6 +167,20 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
     case "analysis-update":
       if (value.analysis) {
         analysis.value = value.analysis;
+      }
+      break;
+    case "comparison-update":
+      if (value.comparison) {
+        comparison.value = value.comparison;
+      }
+      // Selecting or clearing a baseline changes what "Copy Prompt for Other
+      // AI" has to contain, and the host precomputes it - so it arrives
+      // rebuilt alongside the comparison rather than going stale here.
+      if (value.plainTextPrompt !== undefined) {
+        plainTextPrompt.value = value.plainTextPrompt;
+      }
+      if (value.translatedPlainTextPrompt !== undefined) {
+        translatedPlainTextPrompt.value = value.translatedPlainTextPrompt;
       }
       break;
     case "stop-progress":
@@ -186,6 +235,16 @@ const runObservedRead = (): void => {
     command: "runObservedRead",
     params: {},
   });
+};
+
+// The file picker itself is host-side (window.showOpenDialog) - the webview
+// never handles a path (§6.1).
+const selectBaseline = (): void => {
+  vscode.postCommand({ command: "selectPerformanceTuningBaseline", params: {} });
+};
+
+const clearBaseline = (): void => {
+  vscode.postCommand({ command: "clearPerformanceTuningBaseline", params: {} });
 };
 
 const evidenceLabel = (
@@ -272,8 +331,11 @@ defineExpose({
         <!-- Save as Notebook - one shared button; PerformanceTuningPreviewPanel.ts's
              saveAnalysisAsNotebook() picks the RDB or DynamoDB report
              builder itself based on the currently-held context. -->
-        <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success'"
-          title="Save the AI analysis as a new Notebook under reports/performance-tuning/"
+        <!-- Enabled by either a successful AI analysis or a baseline
+             comparison: §14 of the comparison plan requires a comparison
+             report to be savable without ever running an AI analysis. -->
+        <VsCodeButton appearance="secondary" :disabled="!canSaveNotebook"
+          :title="saveNotebookTitle"
           @click="saveAiAnalysisAsNotebook">
           <fa icon="book" />Save as Notebook
         </VsCodeButton>
@@ -323,6 +385,16 @@ defineExpose({
       <RelationalPerformanceTuningView v-if="engine === 'relational'" :data="relational!" part="body" />
       <DynamoDbPerformanceTuningView v-else :data="dynamodb!" part="body" />
 
+      <!-- Baseline comparison (§12) - always rendered, so the
+           "Compare with Baseline…" affordance has a visible home even before
+           anything is selected, the same reasoning as the AI Analysis
+           section's own idle state below. -->
+      <PerformanceTuningComparisonView
+        :state="comparison"
+        @select="selectBaseline"
+        @clear="clearBaseline"
+      />
+
       <!-- AI Analysis is always rendered, even at idle: a first-time user
            had no on-screen indication of *where* the result would show up
            until after clicking "Analyze with AI" - this idle-state hint
@@ -338,10 +410,21 @@ defineExpose({
           Review the details above, then click "Analyze with AI" to see the analysis results here.
         </p>
 
-        <p v-else-if="analysis.status === 'running'" class="analysis-status">Analyzing with AI…</p>
+        <div v-else-if="analysis.status === 'running'">
+          <p class="analysis-status">Analyzing with AI…</p>
+          <p v-if="estimatedTokenUsage" class="section-note">
+            Estimated AI input: {{ estimatedTokenUsage }}
+          </p>
+        </div>
 
         <div v-else-if="analysis.status === 'error'" class="analysis-error">
           <p>{{ analysis.errorMessage }}</p>
+          <p v-if="estimatedTokenUsage" class="section-note">
+            Smallest attempted AI input: {{ estimatedTokenUsage }}
+            <span v-if="analysis.contextDetail">
+              — Current context {{ analysis.contextDetail }}<span v-if="analysis.comparisonDetail">, comparison {{ analysis.comparisonDetail }}</span>
+            </span>
+          </p>
           <details v-if="analysis.rawResponseText" class="advanced-details">
             <summary>Raw AI response</summary>
             <pre class="raw-response">{{ analysis.rawResponseText }}</pre>
@@ -349,7 +432,19 @@ defineExpose({
         </div>
 
         <div v-else-if="analysis.status === 'success' && analysis.result">
+          <!-- The baseline changed after this result was produced, so it
+               never saw the comparison now on screen. Saying so is required
+               rather than presenting the old text as current commentary
+               (§12). -->
+          <p v-if="comparison.analysisStale" class="analysis-stale">
+            <fa icon="triangle-exclamation" />
+            Baseline changed; run Analyze with AI again. The analysis below was produced before the
+            current baseline selection and does not reflect the comparison above.
+          </p>
           <p class="section-note">AI input: {{ analysis.result.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full" }}</p>
+          <p v-if="estimatedTokenUsage" class="section-note">
+            Estimated AI input: {{ estimatedTokenUsage }}
+          </p>
           <p class="analysis-summary">{{ analysis.result.summary }}</p>
 
           <div v-if="analysis.result.findings.length > 0" class="analysis-subsection">
@@ -574,8 +669,11 @@ defineExpose({
        never has to avoid colliding with each other, only with these). */
     .collection-issues-section { order: 2; }
     .information-section { order: 3; }
-    .ai-analysis-section { order: 8; }
-    .advanced-details-section { order: 9; }
+    /* The deterministic comparison sits directly above AI Analysis, which is
+       a consumer of it rather than a peer (§19). */
+    .comparison-section { order: 8; }
+    .ai-analysis-section { order: 9; }
+    .advanced-details-section { order: 10; }
 
     .section {
       margin-bottom: 12px;
@@ -639,6 +737,12 @@ defineExpose({
 
     .analysis-error {
       color: var(--vscode-errorForeground);
+    }
+
+    .analysis-stale {
+      color: var(--vscode-editorWarning-foreground);
+      font-size: 0.9em;
+      margin: 0 0 8px 0;
     }
 
     .raw-response {

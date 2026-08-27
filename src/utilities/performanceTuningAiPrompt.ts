@@ -1,4 +1,8 @@
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  buildComparisonInstructions,
+  type ComparisonAiInput,
+} from "./performanceTuningComparisonAiInput";
 
 // Builds deterministic assistant/user prompt pairs without calling vscode.lm.
 
@@ -98,6 +102,10 @@ export type BuildAiAnalysisPromptOptions = {
   // Full is deliberately the default so saved Notebooks and manual-copy
   // prompts retain the complete, reproducible database artifact.
   contextDetail?: "full" | "compact";
+  // Baseline comparison (comparison implementation plan §13.1). Already
+  // projected down by buildComparisonAiInput() - this file never receives,
+  // and therefore can never send, the baseline's whole Full Context.
+  comparison?: ComparisonAiInput;
 };
 
 /**
@@ -140,7 +148,11 @@ export function buildCompactAiAnalysisContext(context: PerformanceTuningContext)
 // split) and buildPlainTextAnalysisPrompt() (folded into one combined
 // string, since a manual copy/paste has no separate system-message
 // channel) - identical content either way, just assembled differently.
-function buildContextSection(context: PerformanceTuningContext, contextForAi: unknown = context): string {
+function buildContextSection(
+  context: PerformanceTuningContext,
+  contextForAi: unknown = context,
+  comparison?: ComparisonAiInput
+): string {
   const contextJson = JSON.stringify(contextForAi, null, 2);
 
   const dmlSafety = context.statement.analyzeEligibility?.allowed === false
@@ -169,6 +181,18 @@ function buildContextSection(context: PerformanceTuningContext, contextForAi: un
     contextJson,
     "```",
     "",
+    // Appended after the Current context, so the model reads what is on
+    // screen now first and the comparison as commentary on it (§13.1).
+    ...(comparison
+      ? [
+          "# Comparison input (JSON)",
+          "",
+          "```json",
+          JSON.stringify(comparison, null, 2),
+          "```",
+          "",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -176,7 +200,11 @@ export function buildAiAnalysisPrompt(
   context: PerformanceTuningContext,
   options: BuildAiAnalysisPromptOptions = {}
 ): PerformanceTuningAiPrompt {
-  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT, "", RESPONSE_FORMAT_INSTRUCTIONS];
+  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT];
+  if (options.comparison) {
+    assistantParts.push("", buildComparisonInstructions("rdb"));
+  }
+  assistantParts.push("", RESPONSE_FORMAT_INSTRUCTIONS);
   if (options.translateResponse && options.language) {
     assistantParts.push(
       "",
@@ -190,7 +218,10 @@ export function buildAiAnalysisPrompt(
   const assistant = [...assistantParts, ""].join("\n");
 
   const contextForAi = options.contextDetail === "compact" ? buildCompactAiAnalysisContext(context) : context;
-  return { assistant, user: buildContextSection(context, contextForAi) };
+  return {
+    assistant,
+    user: buildContextSection(context, contextForAi, options.comparison),
+  };
 }
 
 // "Copy Prompt for Other AI" toolbar action (PerformanceTuningPreviewPanel.ts) -
@@ -203,17 +234,22 @@ export function buildAiAnalysisPrompt(
 // JSON fields used by buildAiAnalysisPrompt().
 export function buildPlainTextAnalysisPrompt(
   context: PerformanceTuningContext,
-  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language"> = {}
+  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language" | "comparison"> = {}
 ): string {
   const translationInstruction = options.translateResponse && options.language
     ? `Answer all human-readable prose in the following language: ${options.language}. Do not translate SQL code, database identifiers, or evidence identifiers.`
     : undefined;
   return [
     ASSISTANT_ANALYSIS_PROMPT,
+    // The external-AI path gets the same Comparison Input and the same
+    // instructions as the Copilot path, so the two are analyzing under
+    // identical conditions - §13.2 rules out concatenating two full contexts
+    // here just because there is no token limit to respect.
+    ...(options.comparison ? ["", buildComparisonInstructions("rdb")] : []),
     "",
     PLAIN_TEXT_RESPONSE_INSTRUCTIONS,
     ...(translationInstruction ? ["", translationInstruction] : []),
     "",
-    buildContextSection(context),
+    buildContextSection(context, context, options.comparison),
   ].join("\n");
 }

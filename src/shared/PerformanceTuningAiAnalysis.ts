@@ -1,6 +1,8 @@
 // Structured AI output for performance tuning. Evidence references let users
 // verify findings against the collected Full Context JSON.
 
+import type { ComparisonAiInputDetail } from "./PerformanceTuningComparison";
+
 /**
  * Points a finding/recommendation back at the specific piece of
  * PerformanceTuningContext it's about, so a reader can cross-check the AI's
@@ -67,6 +69,12 @@ export type PerformanceTuningAiRecommendation = {
 
 export type PerformanceTuningAiConfidence = "low" | "medium" | "high";
 
+export type PerformanceTuningAiTokenUsage = {
+  inputTokens: number;
+  maxInputTokens: number;
+  safetyMargin: number;
+};
+
 export type PerformanceTuningAiAnalysisResult = {
   formatVersion: 1;
   summary: string;
@@ -93,6 +101,22 @@ export type PerformanceTuningAiAnalysisResult = {
     // records whether the request itself used the model-limit compact
     // projection, so the saved AI request messages remain reproducible.
     contextDetail: "full" | "compact";
+    // Model-specific preflight measurement captured immediately before the
+    // request was sent. `inputTokens` is an estimate returned by VS Code's
+    // model.countTokens(); provider-side message framing may add tokens that
+    // are not visible here, hence the separately recorded safety margin.
+    tokenUsage?: PerformanceTuningAiTokenUsage;
+    // Present only when a baseline comparison was included in the request
+    // (baseline comparison implementation plan §16 Phase 3). Records which
+    // rung of the shrink ladder the request actually used and exactly what
+    // that rung left out, so a saved report never implies the model saw more
+    // than it did (§13.1's "無言で切り捨てない").
+    comparison?: {
+      detail: ComparisonAiInputDetail;
+      omittedFields: string[];
+      baselineFileName: string;
+      baselineContextSha256: string;
+    };
   };
   generatedAt: string; // ISO8601, set by the extension host, not the model
 };
