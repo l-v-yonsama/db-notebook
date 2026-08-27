@@ -35,6 +35,7 @@ import type { ComponentName } from "./ComponentName";
 import type { DBDumpInputParams, DBDumpSettingsUIParams } from "./DBDumpParams";
 import type { DBRestoreInputParams, DBRestoreSettingsUIParams } from "./DBRestoreParams";
 import type {
+  DynamoQueryBuildMode,
   DynamoQueryFilter,
   DynamoQueryProjectionConstraintView,
   DynamoQueryProjectionMode,
@@ -230,6 +231,7 @@ export type DynamoQueryPanelEventData = BaseMessageEventData<
       projectionMode: DynamoQueryProjectionMode;
       projectedAttributes: string[];
       consistentRead: boolean;
+      buildMode: DynamoQueryBuildMode;
       projectionConstraint: DynamoQueryProjectionConstraintView;
     };
     setPreviewInput?: {

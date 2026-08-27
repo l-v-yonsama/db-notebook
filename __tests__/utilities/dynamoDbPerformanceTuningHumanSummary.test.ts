@@ -234,6 +234,35 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
     ).toBe("unknown");
   });
 
+  it("does not turn missing throttle datapoints into a confirmed zero", () => {
+    const value = context({
+      cloudWatch: { window: { startTime: "t0", endTime: "t1", periodSeconds: 60 }, series: [] },
+      collection: {
+        collectedAt: "2026-08-24T00:00:00.000Z",
+        status: "complete",
+        diagnostics: [
+          {
+            code: "DYNAMODB_CLOUDWATCH_NO_DATA",
+            severity: "info",
+            affectsCompleteness: false,
+            scope: "cloudWatchMetrics",
+            message: "No CloudWatch datapoints for ReadThrottleEvents (Sum).",
+            tableName: "orders",
+            metricName: "ReadThrottleEvents",
+          },
+        ],
+        unavailableSections: [],
+      },
+    });
+    const signal = buildDynamoDbPerformanceTuningHumanSummary(value).signals.find((s) => s.kind === "throttling");
+    expect(signal).toMatchObject({
+      level: "info",
+      title: "No throttle datapoints reported",
+    });
+    expect(signal?.summary).toContain("missing datapoints are not treated as a confirmed zero");
+    expect(signal?.rawDataPath).toContain("collection.diagnostics");
+  });
+
   it("treats intentionally skipped monitoring as informational instead of unknown", () => {
     const value = context({
       collection: {

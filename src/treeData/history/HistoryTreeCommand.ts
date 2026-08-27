@@ -122,43 +122,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     );
   };
 
-  // native Query history is never turned into a `sql`-language cell - its
-  // sqlDoc is a value-free description text, not PartiQL/SQL (design doc
-  // §8.3). A dedicated 2-cell shape instead: a provenance Markdown cell (its
-  // own wording, since it can show DynamoDB's item count) followed by a JSON
-  // cell with the real, value-ful input for reproduction/inspection - never
-  // presented as directly executable from the Notebook (that stays the
-  // History "Execute" command's and the Query Panel's job).
-  const createDynamoQueryMarkdownCellByHistory = (history: SQLHistory) => {
-    const parts = [history.connectionName];
-    if (history.executedAt) {
-      parts.push(dayjs(history.executedAt).format("YYYY-MM-DD HH:mm"));
-    }
-    if (history.status === "error") {
-      parts.push("error");
-    } else {
-      const returnedItemCount =
-        history.summary?.dynamoDb?.returnedItemCount ?? history.summary?.selectedRows;
-      if (returnedItemCount !== undefined) {
-        parts.push(`${returnedItemCount} ${returnedItemCount === 1 ? "item" : "items"}`);
-      }
-    }
-    return new NotebookCellData(
-      NotebookCellKind.Markup,
-      `_From SQL history (DynamoDB native Query): ${parts.join(" ・ ")}_`,
-      "markdown"
-    );
-  };
-
-  const createDynamoQueryJsonCellByHistory = (history: SQLHistory) => {
-    const input = history.request?.kind === "dynamodbQuery" ? history.request.input : {};
-    return new NotebookCellData(NotebookCellKind.Code, JSON.stringify(input, null, 2), "json");
-  };
-
   const createNotebookCellsForHistory = (history: SQLHistory): NotebookCellData[] => {
-    if (history.request?.kind === "dynamodbQuery") {
-      return [createDynamoQueryMarkdownCellByHistory(history), createDynamoQueryJsonCellByHistory(history)];
-    }
     const cells: NotebookCellData[] = [];
     if (history.variables && Object.keys(history.variables).length > 0) {
       cells.push(
@@ -172,12 +136,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   const createNotebookCellsByHistories = (histories: SQLHistory[]): NotebookCellData[] => {
     const cells: NotebookCellData[] = [];
     for (const history of histories) {
-      // The DynamoDB markdown cell above already carries the same
-      // provenance role as createProvenanceMarkdownCellByHistory() - adding
-      // both would duplicate it.
-      if (history.request?.kind !== "dynamodbQuery") {
-        cells.push(createProvenanceMarkdownCellByHistory(history));
-      }
+      cells.push(createProvenanceMarkdownCellByHistory(history));
       cells.push(...createNotebookCellsForHistory(history));
     }
     return cells;
@@ -186,7 +145,10 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   const resolveSelectedHistories = (
     history: SQLHistory,
     selectedHistories?: SQLHistory[]
-  ): SQLHistory[] => (selectedHistories && selectedHistories.length > 0 ? selectedHistories : [history]);
+  ): SQLHistory[] =>
+    (selectedHistories && selectedHistories.length > 0 ? selectedHistories : [history]).filter(
+      (item) => item.request?.kind !== "dynamodbQuery"
+    );
 
   registerDisposableCommand(REFRESH_SQL_HISTORIES, () => {
     historyTreeProvider.refresh(true);
@@ -221,6 +183,9 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   });
 
   registerDisposableCommand(OPEN_SQL_HISTORY, async (history: SQLHistory) => {
+    if (history.request?.kind === "dynamodbQuery") {
+      return;
+    }
     const cells = createNotebookCellsForHistory(history);
     commands.executeCommand(CREATE_NEW_NOTEBOOK, cells);
   });
@@ -229,6 +194,9 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     OPEN_SQL_HISTORIES_AS_NOTEBOOK,
     async (history: SQLHistory, selectedHistories?: SQLHistory[]) => {
       const histories = resolveSelectedHistories(history, selectedHistories);
+      if (histories.length === 0) {
+        return;
+      }
       const cells = createNotebookCellsByHistories(histories);
       commands.executeCommand(CREATE_NEW_NOTEBOOK, cells);
     }
@@ -237,13 +205,16 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   registerDisposableCommand(
     APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK,
     async (history: SQLHistory, selectedHistories?: SQLHistory[]) => {
+      const histories = resolveSelectedHistories(history, selectedHistories);
+      if (histories.length === 0) {
+        return;
+      }
       const activeEditor = window.activeNotebookEditor;
       if (!activeEditor || activeEditor.notebook.notebookType !== NOTEBOOK_TYPE) {
         showWindowErrorMessage("No active notebook editor found.");
         return;
       }
 
-      const histories = resolveSelectedHistories(history, selectedHistories);
       const cells = createNotebookCellsByHistories(histories);
       const edit = new WorkspaceEdit();
       const notebookEdit = NotebookEdit.insertCells(activeEditor.selection.end, cells);

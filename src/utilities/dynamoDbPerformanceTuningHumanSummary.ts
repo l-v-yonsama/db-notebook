@@ -180,6 +180,18 @@ function buildThrottlingSignal(context: DynamoDbPerformanceTuningContext): Dynam
       rawDataPath: "Full context JSON → collection.unavailableSections",
     };
   }
+  const missingThrottleDatapoints = context.collection.diagnostics.some(
+    (d) => d.code === "DYNAMODB_CLOUDWATCH_NO_DATA" && d.metricName?.toLowerCase().includes("throttle"),
+  );
+  if (missingThrottleDatapoints) {
+    return {
+      kind: "throttling",
+      level: "info",
+      title: "No throttle datapoints reported",
+      summary: `CloudWatch returned no throttle datapoints for ${targetRef(context)} in the collection window (${context.cloudWatch.window.startTime} – ${context.cloudWatch.window.endTime}). This is common when no throttle events are reported; missing datapoints are not treated as a confirmed zero.`,
+      rawDataPath: "Full context JSON → cloudWatch / collection.diagnostics",
+    };
+  }
   return {
     kind: "throttling",
     level: "info",

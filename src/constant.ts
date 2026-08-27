@@ -67,6 +67,7 @@ export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 //---------------------------------------------------
 // SQL HISTORIES TREE
 //---------------------------------------------------
+export const SQL_HISTORY_LABEL_MAX_LENGTH = 70;
 export const REFRESH_SQL_HISTORIES = `${EXTENSION_NAME}.refresh-sql-histories`;
 export const DELETE_ALL_SQL_HISTORY = `${EXTENSION_NAME}.delete-all-sql-histories`;
 export const EXECUTE_SQL_HISTORY = `${EXTENSION_NAME}.histories.execute`;

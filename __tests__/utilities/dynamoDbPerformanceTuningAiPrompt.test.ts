@@ -168,6 +168,30 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     expect(assistant).toContain("skew across the different key/tenant values");
   });
 
+  it("explains why Run Observed Read can return more items than resultItemLimit", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain('"accessPattern.resultItemLimit"');
+    expect(assistant).toContain("cross-response result cap");
+    expect(assistant).toContain("separate maximum-evaluated-items safety cap");
+    expect(assistant).toContain("may therefore exceed");
+    expect(assistant).toContain("do not report that difference as an inconsistent query condition");
+  });
+
+  it("forbids unsupported Capacity judgements and treats no read-time discard as positive evidence", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain('Consumed Capacity value as "high" or "low"');
+    expect(assistant).toContain("without a comparison, configured limit, throttling signal, or other explicit baseline");
+    expect(assistant).toContain("positive evidence that this read did not discard evaluated items");
+    expect(assistant).toContain("return no findings/recommendations rather than forcing one");
+  });
+
+  it("keeps CloudWatch noData distinct from confirmed zero activity", () => {
+    const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
+    expect(assistant).toContain('"noData": true');
+    expect(assistant).toContain("zero datapoints is not the same fact as zero activity");
+    expect(assistant).toContain("no evidence of throttling or errors");
+  });
+
   it("instructs the model never to conclude a hot partition without explicit evidence", () => {
     const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
     expect(assistant).toContain("DYNAMODB_KEY_RANGE_THROTTLING_OBSERVED");

@@ -108,10 +108,9 @@ describe("buildDynamoQueryDisplayText", () => {
       TableName: "orders",
       KeyConditionExpression: "#pk = :pk",
       FilterExpression: "#status = :status",
+      ExpressionAttributeNames: { "#pk": "tenantId", "#status": "status" },
     });
-    expect(text).toContain("DynamoDB Query orders");
-    expect(text).toContain("Key: #pk = :pk");
-    expect(text).toContain("Filter: #status = :status");
+    expect(text).toBe("DDB orders · K tenantId = … · F status = …");
   });
 
   it("shows the index name when querying an index", () => {
@@ -119,8 +118,9 @@ describe("buildDynamoQueryDisplayText", () => {
       TableName: "orders",
       IndexName: "iStatus",
       KeyConditionExpression: "#pk = :pk",
+      ExpressionAttributeNames: { "#pk": "tenantId" },
     });
-    expect(text).toContain("(index: iStatus)");
+    expect(text).toBe("DDB orders@iStatus · K tenantId = …");
   });
 
   it("omits the filter line when there is no FilterExpression", () => {
@@ -128,40 +128,37 @@ describe("buildDynamoQueryDisplayText", () => {
       TableName: "orders",
       KeyConditionExpression: "#pk = :pk",
     });
-    expect(text).not.toContain("Filter:");
+    expect(text).not.toContain(" · F ");
   });
 
-  it("shows 'All table attributes' for Select=ALL_ATTRIBUTES", () => {
+  it("leaves projection and read consistency to the hover's structural JSON", () => {
     const text = buildDynamoQueryDisplayText({
       TableName: "orders",
       IndexName: "lsiStatus",
       KeyConditionExpression: "#pk = :pk",
       Select: "ALL_ATTRIBUTES",
-    });
-    expect(text).toContain("Projection: All table attributes");
-  });
-
-  it("shows the ProjectionExpression when set", () => {
-    const text = buildDynamoQueryDisplayText({
-      TableName: "orders",
-      KeyConditionExpression: "#pk = :pk",
       ProjectionExpression: "#p0, #p1",
+      ConsistentRead: true,
+      ExpressionAttributeNames: { "#pk": "tenantId", "#p0": "tenantId", "#p1": "status" },
     });
-    expect(text).toContain("Projection: #p0, #p1");
+    expect(text).toBe("DDB orders@lsiStatus · K tenantId = …");
   });
 
-  it("shows consistent read only when true", () => {
-    const consistent = buildDynamoQueryDisplayText({
-      TableName: "orders",
+  it("keeps target, key, and filter visible while bounding a long label", () => {
+    const text = buildDynamoQueryDisplayText({
+      TableName: "dynamo_performance_lab_orders",
       KeyConditionExpression: "#pk = :pk",
-      ConsistentRead: true,
+      FilterExpression: "#status = :status AND #createdAt BETWEEN :from AND :to",
+      ExpressionAttributeNames: {
+        "#pk": "tenantId",
+        "#status": "status",
+        "#createdAt": "createdAt",
+      },
     });
-    expect(consistent).toContain("Consistent read: strong");
 
-    const eventual = buildDynamoQueryDisplayText({
-      TableName: "orders",
-      KeyConditionExpression: "#pk = :pk",
-    });
-    expect(eventual).not.toContain("Consistent read");
+    expect(text).toBe(
+      "DDB dynamo_perf…lab_orders · K tenantId = … · F status = … AND cr…"
+    );
+    expect(text.length).toBeLessThanOrEqual(70);
   });
 });

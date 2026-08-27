@@ -8,6 +8,7 @@ import { formatDuration } from "../toolActivity/ToolActivityTreeProvider";
 import { averageElapsedTimeMilli } from "../../utilities/sqlHistoryUtil";
 import { toDynamoDbQueryAnalysisInput } from "../../utilities/dynamoDbQueryAnalysisInput";
 import { log } from "../../utilities/logger";
+import { SQL_HISTORY_LABEL_MAX_LENGTH } from "../../constant";
 
 const PREFIX = "[HistoryTreeProvider]";
 
@@ -90,8 +91,10 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
 
 export class SQLHistoryItem extends vscode.TreeItem {
   constructor(resource: SQLHistory) {
+    const isDynamoQuery = resource.request?.kind === "dynamodbQuery";
+    const normalizedSqlDoc = resource.sqlDoc.replace(/[ \r\n]+/g, " ").trim();
     super(
-      abbr(resource.sqlDoc.replace(/[ \r\n]+/g, " ").trim(), 40) || "",
+      abbr(normalizedSqlDoc, SQL_HISTORY_LABEL_MAX_LENGTH) || "",
       vscode.TreeItemCollapsibleState.None
     );
 
@@ -111,8 +114,6 @@ export class SQLHistoryItem extends vscode.TreeItem {
     if (resource.executedAt) {
       descriptionParts.push(dayjs(resource.executedAt).format("MM/DD HH:mm"));
     }
-
-    const isDynamoQuery = resource.request?.kind === "dynamodbQuery";
 
     if (resource.status === "error") {
       descriptionParts.push("Error");
@@ -171,61 +172,44 @@ export class SQLHistoryItem extends vscode.TreeItem {
     // structural (values-free) query shape is shown as JSON underneath
     // instead of the raw request, which would leak ExpressionAttributeValues
     // into the tooltip (design doc §4.2).
-    let tooltipMarkdown = isDynamoQuery
-      ? "```text\n" + resource.sqlDoc + "\n```"
-      : "```sql\n" + resource.sqlDoc + "\n```";
+    const tooltip = new vscode.MarkdownString("", true);
+    tooltip.appendCodeblock(resource.sqlDoc, isDynamoQuery ? "text" : "sql");
     if (isDynamoQuery && resource.request?.kind === "dynamodbQuery") {
       try {
-        tooltipMarkdown +=
-          "\n\n```json\n" +
-          JSON.stringify(toDynamoDbQueryAnalysisInput(resource.request.input), null, 2) +
-          "\n```";
+        tooltip.appendMarkdown("\n");
+        tooltip.appendCodeblock(
+          JSON.stringify(toDynamoDbQueryAnalysisInput(resource.request.input), null, 2),
+          "json"
+        );
       } catch {
         // Malformed/incomplete stored input (should not happen for an entry
         // this feature itself saved) - the sqlDoc text above is still shown.
       }
     }
     if (resource.status === "error" && resource.errorMessage) {
-      tooltipMarkdown += "\n\n---\n**Error**\n```\n" + resource.errorMessage + "\n```";
+      tooltip.appendMarkdown("\n\n---\n**Error**\n");
+      tooltip.appendCodeblock(resource.errorMessage);
     }
     if (resource.lastErrorAt) {
-      tooltipMarkdown +=
-        "\n\n---\n**Last retry failed**\n```\n" +
-        (resource.lastErrorMessage || "Unknown error") +
-        "\n```";
+      tooltip.appendMarkdown("\n\n---\n**Last retry failed**\n");
+      tooltip.appendCodeblock(resource.lastErrorMessage || "Unknown error");
     }
     if (resource.performance && resource.performance.sampleCount > 0) {
       const { sampleCount, totalElapsedTimeMilli, maxElapsedTimeMilli, lastElapsedTimeMilli } =
         resource.performance;
-      tooltipMarkdown += `\n\n---\nRan ${sampleCount} times ・ last ${formatDuration(
-        lastElapsedTimeMilli
-      )} ・ total ${formatDuration(totalElapsedTimeMilli)} ・ avg ${formatDuration(
-        Math.round(averageElapsedTimeMilli(resource.performance))
-      )} ・ max ${formatDuration(maxElapsedTimeMilli)}`;
+      tooltip.appendMarkdown(
+        `\n\n---\nRan ${sampleCount} times ・ last ${formatDuration(
+          lastElapsedTimeMilli
+        )} ・ total ${formatDuration(totalElapsedTimeMilli)} ・ avg ${formatDuration(
+          Math.round(averageElapsedTimeMilli(resource.performance))
+        )} ・ max ${formatDuration(maxElapsedTimeMilli)}`
+      );
     }
-    tooltipMarkdown +=
-      "\n\n---\n💡 Tip: Cmd/Ctrl+Click to select multiple entries, then right-click for bulk actions.";
-
-    const tooltip = new vscode.MarkdownString(encodeHtmlWeak(tooltipMarkdown), true);
+    tooltip.appendMarkdown(
+      "\n\n---\n💡 Tip: Cmd/Ctrl+Click to select multiple entries, then right-click for bulk actions."
+    );
     tooltip.isTrusted = true;
 
     this.tooltip = tooltip;
   }
-}
-
-export function encodeHtmlWeak(s: string | undefined): string | undefined {
-  return s?.replace(/[<>&"]/g, (c) => {
-    switch (c) {
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case "&":
-        return "&amp;";
-      case '"':
-        return "&quot;";
-      default:
-        return c;
-    }
-  });
 }

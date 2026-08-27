@@ -62,9 +62,44 @@ describe("buildDynamoDbPerformanceTuningDiagnosticGroups", () => {
       [],
     );
     expect(groups).toHaveLength(1);
+    expect(groups[0].title).toBe("Some CloudWatch metrics have no datapoints");
     expect(groups[0].summary).toContain("ConsumedReadCapacityUnits");
     expect(groups[0].summary).toContain("ReadThrottleEvents");
     expect(groups[0].details).toHaveLength(2);
+  });
+
+  it("explains that missing throttle and error datapoints are common when no events are reported", () => {
+    const groups = buildDynamoDbPerformanceTuningDiagnosticGroups(
+      [
+        diag({ code: "DYNAMODB_CLOUDWATCH_NO_DATA", severity: "info", scope: "cloudWatchMetrics", metricName: "ReadThrottleEvents", message: "no data" }),
+        diag({ code: "DYNAMODB_CLOUDWATCH_NO_DATA", severity: "info", scope: "cloudWatchMetrics", metricName: "ThrottledRequests", message: "no data" }),
+        diag({ code: "DYNAMODB_CLOUDWATCH_NO_DATA", severity: "info", scope: "cloudWatchMetrics", metricName: "SystemErrors", message: "no data" }),
+      ],
+      [],
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      severity: "info",
+      title: "No throttle or error datapoints",
+      summary: expect.stringContaining("common when no such events are reported"),
+    });
+    expect(groups[0].summary).toContain("not treated as a confirmed zero");
+    expect(groups[0].details).toHaveLength(3);
+  });
+
+  it("keeps table and GSI no-data details distinguishable by index name", () => {
+    const groups = buildDynamoDbPerformanceTuningDiagnosticGroups(
+      [
+        diag({ code: "DYNAMODB_CLOUDWATCH_NO_DATA", severity: "info", scope: "cloudWatchMetrics", metricName: "ReadThrottleEvents", message: "table no data" }),
+        diag({ code: "DYNAMODB_CLOUDWATCH_NO_DATA", severity: "info", scope: "cloudWatchMetrics", indexName: "tenant-status-gsi", metricName: "ReadThrottleEvents", message: "gsi no data" }),
+      ],
+      [],
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0].details).toEqual([
+      expect.objectContaining({ objectName: undefined, technicalMessage: "table no data" }),
+      expect.objectContaining({ objectName: "tenant-status-gsi", technicalMessage: "gsi no data" }),
+    ]);
   });
 
   it("renders intentionally skipped monitoring as information rather than a collection warning", () => {

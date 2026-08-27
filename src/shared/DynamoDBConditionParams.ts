@@ -12,6 +12,7 @@ export type DynamoQueryFilter = {
 // - "allTableAttributes": Select: "ALL_ATTRIBUTES" - LSI only (a GSI cannot
 //   fetch non-projected base-table attributes at all).
 export type DynamoQueryProjectionMode = "default" | "specific" | "allTableAttributes";
+export type DynamoQueryBuildMode = "nativeQuery" | "partiql";
 
 export type DynamoDBConditionParams = {
   target: string;
@@ -25,6 +26,11 @@ export type DynamoDBConditionParams = {
   projectionMode: DynamoQueryProjectionMode;
   projectedAttributes: string[];
   consistentRead: boolean;
+  // Controls only the representation built for Preview/Notebook output.
+  // Execute remains a native Query so SQL History keeps Count/ScannedCount.
+  buildMode: DynamoQueryBuildMode;
+  openInNotebook?: boolean;
+  inActiveNotebook?: boolean;
 };
 
 // Per-target Projection/Consistent Read constraints. Computed host-side from

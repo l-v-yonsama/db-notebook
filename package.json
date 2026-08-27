@@ -755,7 +755,7 @@
         },
         {
           "command": "database-notebook.histories.open",
-          "when": "view == database-notebook-histories",
+          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory(Success|Error)$/",
           "group": "inline"
         },
         {
@@ -765,12 +765,12 @@
         },
         {
           "command": "database-notebook.histories.openAsNotebook",
-          "when": "view == database-notebook-histories",
+          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory(Success|Error)$/",
           "group": "history@1"
         },
         {
           "command": "database-notebook.histories.appendToActiveNotebook",
-          "when": "view == database-notebook-histories",
+          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory(Success|Error)$/",
           "group": "history@2"
         },
         {

@@ -1,4 +1,5 @@
 import type { QueryItemsAtClientInputParams } from "@l-v-yonsama/multi-platform-database-drivers";
+import { SQL_HISTORY_LABEL_MAX_LENGTH } from "../constant";
 
 // See misc/specs/dynamodb-query-panel-history-performance-implementation-plan.ja.md
 // §4.1/§4.2. Pure, host-and-webview-agnostic (no vscode import) - kept
@@ -51,32 +52,76 @@ export function buildDynamoQueryStructuralKey(input: QueryItemsAtClientInputPara
   });
 }
 
-// Value-free description text (design doc §4.1) - stored as SQLHistory's
-// generic `sqlDoc` (Tree View/Notebook-cell compatibility) and as
-// SQLHistoryRequest.displayText, but never used for re-execution or
-// analysis. Never contains ExpressionAttributeValues:
-// KeyConditionExpression/FilterExpression/ProjectionExpression only ever
-// reference #name/:value aliases, never literal values.
-export function buildDynamoQueryDisplayText(input: QueryItemsAtClientInputParams): string {
-  const lines: string[] = [];
-  lines.push(
-    input.IndexName
-      ? `DynamoDB Query ${input.TableName} (index: ${input.IndexName})`
-      : `DynamoDB Query ${input.TableName}`
+const toValueFreeDisplayExpression = (
+  expression: string,
+  names: QueryItemsAtClientInputParams["ExpressionAttributeNames"]
+): string =>
+  expression.replace(/#[A-Za-z0-9_]+|:[A-Za-z0-9_]+/g, (token) =>
+    token.startsWith("#") ? (names?.[token] ?? token) : "…"
   );
+
+const abbreviateEnd = (value: string, maxLength: number): string =>
+  value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
+
+const abbreviateMiddle = (value: string, maxLength: number): string => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  const remainingLength = maxLength - 1;
+  const headLength = Math.ceil(remainingLength / 2);
+  return `${value.slice(0, headLength)}…${value.slice(-(remainingLength - headLength))}`;
+};
+
+const buildBoundedDisplayParts = (
+  sections: Array<{ prefix: string; value: string; weight: number; middle?: boolean }>
+): string => {
+  const separator = " · ";
+  const decorationLength =
+    sections.reduce((total, section) => total + section.prefix.length, 0) +
+    separator.length * (sections.length - 1);
+  const valueBudget = Math.max(sections.length, SQL_HISTORY_LABEL_MAX_LENGTH - decorationLength);
+  const totalWeight = sections.reduce((total, section) => total + section.weight, 0);
+  let remainingBudget = valueBudget;
+
+  return sections
+    .map((section, index) => {
+      const maxLength =
+        index === sections.length - 1
+          ? remainingBudget
+          : Math.max(1, Math.floor((valueBudget * section.weight) / totalWeight));
+      remainingBudget -= maxLength;
+      const value = section.middle
+        ? abbreviateMiddle(section.value, maxLength)
+        : abbreviateEnd(section.value, maxLength);
+      return `${section.prefix}${value}`;
+    })
+    .join(separator);
+};
+
+// Compact, value-free description stored in SQL History. It is optimized
+// for finding a native Query in the Tree View; projection and other details
+// remain available in the structural JSON shown in the hover.
+export function buildDynamoQueryDisplayText(input: QueryItemsAtClientInputParams): string {
+  const target = `${input.TableName}${input.IndexName ? `@${input.IndexName}` : ""}`;
+  const sections: Array<{ prefix: string; value: string; weight: number; middle?: boolean }> = [
+    { prefix: "DDB ", value: target, weight: 4, middle: true },
+  ];
   if (input.KeyConditionExpression) {
-    lines.push(`Key: ${input.KeyConditionExpression}`);
+    sections.push({
+      prefix: "K ",
+      value: toValueFreeDisplayExpression(
+        input.KeyConditionExpression,
+        input.ExpressionAttributeNames
+      ),
+      weight: 3,
+    });
   }
   if (input.FilterExpression) {
-    lines.push(`Filter: ${input.FilterExpression}`);
+    sections.push({
+      prefix: "F ",
+      value: toValueFreeDisplayExpression(input.FilterExpression, input.ExpressionAttributeNames),
+      weight: 3,
+    });
   }
-  if (input.Select === "ALL_ATTRIBUTES") {
-    lines.push(`Projection: All table attributes`);
-  } else if (input.ProjectionExpression) {
-    lines.push(`Projection: ${input.ProjectionExpression}`);
-  }
-  if (input.ConsistentRead) {
-    lines.push(`Consistent read: strong`);
-  }
-  return lines.join("\n");
+  return buildBoundedDisplayParts(sections);
 }

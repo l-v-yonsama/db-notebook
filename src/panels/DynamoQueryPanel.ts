@@ -8,17 +8,35 @@ import {
 import { ResultSetData } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import { commands, Uri, ViewColumn, WebviewPanel, window } from "vscode";
-import { OPEN_MDH_VIEWER, REFRESH_SQL_HISTORIES } from "../constant";
+import {
+  commands,
+  NotebookCellData,
+  NotebookCellKind,
+  NotebookEdit,
+  Uri,
+  ViewColumn,
+  WebviewPanel,
+  window,
+  workspace,
+  WorkspaceEdit,
+} from "vscode";
+import {
+  CREATE_NEW_NOTEBOOK,
+  NOTEBOOK_TYPE,
+  OPEN_MDH_VIEWER,
+  REFRESH_SQL_HISTORIES,
+} from "../constant";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import {
   DynamoDBConditionParams,
+  DynamoQueryBuildMode,
   DynamoQueryFilter,
   DynamoQueryProjectionConstraintView,
   DynamoQueryProjectionMode,
 } from "../shared/DynamoDBConditionParams";
 import { DynamoQueryPanelEventData } from "../shared/MessageEventData";
+import { CellMeta } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
@@ -33,6 +51,7 @@ import {
   buildDynamoQueryStructuralKey,
 } from "../utilities/dynamoDbQueryStructural";
 import { restoreDynamoQueryPanelState } from "../utilities/dynamoDbQueryPanelHistory";
+import { buildDynamoPartiqlSelect } from "../utilities/dynamoDbPartiqlBuilder";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -62,6 +81,7 @@ export class DynamoQueryPanel extends BasePanel {
   private projectionMode: DynamoQueryProjectionMode = "default";
   private projectedAttributes: string[] = [];
   private consistentRead = false;
+  private buildMode: DynamoQueryBuildMode = "nativeQuery";
   private projectionConstraint: DynamoQueryProjectionConstraintView = {
     availableAttributes: [],
     projectedAttributes: [],
@@ -138,6 +158,7 @@ export class DynamoQueryPanel extends BasePanel {
     this.projectionMode = "default";
     this.projectedAttributes = [];
     this.consistentRead = false;
+    this.buildMode = "nativeQuery";
 
     if (historyInput) {
       const restored = restoreDynamoQueryPanelState(historyInput, tableRes);
@@ -187,6 +208,7 @@ export class DynamoQueryPanel extends BasePanel {
           projectionMode: this.projectionMode,
           projectedAttributes: this.projectedAttributes,
           consistentRead: this.consistentRead,
+          buildMode: this.buildMode,
           projectionConstraint: this.projectionConstraint,
         },
       },
@@ -219,6 +241,9 @@ export class DynamoQueryPanel extends BasePanel {
             projectionMode,
             projectedAttributes,
             consistentRead,
+            buildMode,
+            openInNotebook,
+            inActiveNotebook,
           } = params as DynamoDBConditionParams;
           this.limit = limit;
           this.target = target;
@@ -233,7 +258,25 @@ export class DynamoQueryPanel extends BasePanel {
           this.projectionMode = projectionMode;
           this.projectedAttributes = projectedAttributes;
           this.consistentRead = consistentRead;
+          this.buildMode = buildMode ?? "nativeQuery";
           this.resetByTarget();
+
+          if (openInNotebook) {
+            if (this.buildMode !== "partiql") {
+              showWindowErrorMessage("Select PartiQL before opening the query in a Notebook.");
+              return;
+            }
+            if (!this.pkValue || !this.queryInput) {
+              showWindowErrorMessage("Enter a partition key value before opening the query.");
+              return;
+            }
+            if (this.projectionMode === "specific" && this.projectedAttributes.length === 0) {
+              showWindowErrorMessage("Select at least one Projection attribute.");
+              return;
+            }
+            await this.openPartiqlInNotebook(inActiveNotebook === true);
+            return;
+          }
 
           if (preview) {
             this.init();
@@ -285,6 +328,45 @@ export class DynamoQueryPanel extends BasePanel {
         }
         return;
     }
+  }
+
+  private async openPartiqlInNotebook(inActiveNotebook: boolean): Promise<void> {
+    const { tableRes, queryInput } = this;
+    if (!tableRes || !queryInput) {
+      return;
+    }
+    let partiql: string;
+    try {
+      partiql = buildDynamoPartiqlSelect({ input: queryInput, sortKeyName: this.skName });
+    } catch (error) {
+      showWindowErrorMessage(error);
+      return;
+    }
+
+    const cell = new NotebookCellData(NotebookCellKind.Code, partiql, "sql");
+    const metadata: CellMeta = { connectionName: tableRes.meta.conName };
+    cell.metadata = metadata;
+
+    if (!inActiveNotebook) {
+      await commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+      this.dispose();
+      return;
+    }
+
+    // Closing the webview returns focus to the previously active Notebook;
+    // mirror ViewConditionPanel's delayed insertion path.
+    this.dispose();
+    setTimeout(async () => {
+      const activeEditor = window.activeNotebookEditor;
+      if (!activeEditor || activeEditor.notebook.notebookType !== NOTEBOOK_TYPE) {
+        showWindowErrorMessage("No active notebook editor found.");
+        return;
+      }
+      const edit = new WorkspaceEdit();
+      const notebookEdit = NotebookEdit.insertCells(activeEditor.selection.end, [cell]);
+      edit.set(activeEditor.notebook.uri, [notebookEdit]);
+      await workspace.applyEdit(edit);
+    }, 100);
   }
 
   // Saves a Query Panel execution (success or failure) to SQL History as a
@@ -513,6 +595,17 @@ export class DynamoQueryPanel extends BasePanel {
       Object.assign(this.queryInput.ExpressionAttributeNames!, projection.expressionAttributeNames);
     }
 
-    this.previewInput = JSON.stringify(this.queryInput, null, 2);
+    if (this.buildMode === "partiql") {
+      try {
+        this.previewInput = buildDynamoPartiqlSelect({
+          input: this.queryInput,
+          sortKeyName: this.skName,
+        });
+      } catch (error) {
+        this.previewInput = `PartiQL build error: ${(error as Error).message}`;
+      }
+    } else {
+      this.previewInput = JSON.stringify(this.queryInput, null, 2);
+    }
   }
 }

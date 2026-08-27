@@ -166,6 +166,16 @@ export class NotebookData {
 
 export class MarkdownString {
   constructor(public value: string = "") {}
+
+  appendMarkdown(value: string): MarkdownString {
+    this.value += value;
+    return this;
+  }
+
+  appendCodeblock(value: string, language = ""): MarkdownString {
+    this.value += `\n\n\`\`\`${language}\n${value}\n\`\`\``;
+    return this;
+  }
 }
 
 export class LanguageModelTextPart {

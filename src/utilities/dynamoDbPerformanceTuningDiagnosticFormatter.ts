@@ -35,6 +35,16 @@ const SCOPED_CODES = new Set<DynamoDbPerformanceTuningDiagnosticCode>([
   "DYNAMODB_COLLECTION_TRUNCATED",
 ]);
 
+const THROTTLE_OR_ERROR_METRICS = new Set([
+  "ReadThrottleEvents",
+  "ReadKeyRangeThroughputThrottleEvents",
+  "ReadProvisionedThroughputThrottleEvents",
+  "ReadAccountLimitThrottleEvents",
+  "ReadMaxOnDemandThroughputThrottleEvents",
+  "ThrottledRequests",
+  "SystemErrors",
+]);
+
 const SECTION_LABEL: Record<DynamoDbUnavailableSectionName, string> = {
   accessPattern: "access pattern classification",
   tableDefinition: "table definition details",
@@ -154,8 +164,17 @@ function titleAndSummaryForDiagnosticGroup(
       };
     case "DYNAMODB_CLOUDWATCH_NO_DATA": {
       const metricNames = [...new Set(members.map((m) => m.metricName).filter((m): m is string => !!m))];
+      const onlyThrottleOrErrorMetrics =
+        metricNames.length > 0 && metricNames.every((metricName) => THROTTLE_OR_ERROR_METRICS.has(metricName));
+      if (onlyThrottleOrErrorMetrics) {
+        return {
+          title: "No throttle or error datapoints",
+          summary:
+            "CloudWatch returned no throttle or system-error datapoints in the collection window. This is common when no such events are reported; missing datapoints are not treated as a confirmed zero.",
+        };
+      }
       return {
-        title: "No CloudWatch datapoints",
+        title: "Some CloudWatch metrics have no datapoints",
         summary: `No datapoints were returned for ${metricNames.length > 0 ? metricNames.join(", ") : "one or more metrics"} in the collection window. This is not the same fact as zero activity.`,
       };
     }

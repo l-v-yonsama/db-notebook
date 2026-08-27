@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { DropdownItem } from "@/types/Components";
+import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import {
   vscode,
   type DynamoDBConditionParams,
+  type DynamoQueryBuildMode,
   type DynamoQueryFilter,
   type DynamoQueryPanelEventData,
   type DynamoQueryProjectionConstraintView,
@@ -15,9 +16,11 @@ import {
 } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
+import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeRadioGroup from "./base/VsCodeRadioGroup.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 provideVSCodeDesignSystem().register(
@@ -67,6 +70,18 @@ const targetItems = ref([] as DropdownItem[]);
 const columnItems = ref([] as DropdownItem[]);
 const filters = ref([] as DynamoQueryFilter[]);
 const target = ref("");
+const buildMode = ref<DynamoQueryBuildMode>("nativeQuery");
+
+const buildModeItems = [
+  { label: "Native Query", value: "nativeQuery" },
+  { label: "PartiQL", value: "partiql" },
+];
+
+type NotebookTarget = "new" | "active";
+const notebookItems: SecondaryItem<NotebookTarget>[] = [
+  { kind: "selection", label: "Display in new notebook", value: "new" },
+  { kind: "selection", label: "Display in active notebook", value: "active" },
+];
 
 const projectionMode = ref<DynamoQueryProjectionMode>("default");
 const projectedAttributes = ref<string[]>([]);
@@ -155,6 +170,7 @@ const projectionSelectionValid = computed(
   () => projectionMode.value !== "specific" || projectedAttributes.value.length > 0
 );
 const executable = computed(() => pkValue.value.length > 0 && projectionSelectionValid.value);
+const notebookAvailable = computed(() => buildMode.value === "partiql" && executable.value);
 
 const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): Promise<void> => {
   if (v === undefined) {
@@ -181,6 +197,7 @@ const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): 
   projectionMode.value = v.projectionMode;
   projectedAttributes.value.splice(0, projectedAttributes.value.length, ...v.projectedAttributes);
   consistentRead.value = v.consistentRead;
+  buildMode.value = v.buildMode ?? "nativeQuery";
   projectionConstraint.value = v.projectionConstraint;
 
   await nextTick();
@@ -227,7 +244,7 @@ const cancel = () => {
     params: {},
   });
 };
-const ok = (preview: boolean) => {
+const ok = (preview: boolean, openInNotebook = false, inActiveNotebook = false) => {
   const params: DynamoDBConditionParams = {
     target: target.value,
     pkValue: pkValue.value,
@@ -239,6 +256,9 @@ const ok = (preview: boolean) => {
     projectionMode: projectionMode.value,
     projectedAttributes: JSON.parse(JSON.stringify(projectedAttributes.value ?? [])),
     consistentRead: consistentRead.value,
+    buildMode: buildMode.value,
+    openInNotebook,
+    inActiveNotebook,
     preview
   };
 
@@ -246,6 +266,9 @@ const ok = (preview: boolean) => {
     command: "ok",
     params,
   });
+};
+const selectedNotebookTarget = (value: NotebookTarget) => {
+  ok(true, true, value === "active");
 };
 const updateOptions = () => {
   ok(true);
@@ -287,27 +310,42 @@ defineExpose({
 
 <template>
   <section class="DynamoQueryPanel">
-    <PanelActionToolbar @cancel="cancel">
+    <PanelActionToolbar @cancel="cancel" cancel-label="" cancel-title="Close">
       <template #left>
-        <label for="tableName">Table:</label>
-        <span id="tableName">{{ tableName }}</span>
-        <label for="numOfRows">Estimated items:</label>
-        <span id="numOfRows">{{ numOfRows }}</span>
-        <label for="limit">Max returned items:</label>
-        <VsCodeTextField id="limit" v-model="limit" :min="0" :max="limitMax" style="width: 100px" type="number"
-          title="The panel may issue multiple Query requests. This limit caps items retained in the result, not the total number of items DynamoDB may evaluate across all requests."
-          placeholder="max returned items" @change="updateTextDocument()">
-        </VsCodeTextField>
         <label for="target">Table or Index:</label>
         <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="width:200px"
           @change="updateOptions()" />
+        <label for="buildMode">Build:</label>
+        <VsCodeRadioGroup id="buildMode" v-model="buildMode" :items="buildModeItems"
+          @change="updateOptions()" />
+        <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute as a native DynamoDB Query">
+          <fa icon="check" />Execute
+        </VsCodeButton>
       </template>
-      <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute">
-        <fa icon="check" />Execute
-      </VsCodeButton>
+      <SecondarySelectionAction label="Open in Notebook" :items="notebookItems"
+        :disabled="!notebookAvailable"
+        :title="buildMode === 'partiql' ? 'Open PartiQL in notebook' : 'Select PartiQL to open in a notebook'"
+        @onSelect="selectedNotebookTarget" />
     </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="settings">
+        <div class="db-resource">
+          <fieldset class="conditions">
+            <legend>DB Resource</legend>
+            <div class="resource-summary">
+              <label for="tableName">Table:</label>
+              <span id="tableName">{{ tableName }}</span>
+              <label for="numOfRows">Estimated items:</label>
+              <span id="numOfRows">{{ numOfRows }}</span>
+              <label for="limit">Max returned items:</label>
+              <VsCodeTextField id="limit" v-model="limit" :min="0" :max="limitMax" style="width: 100px"
+                type="number"
+                title="The panel may issue multiple Query requests. This limit caps items retained in the result, not the total number of items DynamoDB may evaluate across all requests."
+                placeholder="max returned items" @change="updateTextDocument()">
+              </VsCodeTextField>
+            </div>
+          </fieldset>
+        </div>
         <div class="editor">
           <fieldset class="conditions">
             <legend>
@@ -315,16 +353,16 @@ defineExpose({
             </legend>
             <div>
               <label for="pk">Partition key ({{ pkName }} [{{ pkAttr }}] ):</label>
-              <VsCodeDropdown v-model="pkOpe" :items="ONLY_EQUAL_OPERATORS" style="width:160px" />
-              <VsCodeTextField id="pk" v-model="pkValue" style="width: 200px" @change="updateTextDocument()"
+              <VsCodeDropdown v-model="pkOpe" :items="ONLY_EQUAL_OPERATORS" style="width:130px" />
+              <VsCodeTextField id="pk" v-model="pkValue" style="width: 230px" @change="updateTextDocument()"
                 :required="true" :change-on-mouseout="true">
               </VsCodeTextField>
             </div>
             <div v-if="skName">
               <label for="sk">Sort key ({{ skName }} [{{ skAttr }}] ):</label>
-              <VsCodeDropdown v-model="skOpe" :items="OPERATORS" style="width:160px"
+              <VsCodeDropdown v-model="skOpe" :items="OPERATORS" style="width:130px"
                 @change="updateOptions()" />
-              <VsCodeTextField id="sk" v-model="skValue" style="width: 200px" @change="updateTextDocument()"
+              <VsCodeTextField id="sk" v-model="skValue" style="width: 230px" @change="updateTextDocument()"
                 :change-on-mouseout="true">
               </VsCodeTextField>
               <span v-if="skOpe === 'between'" style="font-size: small; margin-left:5px;opacity: 0.7;"> *Separate by
@@ -339,6 +377,9 @@ defineExpose({
                 :title="projectionConstraint.consistentReadAllowed ? 'Use a strongly consistent read (table/LSI only)' : 'A GSI cannot use a strongly consistent read'">
                 Strongly consistent read
               </VsCodeCheckbox>
+              <span v-if="buildMode === 'partiql'" class="inline-hint">
+                Read consistency is an API option and is not embedded in the PartiQL Notebook cell.
+              </span>
             </div>
           </fieldset>
           <fieldset class="conditions">
@@ -411,11 +452,11 @@ defineExpose({
                       @change="updateFilter(idx)" />
                   </td>
                   <td>
-                    <VsCodeDropdown v-model="filter.operator" :items="FILTER_OPERATORS" style="width:160px"
+                    <VsCodeDropdown v-model="filter.operator" :items="FILTER_OPERATORS" style="width:130px"
                       @change="updateFilter(idx)" />
                   </td>
                   <td>
-                    <VsCodeTextField v-model="filter.value" style="width: 200px" @change="updateFilter(idx)">
+                    <VsCodeTextField v-model="filter.value" style="width: 230px" @change="updateFilter(idx)">
                     </VsCodeTextField>
                     <span v-if="filter.operator === 'between'" style="font-size: small; margin-left:5px;opacity: 0.7;">
                       *Separate
@@ -428,7 +469,7 @@ defineExpose({
           </fieldset>
         </div>
         <fieldset class="conditions">
-          <legend>Preview</legend>
+          <legend>Preview ({{ buildMode === 'partiql' ? 'PartiQL' : 'Native Query' }})</legend>
           <p class="preview" v-text="previewInput"></p>
         </fieldset>
       </div>
@@ -487,6 +528,29 @@ section.DynamoQueryPanel {
         }
       }
 
+      .resource-summary {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        label {
+          min-width: auto !important;
+          margin-left: 18px;
+        }
+
+        label:first-child {
+          margin-left: 0;
+        }
+
+        span {
+          max-width: 320px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+
       fieldset.filter {
         margin-top: 10px;
       }
@@ -516,6 +580,12 @@ section.DynamoQueryPanel {
 
       p.hint {
         margin: 4px 0;
+        font-size: small;
+        opacity: 0.7;
+      }
+
+      .inline-hint {
+        margin-left: 8px;
         font-size: small;
         opacity: 0.7;
       }

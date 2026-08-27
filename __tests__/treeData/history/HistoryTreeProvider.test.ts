@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MarkdownString, ThemeIcon } from "vscode";
 import { SQLHistoryItem } from "../../../src/treeData/history/HistoryTreeProvider";
+import { SQL_HISTORY_LABEL_MAX_LENGTH } from "../../../src/constant";
 
 describe("SQLHistoryItem", () => {
   it("count/last/total/avg/maxをtooltipへ表示する", () => {
@@ -45,13 +46,13 @@ describe("SQLHistoryItem", () => {
     const item = new SQLHistoryItem({
       id: "h2",
       connectionName: "local-dynamo",
-      sqlDoc: "DynamoDB Query orders\nKey: #pk = :pk",
+      sqlDoc: "DDB orders_with…characters · K tenantId = … · F status = …",
       status: "success",
       request: {
         kind: "dynamodbQuery",
         origin: "dynamoQueryPanel",
         structuralKey: "k",
-        displayText: "DynamoDB Query orders\nKey: #pk = :pk",
+        displayText: "DDB orders_with…characters · K tenantId = … · F status = …",
         input: {
           TableName: "orders",
           KeyConditionExpression: "#pk = :pk",
@@ -70,6 +71,7 @@ describe("SQLHistoryItem", () => {
     expect(item.description).toContain("70 items");
     expect(item.description).not.toContain("rows");
     expect(item.contextValue).toBe("sqlHistoryDynamoQueryPanelSuccess");
+    expect(item.label).toContain("· F status = …");
 
     const tooltip = (item.tooltip as MarkdownString).value;
     expect(tooltip).not.toContain("```sql");
@@ -77,19 +79,39 @@ describe("SQLHistoryItem", () => {
     expect(tooltip).toContain("```json");
     expect(tooltip).not.toContain("secret-tenant-value");
     expect(tooltip).toContain("tableName");
+    expect(tooltip).toContain('"tableName"');
+    expect(tooltip).not.toContain("&quot;");
   });
 
   it("a plain SQL/PartiQL history entry (no request field) still shows 'rows' and an sql fence", () => {
     const item = new SQLHistoryItem({
       id: "h3",
       connectionName: "conn1",
-      sqlDoc: "select * from t",
+      sqlDoc: 'select "tenantId" from "orders"',
       status: "success",
       meta: { type: "select" } as any,
       summary: { info: "1 row", elapsedTimeMilli: 1, selectedRows: 1 } as any,
     });
 
     expect(item.description).toContain("1 row");
-    expect((item.tooltip as MarkdownString).value).toContain("```sql");
+    const tooltip = (item.tooltip as MarkdownString).value;
+    expect(tooltip).toContain("```sql");
+    expect(tooltip).toContain('select "tenantId" from "orders"');
+    expect(tooltip).not.toContain("&quot;");
+  });
+
+  it("applies the shared label length limit to RDB SQL and DynamoDB PartiQL histories", () => {
+    for (const sqlDoc of [
+      "SELECT tenant_id, order_id, status, created_at FROM application_orders WHERE tenant_id = 'T#001' ORDER BY created_at DESC",
+      'SELECT * FROM "dynamo_performance_lab_orders" WHERE "tenantId" = \'T#001\' AND "status" = \'PENDING\'',
+    ]) {
+      const item = new SQLHistoryItem({
+        id: sqlDoc,
+        connectionName: "conn1",
+        sqlDoc,
+        status: "success",
+      });
+      expect(String(item.label).length).toBeLessThanOrEqual(SQL_HISTORY_LABEL_MAX_LENGTH);
+    }
   });
 });

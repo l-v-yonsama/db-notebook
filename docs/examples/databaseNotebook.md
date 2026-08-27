@@ -271,11 +271,18 @@ it also has:
 - **Max returned items** — the renamed `Limit` field. The panel may issue more than one `Query`
   request; this caps the items kept in the combined result, not a single request's own `Limit`
   parameter or how many items DynamoDB evaluates across every request it makes.
+- **Build** — switches the Preview between the default native Query input and a standalone PartiQL
+  `SELECT`. `Execute` intentionally remains a native Query in either mode so its SQL History result
+  retains DynamoDB `Count`/`ScannedCount`. In PartiQL mode, **Open in Notebook** can add the generated
+  statement to a new or active Notebook; the action is disabled in Native Query mode. Read
+  consistency is an API option rather than PartiQL statement text, so that one option is not carried
+  into the generated SQL cell.
 
 Every execution — successful or failed — is saved to **SQL History** automatically, labeled with an
 item count instead of a row count and no attached SQL (there is nothing equivalent to run as a SQL
-cell; its Notebook entry is a Markdown provenance cell plus a JSON cell showing the reproducible
-request instead). Re-running the same table/index/key-condition/filter/Projection/consistency
+cell). Native Query history therefore does not show the generic SQL History Notebook actions; use
+**Open in Dynamo Query Panel** to inspect or edit it instead. Re-running the same
+table/index/key-condition/filter/Projection/consistency
 structure with different partition/sort key values merges into that one history entry — the newest
 values are kept for `Execute`, but never shown in the entry's label, tooltip, or **Performance
 Tuning** preview (see [Performance Tuning Guide](performanceTuning.md#7-dynamodb)). A failed re-run
