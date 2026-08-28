@@ -22,6 +22,31 @@ const createStateStorage = (initialHistories: unknown[] = []) =>
   new StateStorage(createFakeContext(initialHistories), {} as SecretStorage);
 
 describe("StateStorage.addSQLHistory performance aggregation", () => {
+  it("resets only the performance trip meter and preserves SQL/result metadata", async () => {
+    const stateStorage = createStateStorage();
+    await stateStorage.addSQLHistory({
+      connectionName: "conn1",
+      sqlDoc: "select * from t",
+      summary: { elapsedTimeMilli: 100, selectedRows: 4 } as any,
+      status: "success",
+      executedAt: 1000,
+    });
+    const before = await stateStorage.getSQLHistoryList();
+
+    expect(await stateStorage.resetSQLHistoryPerformanceByID(before[0].id, 2000)).toBe(true);
+    const [after] = await stateStorage.getSQLHistoryList();
+    expect(after.sqlDoc).toBe("select * from t");
+    expect(after.summary?.selectedRows).toBe(4);
+    expect(after.performance).toMatchObject({
+      sampleCount: 0,
+      totalElapsedTimeMilli: 0,
+      statisticsSince: 2000,
+      resetAt: 2000,
+    });
+    expect(after.performance).not.toHaveProperty("maxElapsedTimeMilli");
+    expect(after.performance).not.toHaveProperty("lastElapsedTimeMilli");
+  });
+
   it("同一SQL・同一接続の再実行でsampleCountとtotal/maxが積み上がる", async () => {
     const stateStorage = createStateStorage();
 

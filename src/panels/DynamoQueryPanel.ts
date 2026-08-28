@@ -51,6 +51,7 @@ import {
   buildDynamoQueryStructuralKey,
 } from "../utilities/dynamoDbQueryStructural";
 import { restoreDynamoQueryPanelState } from "../utilities/dynamoDbQueryPanelHistory";
+import { buildDynamoDbNativeQueryPreviewInput } from "../utilities/dynamoDbNativeQueryDisplay";
 import { buildDynamoPartiqlSelect } from "../utilities/dynamoDbPartiqlBuilder";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
@@ -605,7 +606,7 @@ export class DynamoQueryPanel extends BasePanel {
         this.previewInput = `PartiQL build error: ${(error as Error).message}`;
       }
     } else {
-      this.previewInput = JSON.stringify(this.queryInput, null, 2);
+      this.previewInput = JSON.stringify(buildDynamoDbNativeQueryPreviewInput(this.queryInput), null, 2);
     }
   }
 }

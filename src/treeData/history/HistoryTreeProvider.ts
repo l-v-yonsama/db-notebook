@@ -142,12 +142,13 @@ export class SQLHistoryItem extends vscode.TreeItem {
 
     if (resource.performance && resource.performance.sampleCount > 0) {
       const { lastElapsedTimeMilli, sampleCount } = resource.performance;
+      const lastElapsed = lastElapsedTimeMilli ?? 0;
       descriptionParts.push(
         sampleCount > 1
-          ? `${formatDuration(lastElapsedTimeMilli)} (avg ${formatDuration(
+          ? `${formatDuration(lastElapsed)} (avg ${formatDuration(
               Math.round(averageElapsedTimeMilli(resource.performance))
             )} x${sampleCount})`
-          : formatDuration(lastElapsedTimeMilli)
+          : formatDuration(lastElapsed)
       );
     }
 
@@ -199,10 +200,15 @@ export class SQLHistoryItem extends vscode.TreeItem {
         resource.performance;
       tooltip.appendMarkdown(
         `\n\n---\nRan ${sampleCount} times ・ last ${formatDuration(
-          lastElapsedTimeMilli
+          lastElapsedTimeMilli ?? 0
         )} ・ total ${formatDuration(totalElapsedTimeMilli)} ・ avg ${formatDuration(
           Math.round(averageElapsedTimeMilli(resource.performance))
-        )} ・ max ${formatDuration(maxElapsedTimeMilli)}`
+        )} ・ max ${formatDuration(maxElapsedTimeMilli ?? 0)}`
+      );
+    }
+    if (resource.performance?.statisticsSince) {
+      tooltip.appendMarkdown(
+        `\n\nMeasurement period started ${dayjs(resource.performance.statisticsSince).format("YYYY-MM-DD HH:mm:ss")}`
       );
     }
     tooltip.appendMarkdown(

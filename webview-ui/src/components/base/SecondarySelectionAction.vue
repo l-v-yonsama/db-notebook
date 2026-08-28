@@ -1,5 +1,5 @@
 <template>
-  <div class="dropdown-action-container">
+  <div class="dropdown-action-container" :class="{ open: visibleContent }">
     <div class="monaco-dropdown">
       <div class="dropdown-label">
         <a
@@ -15,7 +15,13 @@
         </a>
       </div>
     </div>
-    <section class="dropdown-list" v-click-outside-element="close" v-if="visibleContent">
+    <section
+      ref="dropdownList"
+      class="dropdown-list"
+      v-click-outside-element="close"
+      v-if="visibleContent"
+      :style="{ transform: `translateX(${menuOffsetX}px)` }"
+    >
       <template v-for="(item, idx) of items" :key="idx">
         <p v-if="item.kind == 'selection' && visibleItem(item)">
           <a @click="clickItem(item.value)">{{ item.label }}</a>
@@ -29,7 +35,7 @@
 
 <script setup lang="ts">
 import type { SecondaryItem, SecondaryItemSelection } from "@/types/Components";
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 
 const props = defineProps<{
   title: string;
@@ -51,14 +57,38 @@ const emit = defineEmits<{
 }>();
 
 const visibleContent = ref(false);
+const dropdownList = ref<HTMLElement>();
+const menuOffsetX = ref(0);
 let beforeOpened = new Date().getTime();
 
-const toggle = () => {
+const keepMenuInViewport = () => {
+  const element = dropdownList.value;
+  if (!element) {
+    return;
+  }
+  const viewportPadding = 6;
+  const rect = element.getBoundingClientRect();
+  let offset = 0;
+  if (rect.left < viewportPadding) {
+    offset += viewportPadding - rect.left;
+  }
+  if (rect.right + offset > window.innerWidth - viewportPadding) {
+    offset -= rect.right + offset - (window.innerWidth - viewportPadding);
+  }
+  menuOffsetX.value = Math.round(offset);
+};
+
+const toggle = async () => {
   if (props.disabled) {
     return;
   }
   visibleContent.value = !visibleContent.value;
   beforeOpened = new Date().getTime();
+  menuOffsetX.value = 0;
+  if (visibleContent.value) {
+    await nextTick();
+    keepMenuInViewport();
+  }
 };
 
 const close = () => {
@@ -90,6 +120,13 @@ a {
 }
 .dropdown-action-container {
   position: relative;
+
+  // VsCodeDropdown raises its web component to z-index 200 while focused.
+  // Lift the whole action (not only its child menu) into a higher stacking
+  // context while open so later dropdowns cannot paint over this menu.
+  &.open {
+    z-index: 1000;
+  }
 }
 .dropdown-label {
   cursor: pointer;
@@ -129,12 +166,14 @@ a {
   display: flex;
   flex-direction: column;
   border-radius: 4px;
-  z-index: 10;
+  z-index: 1001;
   padding: 3px;
   color: var(--input-foreground);
   box-sizing: border-box;
   background: var(--input-background);
   border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  max-width: calc(100vw - 12px);
+  overflow-x: auto;
 }
 .dropdown-list p {
   margin: 1px 0;

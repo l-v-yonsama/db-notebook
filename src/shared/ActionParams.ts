@@ -100,6 +100,7 @@ export type ActionCommand =
   | SaveAiAnalysisAsNotebookActionCommand
   | RunActualPlanActionCommand
   | RunObservedDynamoDbReadActionCommand
+  | RunPerformanceTuningBenchmarkActionCommand
   | SelectPerformanceTuningBaselineActionCommand
   | ClearPerformanceTuningBaselineActionCommand;
 
@@ -177,6 +178,11 @@ export type RunActualPlanActionCommand = BaseActionCommand<"runActualPlan">;
 // either). The confirmation gate is host-side (window.showWarningMessage,
 // modal) - see PerformanceTuningPreviewPanel.ts's runObservedRead().
 export type RunObservedDynamoDbReadActionCommand = BaseActionCommand<"runObservedRead">;
+
+export type RunPerformanceTuningBenchmarkActionCommand = BaseActionCommand<
+  "runPerformanceTuningBenchmark",
+  { runs: 3 | 5; mode?: "page" | "completeResult" }
+>;
 
 // "Compare with Baseline..." / "Change Baseline..."
 // (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md

@@ -36,6 +36,7 @@ import {
   isSQLHistoryTarget,
   mergeSQLHistoryPerformance,
   migrateStoredSQLHistory,
+  resetSQLHistoryPerformance,
   StoredSQLHistory,
 } from "./sqlHistoryUtil";
 import { log } from "./logger";
@@ -469,6 +470,23 @@ export class StateStorage {
       return true;
     }
     return false;
+  }
+
+  async resetSQLHistoryPerformanceByID(id: string, resetAt = Date.now()): Promise<boolean> {
+    const list = await this.getSQLHistoryList();
+    const idx = list.findIndex((it) => it.id === id);
+    if (idx < 0) {
+      return false;
+    }
+    const history = list[idx];
+    const includeDynamoDbAggregate =
+      history.performance?.dynamoDb !== undefined || history.summary?.dynamoDb !== undefined;
+    list[idx] = {
+      ...history,
+      performance: resetSQLHistoryPerformance(resetAt, includeDynamoDbAggregate),
+    };
+    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+    return true;
   }
 
   async deleteAllSQLHistories(): Promise<boolean> {

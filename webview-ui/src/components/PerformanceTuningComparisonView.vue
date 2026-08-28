@@ -13,15 +13,16 @@ import type {
   NumericComparison,
   PerformanceTuningComparisonViewState,
 } from "@/utilities/vscode";
+import { formatUtcWithLocal } from "@/utilities/vscode";
 import {
   allMetrics,
-  assessmentDisplay,
   comparabilityDisplay,
   describeIndexChange,
   formatChange,
   formatImprovement,
   formatMetricValue,
   keyImprovements,
+  metricAssessmentDisplay,
 } from "@/utilities/performanceTuningComparisonDisplay";
 import { computed } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
@@ -41,8 +42,37 @@ const comparability = computed(() =>
 );
 const improvements = computed(() => (evidence.value ? keyImprovements(evidence.value) : []));
 const metrics = computed(() => (evidence.value ? allMetrics(evidence.value) : []));
+const missingMetricGuidance = computed(() => {
+  const unique = new Map<string, NonNullable<NumericComparison["missingDataGuidance"]>>();
+  for (const metric of metrics.value) {
+    const guidance = metric.missingDataGuidance;
+    if (guidance) {
+      unique.set(`${guidance.action}\u0000${guidance.detail}`, guidance);
+    }
+  }
+  return [...unique.values()];
+});
 const indexChanges = computed(() => evidence.value?.common.indexes.changes ?? []);
 const queryDiff = computed(() => evidence.value?.common.query.diff ?? []);
+const dynamoCompleteness = computed(() => {
+  const e = evidence.value;
+  if (!e || e.engineSpecific.kind !== "dynamodb") return undefined;
+  return {
+    observation: e.engineSpecific.value.observationCompleteness,
+    benchmark: e.engineSpecific.value.benchmarkCompleteness,
+  };
+});
+
+const completionDisplay = (value: unknown) => {
+  const complete = value === "complete";
+  const notMeasured = value === undefined || value === "not measured";
+  return {
+    label: complete ? "COMPLETE" : notMeasured ? "NOT MEASURED" : "INCOMPLETE",
+    detail: notMeasured ? "not measured" : String(value),
+    icon: complete ? "pass-filled" : notMeasured ? "circle-minus" : "warning",
+    tone: complete ? "complete" : notMeasured ? "unknown" : "incomplete",
+  };
+};
 
 // Access-path rows, normalized across engines: RDB has one row per table from
 // its plan, DynamoDB has a single row describing the whole read.
@@ -128,7 +158,7 @@ const evidenceJson = computed(() =>
   evidence.value ? JSON.stringify(evidence.value, null, 2) : ""
 );
 
-const metricRow = (metric: NumericComparison) => assessmentDisplay(metric.assessment);
+const metricRow = (metric: NumericComparison) => metricAssessmentDisplay(metric);
 </script>
 
 <template>
@@ -187,9 +217,36 @@ const metricRow = (metric: NumericComparison) => assessmentDisplay(metric.assess
           <fa :icon="comparability.icon" />{{ comparability.text }}
         </span>
         <span class="collected-at">
-          baseline collected {{ state.baseline?.collectedAt ?? "unknown" }} · current collected
-          {{ evidence.source.current.collectedAt ?? "unknown" }}
+          baseline collected {{ state.baseline?.collectedAt ? formatUtcWithLocal(state.baseline.collectedAt) : "unknown" }} · current collected
+          {{ evidence.source.current.collectedAt ? formatUtcWithLocal(evidence.source.current.collectedAt) : "unknown" }}
         </span>
+      </div>
+
+      <div v-if="dynamoCompleteness" class="completion-comparison">
+        <strong>Measured result coverage</strong>
+        <div class="completion-grid">
+          <span></span><span>Baseline</span><span>Current</span>
+          <span>Observed read</span>
+          <span
+            v-for="(value, side) in { baseline: dynamoCompleteness.observation.baseline, current: dynamoCompleteness.observation.current }"
+            :key="`observation-${side}`"
+            class="completion-badge"
+            :class="completionDisplay(value).tone"
+          >
+            <fa :icon="completionDisplay(value).icon" />
+            {{ completionDisplay(value).label }} <small>({{ completionDisplay(value).detail }})</small>
+          </span>
+          <span>Benchmark</span>
+          <span
+            v-for="(value, side) in { baseline: dynamoCompleteness.benchmark.baseline, current: dynamoCompleteness.benchmark.current }"
+            :key="`benchmark-${side}`"
+            class="completion-badge"
+            :class="completionDisplay(value).tone"
+          >
+            <fa :icon="completionDisplay(value).icon" />
+            {{ completionDisplay(value).label }} <small>({{ completionDisplay(value).detail }})</small>
+          </span>
+        </div>
       </div>
 
       <!-- 7. Comparison notes: shown up here (not at the bottom) whenever
@@ -335,6 +392,10 @@ const metricRow = (metric: NumericComparison) => assessmentDisplay(metric.assess
       <!-- 6. Metric comparison -->
       <div class="comparison-subsection">
         <h4>Metric comparison</h4>
+        <div v-for="guidance in missingMetricGuidance" :key="`${guidance.action}-${guidance.detail}`" class="metric-guidance">
+          <fa icon="circle-play" />
+          <span><strong>{{ guidance.action }}</strong> — {{ guidance.detail }}</span>
+        </div>
         <p v-if="metrics.length === 0" class="section-note">
           Neither side collected a metric that both could report.
         </p>
@@ -417,6 +478,57 @@ const metricRow = (metric: NumericComparison) => assessmentDisplay(metric.assess
     color: var(--vscode-descriptionForeground);
   }
 
+  .completion-comparison {
+    padding: 8px;
+    margin: 6px 0 10px;
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 3px;
+    background: var(--vscode-editorWidget-background);
+  }
+
+  .completion-grid {
+    display: grid;
+    grid-template-columns: 130px minmax(180px, 1fr) minmax(180px, 1fr);
+    gap: 5px 8px;
+    align-items: center;
+    margin-top: 6px;
+
+    > span:nth-child(2),
+    > span:nth-child(3) {
+      font-weight: 600;
+    }
+  }
+
+  .completion-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 7px;
+    border: 1px solid;
+    border-radius: 3px;
+
+    &.complete {
+      color: var(--vscode-testing-iconPassed);
+      background: color-mix(in srgb, var(--vscode-testing-iconPassed) 10%, transparent);
+    }
+
+    &.incomplete {
+      color: var(--vscode-editorWarning-foreground);
+      background: var(--vscode-inputValidation-warningBackground);
+      border-color: var(--vscode-inputValidation-warningBorder);
+    }
+
+    &.unknown {
+      color: var(--vscode-descriptionForeground);
+      border-color: var(--vscode-editorWidget-border);
+    }
+
+    small {
+      color: inherit;
+      opacity: 0.85;
+    }
+  }
+
   .comparison-error {
     color: var(--vscode-errorForeground);
     font-size: 0.9em;
@@ -474,6 +586,15 @@ const metricRow = (metric: NumericComparison) => assessmentDisplay(metric.assess
   }
 
   .reason-detail {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.9em;
+  }
+
+  .metric-guidance {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    margin: 4px 0 8px 0;
     color: var(--vscode-descriptionForeground);
     font-size: 0.9em;
   }

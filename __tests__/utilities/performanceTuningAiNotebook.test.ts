@@ -116,6 +116,8 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(cells[1].kind).toBe(NotebookCellKind.Markup);
     expect(cells[1].languageId).toBe("markdown");
     expect(cells[1].value).toContain("## 1. Overview");
+    expect(cells[1].value).toContain("2026-08-18T00:00:00.000Z (local ");
+    expect(cells[1].value).toContain("2026-08-18T00:05:00.000Z (local ");
     expect(cells[2].value).toContain("## 2. Target SQL");
     expect(cells[2].value).toContain("SELECT * FROM orders WHERE tenant_id = 42");
     expect(cells[3].value).toContain("## 3. Collection status");
@@ -326,6 +328,28 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(findCell(cells, "### 4.4. Recommendations").value).toContain("No recommendations were reported");
   });
 
+  it("persists deterministic AI quality failures and the different-model guidance", () => {
+    const cells = buildAiAnalysisNotebookCells(
+      buildContext(),
+      {
+        analysis: buildAnalysis({
+          recommendations: [],
+          confidence: "low",
+          qualityIssues: [
+            {
+              code: "SUGGESTED_SQL_MATCHES_CURRENT",
+              recommendationTitle: "Rewrite the filter",
+              message: "The recommendation was excluded; try Analyze with AI again using a different model.",
+            },
+          ],
+        }),
+      }
+    );
+    const summary = findCell(cells, "AI response quality warning").value;
+    expect(summary).toContain("different model");
+    expect(findJsonCell(cells, "AI analysis JSON").value).toContain("SUGGESTED_SQL_MATCHES_CURRENT");
+  });
+
   it("rebuilds the saved request with the language option used by the original analysis", () => {
     const cells = buildAiAnalysisNotebookCells(
       buildContext(),
@@ -499,6 +523,43 @@ describe("buildAiAnalysisNotebookCells", () => {
     expect(executionPlanCell.value).toContain("Actual execution plan (EXPLAIN ANALYZE)");
     expect(executionPlanCell.value).not.toContain("### Tables referenced by this plan");
   });
+
+  it("labels a context-only notebook as an evidence report", () => {
+    const cells = buildAiAnalysisNotebookCells(buildContext(), {});
+
+    expect(cells[0].value).toContain("Performance Tuning Evidence Report");
+    expect(findCell(cells, "## 4. Summary and recommendations").value).toContain(
+      "No AI analysis was run for this report"
+    );
+    expect(cells.some((cell) => cell.metadata?.cellLabel === "AI analysis JSON")).toBe(false);
+  });
+
+  it("includes run-level Benchmark evidence even without a baseline comparison", () => {
+    const cells = buildAiAnalysisNotebookCells(buildContext({
+      benchmark: {
+        startedAt: "2026-08-27T18:30:00.000Z",
+        completedAt: "2026-08-27T18:30:01.000Z",
+        requestedRuns: 3,
+        completedRuns: 3,
+        samples: [
+          { run: 1, clientElapsedTimeMs: 10, returnedRowCount: 4 },
+          { run: 2, clientElapsedTimeMs: 20, returnedRowCount: 4 },
+          { run: 3, clientElapsedTimeMs: 30, returnedRowCount: 4 },
+        ],
+        medianClientElapsedTimeMs: 20,
+        averageClientElapsedTimeMs: 20,
+        minClientElapsedTimeMs: 10,
+        maxClientElapsedTimeMs: 30,
+        planCollectedBeforeBenchmark: true,
+        source: "performanceTuningBenchmark",
+      },
+    }), {});
+    const chapter = findCell(cells, "Benchmark measurements").value;
+
+    expect(chapter).toContain("| Runs | 3 / 3 completed |");
+    expect(chapter).toContain("| 2 | 20 ms | 4 |");
+    expect(chapter).toContain("2026-08-27T18:30:00.000Z (local ");
+  });
 });
 
 describe("saveAiAnalysisAsNotebook", () => {
@@ -510,14 +571,14 @@ describe("saveAiAnalysisAsNotebook", () => {
     });
   });
 
-  it("refuses to save a report with neither an analysis nor a comparison", async () => {
+  it("saves deterministic context as an evidence report without AI or a baseline", async () => {
     const result = await saveAiAnalysisAsNotebook(buildContext(), {});
 
-    expect(result).toEqual({
-      ok: false,
-      message: "There is no AI analysis or baseline comparison to save.",
-    });
-    expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.relativePath).toMatch(
+      /^reports\/performance-tuning\/perf-tuning-evidence-app-\d{8}-\d{6}\.dbn$/
+    );
+    expect(workspace.fs.writeFile).toHaveBeenCalledOnce();
   });
 
   it("returns ok:false and writes nothing when no workspace folder is open", async () => {

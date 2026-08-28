@@ -24,6 +24,7 @@ import type {
   ComparisonReason,
   DynamoDbComparisonEvidence,
   IndexSnapshot,
+  MetricMissingDataGuidance,
   NumericComparison,
   PerformanceTuningComparisonEvidence,
   TargetIdentity,
@@ -83,6 +84,7 @@ export function buildDynamoDbComparison(
         observationMismatch,
         environmentMismatch
       ),
+      ...buildBenchmarkMetrics(baseline, current, environmentMismatch),
       ...buildCloudWatchMetrics(
         baseline.cloudWatch,
         current.cloudWatch,
@@ -138,6 +140,10 @@ export function buildDynamoDbComparison(
       observationCompleteness(baseline.observation),
       observationCompleteness(current.observation)
     ),
+    benchmarkCompleteness: compareValue(
+      benchmarkCompleteness(baseline.benchmark),
+      benchmarkCompleteness(current.benchmark)
+    ),
     cloudWatch,
     metrics: engineMetrics,
   };
@@ -168,6 +174,214 @@ export function buildDynamoDbComparison(
     },
     engineSpecific: { kind: "dynamodb", value: engineSpecific },
   };
+}
+
+function buildBenchmarkMetrics(
+  baseline: DynamoDbPerformanceTuningContext,
+  current: DynamoDbPerformanceTuningContext,
+  environmentMismatch: string | undefined
+): NumericComparison[] {
+  const b = baseline.benchmark;
+  const c = current.benchmark;
+  const protocolMismatch = benchmarkProtocolMismatch(b, c);
+  const completenessMismatch = benchmarkCompletenessMismatch(b, c);
+  const notComparable = protocolMismatch ?? completenessMismatch ?? environmentMismatch;
+  const missingDataGuidance = benchmarkMissingDataGuidance(baseline, current);
+  const inputs: NumericMetricInput[] = [
+    {
+      key: "dynamodb.benchmark.medianClientElapsedTimeMs",
+      label: "Benchmark median client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: b?.medianClientElapsedTimeMs,
+      current: c?.medianClientElapsedTimeMs,
+      notComparable,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.averageClientElapsedTimeMs",
+      label: "Benchmark average client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: b?.averageClientElapsedTimeMs,
+      current: c?.averageClientElapsedTimeMs,
+      notComparable,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.minClientElapsedTimeMs",
+      label: "Benchmark minimum client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: b?.minClientElapsedTimeMs,
+      current: c?.minClientElapsedTimeMs,
+      notComparable,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.maxClientElapsedTimeMs",
+      label: "Benchmark maximum client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: b?.maxClientElapsedTimeMs,
+      current: c?.maxClientElapsedTimeMs,
+      notComparable,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.medianConsumedReadCapacityUnits",
+      label: "Benchmark median consumed read capacity",
+      unit: "RCU",
+      direction: "lowerIsBetter",
+      baseline: b?.medianConsumedReadCapacityUnits,
+      current: c?.medianConsumedReadCapacityUnits,
+      notComparable,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.medianEvaluatedItemCount",
+      label: "Benchmark median evaluated items",
+      unit: "items",
+      direction: "lowerIsBetter",
+      baseline: b?.medianEvaluatedItemCount,
+      current: c?.medianEvaluatedItemCount,
+      notComparable,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.medianReturnedItemCount",
+      label: "Benchmark median returned items",
+      unit: "items",
+      direction: "neutral",
+      baseline: b?.medianReturnedItemCount,
+      current: c?.medianReturnedItemCount,
+      notComparable,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.readEfficiency",
+      label: "Benchmark read efficiency (returned / evaluated)",
+      unit: "fraction",
+      direction: "higherIsBetter",
+      isRatio: true,
+      baseline: benchmarkReadEfficiency(b),
+      current: benchmarkReadEfficiency(c),
+      notComparable: protocolMismatch ?? environmentMismatch,
+      missingDataGuidance,
+    },
+    {
+      key: "dynamodb.benchmark.consumedCapacityPerReturnedItem",
+      label: "Benchmark consumed capacity per returned item",
+      unit: "RCU/item",
+      direction: "lowerIsBetter",
+      baseline: capacityPerReturnedItem(b),
+      current: capacityPerReturnedItem(c),
+      notComparable: protocolMismatch ?? environmentMismatch,
+      missingDataGuidance,
+    },
+  ];
+  return withoutEmptyMetrics(inputs.map(compareNumericMetric));
+}
+
+function benchmarkCompleteness(
+  session: DynamoDbPerformanceTuningContext["benchmark"]
+): "complete" | "bounded" | "unknown" | "mixed" | "not measured" {
+  if (!session) {
+    return "not measured";
+  }
+  if (session.completeness) {
+    return session.completeness;
+  }
+  const values = [...new Set(session.samples.map((sample) => sample.completeness))];
+  return values.length === 1 ? values[0] : "mixed";
+}
+
+function benchmarkCompletenessMismatch(
+  baseline: DynamoDbPerformanceTuningContext["benchmark"],
+  current: DynamoDbPerformanceTuningContext["benchmark"]
+): string | undefined {
+  if (!baseline || !current) {
+    return undefined;
+  }
+  const b = benchmarkCompleteness(baseline);
+  const c = benchmarkCompleteness(current);
+  return b === c
+    ? undefined
+    : `The benchmark sessions measured different amounts of work (baseline: ${b}, current: ${c}). A bounded run measures only part of the result, so raw time, item counts, and Capacity cannot be compared with a complete run.`;
+}
+
+function benchmarkProtocolMismatch(
+  baseline: DynamoDbPerformanceTuningContext["benchmark"],
+  current: DynamoDbPerformanceTuningContext["benchmark"]
+): string | undefined {
+  if (!baseline || !current) {
+    return undefined;
+  }
+  if (
+    baseline.completedRuns !== baseline.requestedRuns ||
+    current.completedRuns !== current.requestedRuns
+  ) {
+    return "At least one benchmark session did not complete every requested run.";
+  }
+  const baselineMode = baseline.mode ?? "page";
+  const currentMode = current.mode ?? "page";
+  const bothComplete =
+    benchmarkCompleteness(baseline) === "complete" &&
+    benchmarkCompleteness(current) === "complete";
+  if (baselineMode !== currentMode && !bothComplete) {
+    return `The benchmark modes differ (baseline: ${baselineMode}, current: ${currentMode}). Raw elapsed time, item counts, and Capacity do not represent the same measurement protocol.`;
+  }
+  if (
+    benchmarkCompleteness(baseline) !== "complete" &&
+    benchmarkCompleteness(current) !== "complete" &&
+    baseline.boundDescription !== current.boundDescription
+  ) {
+    return "The benchmark sessions stopped at different bounds, so their raw elapsed time, item counts, and Capacity do not represent the same amount of work.";
+  }
+  return undefined;
+}
+
+function benchmarkReadEfficiency(
+  session: DynamoDbPerformanceTuningContext["benchmark"]
+): number | undefined {
+  const returned = session?.medianReturnedItemCount;
+  const evaluated = session?.medianEvaluatedItemCount;
+  return returned !== undefined && evaluated !== undefined && evaluated > 0
+    ? returned / evaluated
+    : undefined;
+}
+
+function capacityPerReturnedItem(
+  session: DynamoDbPerformanceTuningContext["benchmark"]
+): number | undefined {
+  const capacity = session?.medianConsumedReadCapacityUnits;
+  const returned = session?.medianReturnedItemCount;
+  return capacity !== undefined && returned !== undefined && returned > 0
+    ? capacity / returned
+    : undefined;
+}
+
+function benchmarkMissingDataGuidance(
+  baseline: DynamoDbPerformanceTuningContext,
+  current: DynamoDbPerformanceTuningContext,
+): MetricMissingDataGuidance | undefined {
+  if (baseline.benchmark && !current.benchmark) {
+    const runs = baseline.benchmark.requestedRuns;
+    const completeResult = baseline.benchmark.mode === "completeResult";
+    return {
+      action: `Run ${completeResult ? "Complete-result " : "Page "}Benchmark (${runs} runs) for Current`,
+      detail:
+        `Current has no benchmark. This action performs ${runs} ${completeResult ? "continuation-aware reads up to the complete-result safety limits" : "bounded one-page reads"} using the same conditions; the first run also refreshes the collected context.`,
+    };
+  }
+  if (!baseline.benchmark && current.benchmark) {
+    return {
+      action: "Select a benchmarked baseline",
+      detail:
+        `The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (${current.benchmark.requestedRuns} runs).`,
+    };
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +459,42 @@ function buildReasons(params: {
       code: "WORKLOAD_VS_SINGLE_OBSERVATION",
       level: "partiallyComparable",
       message: `Rolling workload statistics are present only on the ${baseline.workload ? "baseline" : "current"} side, so the workload rows have nothing to compare against.`,
+    });
+  }
+
+  if (
+    baseline.benchmark &&
+    current.benchmark &&
+    baseline.benchmark.requestedRuns !== current.benchmark.requestedRuns
+  ) {
+    reasons.push({
+      code: "BENCHMARK_SAMPLE_COUNT_DIFFERS",
+      level: "partiallyComparable",
+      message: `Benchmark sample counts differ (${baseline.benchmark.requestedRuns} runs vs ${current.benchmark.requestedRuns} runs). When the measurement modes and result coverage match, their medians remain comparable, but the smaller sample has lower confidence.`,
+    });
+  }
+
+  const benchmarkProtocol = benchmarkProtocolMismatch(
+    baseline.benchmark,
+    current.benchmark
+  );
+  if (benchmarkProtocol) {
+    reasons.push({
+      code: "BENCHMARK_PROTOCOL_DIFFERS",
+      level: "partiallyComparable",
+      message: benchmarkProtocol,
+    });
+  }
+
+  const benchmarkMismatch = benchmarkCompletenessMismatch(
+    baseline.benchmark,
+    current.benchmark
+  );
+  if (benchmarkMismatch) {
+    reasons.push({
+      code: "BENCHMARK_COMPLETENESS_DIFFERS",
+      level: "partiallyComparable",
+      message: benchmarkMismatch,
     });
   }
 

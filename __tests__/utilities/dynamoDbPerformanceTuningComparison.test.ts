@@ -9,6 +9,7 @@ import type {
   PerformanceTuningComparisonEvidence,
 } from "../../src/shared/PerformanceTuningComparison";
 import { buildDynamoDbComparison } from "../../src/utilities/dynamoDbPerformanceTuningComparison";
+import { buildComparisonAiInput } from "../../src/utilities/performanceTuningComparisonAiInput";
 import { dynamoContext } from "./performanceTuningComparisonFixtures";
 
 function compare(
@@ -48,6 +49,166 @@ function metric(
 function reasonCodes(evidence: PerformanceTuningComparisonEvidence): string[] {
   return evidence.comparability.reasons.map((reason) => reason.code);
 }
+
+function benchmark(requestedRuns: 3 | 5, medianClientElapsedTimeMs: number) {
+  return {
+    startedAt: "2026-08-27T00:00:00.000Z",
+    completedAt: "2026-08-27T00:00:01.000Z",
+    requestedRuns,
+    completedRuns: requestedRuns,
+    samples: Array.from({ length: requestedRuns }, (_, index) => ({
+      run: index + 1,
+      clientElapsedTimeMs: medianClientElapsedTimeMs,
+      completeness: "bounded" as const,
+    })),
+    medianClientElapsedTimeMs,
+    averageClientElapsedTimeMs: medianClientElapsedTimeMs,
+    minClientElapsedTimeMs: medianClientElapsedTimeMs,
+    maxClientElapsedTimeMs: medianClientElapsedTimeMs,
+    source: "performanceTuningBenchmark" as const,
+  };
+}
+
+it("keeps 5-run vs 3-run DynamoDB benchmark medians comparable and emits a confidence warning", () => {
+  const evidence = compare(
+    dynamoContext({ benchmark: benchmark(5, 100) }),
+    dynamoContext({ benchmark: benchmark(3, 20) })
+  );
+  expect(reasonCodes(evidence)).toContain("BENCHMARK_SAMPLE_COUNT_DIFFERS");
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")).toMatchObject({
+    comparability: "comparable",
+    improvementPercent: 80,
+    assessment: "improved",
+  });
+});
+
+it("tells the user how to collect a missing Current DynamoDB benchmark", () => {
+  const evidence = compare(
+    dynamoContext({ benchmark: benchmark(3, 100) }),
+    dynamoContext(),
+  );
+
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")).toMatchObject({
+    assessment: "noData",
+    missingDataGuidance: {
+      action: "Run Page Benchmark (3 runs) for Current",
+    },
+  });
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")?.missingDataGuidance?.detail)
+    .toContain("bounded one-page reads");
+});
+
+it("rejects raw benchmark regressions when result coverage differs but keeps efficiency evidence", () => {
+  const baseline = {
+    ...benchmark(3, 75),
+    mode: "page" as const,
+    completeness: "bounded" as const,
+    boundDescription: "One API response, up to 100 evaluated items.",
+    medianReturnedItemCount: 13,
+    medianEvaluatedItemCount: 100,
+    medianConsumedReadCapacityUnits: 11.5,
+  };
+  const current = {
+    ...benchmark(3, 103),
+    mode: "page" as const,
+    completeness: "complete" as const,
+    samples: benchmark(3, 103).samples.map((sample) => ({
+      ...sample,
+      completeness: "complete" as const,
+    })),
+    medianReturnedItemCount: 38,
+    medianEvaluatedItemCount: 38,
+    medianConsumedReadCapacityUnits: 4.5,
+  };
+  const evidence = compare(
+    dynamoContext({ benchmark: baseline }),
+    dynamoContext({ benchmark: current })
+  );
+
+  expect(reasonCodes(evidence)).toContain("BENCHMARK_COMPLETENESS_DIFFERS");
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")).toMatchObject({
+    assessment: "notComparable",
+    comparability: "notComparable",
+  });
+  expect(metric(evidence, "dynamodb.benchmark.readEfficiency")).toMatchObject({
+    assessment: "improved",
+    comparability: "comparable",
+  });
+  expect(metric(evidence, "dynamodb.benchmark.consumedCapacityPerReturnedItem")).toMatchObject({
+    assessment: "improved",
+    comparability: "comparable",
+  });
+  const aiInput = buildComparisonAiInput(evidence);
+  expect(aiInput.metrics.map((candidate) => candidate.metricKey)).not.toContain(
+    "dynamodb.benchmark.medianClientElapsedTimeMs"
+  );
+  expect(aiInput.comparability.rejectedMetrics).toEqual(expect.arrayContaining([
+    expect.objectContaining({ metricKey: "dynamodb.benchmark.medianClientElapsedTimeMs" }),
+  ]));
+});
+
+it("compares complete results even when one finished within a page and the other followed continuations", () => {
+  const baselineBase = benchmark(3, 242);
+  const currentBase = benchmark(5, 103);
+  const baseline = {
+    ...baselineBase,
+    mode: "completeResult" as const,
+    completeness: "complete" as const,
+    samples: baselineBase.samples.map((sample) => ({ ...sample, completeness: "complete" as const })),
+  };
+  const current = {
+    ...currentBase,
+    mode: "page" as const,
+    completeness: "complete" as const,
+    samples: currentBase.samples.map((sample) => ({ ...sample, completeness: "complete" as const })),
+  };
+  const evidence = compare(
+    dynamoContext({ benchmark: baseline }),
+    dynamoContext({ benchmark: current })
+  );
+
+  expect(reasonCodes(evidence)).toContain("BENCHMARK_SAMPLE_COUNT_DIFFERS");
+  expect(reasonCodes(evidence)).not.toContain("BENCHMARK_PROTOCOL_DIFFERS");
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")).toMatchObject({
+    assessment: "improved",
+    comparability: "comparable",
+  });
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")?.improvementPercent)
+    .toBeCloseTo(57.44, 2);
+});
+
+it("rejects mode differences when either benchmark result is incomplete", () => {
+  const baseline = {
+    ...benchmark(3, 75),
+    mode: "page" as const,
+    completeness: "bounded" as const,
+  };
+  const current = {
+    ...benchmark(3, 70),
+    mode: "completeResult" as const,
+    completeness: "bounded" as const,
+  };
+  const evidence = compare(
+    dynamoContext({ benchmark: baseline }),
+    dynamoContext({ benchmark: current })
+  );
+
+  expect(reasonCodes(evidence)).toContain("BENCHMARK_PROTOCOL_DIFFERS");
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")?.assessment)
+    .toBe("notComparable");
+});
+
+it("tells the user to replace a DynamoDB baseline that has no benchmark", () => {
+  const evidence = compare(
+    dynamoContext(),
+    dynamoContext({ benchmark: benchmark(5, 20) }),
+  );
+
+  expect(metric(evidence, "dynamodb.benchmark.medianClientElapsedTimeMs")?.missingDataGuidance).toEqual({
+    action: "Select a benchmarked baseline",
+    detail: "The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (5 runs).",
+  });
+});
 
 /** The "after" side: the Scan became a partition-key Query on the table. */
 function tableQueryContext(): DynamoDbPerformanceTuningContext {

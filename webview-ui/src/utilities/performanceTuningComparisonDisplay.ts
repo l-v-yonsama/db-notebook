@@ -40,6 +40,18 @@ export function assessmentDisplay(assessment: MetricAssessment): AssessmentDispl
   }
 }
 
+/** Uses an actionable label for a resolvable one-sided measurement gap. */
+export function metricAssessmentDisplay(metric: NumericComparison): AssessmentDisplay {
+  if (metric.assessment === "noData" && metric.missingDataGuidance) {
+    return {
+      icon: "circle-play",
+      text: metric.missingDataGuidance.action,
+      tone: "unknown",
+    };
+  }
+  return assessmentDisplay(metric.assessment);
+}
+
 export function comparabilityDisplay(level: ComparabilityLevel): AssessmentDisplay {
   switch (level) {
     case "comparable":

@@ -14,9 +14,28 @@ type SQLHistoryTarget = Pick<SQLHistory, "sqlDoc" | "meta"> & {
 const EMPTY_PERFORMANCE: SQLHistoryPerformance = {
   sampleCount: 0,
   totalElapsedTimeMilli: 0,
-  maxElapsedTimeMilli: 0,
-  lastElapsedTimeMilli: 0,
 };
+
+export const resetSQLHistoryPerformance = (
+  resetAt = Date.now(),
+  includeDynamoDbAggregate = false
+): SQLHistoryPerformance => ({
+  ...EMPTY_PERFORMANCE,
+  ...(includeDynamoDbAggregate
+    ? {
+        capacitySampleCount: 0,
+        dynamoDb: {
+          observationSampleCount: 0,
+          evaluatedCountSampleCount: 0,
+          totalReturnedItemCount: 0,
+          totalEvaluatedItemCount: 0,
+          boundedObservationCount: 0,
+        },
+      }
+    : {}),
+  statisticsSince: resetAt,
+  resetAt,
+});
 
 // Older entries were created before `performance` existed. Derive an
 // equivalent starting point from the single `summary.elapsedTimeMilli`
@@ -204,14 +223,16 @@ export const migrateStoredSQLHistory = (stored: StoredSQLHistory): SQLHistory | 
 const mergeCapacity = (
   base: SQLHistoryPerformance,
   capacityUnits: number | undefined
-): Pick<SQLHistoryPerformance, "capacitySampleCount" | "totalCapacityUnits" | "maxCapacityUnits" | "lastCapacityUnits"> => {
+): Partial<Pick<SQLHistoryPerformance, "capacitySampleCount" | "totalCapacityUnits" | "maxCapacityUnits" | "lastCapacityUnits">> => {
   if (capacityUnits === undefined) {
-    return {
-      capacitySampleCount: base.capacitySampleCount,
-      totalCapacityUnits: base.totalCapacityUnits,
-      maxCapacityUnits: base.maxCapacityUnits,
-      lastCapacityUnits: base.lastCapacityUnits,
-    };
+    return base.capacitySampleCount === undefined
+      ? {}
+      : {
+          capacitySampleCount: base.capacitySampleCount,
+          totalCapacityUnits: base.totalCapacityUnits,
+          maxCapacityUnits: base.maxCapacityUnits,
+          lastCapacityUnits: base.lastCapacityUnits,
+        };
   }
   return {
     capacitySampleCount: (base.capacitySampleCount ?? 0) + 1,
@@ -294,8 +315,10 @@ export const mergeSQLHistoryPerformance = (
       : {
           sampleCount: base.sampleCount + 1,
           totalElapsedTimeMilli: base.totalElapsedTimeMilli + elapsedTimeMilli,
-          maxElapsedTimeMilli: Math.max(base.maxElapsedTimeMilli, elapsedTimeMilli),
+          maxElapsedTimeMilli: Math.max(base.maxElapsedTimeMilli ?? elapsedTimeMilli, elapsedTimeMilli),
           lastElapsedTimeMilli: elapsedTimeMilli,
+          statisticsSince: base.statisticsSince,
+          resetAt: base.resetAt,
           ...capacity,
         };
   return dynamoDbPerformance ? { ...merged, dynamoDb: dynamoDbPerformance } : merged;

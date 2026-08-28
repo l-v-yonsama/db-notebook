@@ -75,6 +75,7 @@ export const OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY = `${EXTENSION_NAME}.histories
 export const START_PERFORMANCE_TUNING_FROM_HISTORY = `${EXTENSION_NAME}.histories.startPerformanceTuning`;
 export const OPEN_SQL_HISTORY = `${EXTENSION_NAME}.histories.open`;
 export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;
+export const RESET_SQL_HISTORY_PERFORMANCE = `${EXTENSION_NAME}.histories.resetPerformance`;
 export const OPEN_SQL_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openAsNotebook`;
 export const APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.histories.appendToActiveNotebook`;
 export const FILTER_SQL_HISTORIES_BY_CONNECTION = `${EXTENSION_NAME}.histories.filterByConnection`;

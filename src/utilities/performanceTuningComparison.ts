@@ -25,6 +25,7 @@ import type {
   MetricComparability,
   MetricDirection,
   NumericComparison,
+  MetricMissingDataGuidance,
   PerformanceTuningBaselineSelection,
   PerformanceTuningComparisonEvidence,
   QueryComparison,
@@ -95,6 +96,7 @@ export type NumericMetricInput = {
   // Set this rather than dropping the metric: §11 says a not-comparable
   // metric may still show both raw values, just no improvement figure.
   notComparable?: string;
+  missingDataGuidance?: MetricMissingDataGuidance;
 };
 
 /**
@@ -107,7 +109,7 @@ export type NumericMetricInput = {
  * display code rounds at render time (§10.1's closing rule).
  */
 export function compareNumericMetric(input: NumericMetricInput): NumericComparison {
-  const { key, label, unit, direction, baseline, current, isRatio, notComparable } = input;
+  const { key, label, unit, direction, baseline, current, isRatio, notComparable, missingDataGuidance } = input;
   const base: NumericComparison = {
     key,
     label,
@@ -124,7 +126,7 @@ export function compareNumericMetric(input: NumericMetricInput): NumericComparis
     return base;
   }
   if (baseline === undefined || current === undefined) {
-    return { ...base, assessment: "noData" };
+    return { ...base, assessment: "noData", missingDataGuidance };
   }
 
   const absoluteDelta = current - baseline;

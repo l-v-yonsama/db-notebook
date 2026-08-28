@@ -66,6 +66,20 @@ function rdbEvidence(): PerformanceTuningComparisonEvidence {
   });
 }
 
+const rdbBenchmark = {
+  startedAt: "2026-08-27T00:00:00.000Z",
+  completedAt: "2026-08-27T00:00:01.000Z",
+  requestedRuns: 3 as const,
+  completedRuns: 3,
+  samples: [1, 2, 3].map((run) => ({ run, clientElapsedTimeMs: 100 })),
+  medianClientElapsedTimeMs: 100,
+  averageClientElapsedTimeMs: 100,
+  minClientElapsedTimeMs: 100,
+  maxClientElapsedTimeMs: 100,
+  planCollectedBeforeBenchmark: true as const,
+  source: "performanceTuningBenchmark" as const,
+};
+
 describe("RDB comparison report", () => {
   const baselineContext = rdbContext();
   const currentContext = rdbContext({
@@ -127,6 +141,18 @@ describe("RDB comparison report", () => {
     expect(chapter).toContain("perf-tuning-analysis-app-20260802-000000.dbn");
     expect(chapter).toContain("a".repeat(64));
     expect(chapter).toContain("/ws/reports/performance-tuning/");
+    expect(chapter).toContain("2026-08-27T00:00:00.000Z (local ");
+  });
+
+  it("keeps UTC comparison timestamps and appends compact local-time hints", () => {
+    const cells = buildAiAnalysisNotebookCells(currentContext, {
+      comparison: { evidence, baselineContext },
+    }) as BuiltCell[];
+    const chapter = markdownContaining(cells, "### 8.1. Summary");
+
+    expect(chapter).toContain("2026-08-02T00:00:00.000Z (local ");
+    expect(chapter).toContain("2026-08-06T00:00:00.000Z (local ");
+    expect(chapter).toContain("2026-08-27T00:00:00.000Z (local ");
   });
 
   it("can be selected as a baseline again, resolving to the Current context", () => {
@@ -151,6 +177,23 @@ describe("RDB comparison report", () => {
 
     expect(chapter).toContain("Execution time");
     expect(chapter).toContain("98% better");
+  });
+
+  it("renders missing Benchmark guidance once instead of repeating its detail for every metric", () => {
+    const benchmarkBaseline = rdbContext({ benchmark: rdbBenchmark });
+    const benchmarkEvidence = buildRdbComparison({
+      baseline: benchmarkBaseline,
+      current: currentContext,
+      source: source(currentContext.collection.collectedAt),
+      generatedAt: "2026-08-28T00:00:00.000Z",
+    });
+    const cells = buildAiAnalysisNotebookCells(currentContext, {
+      comparison: { evidence: benchmarkEvidence, baselineContext: benchmarkBaseline },
+    }) as BuiltCell[];
+    const chapter = markdownContaining(cells, "### 8.6. Metric comparison");
+
+    expect(chapter).toContain("▶ Run Benchmark (3 runs) for Current");
+    expect(chapter.match(/automatically collects EXPLAIN ANALYZE first/g)).toHaveLength(1);
   });
 
   it("still builds the original analysis-only report unchanged", () => {

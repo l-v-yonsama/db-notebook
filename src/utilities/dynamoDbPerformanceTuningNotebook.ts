@@ -2,6 +2,7 @@ import type {
   DynamoDbCapacityBreakdown,
   DynamoDbPerformanceTuningContext,
 } from "@l-v-yonsama/multi-platform-database-drivers";
+import { formatUtcWithLocal } from "../shared/dateTimeDisplay";
 import { validateDynamoDbPerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { NotebookCellData, Uri, ViewColumn, workspace } from "vscode";
 import { openNotebookFile, writeNotebookFile } from "../notebook/notebookFileUtil";
@@ -12,8 +13,9 @@ import { buildDynamoDbPerformanceTuningHumanSummary } from "./dynamoDbPerformanc
 import { buildDynamoDbAiAnalysisPrompt } from "./dynamoDbPerformanceTuningAiPrompt";
 import { createDirectory, existsUri } from "./fsUtil";
 import {
-  buildAiAnalysisNotebookFilename,
+  buildPerformanceTuningNotebookFilename,
   buildAnalysisMarkdown,
+  getPerformanceTuningReportKind,
   buildJsonAppendixMarkdown,
   buildNotebookTocMarkdown,
   diagnosticGroupsMarkdown,
@@ -183,7 +185,7 @@ function buildOverviewMarkdown(
   if (context.service.region) {
     lines.push(`| Region | ${context.service.region} |`);
   }
-  lines.push(`| Collected at | ${context.collection.collectedAt} |`);
+  lines.push(`| Collected at | ${formatUtcWithLocal(context.collection.collectedAt)} |`);
   lines.push(`| Collection status | ${context.collection.status} |`);
   // A comparison-only report is saved without ever running an AI analysis
   // (comparison implementation plan §14).
@@ -202,7 +204,7 @@ function buildOverviewMarkdown(
       );
       lines.push(`| Token safety margin | ${formatNumber(tokenUsage.safetyMargin)} tokens |`);
     }
-    lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
+    lines.push(`| Analyzed at | ${formatUtcWithLocal(analysis.generatedAt)} |`);
     lines.push(`| Confidence | ${analysis.confidence} |`);
   } else {
     lines.push("| AI analysis | Not run - this report contains collected evidence only |");
@@ -403,31 +405,67 @@ export function buildObservedRequestMarkdown(context: DynamoDbPerformanceTuningC
   const observation = context.observation;
   if (!observation) {
     lines.push("_No read has been observed for this exact statement yet._");
-    return lines.join("\n");
+  } else {
+    lines.push("| Field | Value |", "|---|---|");
+    lines.push(
+      `| Result coverage | ${observation.completeness === "complete" && !observation.bounded ? "✅ **COMPLETE** — the read reached the end of the result" : "⚠️ **INCOMPLETE** — the full result was not observed"} |`,
+    );
+    lines.push(`| Source | ${observation.source} |`);
+    if (observation.observedAt) {
+      lines.push(`| Observed at | ${formatUtcWithLocal(observation.observedAt)} |`);
+    }
+    lines.push(`| Returned items | ${observation.returnedItemCount ?? "-"} |`);
+    if (observation.evaluatedItemCount !== undefined) {
+      lines.push(`| Evaluated items | ${observation.evaluatedItemCount} |`);
+    }
+    if (observation.filterPassRate !== undefined) {
+      lines.push(`| Filter pass rate | ${(observation.filterPassRate * 100).toFixed(2)}% |`);
+    }
+    if (observation.consumedCapacity) {
+      lines.push(`| Consumed Capacity | ${formatCapacity(observation.consumedCapacity)} |`);
+    }
+    if (observation.clientElapsedTimeMs !== undefined) {
+      lines.push(`| Client elapsed time | ${formatNumber(observation.clientElapsedTimeMs)} ms |`);
+    }
+    lines.push(`| Request / retry count | ${observation.requestCount ?? "-"} / ${observation.retryCount ?? "-"} |`);
+    if (observation.bounded) {
+      lines.push(
+        "",
+        `_${observation.boundDescription ?? "This observation is bounded and may not reflect the statement's full result."}_`,
+      );
+    }
   }
-  lines.push("| Field | Value |", "|---|---|");
-  lines.push(`| Source | ${observation.source} |`);
-  if (observation.observedAt) {
-    lines.push(`| Observed at | ${observation.observedAt} |`);
-  }
-  lines.push(`| Returned items | ${observation.returnedItemCount ?? "-"} |`);
-  if (observation.evaluatedItemCount !== undefined) {
-    lines.push(`| Evaluated items | ${observation.evaluatedItemCount} |`);
-  }
-  if (observation.filterPassRate !== undefined) {
-    lines.push(`| Filter pass rate | ${(observation.filterPassRate * 100).toFixed(2)}% |`);
-  }
-  if (observation.consumedCapacity) {
-    lines.push(`| Consumed Capacity | ${formatCapacity(observation.consumedCapacity)} |`);
-  }
-  if (observation.clientElapsedTimeMs !== undefined) {
-    lines.push(`| Client elapsed time | ${formatNumber(observation.clientElapsedTimeMs)} ms |`);
-  }
-  lines.push(`| Request / retry count | ${observation.requestCount ?? "-"} / ${observation.retryCount ?? "-"} |`);
-  if (observation.bounded) {
+  if (context.benchmark) {
+    const benchmark = context.benchmark;
+    const benchmarkStates = [...new Set(benchmark.samples.map((sample) => sample.completeness))];
+    const benchmarkCompleteness = benchmark.completeness ??
+      (benchmarkStates.length === 1 ? benchmarkStates[0] : "mixed");
+    const benchmarkComplete = benchmarkCompleteness === "complete";
     lines.push(
       "",
-      `_${observation.boundDescription ?? "This observation is bounded and may not reflect the statement's full result."}_`,
+      "### 7.1. Benchmark measurements",
+      "",
+      benchmark.mode === "completeResult"
+        ? "_Each sample followed continuation tokens up to the complete-result safety limits._"
+        : "_Each sample measured one bounded API response._",
+      "",
+      "| Item | Value |",
+      "|---|---|",
+      `| Result coverage | ${benchmarkComplete ? "✅ **COMPLETE** — every run reached the end of the result" : `⚠️ **INCOMPLETE** — ${benchmark.boundDescription ?? `benchmark coverage was ${benchmarkCompleteness}`}`} |`,
+      `| Started at | ${formatUtcWithLocal(benchmark.startedAt)} |`,
+      `| Completed at | ${formatUtcWithLocal(benchmark.completedAt)} |`,
+      `| Runs | ${benchmark.completedRuns} / ${benchmark.requestedRuns} completed |`,
+      `| Median | ${formatNumber(benchmark.medianClientElapsedTimeMs)} ms |`,
+      `| Average | ${formatNumber(benchmark.averageClientElapsedTimeMs)} ms |`,
+      `| Min / Max | ${formatNumber(benchmark.minClientElapsedTimeMs)} / ${formatNumber(benchmark.maxClientElapsedTimeMs)} ms |`,
+      "",
+      "| Run | Client elapsed | Returned / evaluated | Consumed read capacity |",
+      "|---|---|---|---|",
+      ...benchmark.samples.map(
+        (sample) =>
+          `| ${sample.run} | ${formatNumber(sample.clientElapsedTimeMs)} ms | ${formatNumber(sample.returnedItemCount)} / ${formatNumber(sample.evaluatedItemCount)} | ${sample.consumedCapacity ? formatCapacity(sample.consumedCapacity) : "-"} |`,
+      ),
+      "",
     );
   }
   return lines.join("\n");
@@ -445,7 +483,7 @@ export function buildCloudWatchMarkdown(context: DynamoDbPerformanceTuningContex
     return lines.join("\n");
   }
   lines.push(
-    `Window: ${cw.window.startTime} – ${cw.window.endTime} (period ${cw.window.periodSeconds}s). Table/index/operation-level activity over that window, not only this statement.`,
+    `Window: ${formatUtcWithLocal(cw.window.startTime)} – ${formatUtcWithLocal(cw.window.endTime)} (period ${cw.window.periodSeconds}s). Table/index/operation-level activity over that window, not only this statement.`,
     "",
   );
   if (cw.series.length === 0) {
@@ -487,7 +525,7 @@ function buildRawMetricsAppendixMarkdown(context: DynamoDbPerformanceTuningConte
       return;
     }
     lines.push("| Timestamp | Value |", "|---|---|");
-    s.timestamps.forEach((t, i) => lines.push(`| ${t} | ${s.values[i]} |`));
+    s.timestamps.forEach((t, i) => lines.push(`| ${formatUtcWithLocal(t)} | ${s.values[i]} |`));
     lines.push("");
   });
   return lines.join("\n");
@@ -527,6 +565,7 @@ export function buildDynamoDbAiAnalysisNotebookCells(
   input: PerformanceTuningReportInput,
 ): NotebookCellData[] {
   const { analysis, comparison } = input;
+  const reportKind = getPerformanceTuningReportKind(input);
   const tocEntries: NotebookTocEntry[] = [
     { label: "1. Overview", anchor: "1-overview" },
     { label: "2. Target request", anchor: "2-target-request" },
@@ -534,7 +573,7 @@ export function buildDynamoDbAiAnalysisNotebookCells(
     { label: "4. Summary and recommendations", anchor: "4-summary-and-recommendations" },
     { label: "5. Query flow", anchor: "5-query-flow" },
     { label: "6. Access pattern", anchor: "6-access-pattern" },
-    { label: "7. Observed measurements", anchor: "7-observed-measurements" },
+    { label: "7. Observed / benchmark measurements", anchor: "7-observed-measurements" },
     { label: "8. Table and index information", anchor: "8-table-and-index-information" },
     { label: "9. CloudWatch metrics", anchor: "9-cloudwatch-metrics" },
     { label: "10. Additional information", anchor: "10-additional-information" },
@@ -553,9 +592,11 @@ export function buildDynamoDbAiAnalysisNotebookCells(
   const cells: NotebookCellData[] = [
     markupCell(
       buildNotebookTocMarkdown(
-        comparison
+        reportKind === "comparison"
           ? "DynamoDB Performance Tuning Comparison Report"
-          : "DynamoDB Performance Tuning AI Analysis",
+          : reportKind === "analysis"
+            ? "DynamoDB Performance Tuning AI Analysis"
+            : "DynamoDB Performance Tuning Evidence Report",
         tocEntries,
         context.collection.status,
       ),
@@ -623,8 +664,8 @@ const REPORTS_SUBPATH = ["reports", "performance-tuning"] as const;
 
 /**
  * Writes and opens a new Notebook under `<workspace root>/reports/performance-tuning/`
- * (auto-created if missing), containing the DynamoDB context/AI analysis
- * cells above (§13). Never appends to an existing Notebook and never
+ * (auto-created if missing), containing the DynamoDB context and optional AI
+ * analysis/comparison cells above (§13). Never appends to an existing Notebook and never
  * prompts a save dialog - same product decision as the RDB version (§16.1).
  * Re-validates the context immediately before writing
  * (validateDynamoDbPerformanceTuningContext()) as a last defense-in-depth
@@ -645,24 +686,20 @@ export async function saveDynamoDbAiAnalysisAsNotebook(
       message: `Refusing to save: the collected context failed validation (${violations.join("; ")}).`,
     };
   }
-  if (!input.analysis && !input.comparison) {
-    return {
-      ok: false,
-      message: "There is no AI analysis or baseline comparison to save.",
-    };
-  }
-
   const wsFolder = workspace.workspaceFolders?.[0];
   if (!wsFolder) {
     return {
       ok: false,
       message:
-        "No workspace folder is open, so the AI analysis notebook cannot be saved. Open a workspace folder and try again.",
+        "No workspace folder is open, so the performance tuning report cannot be saved. Open a workspace folder and try again.",
     };
   }
 
   const dirUri = Uri.joinPath(wsFolder.uri, ...REPORTS_SUBPATH);
-  let filename = buildAiAnalysisNotebookFilename(context.service.tableName);
+  let filename = buildPerformanceTuningNotebookFilename(
+    context.service.tableName,
+    getPerformanceTuningReportKind(input),
+  );
   let targetUri = Uri.joinPath(dirUri, filename);
 
   await createDirectory(dirUri);

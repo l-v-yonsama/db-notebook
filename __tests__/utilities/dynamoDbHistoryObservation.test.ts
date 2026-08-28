@@ -56,6 +56,20 @@ describe("toPerformanceCapacityBreakdown", () => {
 });
 
 describe("buildObservationFromHistory", () => {
+  it("does not resurrect a pre-reset summary as current measurement evidence", () => {
+    const history = baseHistory({
+      executedAt: 1000,
+      performance: {
+        sampleCount: 0,
+        totalElapsedTimeMilli: 0,
+        statisticsSince: 2000,
+        resetAt: 2000,
+      },
+      summary: { dynamoDb: { returnedItemCount: 3 } } as any,
+    });
+    expect(buildObservationFromHistory(history)).toBeUndefined();
+  });
+
   it("returns undefined when summary.dynamoDb is absent (dev-era history, or a non-AWS connection)", () => {
     const history = baseHistory({ summary: { info: "1 row", elapsedTimeMilli: 10, selectedRows: 1 } as any });
     expect(buildObservationFromHistory(history)).toBeUndefined();

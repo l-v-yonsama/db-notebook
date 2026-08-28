@@ -13,12 +13,14 @@ import type {
   PerformanceTuningPreviewPanelEventData,
   RelationalPerformanceTuningInitializeViewModel,
 } from "@/utilities/vscode";
-import { vscode } from "@/utilities/vscode";
+import { formatUtcWithLocal, vscode } from "@/utilities/vscode";
 import { buildDynamoDbObservedReadNotice } from "@/utilities/dynamoDbObservedReadNotice";
 import { computed, ref } from "vue";
+import type { SecondaryItem } from "@/types/Components";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
+import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
@@ -28,7 +30,24 @@ import RelationalPerformanceTuningView from "./RelationalPerformanceTuningView.v
 
 const relational = ref<RelationalPerformanceTuningInitializeViewModel | undefined>(undefined);
 const dynamodb = ref<DynamoDbPerformanceTuningInitializeViewModel | undefined>(undefined);
-const engine = computed(() => (relational.value ? "relational" : dynamodb.value ? "dynamodb" : undefined));
+const engine = computed(() =>
+  relational.value ? "relational" : dynamodb.value ? "dynamodb" : undefined
+);
+const benchmark = computed(
+  () => relational.value?.context.benchmark ?? dynamodb.value?.context.benchmark
+);
+const benchmarkCompleteness = computed(() => {
+  const session = dynamodb.value?.context.benchmark;
+  if (!session) return undefined;
+  if (session.completeness) return session.completeness;
+  const values = [...new Set(session.samples.map((sample) => sample.completeness))];
+  return values.length === 1 ? values[0] : "mixed";
+});
+const benchmarkIsComplete = computed(() => benchmarkCompleteness.value === "complete");
+const benchmarkBoundDescription = computed(
+  () => dynamodb.value?.context.benchmark?.boundDescription
+);
+const formatMs = (value: number): string => `${Number(value.toFixed(2)).toLocaleString()} ms`;
 // Whichever of the two is currently set. Only the shell-owned fields shared
 // by both (PerformanceTuningPreviewShellFields in MessageEventData.ts:
 // jsonHtml/plainTextPrompt/.../languageModels/...) are ever read through
@@ -44,10 +63,11 @@ const diagnosticGroups = computed(() => active.value?.diagnosticGroups ?? []);
 const infoGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "info"));
 const issueGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "warning"));
 
-const contextJson = computed(() => (active.value ? JSON.stringify(active.value.context, null, 2) : ""));
-// Payload-size display (with its own exceeded check) now lives in each
-// engine's own header row - see Relational/DynamoDbPerformanceTuningView.vue -
-// so the shell itself has no more use for that computation.
+const contextJson = computed(() =>
+  active.value ? JSON.stringify(active.value.context, null, 2) : ""
+);
+// Raw byte size is diagnostic metadata, shown only inside the collapsed Full
+// context JSON details. Model fit is communicated separately in tokens.
 
 // AI options are available as soon as a context is loaded.
 const languageModels = ref<LabelValueItem[]>([]);
@@ -72,32 +92,73 @@ const isAnalyzing = computed(() => analysis.value.status === "running");
 const analysisJson = computed(() =>
   analysis.value.result ? JSON.stringify(analysis.value.result, null, 2) : ""
 );
+const isRunningSecondaryAction = ref(false);
+const tokenUsage = computed(
+  () => analysis.value.result?.request?.tokenUsage ?? analysis.value.tokenUsage
+);
+const tokenUsagePercentage = computed(() => {
+  const usage = tokenUsage.value;
+  return usage && usage.maxInputTokens > 0
+    ? (usage.inputTokens / usage.maxInputTokens) * 100
+    : undefined;
+});
 const estimatedTokenUsage = computed(() => {
-  const usage = analysis.value.result?.request?.tokenUsage ?? analysis.value.tokenUsage;
+  const usage = tokenUsage.value;
   if (!usage) {
     return undefined;
   }
-  const percentage = usage.maxInputTokens > 0
-    ? ((usage.inputTokens / usage.maxInputTokens) * 100).toFixed(1)
-    : "-";
-  return `${usage.inputTokens.toLocaleString()} / ${usage.maxInputTokens.toLocaleString()} tokens (${percentage}%; safety margin ${usage.safetyMargin.toLocaleString()} tokens)`;
+  const percentage =
+    tokenUsagePercentage.value !== undefined ? tokenUsagePercentage.value.toFixed(1) : "-";
+  return `${usage.inputTokens.toLocaleString()} / ${usage.maxInputTokens.toLocaleString()} tokens (${percentage}%)`;
+});
+const tokenUsageNearLimit = computed(
+  () => tokenUsagePercentage.value !== undefined && tokenUsagePercentage.value >= 80
+);
+const tokenUsageTitle = computed(() =>
+  tokenUsage.value
+    ? `A ${tokenUsage.value.safetyMargin.toLocaleString()}-token safety margin is reserved for provider-side message framing.`
+    : undefined
+);
+const aiInputDetail = computed(() => {
+  const contextDetail =
+    analysis.value.result?.request?.contextDetail ?? analysis.value.contextDetail;
+  const comparisonDetail =
+    analysis.value.result?.request?.comparison?.detail ?? analysis.value.comparisonDetail;
+  const contextReduced = contextDetail === "compact";
+  const comparisonReduced = comparisonDetail !== undefined && comparisonDetail !== "full";
+  if (contextReduced && comparisonReduced) {
+    return "Context and comparison reduced to fit this model";
+  }
+  if (contextReduced) {
+    return "Context reduced to fit this model";
+  }
+  if (comparisonReduced) {
+    return "Comparison reduced to fit this model";
+  }
+  return contextDetail === "full" ? "Full context included" : undefined;
 });
 
+// The collected context is useful evidence by itself. AI analysis and a
+// baseline comparison enrich the report, but neither is a prerequisite.
+// Avoid saving while an AI/benchmark refresh is in flight so the user never
+// gets an ambiguous snapshot of the preceding state.
 const canSaveNotebook = computed(
-  () =>
-    comparison.value.status === "ready" ||
-    (analysis.value.status === "success" && !comparison.value.analysisStale)
+  () => Boolean(active.value) && !isAnalyzing.value && !isRunningSecondaryAction.value
 );
 const saveNotebookTitle = computed(() => {
-  if (!canSaveNotebook.value) {
-    return "Run Analyze with AI, or select a baseline to compare against, to save a report";
+  if (isAnalyzing.value || isRunningSecondaryAction.value) {
+    return "Wait for the current analysis or measurement to finish before saving";
   }
-  if (analysis.value.status !== "success" || comparison.value.analysisStale) {
+  if (comparison.value.status === "ready") {
+    if (analysis.value.status === "success" && !comparison.value.analysisStale) {
+      return "Save the AI analysis and baseline comparison as a new Notebook under reports/performance-tuning/";
+    }
     return "Save the baseline comparison as a new Notebook under reports/performance-tuning/";
   }
-  return comparison.value.status === "ready"
-    ? "Save the AI analysis and the baseline comparison as a new Notebook under reports/performance-tuning/"
-    : "Save the AI analysis as a new Notebook under reports/performance-tuning/";
+  if (analysis.value.status === "success" && !comparison.value.analysisStale) {
+    return "Save the AI analysis as a new Notebook under reports/performance-tuning/";
+  }
+  return "Save the collected performance evidence as a new Notebook under reports/performance-tuning/";
 });
 
 // "Run Explain Analyze" (RDB) / "Run Observed Read" (DynamoDB) - one shared
@@ -107,34 +168,38 @@ const saveNotebookTitle = computed(() => {
 // by "stop-progress" or a fresh "initialize" (a successful run always
 // replaces the whole panel via the latter, never a "success" branch of its
 // own here).
-const isRunningSecondaryAction = ref(false);
-
 const statementAllowsActualPlan = computed(
   () => relational.value?.context.statement.analyzeEligibility?.allowed ?? true
 );
 const actualPlanButtonTitle = computed(() => {
   if (!statementAllowsActualPlan.value) {
-    return relational.value?.context.statement.analyzeEligibility?.reason ??
-      "Explain Analyze is limited to a single SELECT statement.";
+    return (
+      relational.value?.context.statement.analyzeEligibility?.reason ??
+      "Explain Analyze is limited to a single SELECT statement."
+    );
   }
   return relational.value?.analyzedExecutionPlan.available
     ? "Run this SQL for real to measure its actual execution plan (real query execution - see the note below)"
-    : (relational.value?.analyzedExecutionPlan.message ?? "Not available for this database");
+    : relational.value?.analyzedExecutionPlan.message ?? "Not available for this database";
 });
 
-const observationEligibility = computed(() => dynamodb.value?.context.statement.observationEligibility);
+const observationEligibility = computed(
+  () => dynamodb.value?.context.statement.observationEligibility
+);
 const observedReadNotice = computed(() =>
   buildDynamoDbObservedReadNotice(dynamodb.value?.context.observation)
 );
 const observedReadButtonTitle = computed(() => {
   if (observationEligibility.value?.allowed === false) {
-    return observationEligibility.value.reason ?? "This statement is not eligible for Run Observed Read.";
+    return (
+      observationEligibility.value.reason ?? "This statement is not eligible for Run Observed Read."
+    );
   }
   return dynamodb.value?.observedReadCapability.available
     ? dynamodb.value.context.observation
       ? "Run another real read to refresh the observed measurements (real query execution - see the note below)"
       : "Read real items to measure this statement's actual Consumed Capacity and result shape (real query execution - see the note below)"
-    : (dynamodb.value?.observedReadCapability.message ?? "Not available for this connection");
+    : dynamodb.value?.observedReadCapability.message ?? "Not available for this connection";
 });
 
 const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initialize"]): void => {
@@ -167,6 +232,14 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
     case "analysis-update":
       if (value.analysis) {
         analysis.value = value.analysis;
+      }
+      if (value.unavailableLanguageModelId) {
+        languageModels.value = languageModels.value.filter(
+          (model) => model.value !== value.unavailableLanguageModelId
+        );
+        if (languageModelId.value === value.unavailableLanguageModelId) {
+          languageModelId.value = languageModels.value[0]?.value ?? "";
+        }
       }
       break;
     case "comparison-update":
@@ -237,6 +310,46 @@ const runObservedRead = (): void => {
   });
 };
 
+const benchmarkItems = computed<SecondaryItem[]>(() =>
+  engine.value === "dynamodb"
+    ? [
+        { kind: "selection", label: "Page Benchmark (3 runs)", value: { runs: 3, mode: "page" } },
+        { kind: "selection", label: "Page Benchmark (5 runs)", value: { runs: 5, mode: "page" } },
+        { kind: "divider" },
+        {
+          kind: "selection",
+          label: "Complete-result Benchmark (3 runs)",
+          value: { runs: 3, mode: "completeResult" },
+        },
+        {
+          kind: "selection",
+          label: "Complete-result Benchmark (5 runs)",
+          value: { runs: 5, mode: "completeResult" },
+        },
+      ]
+    : [
+        { kind: "selection", label: "Benchmark (3 runs)", value: 3 },
+        { kind: "selection", label: "Benchmark (5 runs)", value: 5 },
+      ]
+);
+
+const runBenchmark = (selection: unknown): void => {
+  const runs = typeof selection === "object" && selection !== null && "runs" in selection
+    ? (selection as { runs: unknown }).runs
+    : selection;
+  const mode = typeof selection === "object" && selection !== null && "mode" in selection
+    ? (selection as { mode?: "page" | "completeResult" }).mode
+    : undefined;
+  if (runs !== 3 && runs !== 5) {
+    return;
+  }
+  isRunningSecondaryAction.value = true;
+  vscode.postCommand({
+    command: "runPerformanceTuningBenchmark",
+    params: { runs, mode },
+  });
+};
+
 // The file picker itself is host-side (window.showOpenDialog) - the webview
 // never handles a path (§6.1).
 const selectBaseline = (): void => {
@@ -298,22 +411,48 @@ defineExpose({
         <VsCodeButton
           v-if="engine === 'relational'"
           appearance="secondary"
-          :disabled="isRunningSecondaryAction || !relational?.analyzedExecutionPlan.available || !statementAllowsActualPlan"
+          :disabled="
+            isRunningSecondaryAction ||
+            !relational?.analyzedExecutionPlan.available ||
+            !statementAllowsActualPlan
+          "
           :title="actualPlanButtonTitle"
           @click="runActualPlan"
         >
-          <fa icon="circle-play" />{{ isRunningSecondaryAction ? "Running…" : "Run Explain Analyze" }}
+          <fa icon="circle-play" />{{
+            isRunningSecondaryAction ? "Running…" : "Run Explain Analyze"
+          }}
         </VsCodeButton>
         <VsCodeButton
           v-else
           appearance="secondary"
-          :disabled="isRunningSecondaryAction || !dynamodb?.observedReadCapability.available || observationEligibility?.allowed === false"
+          :disabled="
+            isRunningSecondaryAction ||
+            !dynamodb?.observedReadCapability.available ||
+            observationEligibility?.allowed === false
+          "
           :title="observedReadButtonTitle"
           @click="runObservedRead"
         >
           <fa icon="circle-play" />{{ isRunningSecondaryAction ? "Running…" : "Run Observed Read" }}
         </VsCodeButton>
-        <VsCodeButton :disabled="isAnalyzing" title="Analyze this context with AI" @click="analyzeWithAi">
+        <SecondarySelectionAction
+          title="Benchmark options"
+          :items="benchmarkItems"
+          :disabled="
+            isRunningSecondaryAction ||
+            (engine === 'relational'
+              ? !relational?.analyzedExecutionPlan.available || !statementAllowsActualPlan
+              : !dynamodb?.observedReadCapability.available ||
+                observationEligibility?.allowed === false)
+          "
+          @onSelect="runBenchmark"
+        />
+        <VsCodeButton
+          :disabled="isAnalyzing || languageModels.length === 0"
+          title="Analyze this context with AI"
+          @click="analyzeWithAi"
+        >
           <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
         </VsCodeButton>
         <!-- "Copy Prompt for Other AI" (2026-08-21 follow-up) - for a user
@@ -324,8 +463,11 @@ defineExpose({
              into directly. Copies the same domain-guided prompt as "Analyze
              with AI", just asking for a plain-text answer instead of JSON -
              no vscode.lm call happens for this button. -->
-        <CopyToClipboardButton appearance="secondary" :content="copyPromptForOtherAi"
-          title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)">
+        <CopyToClipboardButton
+          appearance="secondary"
+          :content="copyPromptForOtherAi"
+          title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)"
+        >
           <fa icon="comment-dots" />Copy Prompt for Other AI
         </CopyToClipboardButton>
         <!-- Save as Notebook - one shared button; PerformanceTuningPreviewPanel.ts's
@@ -334,9 +476,12 @@ defineExpose({
         <!-- Enabled by either a successful AI analysis or a baseline
              comparison: §14 of the comparison plan requires a comparison
              report to be savable without ever running an AI analysis. -->
-        <VsCodeButton appearance="secondary" :disabled="!canSaveNotebook"
+        <VsCodeButton
+          appearance="secondary"
+          :disabled="!canSaveNotebook"
           :title="saveNotebookTitle"
-          @click="saveAiAnalysisAsNotebook">
+          @click="saveAiAnalysisAsNotebook"
+        >
           <fa icon="book" />Save as Notebook
         </VsCodeButton>
       </template>
@@ -348,9 +493,13 @@ defineExpose({
          it. The second layer (a blocking modal) is host-side, on click. -->
     <template v-if="engine === 'relational'">
       <p v-if="!statementAllowsActualPlan" class="section-note">
-        This {{ relational?.context.statement.kind ?? "non-SELECT" }} statement uses an estimated plan only. Actual runtime metrics are not collected here.
+        This {{ relational?.context.statement.kind ?? "non-SELECT" }} statement uses an estimated
+        plan only. Actual runtime metrics are not collected here.
       </p>
-      <p v-else-if="relational?.analyzedExecutionPlan.available" class="section-note actual-plan-warning">
+      <p
+        v-else-if="relational?.analyzedExecutionPlan.available"
+        class="section-note actual-plan-warning"
+      >
         <fa icon="triangle-exclamation" />
         "Run Explain Analyze" executes the SQL above for real against the database, instead of only
         estimating its plan.
@@ -360,7 +509,10 @@ defineExpose({
       <p v-if="observationEligibility?.allowed === false" class="section-note">
         Run Observed Read is not available for this statement: {{ observationEligibility.reason }}
       </p>
-      <p v-else-if="dynamodb?.observedReadCapability.available" class="section-note actual-plan-warning">
+      <p
+        v-else-if="dynamodb?.observedReadCapability.available"
+        class="section-note actual-plan-warning"
+      >
         <fa icon="triangle-exclamation" />
         {{ observedReadNotice }}
       </p>
@@ -373,17 +525,99 @@ defineExpose({
       <div class="row ai-options">
         <span class="label">AI options</span>
         <label for="languageModelId" class="label-inline">Language model</label>
-        <VsCodeDropdown id="languageModelId" :items="languageModels" v-model="languageModelId"
-          :disabled="isAnalyzing || languageModels.length === 0" style="width: 220px" />
-        <VsCodeCheckbox v-model="translateResponse" :disabled="isAnalyzing">Translate response</VsCodeCheckbox>
+        <VsCodeDropdown
+          id="languageModelId"
+          :items="languageModels"
+          v-model="languageModelId"
+          :disabled="isAnalyzing || languageModels.length === 0"
+          style="width: 220px"
+        />
+        <VsCodeCheckbox v-model="translateResponse" :disabled="isAnalyzing"
+          >Translate response</VsCodeCheckbox
+        >
       </div>
-      <RelationalPerformanceTuningView v-if="engine === 'relational'" :data="relational!" part="header" />
+      <RelationalPerformanceTuningView
+        v-if="engine === 'relational'"
+        :data="relational!"
+        part="header"
+      />
       <DynamoDbPerformanceTuningView v-else :data="dynamodb!" part="header" />
     </div>
 
     <div class="scrollArea">
-      <RelationalPerformanceTuningView v-if="engine === 'relational'" :data="relational!" part="body" />
+      <RelationalPerformanceTuningView
+        v-if="engine === 'relational'"
+        :data="relational!"
+        part="body"
+      />
       <DynamoDbPerformanceTuningView v-else :data="dynamodb!" part="body" />
+
+      <div v-if="benchmark" class="section benchmark-section">
+        <h3 class="section-title">Benchmark</h3>
+        <div
+          v-if="engine === 'dynamodb' && benchmarkCompleteness"
+          class="completion-banner"
+          :class="benchmarkIsComplete ? 'complete' : 'incomplete'"
+        >
+          <span class="codicon" :class="benchmarkIsComplete ? 'codicon-pass-filled' : 'codicon-warning'"></span>
+          <strong>{{ benchmarkIsComplete ? "COMPLETE" : "INCOMPLETE" }}</strong>
+          <span>
+            {{ benchmarkIsComplete
+              ? "Every benchmark run reached the end of the result."
+              : benchmarkBoundDescription ?? "At least one run stopped before the full result was evaluated." }}
+          </span>
+        </div>
+        <p class="section-note">
+          {{ benchmark.completedRuns }} ordinary measured runs; no hidden warm-up run.
+          <span v-if="engine === 'relational'"
+            >EXPLAIN ANALYZE was collected first and is excluded from these timings.</span
+          >
+          <span v-else>
+            {{ "mode" in benchmark && benchmark.mode === "completeResult"
+              ? "Each sample followed continuation tokens up to the complete-result safety limits."
+              : "Each sample measured one bounded API response." }}
+          </span>
+        </p>
+        <p class="section-note">
+          {{ formatUtcWithLocal(benchmark.startedAt) }} –
+          {{ formatUtcWithLocal(benchmark.completedAt) }}
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Run</th>
+              <th>Client elapsed</th>
+              <th v-if="engine === 'dynamodb'">Returned / evaluated</th>
+              <th v-if="engine === 'dynamodb'">Consumed read capacity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="sample in benchmark.samples" :key="sample.run">
+              <td>{{ sample.run }}</td>
+              <td>{{ formatMs(sample.clientElapsedTimeMs) }}</td>
+              <td v-if="engine === 'dynamodb'">
+                {{ "returnedItemCount" in sample ? sample.returnedItemCount ?? "—" : "—" }} /
+                {{ "evaluatedItemCount" in sample ? sample.evaluatedItemCount ?? "—" : "—" }}
+              </td>
+              <td v-if="engine === 'dynamodb'">
+                {{
+                  "consumedCapacity" in sample
+                    ? sample.consumedCapacity?.readCapacityUnits ??
+                      sample.consumedCapacity?.capacityUnits ??
+                      "—"
+                    : "—"
+                }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="benchmark-summary">
+          Median {{ formatMs(benchmark.medianClientElapsedTimeMs) }} ・ Average
+          {{ formatMs(benchmark.averageClientElapsedTimeMs) }} ・ Min / Max
+          {{ formatMs(benchmark.minClientElapsedTimeMs) }} /
+          {{ formatMs(benchmark.maxClientElapsedTimeMs) }}
+        </p>
+      </div>
 
       <!-- Baseline comparison (§12) - always rendered, so the
            "Compare with Baseline…" affordance has a visible home even before
@@ -403,7 +637,12 @@ defineExpose({
       <div class="section ai-analysis ai-analysis-section">
         <div class="section-title-row">
           <h3 class="section-title">AI Analysis</h3>
-          <CopyToClipboardButton v-if="analysisJson" class="copy-analysis-btn" :content="analysisJson" title="Copy AI analysis JSON" />
+          <CopyToClipboardButton
+            v-if="analysisJson"
+            class="copy-analysis-btn"
+            :content="analysisJson"
+            title="Copy AI analysis JSON"
+          />
         </div>
 
         <p v-if="analysis.status === 'idle'" class="section-note">
@@ -412,8 +651,15 @@ defineExpose({
 
         <div v-else-if="analysis.status === 'running'">
           <p class="analysis-status">Analyzing with AI…</p>
-          <p v-if="estimatedTokenUsage" class="section-note">
+          <p v-if="aiInputDetail" class="section-note">{{ aiInputDetail }}</p>
+          <p
+            v-if="estimatedTokenUsage"
+            class="section-note"
+            :class="{ 'token-usage-warning': tokenUsageNearLimit }"
+            :title="tokenUsageTitle"
+          >
             Estimated AI input: {{ estimatedTokenUsage }}
+            <span v-if="tokenUsageNearLimit"> — Near this model's input limit</span>
           </p>
         </div>
 
@@ -422,7 +668,10 @@ defineExpose({
           <p v-if="estimatedTokenUsage" class="section-note">
             Smallest attempted AI input: {{ estimatedTokenUsage }}
             <span v-if="analysis.contextDetail">
-              — Current context {{ analysis.contextDetail }}<span v-if="analysis.comparisonDetail">, comparison {{ analysis.comparisonDetail }}</span>
+              — Current context {{ analysis.contextDetail
+              }}<span v-if="analysis.comparisonDetail"
+                >, comparison {{ analysis.comparisonDetail }}</span
+              >
             </span>
           </p>
           <details v-if="analysis.rawResponseText" class="advanced-details">
@@ -441,10 +690,30 @@ defineExpose({
             Baseline changed; run Analyze with AI again. The analysis below was produced before the
             current baseline selection and does not reflect the comparison above.
           </p>
-          <p class="section-note">AI input: {{ analysis.result.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full" }}</p>
-          <p v-if="estimatedTokenUsage" class="section-note">
+          <p v-if="aiInputDetail" class="section-note">AI input: {{ aiInputDetail }}</p>
+          <p
+            v-if="estimatedTokenUsage"
+            class="section-note"
+            :class="{ 'token-usage-warning': tokenUsageNearLimit }"
+            :title="tokenUsageTitle"
+          >
             Estimated AI input: {{ estimatedTokenUsage }}
+            <span v-if="tokenUsageNearLimit"> — Near this model's input limit</span>
           </p>
+          <div v-if="analysis.result.qualityIssues?.length" class="analysis-quality-warning">
+            <p>
+              <fa icon="triangle-exclamation" /> Some AI recommendations failed deterministic
+              validation.
+            </p>
+            <ul>
+              <li
+                v-for="issue in analysis.result.qualityIssues"
+                :key="`${issue.code}-${issue.recommendationTitle ?? ''}`"
+              >
+                {{ issue.message }}
+              </li>
+            </ul>
+          </div>
           <p class="analysis-summary">{{ analysis.result.summary }}</p>
 
           <div v-if="analysis.result.findings.length > 0" class="analysis-subsection">
@@ -457,7 +726,9 @@ defineExpose({
             >
               <p class="ai-card-title">{{ f.title }}</p>
               <p class="ai-card-detail">{{ f.detail }}</p>
-              <p v-if="evidenceLabel(f.evidence)" class="ai-card-evidence">{{ evidenceLabel(f.evidence) }}</p>
+              <p v-if="evidenceLabel(f.evidence)" class="ai-card-evidence">
+                {{ evidenceLabel(f.evidence) }}
+              </p>
             </div>
           </div>
 
@@ -471,7 +742,9 @@ defineExpose({
             >
               <p class="ai-card-title">{{ r.title }}</p>
               <p class="ai-card-detail">{{ r.detail }}</p>
-              <p class="ai-card-rationale"><span class="label-inline">Rationale:</span> {{ r.rationale }}</p>
+              <p class="ai-card-rationale">
+                <span class="label-inline">Rationale:</span> {{ r.rationale }}
+              </p>
               <pre v-if="r.suggestedSql" class="ai-card-sql">{{ r.suggestedSql }}</pre>
               <!-- possibleDuplicateOfIndex is host-computed, never
                    AI-authored, and RDB-only (never set for a DynamoDB
@@ -479,26 +752,33 @@ defineExpose({
                    analyzeWithAi()). -->
               <p v-if="r.possibleDuplicateOfIndex" class="ai-card-duplicate-warning">
                 <fa icon="triangle-exclamation" />
-                Possible duplicate of existing index "{{ r.possibleDuplicateOfIndex }}" - verify before running.
+                Possible duplicate of existing index "{{ r.possibleDuplicateOfIndex }}" - verify
+                before running.
               </p>
-              <p v-if="evidenceLabel(r.evidence)" class="ai-card-evidence">{{ evidenceLabel(r.evidence) }}</p>
+              <p v-if="evidenceLabel(r.evidence)" class="ai-card-evidence">
+                {{ evidenceLabel(r.evidence) }}
+              </p>
             </div>
           </div>
 
           <p class="analysis-note">
-            Recommendations are AI-generated suggestions based on this one context snapshot. They are not applied
-            automatically - review and run them yourself.
+            Recommendations are AI-generated suggestions based on this one context snapshot. They
+            are not applied automatically - review and run them yourself.
           </p>
 
           <div class="row">
             <span class="label">Confidence</span>
-            <span class="badge" :class="`confidence-${analysis.result.confidence}`">{{ analysis.result.confidence }}</span>
+            <span class="badge" :class="`confidence-${analysis.result.confidence}`">{{
+              analysis.result.confidence
+            }}</span>
           </div>
 
           <div v-if="analysis.result.missingContext.length > 0" class="analysis-subsection">
             <h4>Missing context</h4>
             <ul>
-              <li v-for="(m, i) in analysis.result.missingContext" :key="`missing-${i}`">{{ m }}</li>
+              <li v-for="(m, i) in analysis.result.missingContext" :key="`missing-${i}`">
+                {{ m }}
+              </li>
             </ul>
           </div>
 
@@ -522,9 +802,10 @@ defineExpose({
       <div v-if="infoGroups.length > 0" class="section information-section">
         <h3 class="section-title">Information</h3>
         <p class="section-note">
-          The items below describe {{ engine === "relational" ? "execution-plan" : "access-pattern/collection" }}
-          characteristics. On their own, they don't indicate a confirmed performance problem — see each item's
-          technical details.
+          The items below describe
+          {{ engine === "relational" ? "execution-plan" : "access-pattern/collection" }}
+          characteristics. On their own, they don't indicate a confirmed performance problem — see
+          each item's technical details.
         </p>
         <DiagnosticGroupCard v-for="g in infoGroups" :key="g.key" :group="g" />
       </div>
@@ -533,8 +814,15 @@ defineExpose({
       <details class="section advanced-details advanced-details-section">
         <summary class="section-title">Advanced details: Full context JSON</summary>
         <p class="advanced-note">
-          This preview includes the statement/target, table definitions, and predicates exactly as collected.
-          Review the content before sending it to an AI service.
+          This preview includes the statement/target, table definitions, and predicates exactly as
+          collected. Review the content before sending it to an AI service.
+        </p>
+        <p v-if="active" class="advanced-note">
+          Diagnostic context size: {{ active.payloadBytes.toLocaleString() }} /
+          {{ active.maxPayloadBytes.toLocaleString() }} bytes
+          <span v-if="active.maxPayloadBytes > 0 && active.payloadBytes > active.maxPayloadBytes">
+            (exceeds collection limit)</span
+          >
         </p>
         <div class="code-panel json-panel">
           <div class="json-block" v-html="active?.jsonHtml"></div>
@@ -667,13 +955,23 @@ defineExpose({
        own <style> for their sections' order values (1 and 4-7 respectively;
        only one of the two is ever mounted at a time, so their numbering
        never has to avoid colliding with each other, only with these). */
-    .collection-issues-section { order: 2; }
-    .information-section { order: 3; }
+    .collection-issues-section {
+      order: 2;
+    }
+    .information-section {
+      order: 3;
+    }
     /* The deterministic comparison sits directly above AI Analysis, which is
        a consumer of it rather than a peer (§19). */
-    .comparison-section { order: 8; }
-    .ai-analysis-section { order: 9; }
-    .advanced-details-section { order: 10; }
+    .comparison-section {
+      order: 8;
+    }
+    .ai-analysis-section {
+      order: 9;
+    }
+    .advanced-details-section {
+      order: 10;
+    }
 
     .section {
       margin-bottom: 12px;
@@ -699,6 +997,27 @@ defineExpose({
       color: var(--vscode-descriptionForeground);
       font-size: 0.9em;
       margin: 0 0 8px 0;
+    }
+
+    .completion-banner {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 9px;
+      margin: 4px 0 8px;
+      border: 1px solid;
+      border-radius: 3px;
+
+      &.complete {
+        color: var(--vscode-testing-iconPassed);
+        background: color-mix(in srgb, var(--vscode-testing-iconPassed) 10%, transparent);
+      }
+
+      &.incomplete {
+        color: var(--vscode-editorWarning-foreground);
+        background: var(--vscode-inputValidation-warningBackground);
+        border-color: var(--vscode-inputValidation-warningBorder);
+      }
     }
 
     .json-panel {
@@ -743,6 +1062,22 @@ defineExpose({
       color: var(--vscode-editorWarning-foreground);
       font-size: 0.9em;
       margin: 0 0 8px 0;
+    }
+
+    .token-usage-warning {
+      color: var(--vscode-editorWarning-foreground);
+    }
+
+    .analysis-quality-warning {
+      color: var(--vscode-editorWarning-foreground);
+      border-left: 3px solid var(--vscode-editorWarning-foreground);
+      padding: 4px 8px;
+      margin: 0 0 8px 0;
+
+      p,
+      ul {
+        margin: 2px 0;
+      }
     }
 
     .raw-response {

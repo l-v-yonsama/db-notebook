@@ -64,6 +64,9 @@ export type ComparisonReasonCode =
   | "OBSERVATION_BOUNDS_DIFFER"
   | "TARGET_SET_CHANGED"
   | "ENVIRONMENT_MISMATCH"
+  | "BENCHMARK_SAMPLE_COUNT_DIFFERS"
+  | "BENCHMARK_COMPLETENESS_DIFFERS"
+  | "BENCHMARK_PROTOCOL_DIFFERS"
   // comparable, but worth stating (§11.3)
   | "ENVIRONMENT_MAY_DIFFER"
   | "CLOUDWATCH_SCOPE_WIDER_THAN_STATEMENT"
@@ -105,6 +108,13 @@ export type MetricAssessment =
   | "noData"
   | "notComparable";
 
+export type MetricMissingDataGuidance = {
+  // Short action-oriented label shown in the Assessment column.
+  action: string;
+  // Explains why that action supplies the missing side and what it executes.
+  detail: string;
+};
+
 export type NumericComparison = {
   // Stable identifier used by metricDecisions, the AI projection, and tests.
   key: string;
@@ -125,6 +135,10 @@ export type NumericComparison = {
   direction: MetricDirection;
   comparability: "comparable" | "notComparable";
   reason?: string;
+  // Present only for a one-sided missing value that the user can resolve with
+  // a known action. Benchmark collection uses this; arbitrary missing metrics
+  // retain the generic noData assessment.
+  missingDataGuidance?: MetricMissingDataGuidance;
   assessment: MetricAssessment;
 };
 
@@ -340,6 +354,7 @@ export type DynamoDbComparisonEvidence = {
   // 'complete' | 'bounded' | 'unknown' per side; a one-sided bound is a
   // partial-comparability reason, never silently averaged away (§11.2).
   observationCompleteness: ComparisonValue<string>;
+  benchmarkCompleteness: ComparisonValue<string>;
   cloudWatch?: {
     // "<duration> min @ <period>s" per side. The absolute start/end always
     // differ (the two collections happened at different times, which is the

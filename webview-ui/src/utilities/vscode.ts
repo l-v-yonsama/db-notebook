@@ -7,6 +7,7 @@ export * from "../../../src/shared/ComponentName";
 export * from "../../../src/shared/CreateScriptConditionParams";
 export * from "../../../src/shared/DBDumpParams";
 export * from "../../../src/shared/DBRestoreParams";
+export * from "../../../src/shared/dateTimeDisplay";
 export * from "../../../src/shared/DynamoDBConditionParams";
 export * from "../../../src/shared/DynamoDbPerformanceTuningHumanSummary";
 export * from "../../../src/shared/ExtChartJs";

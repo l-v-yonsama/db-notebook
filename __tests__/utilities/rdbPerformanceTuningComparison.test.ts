@@ -43,6 +43,63 @@ function reasonCodes(evidence: PerformanceTuningComparisonEvidence): string[] {
   return evidence.comparability.reasons.map((reason) => reason.code);
 }
 
+function benchmark(requestedRuns: 3 | 5, medianClientElapsedTimeMs: number) {
+  return {
+    startedAt: "2026-08-27T00:00:00.000Z",
+    completedAt: "2026-08-27T00:00:01.000Z",
+    requestedRuns,
+    completedRuns: requestedRuns,
+    samples: Array.from({ length: requestedRuns }, (_, index) => ({ run: index + 1, clientElapsedTimeMs: medianClientElapsedTimeMs })),
+    medianClientElapsedTimeMs,
+    averageClientElapsedTimeMs: medianClientElapsedTimeMs,
+    minClientElapsedTimeMs: medianClientElapsedTimeMs,
+    maxClientElapsedTimeMs: medianClientElapsedTimeMs,
+    planCollectedBeforeBenchmark: true as const,
+    source: "performanceTuningBenchmark" as const,
+  };
+}
+
+it("keeps 5-run vs 3-run benchmark medians comparable and emits a confidence warning", () => {
+  const evidence = compare(
+    rdbContext({ benchmark: benchmark(5, 100) }),
+    rdbContext({ benchmark: benchmark(3, 20) })
+  );
+  expect(reasonCodes(evidence)).toContain("BENCHMARK_SAMPLE_COUNT_DIFFERS");
+  expect(metric(evidence, "rdb.benchmark.medianClientElapsedTimeMs")).toMatchObject({
+    comparability: "comparable",
+    improvementPercent: 80,
+    assessment: "improved",
+  });
+});
+
+it("tells the user how to collect a missing Current benchmark", () => {
+  const evidence = compare(
+    rdbContext({ benchmark: benchmark(5, 100) }),
+    rdbContext(),
+  );
+
+  expect(metric(evidence, "rdb.benchmark.medianClientElapsedTimeMs")).toMatchObject({
+    assessment: "noData",
+    missingDataGuidance: {
+      action: "Run Benchmark (5 runs) for Current",
+    },
+  });
+  expect(metric(evidence, "rdb.benchmark.medianClientElapsedTimeMs")?.missingDataGuidance?.detail)
+    .toContain("automatically collects EXPLAIN ANALYZE first");
+});
+
+it("tells the user to replace a baseline that has no benchmark", () => {
+  const evidence = compare(
+    rdbContext(),
+    rdbContext({ benchmark: benchmark(3, 20) }),
+  );
+
+  expect(metric(evidence, "rdb.benchmark.medianClientElapsedTimeMs")?.missingDataGuidance).toEqual({
+    action: "Select a benchmarked baseline",
+    detail: "The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (3 runs).",
+  });
+});
+
 /** The "after" side of the classic Seq Scan -> Index Scan improvement. */
 function improvedContext(): PerformanceTuningContext {
   return rdbContext({

@@ -15,6 +15,7 @@ import {
   formatImprovement,
   formatMetricValue,
   keyImprovements,
+  metricAssessmentDisplay,
 } from "../../webview-ui/src/utilities/performanceTuningComparisonDisplay";
 import { rdbContext } from "./performanceTuningComparisonFixtures";
 
@@ -53,6 +54,22 @@ describe("assessmentDisplay / comparabilityDisplay", () => {
       expect(comparabilityDisplay(level).icon).not.toBe("");
       expect(comparabilityDisplay(level).text).not.toBe("");
     }
+  });
+
+  it("uses actionable Benchmark guidance instead of the generic one-sided label", () => {
+    const display = metricAssessmentDisplay(metric({
+      assessment: "noData",
+      current: undefined,
+      missingDataGuidance: {
+        action: "Run Benchmark (3 runs) for Current",
+        detail: "Current has no benchmark.",
+      },
+    }));
+
+    expect(display).toMatchObject({
+      icon: "circle-play",
+      text: "Run Benchmark (3 runs) for Current",
+    });
   });
 });
 

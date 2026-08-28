@@ -5,6 +5,8 @@ import {
   DEFAULT_MAX_PAYLOAD_BYTES,
   DynamoDbPerformanceTuningCallOptions,
   DynamoDbPerformanceTuningContext,
+  DynamoDbBenchmarkSample,
+  PerformanceTuningBenchmarkSample,
   PerformanceTuningContext,
   RDSBaseDriver,
   createPerformanceQueryDiagram,
@@ -50,11 +52,17 @@ import { buildDynamoDbAiAnalysisPrompt, buildDynamoDbPlainTextAnalysisPrompt } f
 import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "../utilities/dynamoDbPerformanceTuningDiagnosticFormatter";
 import { buildDynamoDbPerformanceTuningHumanSummary } from "../utilities/dynamoDbPerformanceTuningHumanSummary";
 import { saveDynamoDbAiAnalysisAsNotebook } from "../utilities/dynamoDbPerformanceTuningNotebook";
+import { buildDynamoDbNativeQueryViewModel } from "../utilities/dynamoDbNativeQueryDisplay";
 import { toDynamoDbQueryAnalysisInput } from "../utilities/dynamoDbQueryAnalysisInput";
 import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
-import { buildLanguageModelSelection, defaultTranslateResponse } from "../utilities/lmModelSelection";
+import {
+  buildLanguageModelSelection,
+  defaultTranslateResponse,
+  isModelNotSupportedError,
+  MODEL_NOT_SUPPORTED_ERROR_MESSAGE,
+} from "../utilities/lmModelSelection";
 import {
   saveAiAnalysisAsNotebook,
   type PerformanceTuningReportInput,
@@ -63,6 +71,12 @@ import { buildAiAnalysisPrompt, buildPlainTextAnalysisPrompt } from "../utilitie
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
 import { findPossibleDuplicateIndex } from "../utilities/performanceTuningIndexDuplication";
 import { buildPerformanceTuningHumanSummary } from "../utilities/performanceTuningHumanSummary";
+import { excludeUnchangedSqlRecommendations } from "../utilities/performanceTuningAiRecommendationGuard";
+import {
+  buildDynamoDbBenchmarkSession,
+  buildRdbBenchmarkSession,
+  type BenchmarkRunCount,
+} from "../utilities/performanceTuningBenchmark";
 import {
   buildPlanTableMappingRows,
   formatActualPlanForDisplay,
@@ -349,6 +363,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   private context: AnyPerformanceTuningContext | undefined;
   private lastAnalysis: PerformanceTuningAiAnalysisResult | undefined;
   private analysisCancellationSource: CancellationTokenSource | undefined;
+  // A provider may advertise a model through selectChatModels() and reject
+  // it only when sendRequest() reaches the backend. Quarantine that model for
+  // this Preview panel's lifetime; closing the panel creates a fresh instance
+  // and therefore retries against a newly queried provider list.
+  private readonly unavailableLanguageModelIds = new Set<string>();
 
   // Baseline comparison (§6, §12). The selection holds its own immutable
   // Context snapshot, so nothing here ever re-reads the .dbn - a comparison
@@ -554,7 +573,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     // (2026-08-19 follow-up, design doc §0). No gpt-4o-family preference
     // (deliberately - see lmModelSelection.ts); translateResponse defaults
     // off only for an English display language.
-    const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(models);
+    const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(
+      models.filter((model) => !this.unavailableLanguageModelIds.has(model.id))
+    );
 
     const msg: PerformanceTuningPreviewPanelEventData = {
       command: "initialize",
@@ -614,7 +635,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
     const humanSummary = buildDynamoDbPerformanceTuningHumanSummary(context);
     const accessPattern = buildDynamoDbAccessPatternViewModel(context.accessPattern);
-    const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(models);
+    const nativeQuery = this.dynamoDbRequest?.statement.request.kind === "query"
+      ? buildDynamoDbNativeQueryViewModel(this.dynamoDbRequest.statement.request.input)
+      : undefined;
+    const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(
+      models.filter((model) => !this.unavailableLanguageModelIds.has(model.id))
+    );
 
     const msg: PerformanceTuningPreviewPanelEventData = {
       command: "initialize",
@@ -627,6 +653,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           accessPattern,
           humanSummary,
           sqlHtml,
+          nativeQuery,
           jsonHtml,
           plainTextPrompt,
           translatedPlainTextPrompt,
@@ -662,6 +689,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         break;
       case "runObservedRead":
         await this.runObservedRead();
+        break;
+      case "runPerformanceTuningBenchmark":
+        await this.runBenchmark(message.params.runs, message.params.mode);
         break;
       case "selectPerformanceTuningBaseline":
         await this.selectBaseline();
@@ -957,6 +987,18 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
             accumulatedResponse += fragment;
           }
         } catch (e) {
+          if (isModelNotSupportedError(e)) {
+            this.unavailableLanguageModelIds.add(model.id);
+            await this.postAnalysisUpdate(
+              myGeneration,
+              {
+                status: "error",
+                errorMessage: MODEL_NOT_SUPPORTED_ERROR_MESSAGE,
+              },
+              model.id,
+            );
+            return;
+          }
           await this.postAnalysisUpdate(myGeneration, {
             status: "error",
             errorMessage: `The AI request failed: ${getErrorMessage(e)}`,
@@ -990,6 +1032,19 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           return;
         }
 
+        const recommendations = (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).map((r) => ({
+          ...r,
+          possibleDuplicateOfIndex: isDynamoDbPerformanceTuningContext(context)
+            ? undefined
+            : findPossibleDuplicateIndex(r?.suggestedSql, context)?.matchedIndexName,
+        }));
+        const recommendationReview = isDynamoDbPerformanceTuningContext(context)
+          ? { recommendations, qualityIssues: [] }
+          : excludeUnchangedSqlRecommendations({
+              currentSql: context.statement.sql,
+              recommendations,
+            });
+
         const result: PerformanceTuningAiAnalysisResult = {
           formatVersion: 1,
           summary: typeof parsed.summary === "string" ? parsed.summary : "",
@@ -1002,14 +1057,16 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           // only (design doc §12: "possibleDuplicateOfIndex の host-side
           // CREATE INDEX 検査は RDB Context の場合だけ実行する") - DynamoDB has
           // no CREATE INDEX concept at all to check against.
-          recommendations: (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).map((r) => ({
-            ...r,
-            possibleDuplicateOfIndex: isDynamoDbPerformanceTuningContext(context)
-              ? undefined
-              : findPossibleDuplicateIndex(r?.suggestedSql, context)?.matchedIndexName,
-          })),
+          recommendations: recommendationReview.recommendations,
+          ...(recommendationReview.qualityIssues.length > 0
+            ? { qualityIssues: recommendationReview.qualityIssues }
+            : {}),
           confidence:
-            parsed.confidence === "high" || parsed.confidence === "medium" ? parsed.confidence : "low",
+            recommendationReview.qualityIssues.length > 0
+              ? "low"
+              : parsed.confidence === "high" || parsed.confidence === "medium"
+                ? parsed.confidence
+                : "low",
           missingContext: Array.isArray(parsed.missingContext) ? parsed.missingContext : [],
           model: {
             id: model.id,
@@ -1081,11 +1138,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   // forced through saveAiAnalysisAsNotebook()'s RDB-shaped cells.
   private async saveAnalysisAsNotebook(): Promise<void> {
     const myGeneration = this.renderGeneration;
-    // A report needs *something* to report. Since the comparison
-    // implementation plan (§14) made AI analysis optional, either an analysis
-    // or a comparison is now enough - previously only the former existed.
     const evidence = this.comparison.evidence;
-    if (!this.context || (!this.lastAnalysis && !evidence)) {
+    if (!this.context) {
       return;
     }
     const context = this.context;
@@ -1105,16 +1159,6 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       evidence && this.baseline
         ? { evidence, baselineContext: this.baseline.context }
         : undefined;
-    // The initial guard above runs before stale analysis is deliberately
-    // removed. Re-check the effective report content so clearing a baseline
-    // after an analysis cannot create an empty, misleading Notebook.
-    if (!analysis && !comparison) {
-      window.showErrorMessage(
-        "There is no current analysis or baseline comparison to save. Run Analyze with AI again, or select a baseline."
-      );
-      return;
-    }
-
     const input: PerformanceTuningReportInput = {
       analysis,
       comparison,
@@ -1130,10 +1174,15 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       return;
     }
 
+    const reportDescription = comparison
+      ? "comparison report"
+      : analysis
+        ? "AI analysis"
+        : "performance evidence report";
     window.showInformationMessage(
       analysisIsStale
-        ? `Saved comparison report to ${result.relativePath}. The AI analysis on screen was produced against a different baseline, so it was left out - run Analyze with AI again to include it.`
-        : `Saved ${analysis ? "AI analysis" : "comparison report"} to ${result.relativePath}`
+        ? `Saved ${reportDescription} to ${result.relativePath}. The AI analysis on screen was produced against a different baseline, so it was left out - run Analyze with AI again to include it.`
+        : `Saved ${reportDescription} to ${result.relativePath}`
     );
 
     if (myGeneration !== this.renderGeneration) {
@@ -1359,6 +1408,290 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
   }
 
+  private async runBenchmark(
+    runs: BenchmarkRunCount,
+    mode: "page" | "completeResult" = "page"
+  ): Promise<void> {
+    if (runs !== 3 && runs !== 5) {
+      await this.postStopProgress();
+      return;
+    }
+    if (this.context && isDynamoDbPerformanceTuningContext(this.context)) {
+      await this.runDynamoDbBenchmark(runs, mode);
+    } else {
+      await this.runRdbBenchmark(runs);
+    }
+  }
+
+  // Option A: collect one actual plan first, then execute the ordinary SELECT
+  // N times. The instrumented EXPLAIN ANALYZE duration remains execution-plan
+  // evidence and is never included in the benchmark distribution.
+  private async runRdbBenchmark(runs: BenchmarkRunCount): Promise<void> {
+    const myGeneration = this.renderGeneration;
+    const request = this.request;
+    const context = this.context;
+    if (!request || !context || isDynamoDbPerformanceTuningContext(context) || !this.analyzedExecutionPlan.available) {
+      await this.postStopProgress();
+      return;
+    }
+    if (context.statement.analyzeEligibility?.allowed === false) {
+      void window.showErrorMessage(context.statement.analyzeEligibility.reason ?? "Benchmark is limited to a single SELECT statement.");
+      await this.postStopProgress();
+      return;
+    }
+    const confirmed = await window.showWarningMessage(
+      `This runs EXPLAIN ANALYZE once and then executes the SQL normally ${runs} times against "${request.connectionSetting.name}". All executions read real data. Continue?`,
+      { modal: true },
+      "Run Benchmark"
+    );
+    if (confirmed !== "Run Benchmark") {
+      await this.postStopProgress();
+      return;
+    }
+
+    await window.withProgress(
+      { location: ProgressLocation.Notification, cancellable: true, title: `Running benchmark (${runs} runs)...` },
+      async (progress, token) => {
+        const controller = new AbortController();
+        this.secondaryExecutionController = controller;
+        let driverForKill: RDSBaseDriver | undefined;
+        token.onCancellationRequested(() => {
+          controller.abort();
+          void driverForKill?.kill();
+        });
+        const { ok, message, result } = await workflow<RDSBaseDriver, PerformanceTuningContext>(
+          request.connectionSetting,
+          async (driver) => {
+            driverForKill = driver;
+            progress.report({ message: "Collecting actual execution plan..." });
+            const actual = await driver.getPerformanceTuningContext(
+              {
+                databaseName: request.databaseName,
+                statement: request.statement,
+                plan: { ...request.plan, mode: "analyze", allowExecution: true },
+                targetTables: request.targetTables,
+                tableAliasMap: request.tableAliasMap,
+              },
+              { signal: controller.signal }
+            );
+            if (!actual.ok || !actual.result) {
+              throw new Error(actual.message);
+            }
+            const startedAt = new Date().toISOString();
+            const samples: PerformanceTuningBenchmarkSample[] = [];
+            for (let index = 0; index < runs; index += 1) {
+              if (controller.signal.aborted) {
+                throw new Error("Benchmark cancelled.");
+              }
+              progress.report({ message: `Running ordinary SELECT ${index + 1}/${runs}...` });
+              const started = Date.now();
+              const rdh = await driver.requestSql({
+                sql: request.statement.sql,
+                // QueryParams predates Performance Tuning and declares binds
+                // as string[], while the plan path correctly retains typed
+                // bind values. Preserve those runtime values exactly; do not
+                // stringify numbers/nulls and accidentally benchmark a
+                // different predicate.
+                conditions: { binds: request.plan.binds as string[] | undefined },
+                prepare: { useDatabaseName: request.databaseName },
+              });
+              samples.push({
+                run: index + 1,
+                clientElapsedTimeMs: Date.now() - started,
+                returnedRowCount: rdh.summary?.selectedRows ?? rdh.rows.length,
+              });
+            }
+            actual.result.benchmark = buildRdbBenchmarkSession({
+              startedAt,
+              completedAt: new Date().toISOString(),
+              requestedRuns: runs,
+              samples,
+            });
+            return actual.result;
+          },
+          true
+        );
+        if (this.secondaryExecutionController === controller) {
+          this.secondaryExecutionController = undefined;
+        }
+        if (myGeneration !== this.renderGeneration) {
+          return;
+        }
+        if (ok && result) {
+          await this.renderSub(result);
+          return;
+        }
+        window.showErrorMessage(`Failed to run benchmark.${message ? ` ${message}` : ""}`);
+        await this.postStopProgress();
+      }
+    );
+  }
+
+  private async runDynamoDbBenchmark(
+    runs: BenchmarkRunCount,
+    mode: "page" | "completeResult"
+  ): Promise<void> {
+    const myGeneration = this.renderGeneration;
+    const request = this.dynamoDbRequest;
+    const context = this.context;
+    if (!request || !context || !isDynamoDbPerformanceTuningContext(context) || !this.observedReadCapability.available) {
+      await this.postStopProgress();
+      return;
+    }
+    if (!context.statement.observationEligibility.allowed) {
+      void window.showErrorMessage(context.statement.observationEligibility.reason ?? "Benchmark is not available for this statement.");
+      await this.postStopProgress();
+      return;
+    }
+    const completeResult = mode === "completeResult";
+    const confirmed = await window.showWarningMessage(
+      completeResult
+        ? `This performs ${runs} real reads against "${request.connectionSetting.name}" and follows continuation tokens to complete each result, with hard safety limits of 10 pages, 1,000 evaluated items, and 30 seconds per run. Continue?`
+        : `This performs ${runs} real, bounded reads against "${request.connectionSetting.name}" (one response, up to 100 evaluated items per run). Continue?`,
+      { modal: true },
+      "Run Benchmark"
+    );
+    if (confirmed !== "Run Benchmark") {
+      await this.postStopProgress();
+      return;
+    }
+
+    await window.withProgress(
+      { location: ProgressLocation.Notification, cancellable: true, title: `Running DynamoDB benchmark (${runs} runs)...` },
+      async (progress, token) => {
+        const controller = new AbortController();
+        this.secondaryExecutionController = controller;
+        token.onCancellationRequested(() => controller.abort());
+        const execution: DynamoDbPerformanceTuningCallOptions["execution"] =
+          request.statement.request.kind === "partiql"
+            ? { kind: "partiql" }
+            : { kind: "query", input: request.statement.request.input };
+        const staticRequest = request.statement.request.kind === "partiql"
+          ? request.statement.request
+          : { kind: "query" as const, input: toDynamoDbQueryAnalysisInput(request.statement.request.input) };
+
+        const { ok, message, result } = await workflow<AwsDriver, DynamoDbPerformanceTuningContext>(
+          request.connectionSetting,
+          async (driver) => {
+            progress.report({ message: `Running observed read 1/${runs} and collecting context...` });
+            const first = await driver.getDynamoDbPerformanceTuningContext(
+              {
+                statement: { source: request.statement.source, request: staticRequest, workload: request.workload },
+                observation: {
+                  mode: completeResult ? "executeComplete" : "executeOnce",
+                  allowExecution: true,
+                  ...(completeResult
+                    ? { maxPages: 10, maxEvaluatedItems: 1000, timeoutMs: 30_000 }
+                    : {}),
+                },
+              },
+              { signal: controller.signal, execution }
+            );
+            if (!first.ok || !first.result?.observation || first.result.observation.clientElapsedTimeMs === undefined) {
+              throw new Error(first.message || "The first observed read did not return elapsed-time evidence.");
+            }
+            const startedAt = first.result.observation.observedAt ?? new Date().toISOString();
+            const samples: DynamoDbBenchmarkSample[] = [
+              {
+                run: 1,
+                clientElapsedTimeMs: first.result.observation.clientElapsedTimeMs,
+                requestCount: first.result.observation.requestCount,
+                retryCount: first.result.observation.retryCount,
+                returnedItemCount: first.result.observation.returnedItemCount,
+                evaluatedItemCount: first.result.observation.evaluatedItemCount,
+                filterPassRate: first.result.observation.filterPassRate,
+                consumedCapacity: first.result.observation.consumedCapacity,
+                completeness: first.result.observation.completeness ?? (first.result.observation.bounded ? "bounded" : "complete"),
+              },
+            ];
+            for (let index = 1; index < runs; index += 1) {
+              if (controller.signal.aborted) {
+                throw new Error("Benchmark cancelled.");
+              }
+              progress.report({ message: `Running observed read ${index + 1}/${runs}...` });
+              const observed = completeResult
+                ? execution.kind === "partiql"
+                  ? await driver.dynamoClient.observePartiqlReadComplete({
+                      statement:
+                        request.statement.request.kind === "partiql"
+                          ? request.statement.request.text
+                          : "",
+                      maxPages: 10,
+                      timeoutMs: 30_000,
+                      signal: controller.signal,
+                    })
+                  : await driver.dynamoClient.observeNativeQueryReadComplete({
+                      input: execution.input,
+                      maxPages: 10,
+                      maxEvaluatedItems: 1000,
+                      timeoutMs: 30_000,
+                      signal: controller.signal,
+                    })
+                : execution.kind === "partiql"
+                  ? await driver.dynamoClient.observePartiqlRead({
+                      statement:
+                        request.statement.request.kind === "partiql"
+                          ? request.statement.request.text
+                          : "",
+                      maxEvaluatedItems: 100,
+                      signal: controller.signal,
+                    })
+                  : await driver.dynamoClient.observeNativeQueryRead({
+                      input: execution.input,
+                      maxEvaluatedItems: 100,
+                      signal: controller.signal,
+                    });
+              samples.push({
+                run: index + 1,
+                clientElapsedTimeMs: observed.clientElapsedTimeMs,
+                requestCount: observed.requestCount,
+                retryCount: observed.retryCount,
+                returnedItemCount: observed.returnedItemCount,
+                evaluatedItemCount: observed.scannedItemCount,
+                filterPassRate:
+                  observed.scannedItemCount !== undefined && observed.scannedItemCount > 0
+                    ? observed.returnedItemCount / observed.scannedItemCount
+                    : undefined,
+                consumedCapacity: observed.capacityBreakdown,
+                completeness: observed.hasMorePages ? "bounded" : "complete",
+              });
+            }
+            first.result.benchmark = buildDynamoDbBenchmarkSession({
+              startedAt,
+              completedAt: new Date().toISOString(),
+              requestedRuns: runs,
+              samples,
+              mode,
+              ...(completeResult
+                ? {
+                    boundDescription:
+                      "Complete-result Benchmark reached a safety limit (10 pages / 1,000 evaluated items / 30 seconds).",
+                  }
+                : {
+                    boundDescription:
+                      "Page Benchmark intentionally stops after one API response / 100 evaluated items.",
+                  }),
+            });
+            return first.result;
+          },
+          true
+        );
+        if (this.secondaryExecutionController === controller) {
+          this.secondaryExecutionController = undefined;
+        }
+        if (myGeneration !== this.renderGeneration) {
+          return;
+        }
+        if (ok && result) {
+          await this.renderSub(result);
+          return;
+        }
+        window.showErrorMessage(`Failed to run benchmark.${message ? ` ${message}` : ""}`);
+        await this.postStopProgress();
+      }
+    );
+  }
+
   // Generic "clear whatever loading indicator you're showing" signal, same
   // BaseMessageEventDataCommand ScanPanel.ts/DynamoQueryPanel.ts etc. already
   // use for the identical purpose - the webview's own isRunningActualPlan/
@@ -1377,7 +1710,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
   private async postAnalysisUpdate(
     generation: number,
-    analysis: PerformanceTuningAiAnalysisViewState
+    analysis: PerformanceTuningAiAnalysisViewState,
+    unavailableLanguageModelId?: string,
   ): Promise<void> {
     if (generation !== this.renderGeneration) {
       // Superseded by a newer preview - never let a stale analysis update
@@ -1387,7 +1721,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const msg: PerformanceTuningPreviewPanelEventData = {
       command: "analysis-update",
       componentName: "PerformanceTuningPreviewPanel",
-      value: { analysis },
+      value: { analysis, unavailableLanguageModelId },
     };
     await this.getWebviewPanel().webview.postMessage(msg);
   }

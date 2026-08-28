@@ -17,6 +17,7 @@ import type {
   NumericComparison,
   PerformanceTuningComparisonEvidence,
 } from "../shared/PerformanceTuningComparison";
+import { formatUtcWithLocal } from "../shared/dateTimeDisplay";
 
 // Deliberately a local copy of performanceTuningAiNotebook.ts's escapeMdCell()
 // rather than an import of it: that module imports this one (it owns the
@@ -91,11 +92,11 @@ function summaryTable(
     "| Item | Detail |",
     "|---|---|",
     `| Baseline report | ${escapeMdCell(baselineFileName)} |`,
-    `| Baseline collected at | ${evidence.source.baseline.collectedAt ?? "unknown"} |`,
-    `| Current collected at | ${evidence.source.current.collectedAt ?? "unknown"} |`,
+    `| Baseline collected at | ${evidence.source.baseline.collectedAt ? formatUtcWithLocal(evidence.source.baseline.collectedAt) : "unknown"} |`,
+    `| Current collected at | ${evidence.source.current.collectedAt ? formatUtcWithLocal(evidence.source.current.collectedAt) : "unknown"} |`,
     `| Comparability | ${comparabilityLabel(level)} |`,
     `| Engine | ${evidence.engine === "rdb" ? "Relational database" : "DynamoDB"} |`,
-    `| Comparison generated at | ${evidence.generatedAt} |`,
+    `| Comparison generated at | ${formatUtcWithLocal(evidence.generatedAt)} |`,
   ];
 }
 
@@ -258,7 +259,8 @@ function engineStructureRows(evidence: PerformanceTuningComparisonEvidence): str
     valueRow("DynamoDB API Limit", v.limits.apiLimit),
     valueRow("Result item cap (panel)", v.limits.resultItemLimit),
     valueRow("Observation bound", v.limits.observationBound),
-    valueRow("Observation completeness", v.observationCompleteness),
+    completionValueRow("Observation completeness", v.observationCompleteness),
+    completionValueRow("Benchmark completeness", v.benchmarkCompleteness),
     ...(v.cloudWatch ? [valueRow("CloudWatch window", v.cloudWatch.window)] : []),
   ];
 }
@@ -266,6 +268,17 @@ function engineStructureRows(evidence: PerformanceTuningComparisonEvidence): str
 function valueRow(label: string, value: ComparisonValue<unknown>): string {
   const marker = value.changed ? " ←" : "";
   return `| ${escapeMdCell(label)} | ${escapeMdCell(formatSide(value.baseline))} | ${escapeMdCell(formatSide(value.current))}${marker} |`;
+}
+
+function completionValueRow(label: string, value: ComparisonValue<unknown>): string {
+  const format = (side: unknown): string =>
+    side === "complete"
+      ? "✅ COMPLETE"
+      : side === undefined || side === "not measured"
+        ? "➖ NOT MEASURED"
+        : `⚠️ INCOMPLETE (${String(side)})`;
+  const marker = value.changed ? " ←" : "";
+  return `| ${escapeMdCell(label)} | ${escapeMdCell(format(value.baseline))} | ${escapeMdCell(format(value.current))}${marker} |`;
 }
 
 function formatSide(value: unknown): string {
@@ -366,6 +379,21 @@ function metricTable(evidence: PerformanceTuningComparisonEvidence, n: string): 
         `| ${escapeMdCell(metric.label)} | ${formatValue(metric.baseline, metric.unit)} | ${formatValue(metric.current, metric.unit)} | ${formatChange(metric)} | ${assessmentLabel(metric)} |`
     )
   );
+  const guidance = new Map<string, NonNullable<NumericComparison["missingDataGuidance"]>>();
+  for (const metric of metrics) {
+    if (metric.missingDataGuidance) {
+      guidance.set(
+        `${metric.missingDataGuidance.action}\u0000${metric.missingDataGuidance.detail}`,
+        metric.missingDataGuidance,
+      );
+    }
+  }
+  if (guidance.size > 0) {
+    lines.push("", "**How to collect missing benchmark data**", "");
+    for (const item of guidance.values()) {
+      lines.push(`- **${escapeMdCell(item.action)}:** ${escapeMdCell(item.detail)}`);
+    }
+  }
   return lines;
 }
 
@@ -407,7 +435,9 @@ function assessmentLabel(metric: NumericComparison): string {
     case "changed":
       return "↔️ Changed";
     case "noData":
-      return "❔ Only one side has a value";
+      return metric.missingDataGuidance
+        ? `▶ ${escapeMdCell(metric.missingDataGuidance.action)}`
+        : "❔ Only one side has a value";
     case "notComparable":
       return `❔ Not comparable${metric.reason ? ` - ${escapeMdCell(metric.reason)}` : ""}`;
   }
@@ -457,7 +487,7 @@ function baselineSource(
     "| Item | Detail |",
     "|---|---|",
     `| File | ${escapeMdCell(baselineFileName)} |`,
-    `| Selected at | ${baseline.selectedAt} |`,
+    `| Selected at | ${formatUtcWithLocal(baseline.selectedAt)} |`,
     `| Context SHA-256 | \`${baseline.contextSha256}\` |`,
   ];
   if (baseline.sourcePath) {

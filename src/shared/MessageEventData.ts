@@ -649,8 +649,9 @@ type PerformanceTuningPreviewShellFields = {
   // the Translate response checkbox changes, without a host round trip.
   translatedPlainTextPrompt: string;
   // Computed on the extension side (Buffer.byteLength) rather than
-  // re-serialized/measured in the webview, so the displayed number always
-  // matches what the driver's own payload-limit enforcement saw.
+  // re-serialized/measured in the webview. This is retained as diagnostic
+  // metadata under the collapsed Full context JSON details; model fit is
+  // communicated with model-specific token usage instead.
   payloadBytes: number;
   maxPayloadBytes: number;
   // Analyze with AI's "Language model"/"Translate response" options
@@ -719,10 +720,13 @@ export type DynamoDbPerformanceTuningInitializeViewModel = PerformanceTuningPrev
   accessPattern: DynamoDbAccessPatternViewModel;
   humanSummary: DynamoDbPerformanceTuningHumanSummary;
   // Only set when context.statement.text is present (a PartiQL statement) -
-  // a native Query/Scan statement has no SQL-like text to highlight, so the
-  // webview falls back to rendering `accessPattern` alone for the "Target"
-  // section in that case (design doc §11.3 item 2).
+  // a native Query/Scan statement has no SQL-like text to highlight; its
+  // value-ful, Preview-only rendering is carried separately in nativeQuery.
   sqlHtml?: string;
+  // Ephemeral Preview-only rendering of the value-ful native Query input.
+  // It is deliberately not part of DynamoDbPerformanceTuningContext, so it
+  // never enters Full Context JSON, saved DBNs, comparisons, or AI prompts.
+  nativeQuery?: DynamoDbNativeQueryViewModel;
   // "Run Observed Read" - the DynamoDB counterpart of RDB's
   // analyzedExecutionPlan above, kept as its own field (not the same field
   // reused) since the two capabilities are genuinely different checks with
@@ -732,12 +736,32 @@ export type DynamoDbPerformanceTuningInitializeViewModel = PerformanceTuningPrev
   observedReadCapability: CapabilityStatus;
 };
 
+export type DynamoDbNativeQueryViewModel = {
+  target: string;
+  keyCondition: { raw: string; resolved: string };
+  filter?: { raw: string; resolved: string };
+  projection?: { raw: string; resolved: string };
+  select?: string;
+  expressionAttributeNames: Array<{ token: string; name: string }>;
+  expressionAttributeValues: Array<{ token: string; value: string }>;
+  consistentRead: "Strong" | "Eventual";
+  scanDirection: "Ascending" | "Descending";
+  limit?: number;
+};
+
 export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
   BaseMessageEventDataCommand | "analysis-update" | "comparison-update",
   "PerformanceTuningPreviewPanel",
   {
-    initialize?: RelationalPerformanceTuningInitializeViewModel | DynamoDbPerformanceTuningInitializeViewModel;
+    initialize?:
+      | RelationalPerformanceTuningInitializeViewModel
+      | DynamoDbPerformanceTuningInitializeViewModel;
     analysis?: PerformanceTuningAiAnalysisViewState;
+    // Set only when Copilot advertised a model that its request endpoint then
+    // rejected as model_not_supported. The webview removes it immediately;
+    // the host also remembers it for the lifetime of this Preview panel so a
+    // later context re-render cannot add it back.
+    unavailableLanguageModelId?: string;
     // Sent on its own by "comparison-update" whenever a baseline is selected,
     // changed, cleared, or the Current Context was re-collected underneath an
     // existing selection (§16 Phase 2).

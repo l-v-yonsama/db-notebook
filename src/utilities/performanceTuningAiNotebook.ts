@@ -13,6 +13,7 @@ import type {
 import { actualExecutionEvidenceSource, hasActualExecutionEvidence } from "../shared/PerformanceTuningActualEvidence";
 import type { PerformanceTuningHumanSummary } from "../shared/PerformanceTuningHumanSummary";
 import type { CellMeta } from "../types/Notebook";
+import { formatUtcWithLocal } from "../shared/dateTimeDisplay";
 import { createDirectory, existsUri } from "./fsUtil";
 import { buildAiAnalysisPrompt } from "./performanceTuningAiPrompt";
 import type { ComparisonAiInput } from "./performanceTuningComparisonAiInput";
@@ -42,8 +43,18 @@ function formatTimestamp(now: Date): string {
 
 /** Exported for tests; also usable if a caller ever wants to preview the target name. */
 export function buildAiAnalysisNotebookFilename(databaseName: string, now: Date = new Date()): string {
+  return buildPerformanceTuningNotebookFilename(databaseName, "analysis", now);
+}
+
+export type PerformanceTuningReportKind = "evidence" | "analysis" | "comparison";
+
+export function buildPerformanceTuningNotebookFilename(
+  databaseName: string,
+  kind: PerformanceTuningReportKind,
+  now: Date = new Date(),
+): string {
   const safeDb = databaseName.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "db";
-  return `perf-tuning-analysis-${safeDb}-${formatTimestamp(now)}.dbn`;
+  return `perf-tuning-${kind}-${safeDb}-${formatTimestamp(now)}.dbn`;
 }
 
 // Exported (2026-08-24 follow-up, DynamoDB support): the report-building
@@ -177,7 +188,7 @@ function buildOverviewMarkdown(
       context.database.schemaName ? `.${context.database.schemaName}` : ""
     } |`
   );
-  lines.push(`| Collected at | ${context.collection.collectedAt} |`);
+  lines.push(`| Collected at | ${formatUtcWithLocal(context.collection.collectedAt)} |`);
   lines.push(`| Collection status | ${context.collection.status} |`);
   // A comparison-only report is saved without ever running an AI analysis
   // (comparison implementation plan §14), so these rows describe an AI run
@@ -199,7 +210,7 @@ function buildOverviewMarkdown(
       );
       lines.push(`| Token safety margin | ${formatNumber(tokenUsage.safetyMargin)} tokens |`);
     }
-    lines.push(`| Analyzed at | ${analysis.generatedAt} |`);
+    lines.push(`| Analyzed at | ${formatUtcWithLocal(analysis.generatedAt)} |`);
     lines.push(`| Confidence | ${analysis.confidence} |`);
   } else {
     lines.push("| AI analysis | Not run - this report contains collected evidence only |");
@@ -423,6 +434,19 @@ export function buildAnalysisMarkdown(
   lines.push("");
   lines.push(analysis.summary);
   lines.push("");
+  if (analysis.qualityIssues && analysis.qualityIssues.length > 0) {
+    lines.push("#### 4.2.1. AI response quality warning");
+    lines.push("");
+    lines.push(
+      "The extension excluded one or more recommendations that contradicted deterministic context checks. " +
+        "The selected model may not have understood the current context; consider running the analysis again with a different model."
+    );
+    lines.push("");
+    for (const issue of analysis.qualityIssues) {
+      lines.push(`- ${issue.message}`);
+    }
+    lines.push("");
+  }
   lines.push("### 4.3. Findings");
   lines.push("");
   lines.push(...findingsTable(analysis.findings));
@@ -484,7 +508,7 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string {
   const actualPlan = context.executionPlan.actualPlan;
   const hasActualEvidence = hasActualExecutionEvidence(context);
   const actualEvidenceSource = actualExecutionEvidenceSource(context);
-  if (!planTreeText && rows.length === 0 && !actualPlan) {
+  if (!planTreeText && rows.length === 0 && !actualPlan && !context.benchmark) {
     return [
       "## 6. Execution plan",
       "",
@@ -523,6 +547,31 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string {
   }
   if (rows.length > 0) {
     lines.push(subsectionHeading("Table metrics"), "", ...planTableMappingsTable(rows), "");
+  }
+  if (context.benchmark) {
+    const benchmark = context.benchmark;
+    lines.push(
+      subsectionHeading("Benchmark measurements"),
+      "",
+      "_These are ordinary query timings collected after EXPLAIN ANALYZE. The EXPLAIN ANALYZE duration is not included in the samples._",
+      "",
+      "| Item | Value |",
+      "|---|---|",
+      `| Started at | ${formatUtcWithLocal(benchmark.startedAt)} |`,
+      `| Completed at | ${formatUtcWithLocal(benchmark.completedAt)} |`,
+      `| Runs | ${benchmark.completedRuns} / ${benchmark.requestedRuns} completed |`,
+      `| Median | ${formatNumber(benchmark.medianClientElapsedTimeMs)} ms |`,
+      `| Average | ${formatNumber(benchmark.averageClientElapsedTimeMs)} ms |`,
+      `| Min / Max | ${formatNumber(benchmark.minClientElapsedTimeMs)} / ${formatNumber(benchmark.maxClientElapsedTimeMs)} ms |`,
+      "",
+      "| Run | Client elapsed | Returned rows |",
+      "|---|---|---|",
+      ...benchmark.samples.map(
+        (sample) =>
+          `| ${sample.run} | ${formatNumber(sample.clientElapsedTimeMs)} ms | ${formatNumber(sample.returnedRowCount)} |`,
+      ),
+      "",
+    );
   }
   return lines.join("\n");
 }
@@ -576,9 +625,9 @@ function buildAiRequestMessagesJson(
 /**
  * What a saved report covers. Both fields are optional and independent
  * (comparison implementation plan §14): an AI analysis alone is the original
- * report, a comparison alone is a "what changed" report saved without ever
- * calling a model, and both together is the full report. The caller is
- * responsible for not asking for a report with neither.
+ * report, a comparison alone is a "what changed" report, and both together
+ * is the full report. With neither, the collected context becomes a
+ * deterministic evidence report.
  */
 export type PerformanceTuningReportInput = {
   analysis?: PerformanceTuningAiAnalysisResult;
@@ -591,12 +640,17 @@ export type PerformanceTuningReportInput = {
   analysisComparisonInput?: ComparisonAiInput;
 };
 
+export function getPerformanceTuningReportKind(input: PerformanceTuningReportInput): PerformanceTuningReportKind {
+  return input.comparison ? "comparison" : input.analysis ? "analysis" : "evidence";
+}
+
 /** Pure cell-construction step (§8.2) - kept separate from the write/open I/O below for unit testing. */
 export function buildAiAnalysisNotebookCells(
   context: PerformanceTuningContext,
   input: PerformanceTuningReportInput
 ): NotebookCellData[] {
   const { analysis, comparison } = input;
+  const reportKind = getPerformanceTuningReportKind(input);
   // The comparison is appended as its own chapter rather than inserted into
   // the middle: §14 says a comparison *adds* to the normal report, and
   // renumbering chapters 5-7 for one variant would break the anchors every
@@ -607,7 +661,7 @@ export function buildAiAnalysisNotebookCells(
     { label: "3. Collection status", anchor: "3-collection-status" },
     { label: "4. Summary and recommendations", anchor: "4-summary-and-recommendations" },
     { label: "5. Query structure", anchor: "5-query-structure" },
-    { label: "6. Execution plan", anchor: "6-execution-plan" },
+    { label: "6. Execution plan / benchmark", anchor: "6-execution-plan" },
     { label: "7. Additional information", anchor: "7-additional-information" },
     ...(comparison
       ? [{ label: "8. Comparison with baseline", anchor: "8-comparison-with-baseline" }]
@@ -621,7 +675,11 @@ export function buildAiAnalysisNotebookCells(
   const cells: NotebookCellData[] = [
     markupCell(
       buildNotebookTocMarkdown(
-        comparison ? "Performance Tuning Comparison Report" : "Performance Tuning AI Analysis",
+        reportKind === "comparison"
+          ? "Performance Tuning Comparison Report"
+          : reportKind === "analysis"
+            ? "Performance Tuning AI Analysis"
+            : "Performance Tuning Evidence Report",
         tocEntries,
         context.collection.status,
       ),
@@ -694,31 +752,28 @@ export type SaveAiAnalysisAsNotebookResult =
  * existing Notebook and never prompts a save dialog - both decided with the
  * user (design doc §16.1).
  *
- * `input` may carry an AI analysis, a baseline comparison, or both - a
- * comparison-only report is saved without ever calling a model (comparison
- * implementation plan §14).
+ * `input` may carry an AI analysis, a baseline comparison, both, or neither.
+ * With neither, the deterministic collected context is saved as an evidence
+ * report without calling a model.
  */
 export async function saveAiAnalysisAsNotebook(
   context: PerformanceTuningContext,
   input: PerformanceTuningReportInput
 ): Promise<SaveAiAnalysisAsNotebookResult> {
-  if (!input.analysis && !input.comparison) {
-    return {
-      ok: false,
-      message: "There is no AI analysis or baseline comparison to save.",
-    };
-  }
   const wsFolder = workspace.workspaceFolders?.[0];
   if (!wsFolder) {
     return {
       ok: false,
       message:
-        "No workspace folder is open, so the AI analysis notebook cannot be saved. Open a workspace folder and try again.",
+        "No workspace folder is open, so the performance tuning report cannot be saved. Open a workspace folder and try again.",
     };
   }
 
   const dirUri = Uri.joinPath(wsFolder.uri, ...REPORTS_SUBPATH);
-  let filename = buildAiAnalysisNotebookFilename(context.database.databaseName);
+  let filename = buildPerformanceTuningNotebookFilename(
+    context.database.databaseName,
+    getPerformanceTuningReportKind(input),
+  );
   let targetUri = Uri.joinPath(dirUri, filename);
 
   await createDirectory(dirUri);

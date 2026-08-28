@@ -28,6 +28,7 @@ import {
   OPEN_SQL_HISTORIES_AS_NOTEBOOK,
   OPEN_SQL_HISTORY,
   REFRESH_SQL_HISTORIES,
+  RESET_SQL_HISTORY_PERFORMANCE,
   SORT_SQL_HISTORIES_BY_DURATION,
   SORT_SQL_HISTORIES_BY_RECENT,
   START_PERFORMANCE_TUNING_FROM_HISTORY,
@@ -180,6 +181,20 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
 
     await stateStorage.deleteSQLHistoryByID(history.id);
     historyTreeProvider.refresh(true);
+  });
+
+  registerDisposableCommand(RESET_SQL_HISTORY_PERFORMANCE, async (history: SQLHistory) => {
+    const answer = await window.showWarningMessage(
+      "Reset the accumulated performance statistics for this SQL History item? The SQL, bind values, and latest result remain available. New executions start a new measurement period.",
+      { modal: true },
+      "Reset"
+    );
+    if (answer !== "Reset") {
+      return;
+    }
+    await stateStorage.resetSQLHistoryPerformanceByID(history.id);
+    await historyTreeProvider.refresh(true);
+    window.showInformationMessage("Performance statistics were reset. Save a baseline report before resetting when you need to retain the previous evidence.");
   });
 
   registerDisposableCommand(OPEN_SQL_HISTORY, async (history: SQLHistory) => {
@@ -560,7 +575,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     // here from the aggregate's own totals (design doc §7.3: "weighted pass
     // rate は保存せず...から算出する"), never averaged from per-sample rates.
     const dynamoDbPerf = history.performance?.dynamoDb;
-    const workload: DynamoDbWorkloadContext | undefined = history.performance
+    const workload: DynamoDbWorkloadContext | undefined = history.performance && history.performance.sampleCount > 0
       ? {
           executionCount: history.performance.sampleCount,
           totalClientElapsedTimeMs: history.performance.totalElapsedTimeMilli,
@@ -638,13 +653,16 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       return;
     }
 
-    const statistics: SelectedStatementStatistics | undefined = history.performance
+    const statistics: SelectedStatementStatistics | undefined = history.performance && history.performance.sampleCount > 0
       ? {
           executionCount: history.performance.sampleCount,
           totalElapsedTimeMs: history.performance.totalElapsedTimeMilli,
           averageElapsedTimeMs:
             history.performance.totalElapsedTimeMilli / history.performance.sampleCount,
           maxElapsedTimeMs: history.performance.maxElapsedTimeMilli,
+          statisticsSince: history.performance.statisticsSince
+            ? new Date(history.performance.statisticsSince).toISOString()
+            : undefined,
           lastExecutedAt: history.executedAt
             ? new Date(history.executedAt).toISOString()
             : undefined,

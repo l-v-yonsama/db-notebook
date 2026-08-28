@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildLanguageModelSelection,
   defaultTranslateResponse,
+  isModelNotSupportedError,
   LanguageModelSummary,
 } from "../../src/utilities/lmModelSelection";
 
@@ -81,5 +82,30 @@ describe("defaultTranslateResponse", () => {
 
   it("is true when the language is unknown/undefined", () => {
     expect(defaultTranslateResponse(undefined)).toBe(true);
+  });
+});
+
+describe("isModelNotSupportedError", () => {
+  it("recognizes the Copilot 400 response embedded in an Error message", () => {
+    expect(
+      isModelNotSupportedError(
+        new Error(
+          'Request Failed: 400 {"error":{"message":"The requested model is not supported.","code":"model_not_supported"}}'
+        )
+      )
+    ).toBe(true);
+  });
+
+  it("recognizes a provider error nested under a VS Code-style cause", () => {
+    expect(
+      isModelNotSupportedError({
+        code: "Unknown",
+        cause: { code: "model_not_supported", message: "The requested model is not supported." },
+      })
+    ).toBe(true);
+  });
+
+  it("does not quarantine models for unrelated request failures", () => {
+    expect(isModelNotSupportedError(new Error("Quota exceeded"))).toBe(false);
   });
 });

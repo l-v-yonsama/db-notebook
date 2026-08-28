@@ -207,19 +207,19 @@ const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): 
   columnItems.value.push(...v.columnItems);
 
   targetItems.value.push({
-    label: "TABLE",
+    label: `TABLE: ${tableRes.name}`,
     value: "$table",
   });
 
-  tableRes.attr.lsi.forEach((it, idx) => {
+  tableRes.attr.lsi.forEach((it) => {
     targetItems.value.push({
-      label: `LSI(${idx + 1}):${it.IndexName} (${it.KeySchema?.map((it) => it.AttributeName).join(",")})`,
+      label: `LSI: ${it.IndexName} (${it.KeySchema?.map((key) => key.AttributeName).join(", ")})`,
       value: "$lsi:" + it.IndexName,
     });
   });
-  tableRes.attr.gsi.forEach((it, idx) => {
+  tableRes.attr.gsi.forEach((it) => {
     targetItems.value.push({
-      label: `GSI(${idx + 1}):${it.IndexName} (${it.KeySchema?.map((it) => it.AttributeName).join(",")})`,
+      label: `GSI: ${it.IndexName} (${it.KeySchema?.map((key) => key.AttributeName).join(", ")})`,
       value: "$gsi:" + it.IndexName,
     });
   });
@@ -312,12 +312,15 @@ defineExpose({
   <section class="DynamoQueryPanel">
     <PanelActionToolbar @cancel="cancel" cancel-label="" cancel-title="Close">
       <template #left>
-        <label for="target">Table or Index:</label>
-        <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="width:200px"
-          @change="updateOptions()" />
         <label for="buildMode">Build:</label>
         <VsCodeRadioGroup id="buildMode" v-model="buildMode" :items="buildModeItems"
           @change="updateOptions()" />
+        <label for="limit">Result limit (all pages):</label>
+        <VsCodeTextField id="limit" v-model="limit" :min="0" :max="limitMax" style="width: 100px"
+          type="number"
+          title="Maximum number of matching items retained across paginated Query requests. This is not the DynamoDB API Limit."
+          placeholder="result limit" @change="updateTextDocument()">
+        </VsCodeTextField>
         <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute as a native DynamoDB Query">
           <fa icon="check" />Execute
         </VsCodeButton>
@@ -333,16 +336,11 @@ defineExpose({
           <fieldset class="conditions">
             <legend>DB Resource</legend>
             <div class="resource-summary">
-              <label for="tableName">Table:</label>
-              <span id="tableName">{{ tableName }}</span>
-              <label for="numOfRows">Estimated items:</label>
+              <label for="target">Target:</label>
+              <VsCodeDropdown id="target" v-model="target" :items="targetItems"
+                style="width: 360px; max-width: 100%" @change="updateOptions()" />
+              <label for="numOfRows">Estimated table items:</label>
               <span id="numOfRows">{{ numOfRows }}</span>
-              <label for="limit">Max returned items:</label>
-              <VsCodeTextField id="limit" v-model="limit" :min="0" :max="limitMax" style="width: 100px"
-                type="number"
-                title="The panel may issue multiple Query requests. This limit caps items retained in the result, not the total number of items DynamoDB may evaluate across all requests."
-                placeholder="max returned items" @change="updateTextDocument()">
-              </VsCodeTextField>
             </div>
           </fieldset>
         </div>
@@ -471,6 +469,10 @@ defineExpose({
         <fieldset class="conditions">
           <legend>Preview ({{ buildMode === 'partiql' ? 'PartiQL' : 'Native Query' }})</legend>
           <p class="preview" v-text="previewInput"></p>
+          <p v-if="buildMode === 'nativeQuery'" class="hint">
+            Result limit (all pages): {{ limit }} — Applied by Database Notebook across paginated requests; this is
+            not the DynamoDB Query API Limit.
+          </p>
         </fieldset>
       </div>
     </div>

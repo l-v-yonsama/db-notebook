@@ -8,6 +8,7 @@ import {
   isSQLHistoryTarget,
   mergeSQLHistoryPerformance,
   migrateStoredSQLHistory,
+  resetSQLHistoryPerformance,
 } from "../../src/utilities/sqlHistoryUtil";
 
 const baseHistory = (overrides: Partial<SQLHistory> = {}): SQLHistory => ({
@@ -31,8 +32,25 @@ describe("createInitialSQLHistoryPerformance", () => {
     expect(createInitialSQLHistoryPerformance(undefined)).toEqual({
       sampleCount: 0,
       totalElapsedTimeMilli: 0,
-      maxElapsedTimeMilli: 0,
-      lastElapsedTimeMilli: 0,
+    });
+  });
+});
+
+describe("resetSQLHistoryPerformance", () => {
+  it("starts an empty measurement epoch without fabricated min/max/last values", () => {
+    expect(resetSQLHistoryPerformance(1234, true)).toEqual({
+      sampleCount: 0,
+      totalElapsedTimeMilli: 0,
+      capacitySampleCount: 0,
+      dynamoDb: {
+        observationSampleCount: 0,
+        evaluatedCountSampleCount: 0,
+        totalReturnedItemCount: 0,
+        totalEvaluatedItemCount: 0,
+        boundedObservationCount: 0,
+      },
+      statisticsSince: 1234,
+      resetAt: 1234,
     });
   });
 });
@@ -66,8 +84,6 @@ describe("mergeSQLHistoryPerformance", () => {
     expect(mergeSQLHistoryPerformance(previous, undefined)).toEqual({
       sampleCount: 0,
       totalElapsedTimeMilli: 0,
-      maxElapsedTimeMilli: 0,
-      lastElapsedTimeMilli: 0,
     });
   });
 

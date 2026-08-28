@@ -75,11 +75,21 @@ export type PerformanceTuningAiTokenUsage = {
   safetyMargin: number;
 };
 
+export type PerformanceTuningAiQualityIssue = {
+  code: "SUGGESTED_SQL_MATCHES_CURRENT";
+  recommendationTitle?: string;
+  message: string;
+};
+
 export type PerformanceTuningAiAnalysisResult = {
   formatVersion: 1;
   summary: string;
   findings: PerformanceTuningAiFinding[];
   recommendations: PerformanceTuningAiRecommendation[];
+  // Host-computed quality failures. Recommendations listed here have already
+  // been removed from `recommendations`; this evidence explains why and lets
+  // both Preview and saved reports recommend trying a stronger model.
+  qualityIssues?: PerformanceTuningAiQualityIssue[];
   confidence: PerformanceTuningAiConfidence;
   missingContext: string[];
   model: {

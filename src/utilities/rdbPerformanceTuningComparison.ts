@@ -18,6 +18,7 @@ import type {
   AccessPathStep,
   ComparisonReason,
   IndexSnapshot,
+  MetricMissingDataGuidance,
   NumericComparison,
   PerformanceTuningComparisonEvidence,
   RdbComparisonEvidence,
@@ -219,6 +220,19 @@ function buildReasons(params: {
       code: "WORKLOAD_VS_SINGLE_OBSERVATION",
       level: "partiallyComparable",
       message: `Rolling workload statistics are present only on the ${baseline.workload ? "baseline" : "current"} side, so the workload rows have nothing to compare against.`,
+    });
+  }
+
+
+  if (
+    baseline.benchmark &&
+    current.benchmark &&
+    baseline.benchmark.requestedRuns !== current.benchmark.requestedRuns
+  ) {
+    reasons.push({
+      code: "BENCHMARK_SAMPLE_COUNT_DIFFERS",
+      level: "partiallyComparable",
+      message: `Benchmark sample counts differ (${baseline.benchmark.requestedRuns} runs vs ${current.benchmark.requestedRuns} runs). The sessions use the same measurement method, so their medians remain comparable, but the smaller sample has lower confidence.`,
     });
   }
 
@@ -464,8 +478,49 @@ function buildPlanMetrics(params: {
   const timing = executionOnly ?? environmentMismatch;
   const baselineRoot = baseline.executionPlan.normalizedPlan;
   const currentRoot = current.executionPlan.normalizedPlan;
+  const benchmarkGuidance = benchmarkMissingDataGuidance(baseline, current);
 
   const inputs: NumericMetricInput[] = [
+    {
+      key: "rdb.benchmark.medianClientElapsedTimeMs",
+      label: "Benchmark median client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: baseline.benchmark?.medianClientElapsedTimeMs,
+      current: current.benchmark?.medianClientElapsedTimeMs,
+      notComparable: benchmarkMismatch(baseline, current) ?? environmentMismatch,
+      missingDataGuidance: benchmarkGuidance,
+    },
+    {
+      key: "rdb.benchmark.averageClientElapsedTimeMs",
+      label: "Benchmark average client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: baseline.benchmark?.averageClientElapsedTimeMs,
+      current: current.benchmark?.averageClientElapsedTimeMs,
+      notComparable: benchmarkMismatch(baseline, current) ?? environmentMismatch,
+      missingDataGuidance: benchmarkGuidance,
+    },
+    {
+      key: "rdb.benchmark.minClientElapsedTimeMs",
+      label: "Benchmark minimum client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: baseline.benchmark?.minClientElapsedTimeMs,
+      current: current.benchmark?.minClientElapsedTimeMs,
+      notComparable: benchmarkMismatch(baseline, current) ?? environmentMismatch,
+      missingDataGuidance: benchmarkGuidance,
+    },
+    {
+      key: "rdb.benchmark.maxClientElapsedTimeMs",
+      label: "Benchmark maximum client elapsed time",
+      unit: "ms",
+      direction: "lowerIsBetter",
+      baseline: baseline.benchmark?.maxClientElapsedTimeMs,
+      current: current.benchmark?.maxClientElapsedTimeMs,
+      notComparable: benchmarkMismatch(baseline, current) ?? environmentMismatch,
+      missingDataGuidance: benchmarkGuidance,
+    },
     {
       key: "rdb.plan.planningTimeMs",
       label: "Planning time",
@@ -591,6 +646,40 @@ function buildPlanMetrics(params: {
     ...withoutEmptyMetrics(inputs.map(compareNumericMetric)),
     ...buildTableMetrics(baseline, current, bothActual),
   ];
+}
+
+function benchmarkMismatch(
+  baseline: PerformanceTuningContext,
+  current: PerformanceTuningContext
+): string | undefined {
+  const b = baseline.benchmark;
+  const c = current.benchmark;
+  if (b && c && (b.completedRuns !== b.requestedRuns || c.completedRuns !== c.requestedRuns)) {
+    return "At least one benchmark session did not complete every requested run.";
+  }
+  return undefined;
+}
+
+function benchmarkMissingDataGuidance(
+  baseline: PerformanceTuningContext,
+  current: PerformanceTuningContext,
+): MetricMissingDataGuidance | undefined {
+  if (baseline.benchmark && !current.benchmark) {
+    const runs = baseline.benchmark.requestedRuns;
+    return {
+      action: `Run Benchmark (${runs} runs) for Current`,
+      detail:
+        `Current has no benchmark. This action automatically collects EXPLAIN ANALYZE first, then runs the ordinary query ${runs} times; the EXPLAIN ANALYZE duration is excluded from the samples.`,
+    };
+  }
+  if (!baseline.benchmark && current.benchmark) {
+    return {
+      action: "Select a benchmarked baseline",
+      detail:
+        `The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (${current.benchmark.requestedRuns} runs).`,
+    };
+  }
+  return undefined;
 }
 
 function dominantUnit(

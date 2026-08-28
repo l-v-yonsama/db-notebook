@@ -70,8 +70,13 @@ export type SQLHistoryDynamoDbPerformance = {
 export type SQLHistoryPerformance = {
   sampleCount: number;
   totalElapsedTimeMilli: number;
-  maxElapsedTimeMilli: number;
-  lastElapsedTimeMilli: number;
+  maxElapsedTimeMilli?: number;
+  lastElapsedTimeMilli?: number;
+  // Manual trip-meter boundary. Evidence from summary/executedAt before this
+  // instant is retained for History display/re-execution but must not be used
+  // by Performance Tuning as part of the new measurement epoch.
+  statisticsSince?: number;
+  resetAt?: number;
   // Additive Capacity aggregates. DynamoDB executions are folded in from
   // summary.dynamoDb.consumedCapacity.totalCapacityUnits (the DynamoDB
   // telemetry source of truth); a non-DynamoDB producer may use the generic

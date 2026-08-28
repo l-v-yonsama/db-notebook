@@ -81,6 +81,12 @@ export function toPerformanceCapacityBreakdown(
 // §7.4/§9.1's "古い履歴でtoken状態が不明な場合は完全観測と断定しない", applied
 // one step earlier: no dynamoDb evidence at all means no Observation).
 export function buildObservationFromHistory(history: SQLHistory): DynamoDbReadObservation | undefined {
+  if (
+    history.performance?.statisticsSince !== undefined &&
+    (history.executedAt === undefined || history.executedAt < history.performance.statisticsSince)
+  ) {
+    return undefined;
+  }
   const dynamoDb = history.summary?.dynamoDb;
   if (!dynamoDb) {
     return undefined;

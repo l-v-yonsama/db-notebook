@@ -31,7 +31,7 @@ const props = defineProps<{
 const context = computed(() => props.data.context);
 
 const isDmlEstimate = computed(
-  () => context.value.statement.kind !== undefined && context.value.statement.kind !== "select",
+  () => context.value.statement.kind !== undefined && context.value.statement.kind !== "select"
 );
 const hasActualEvidence = computed(() => hasActualExecutionEvidence(context.value));
 const actualEvidenceSource = computed(() => actualExecutionEvidenceSource(context.value));
@@ -44,9 +44,10 @@ const formatRatio = (value: number | undefined): string => {
   if (value === undefined) {
     return "-";
   }
-  const text = value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
-    ? value.toPrecision(3)
-    : value.toFixed(2);
+  const text =
+    value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
+      ? value.toPrecision(3)
+      : value.toFixed(2);
   return `${text}x`;
 };
 
@@ -55,119 +56,161 @@ const formatFractionAsPercent = (value: number | undefined): string => {
     return "-";
   }
   const percent = value * 100;
-  const text = percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
+  const text =
+    percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
   return `${text}%`;
 };
 const formatActualRows = (value: number | undefined): string =>
   value === undefined && isDmlEstimate.value ? "Not measured (DML)" : (value ?? "-").toString();
-const formatRuntimeMetric = (value: number | undefined, format: (value: number | undefined) => string): string =>
-  value === undefined && isDmlEstimate.value ? "Not measured (DML)" : format(value);
-
-
+const formatRuntimeMetric = (
+  value: number | undefined,
+  format: (value: number | undefined) => string
+): string => (value === undefined && isDmlEstimate.value ? "Not measured (DML)" : format(value));
 </script>
 
 <template>
   <!-- 1. Database / Status / SQL - rendered into the shell's fixed (non-scrolling) .header. -->
   <template v-if="part === 'header'">
-  <div class="row">
-    <span class="label">Database</span>
-    <span>{{ context.database.vendor }}{{ context.database.version ? ` ${context.database.version}` : "" }} ・
-      {{ context.database.databaseName }}<span v-if="context.database.schemaName">.{{ context.database.schemaName }}</span></span>
-  </div>
-  <div class="row status-summary">
-    <span class="label">Status</span>
-    <span class="badge" :class="context.collection.status">{{ context.collection.status }}</span>
-    <!-- complete badge stays green even with informational notes present -
-         this is a supplementary count, not a new status value. -->
-    <span v-if="context.collection.status === 'complete' && data.diagnosticGroups.some((g) => g.severity === 'info')" class="notes-hint">
-      {{ data.diagnosticGroups.filter((g) => g.severity === 'info').length }}
-      {{ data.diagnosticGroups.filter((g) => g.severity === 'info').length === 1 ? "note" : "notes" }}
-    </span>
-    <span class="payload-size" :class="{ exceeded: data.maxPayloadBytes > 0 && data.payloadBytes > data.maxPayloadBytes }">
-      <span class="label-inline">Payload size:</span>
-      {{ data.payloadBytes.toLocaleString() }} / {{ data.maxPayloadBytes.toLocaleString() }} bytes
-      <span v-if="data.maxPayloadBytes > 0 && data.payloadBytes > data.maxPayloadBytes">(exceeds limit)</span>
-    </span>
-  </div>
-  <div class="row sql">
-    <span class="label">SQL</span>
-    <div class="code-panel">
-      <div class="sql-block" v-html="data.sqlHtml"></div>
-      <CopyToClipboardButton class="copy-btn" :content="context.statement.sql" title="Copy SQL" />
+    <div class="row">
+      <span class="label">Database</span>
+      <span
+        >{{ context.database.vendor
+        }}{{ context.database.version ? ` ${context.database.version}` : "" }} ・
+        {{ context.database.databaseName
+        }}<span v-if="context.database.schemaName">.{{ context.database.schemaName }}</span></span
+      >
     </div>
-  </div>
+    <div class="row status-summary">
+      <span class="label">Status</span>
+      <span class="badge" :class="context.collection.status">{{ context.collection.status }}</span>
+      <!-- complete badge stays green even with informational notes present -
+         this is a supplementary count, not a new status value. -->
+      <span
+        v-if="
+          context.collection.status === 'complete' &&
+          data.diagnosticGroups.some((g) => g.severity === 'info')
+        "
+        class="notes-hint"
+      >
+        {{ data.diagnosticGroups.filter((g) => g.severity === "info").length }}
+        {{
+          data.diagnosticGroups.filter((g) => g.severity === "info").length === 1 ? "note" : "notes"
+        }}
+      </span>
+    </div>
+    <div class="row sql">
+      <span class="label">SQL</span>
+      <div class="code-panel">
+        <div class="sql-block" v-html="data.sqlHtml"></div>
+        <CopyToClipboardButton class="copy-btn" :content="context.statement.sql" title="Copy SQL" />
+      </div>
+    </div>
   </template>
 
   <!-- 2. Performance snapshot - rendered into the shell's scrolling .scrollArea. -->
   <template v-else>
-  <div class="section performance-snapshot-section">
-    <h3 class="section-title">Performance snapshot</h3>
-    <PerformanceTuningSnapshot :summary="data.humanSummary" />
-    <p v-if="data.queryDiagramAvailable" class="section-note query-diagram-notice">
-      A query-scoped structure view (ER diagram and relevant indexes) will be included when you save this analysis as a Notebook; view it in the saved DBN or HTML report.<span v-if="data.queryDiagramHasWarnings"> Some relationships could not be resolved conservatively; the saved Notebook includes the details.</span>
-    </p>
-  </div>
+    <div class="section performance-snapshot-section">
+      <h3 class="section-title">Performance snapshot</h3>
+      <PerformanceTuningSnapshot :summary="data.humanSummary" />
+      <p v-if="data.queryDiagramAvailable" class="section-note query-diagram-notice">
+        A query-scoped structure view (ER diagram and relevant indexes) will be included when you
+        save this analysis as a Notebook; view it in the saved DBN or HTML report.<span
+          v-if="data.queryDiagramHasWarnings"
+        >
+          Some relationships could not be resolved conservatively; the saved Notebook includes the
+          details.</span
+        >
+      </p>
+    </div>
 
-  <!-- 5. Execution plan: normalizedPlan is a tree, so it's rendered as an
+    <!-- 5. Execution plan: normalizedPlan is a tree, so it's rendered as an
        EXPLAIN-style indented text block rather than a table (a table would
        lose the parent-child structure); planTableMappings is a genuinely
        flat per-table array, so that one is a small table. Both come
        pre-formatted from performanceTuningPlanFormatter.ts - this component
        only renders. -->
-  <div v-if="data.planTreeText || data.planTableMappingRows.length > 0" class="section execution-plan-section">
-    <h3 class="section-title">
-      Execution plan
-      <span v-if="context.executionPlan.mode === 'analyze'" class="badge analyzed-badge">analyzed</span>
-    </h3>
-    <p v-if="context.executionPlan.executionTimeMs !== undefined" class="section-note">
-      Real execution time: {{ context.executionPlan.executionTimeMs }} ms
-    </p>
-    <p v-if="context.executionPlan.actualPlan" class="section-note">
-      Runtime evidence from {{ actualEvidenceSource }} is shown first. The estimated topology is retained
-      below only for structured table/predicate metadata and comparison.
-    </p>
-    <p v-else-if="hasActualEvidence" class="section-note">
-      Runtime evidence from {{ actualEvidenceSource }} is included in the normalized execution plan below.
-    </p>
-    <p v-else class="section-note">
-      {{ isDmlEstimate ? "DML statement — estimated plan only; runtime measurements are not collected." : "Estimated plan only — the SQL has not been executed for runtime measurements." }}
-    </p>
-    <div v-if="context.executionPlan.actualPlan" class="actual-plan-text-block">
-      <h4>Actual execution plan ({{ context.executionPlan.actualPlan.source }})</h4>
-      <pre class="plan-tree">{{ data.actualPlanDisplayText ?? context.executionPlan.actualPlan.content }}</pre>
+    <div
+      v-if="data.planTreeText || data.planTableMappingRows.length > 0"
+      class="section execution-plan-section"
+    >
+      <h3 class="section-title">
+        Execution plan
+        <span v-if="context.executionPlan.mode === 'analyze'" class="badge analyzed-badge"
+          >analyzed</span
+        >
+      </h3>
+      <p v-if="context.executionPlan.executionTimeMs !== undefined" class="section-note">
+        Real execution time: {{ context.executionPlan.executionTimeMs }} ms
+      </p>
+      <p v-if="context.executionPlan.actualPlan" class="section-note">
+        Runtime evidence from {{ actualEvidenceSource }} is shown first. The estimated topology is
+        retained below only for structured table/predicate metadata and comparison.
+      </p>
+      <p v-else-if="hasActualEvidence" class="section-note">
+        Runtime evidence from {{ actualEvidenceSource }} is included in the normalized execution
+        plan below.
+      </p>
+      <p v-else class="section-note">
+        {{
+          isDmlEstimate
+            ? "DML statement — estimated plan only; runtime measurements are not collected."
+            : "Estimated plan only — the SQL has not been executed for runtime measurements."
+        }}
+      </p>
+      <div v-if="context.executionPlan.actualPlan" class="actual-plan-text-block">
+        <h4>Actual execution plan ({{ context.executionPlan.actualPlan.source }})</h4>
+        <pre class="plan-tree">{{
+          data.actualPlanDisplayText ?? context.executionPlan.actualPlan.content
+        }}</pre>
+      </div>
+      <details
+        v-if="data.planTreeText"
+        class="advanced-details"
+        :open="!context.executionPlan.actualPlan"
+      >
+        <summary>
+          {{
+            context.executionPlan.actualPlan
+              ? "Estimated plan topology"
+              : hasActualEvidence
+              ? `Actual execution plan (${actualEvidenceSource})`
+              : "Execution plan topology"
+          }}
+        </summary>
+        <pre class="plan-tree">{{ data.planTreeText }}</pre>
+      </details>
+      <table v-if="data.planTableMappingRows.length > 0" class="plan-table-mappings">
+        <caption>
+          Table metrics
+        </caption>
+        <thead>
+          <tr>
+            <th>Table</th>
+            <th>Index</th>
+            <th>Est. rows</th>
+            <th>Actual rows</th>
+            <th>Actual/est. ratio</th>
+            <th>Access fraction</th>
+            <th>Filter pass rate</th>
+            <th>Columns used</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, i) in data.planTableMappingRows" :key="`plan-table-${i}`">
+            <td>{{ row.table }}</td>
+            <td>{{ row.index ?? "-" }}</td>
+            <td>{{ row.estimatedRows ?? "-" }}</td>
+            <td>{{ formatActualRows(row.actualRows) }}</td>
+            <td>{{ formatRuntimeMetric(row.rowEstimateRatio, formatRatio) }}</td>
+            <td>{{ formatRuntimeMetric(row.tableAccessFraction, formatFractionAsPercent) }}</td>
+            <td>
+              {{ formatRuntimeMetric(row.predicateFilterSelectivity, formatFractionAsPercent) }}
+            </td>
+            <td>{{ row.columnsUsed ?? "-" }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <details v-if="data.planTreeText" class="advanced-details" :open="!context.executionPlan.actualPlan">
-      <summary>{{ context.executionPlan.actualPlan ? "Estimated plan topology" : hasActualEvidence ? `Actual execution plan (${actualEvidenceSource})` : "Execution plan topology" }}</summary>
-      <pre class="plan-tree">{{ data.planTreeText }}</pre>
-    </details>
-    <table v-if="data.planTableMappingRows.length > 0" class="plan-table-mappings">
-      <caption>Table metrics</caption>
-      <thead>
-        <tr>
-          <th>Table</th>
-          <th>Index</th>
-          <th>Est. rows</th>
-          <th>Actual rows</th>
-          <th>Actual/est. ratio</th>
-          <th>Access fraction</th>
-          <th>Filter pass rate</th>
-          <th>Columns used</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(row, i) in data.planTableMappingRows" :key="`plan-table-${i}`">
-          <td>{{ row.table }}</td>
-          <td>{{ row.index ?? "-" }}</td>
-          <td>{{ row.estimatedRows ?? "-" }}</td>
-          <td>{{ formatActualRows(row.actualRows) }}</td>
-          <td>{{ formatRuntimeMetric(row.rowEstimateRatio, formatRatio) }}</td>
-          <td>{{ formatRuntimeMetric(row.tableAccessFraction, formatFractionAsPercent) }}</td>
-          <td>{{ formatRuntimeMetric(row.predicateFilterSelectivity, formatFractionAsPercent) }}</td>
-          <td>{{ row.columnsUsed ?? "-" }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
   </template>
 </template>
 
@@ -189,21 +232,6 @@ const formatRuntimeMetric = (value: number | undefined, format: (value: number |
     .code-panel {
       flex: 1 1 auto;
       min-width: 0;
-    }
-  }
-
-  &.status-summary {
-    display: grid;
-    grid-template-columns: 110px max-content 220px max-content;
-    align-items: baseline;
-
-    .label {
-      min-width: 0;
-    }
-
-    .payload-size {
-      grid-column: 4;
-      white-space: nowrap;
     }
   }
 }
@@ -278,8 +306,12 @@ const formatRuntimeMetric = (value: number | undefined, format: (value: number |
 /* Body sections - `order` keeps the documented visual sequence (§6.1's
    layout, unchanged by the split) even though these are now flex siblings
    of the shell's own sections within its shared .scrollArea. */
-.performance-snapshot-section { order: 1; }
-.execution-plan-section { order: 4; }
+.performance-snapshot-section {
+  order: 1;
+}
+.execution-plan-section {
+  order: 4;
+}
 
 .section {
   margin-bottom: 12px;

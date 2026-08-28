@@ -214,6 +214,12 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     expect(assistant).toContain("skew across the different key/tenant values");
   });
 
+  it("forbids performance conclusions from rejected benchmark metrics", () => {
+    expect(buildDynamoDbAiAnalysisPrompt(context()).assistant).toContain(
+      "never describe its raw change as an improvement or regression"
+    );
+  });
+
   it("explains why Run Observed Read can return more items than resultItemLimit", () => {
     const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
     expect(assistant).toContain('"accessPattern.resultItemLimit"');

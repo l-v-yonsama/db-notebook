@@ -107,6 +107,8 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
     expect(cells[0].value).toContain("## Table of contents");
     expect(cells[0].value).toContain("[4. Summary and recommendations](#4-summary-and-recommendations)");
     expect(cells[1].value).toContain("## 1. Overview");
+    expect(cells[1].value).toContain("2026-08-24T00:00:00.000Z (local ");
+    expect(cells[1].value).toContain("2026-08-24T00:05:00.000Z (local ");
     expect(cells[2].value).toContain("## 2. Target request");
     expect(cells[2].value).toContain("SELECT * FROM orders WHERE pk = 'tenant#42'");
     expect(cells[3].value).toContain("## 3. Collection status");
@@ -201,6 +203,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
       buildContext({
         observation: {
           source: "observedRead",
+          observedAt: "2026-08-24T00:01:00.000Z",
           returnedItemCount: 3,
           requestCount: 1,
           retryCount: 0,
@@ -213,6 +216,7 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
     );
     const observedCell = findCell(cells, "## 7. Observed measurements");
     expect(observedCell.value).toContain("| Returned items | 3 |");
+    expect(observedCell.value).toContain("2026-08-24T00:01:00.000Z (local ");
     expect(observedCell.value).toContain("1.5 total");
     expect(observedCell.value).toContain("Limited to a single API response");
     const flowCell = findCell(cells, "## 5. Query flow");
@@ -326,6 +330,39 @@ describe("buildDynamoDbAiAnalysisNotebookCells", () => {
       tokenUsage: { inputTokens: 12_345, maxInputTokens: 32_000, safetyMargin: 128 },
     });
   });
+
+  it("labels a context-only notebook as an evidence report", () => {
+    const cells = buildDynamoDbAiAnalysisNotebookCells(buildContext(), {});
+
+    expect(cells[0].value).toContain("DynamoDB Performance Tuning Evidence Report");
+    expect(cells.some((cell) => cell.metadata?.cellLabel === "AI analysis JSON")).toBe(false);
+  });
+
+  it("includes run-level Benchmark evidence even without a baseline comparison", () => {
+    const cells = buildDynamoDbAiAnalysisNotebookCells(buildContext({
+      benchmark: {
+        startedAt: "2026-08-27T18:30:00.000Z",
+        completedAt: "2026-08-27T18:30:01.000Z",
+        requestedRuns: 3,
+        completedRuns: 3,
+        samples: [
+          { run: 1, clientElapsedTimeMs: 10, returnedItemCount: 2, evaluatedItemCount: 20, completeness: "bounded" },
+          { run: 2, clientElapsedTimeMs: 20, returnedItemCount: 2, evaluatedItemCount: 20, completeness: "bounded" },
+          { run: 3, clientElapsedTimeMs: 30, returnedItemCount: 2, evaluatedItemCount: 20, completeness: "bounded" },
+        ],
+        medianClientElapsedTimeMs: 20,
+        averageClientElapsedTimeMs: 20,
+        minClientElapsedTimeMs: 10,
+        maxClientElapsedTimeMs: 30,
+        source: "performanceTuningBenchmark",
+      },
+    }), {});
+    const chapter = findCell(cells, "Benchmark measurements").value;
+
+    expect(chapter).toContain("| Runs | 3 / 3 completed |");
+    expect(chapter).toContain("| 2 | 20 ms | 2 / 20 | - |");
+    expect(chapter).toContain("2026-08-27T18:30:00.000Z (local ");
+  });
 });
 
 describe("saveDynamoDbAiAnalysisAsNotebook", () => {
@@ -337,14 +374,14 @@ describe("saveDynamoDbAiAnalysisAsNotebook", () => {
     });
   });
 
-  it("refuses to save a report with neither an analysis nor a comparison", async () => {
+  it("saves deterministic context as an evidence report without AI or a baseline", async () => {
     const result = await saveDynamoDbAiAnalysisAsNotebook(buildContext(), {});
 
-    expect(result).toEqual({
-      ok: false,
-      message: "There is no AI analysis or baseline comparison to save.",
-    });
-    expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.relativePath).toMatch(
+      /^reports\/performance-tuning\/perf-tuning-evidence-orders-\d{8}-\d{6}\.dbn$/
+    );
+    expect(workspace.fs.writeFile).toHaveBeenCalledOnce();
   });
 
   it("returns ok:false and writes nothing when no workspace folder is open", async () => {

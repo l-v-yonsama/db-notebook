@@ -22,6 +22,46 @@ export type LanguageModelSelection = {
   defaultLanguageModelId: string;
 };
 
+export const MODEL_NOT_SUPPORTED_ERROR_MESSAGE =
+  'Copilot reported this model as an available option, but it cannot be used by extensions in the current environment. Select a different AI model and run Analyze with AI again, or use "Copy Prompt for Other AI".';
+
+/**
+ * Copilot can temporarily advertise a model through selectChatModels() even
+ * though its request endpoint rejects that same model. VS Code normally
+ * wraps the provider failure, so inspect both the wrapper and its nested
+ * cause instead of depending on one concrete error class/shape.
+ */
+export function isModelNotSupportedError(error: unknown): boolean {
+  const pending: unknown[] = [error];
+  const visited = new Set<object>();
+
+  while (pending.length > 0) {
+    const value = pending.pop();
+    if (typeof value === "string") {
+      if (/model_not_supported|requested model is not supported/i.test(value)) {
+        return true;
+      }
+      continue;
+    }
+    if (!value || typeof value !== "object" || visited.has(value)) {
+      continue;
+    }
+    visited.add(value);
+
+    const candidate = value as Record<string, unknown>;
+    pending.push(
+      candidate.code,
+      candidate.message,
+      candidate.cause,
+      candidate.error,
+      candidate.body,
+      candidate.response,
+    );
+  }
+
+  return false;
+}
+
 // `LanguageModelChat.name` is a "human-readable name", not a unique key -
 // Copilot can (and, per user report 2026-08-19, does) return more than one
 // model entry with the identical `.name` (e.g. a directly-pinned model and
