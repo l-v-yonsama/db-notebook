@@ -119,7 +119,9 @@ baseline comparison.
 
 1. Run `Run Explain Analyze` first if actual measurements are needed and it is safe to do so.
 2. Select a language model.
-3. Enable `Translate response` if you want the response in another language.
+3. On a non-English VS Code UI, keep `Respond in <language>` enabled to receive the response in
+   that display language, or disable it to receive the default AI response. This option is omitted
+   on an English UI.
 4. Select `Analyze with AI`.
 
 The AI response includes a summary, findings, recommendations, and missing context. A suggested
@@ -127,7 +129,7 @@ query is never run automatically. Validate DDL and rewritten statements in a tes
 review their execution plans, and assess their impact before applying them.
 
 To use an AI other than Copilot, select `Copy Prompt for Other AI` and paste the prompt into a
-client such as ChatGPT, Claude, or Codex. When `Translate response` is enabled, the copied prompt
+client such as ChatGPT, Claude, or Codex. When `Respond in <language>` is enabled, the copied prompt
 also specifies the response language.
 
 ## 6. Save and share the analysis

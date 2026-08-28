@@ -61,8 +61,10 @@ import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
 import { createCodeHtmlString } from "../utilities/highlighter";
 import {
+  buildTranslateResponseLabel,
   buildLanguageModelSelection,
   defaultTranslateResponse,
+  isResponseTranslationAvailable,
   isModelNotSupportedError,
   MODEL_NOT_SUPPORTED_ERROR_MESSAGE,
 } from "../utilities/lmModelSelection";
@@ -526,6 +528,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           languageModels,
           languageModelId: defaultLanguageModelId,
           translateResponse: defaultTranslateResponse(env.language),
+          translateResponseLabel: buildTranslateResponseLabel(env.language),
           analyzedExecutionPlan: this.analyzedExecutionPlan,
           comparison: this.comparison,
         },
@@ -593,6 +596,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           languageModels,
           languageModelId: defaultLanguageModelId,
           translateResponse: defaultTranslateResponse(env.language),
+          translateResponseLabel: buildTranslateResponseLabel(env.language),
           observedReadCapability: this.observedReadCapability,
           comparison: this.comparison,
         },
@@ -725,12 +729,13 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     if (!context) {
       return undefined;
     }
+    const translateResponse = isResponseTranslationAvailable(env.language);
     const comparison = this.comparisonAttempt("full");
     if (isDynamoDbPerformanceTuningContext(context)) {
       return {
         plainTextPrompt: buildDynamoDbPlainTextAnalysisPrompt(context, { comparison }),
         translatedPlainTextPrompt: buildDynamoDbPlainTextAnalysisPrompt(context, {
-          translateResponse: true,
+          translateResponse,
           language: env.language,
           comparison,
         }),
@@ -739,7 +744,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     return {
       plainTextPrompt: buildPlainTextAnalysisPrompt(context, { comparison }),
       translatedPlainTextPrompt: buildPlainTextAnalysisPrompt(context, {
-        translateResponse: true,
+        translateResponse,
         language: env.language,
         comparison,
       }),
@@ -765,6 +770,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       return;
     }
     const context = this.context;
+    // The webview normally sends false when the English-only control is
+    // hidden. Enforce the locale policy host-side as well so no English UI
+    // request can add a translation instruction from stale/tampered state.
+    const effectiveTranslateResponse =
+      translateResponse && isResponseTranslationAvailable(env.language);
     // Pin the baseline because controls remain interactive during model I/O.
     const baseline = this.baseline;
     const evidence = this.comparison.evidence;
@@ -814,7 +824,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
             ? await this.buildDynamoDbMessagesWithinModelInputLimit(
                 model,
                 context,
-                translateResponse,
+                effectiveTranslateResponse,
                 cts.token,
                 baseline,
                 evidence
@@ -822,7 +832,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
             : await this.buildMessagesWithinModelInputLimit(
                 model,
                 context,
-                translateResponse,
+                effectiveTranslateResponse,
                 cts.token,
                 baseline,
                 evidence
@@ -961,7 +971,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           },
           request: {
             promptFormatVersion: 1,
-            translateResponse,
+            translateResponse: effectiveTranslateResponse,
             language: env.language,
             contextDetail: compact ? "compact" : "full",
             tokenUsage: {

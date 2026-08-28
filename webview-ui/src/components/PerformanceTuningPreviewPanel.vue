@@ -59,6 +59,7 @@ const contextJson = computed(() =>
 const languageModels = ref<LabelValueItem[]>([]);
 const languageModelId = ref("");
 const translateResponse = ref(false);
+const translateResponseLabel = ref<string | undefined>(undefined);
 const plainTextPrompt = ref("");
 const translatedPlainTextPrompt = ref("");
 const copyPromptForOtherAi = computed(() =>
@@ -198,6 +199,7 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   languageModels.value = v.languageModels;
   languageModelId.value = v.languageModelId;
   translateResponse.value = v.translateResponse;
+  translateResponseLabel.value = v.translateResponseLabel;
   plainTextPrompt.value = v.plainTextPrompt;
   translatedPlainTextPrompt.value = v.translatedPlainTextPrompt;
   analysis.value = { status: "idle" };
@@ -476,9 +478,8 @@ defineExpose({
     </template>
 
     <div class="header">
-      <!-- Analyze with AI's model/translation options - always visible (not
-           gated on analysis.status), since the choice has to be made before
-           clicking the button in the toolbar above. -->
+      <!-- Analyze with AI options remain visible before the action. The host
+           omits translateResponseLabel for English UI locales. -->
       <div class="row ai-options">
         <span class="label">AI options</span>
         <label for="languageModelId" class="label-inline">Language model</label>
@@ -489,9 +490,13 @@ defineExpose({
           :disabled="isAnalyzing || languageModels.length === 0"
           style="width: 220px"
         />
-        <VsCodeCheckbox v-model="translateResponse" :disabled="isAnalyzing"
-          >Translate response</VsCodeCheckbox
+        <VsCodeCheckbox
+          v-if="translateResponseLabel"
+          v-model="translateResponse"
+          :disabled="isAnalyzing"
         >
+          {{ translateResponseLabel }}
+        </VsCodeCheckbox>
       </div>
       <RelationalPerformanceTuningView
         v-if="engine === 'relational'"

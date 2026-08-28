@@ -108,7 +108,49 @@ export function buildLanguageModelSelection(models: LanguageModelSummary[]): Lan
   };
 }
 
-/** Uses the shared default for AI panels: translate except for English UI users. */
+function primaryLanguage(language: string): string {
+  try {
+    return new Intl.Locale(language).language.toLowerCase();
+  } catch {
+    // VS Code normally supplies a BCP 47 tag. Keep malformed/legacy tags
+    // usable for the simple English guard and the label fallback below.
+    return language.trim().split(/[-_]/, 1)[0].toLowerCase();
+  }
+}
+
+/** Translation is only meaningful when VS Code reports a non-English UI language. */
+export function isResponseTranslationAvailable(language: string | undefined): boolean {
+  if (!language?.trim()) {
+    return false;
+  }
+  return primaryLanguage(language) !== "en";
+}
+
+/** Uses the shared default for AI panels: enabled only when the option is available. */
 export function defaultTranslateResponse(language: string | undefined): boolean {
-  return language !== "en";
+  return isResponseTranslationAvailable(language);
+}
+
+/**
+ * Builds the English UI label without maintaining a language-code table.
+ * Returns undefined for English/unknown UI languages so the webview can omit
+ * the option entirely.
+ */
+export function buildTranslateResponseLabel(language: string | undefined): string | undefined {
+  if (!isResponseTranslationAvailable(language)) {
+    return undefined;
+  }
+
+  // Availability above guarantees a non-empty language value.
+  const code = language?.trim() ?? "";
+  try {
+    const displayName = new Intl.DisplayNames(["en"], { type: "language" }).of(code);
+    if (displayName && displayName.toLowerCase() !== code.toLowerCase()) {
+      return `Respond in ${displayName}`;
+    }
+  } catch {
+    // Fall through to a useful label even if a future VS Code locale is not
+    // recognized by the Electron/Node ICU data bundled with the host.
+  }
+  return `Respond in the VS Code display language (${code})`;
 }

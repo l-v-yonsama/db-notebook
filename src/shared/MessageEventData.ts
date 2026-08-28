@@ -641,8 +641,8 @@ type PerformanceTuningPreviewShellFields = {
   // extension host.
   plainTextPrompt: string;
   // The same external-AI prompt with the current UI language response
-  // instruction. The webview switches between these immediately when
-  // the Translate response checkbox changes, without a host round trip.
+  // instruction. The webview switches between these immediately when the
+  // response-language checkbox changes, without a host round trip.
   translatedPlainTextPrompt: string;
   // Computed on the extension side (Buffer.byteLength) rather than
   // re-serialized/measured in the webview. This is retained as diagnostic
@@ -650,15 +650,16 @@ type PerformanceTuningPreviewShellFields = {
   // communicated with model-specific token usage instead.
   payloadBytes: number;
   maxPayloadBytes: number;
-  // Analyze with AI's "Language model"/"Translate response" options
-  // (2026-08-19 follow-up) - populated directly from
+  // Analyze with AI's model/response-language options (2026-08-19 follow-up)
+  // - populated directly from
   // lm.selectChatModels({vendor: "copilot"}) mapped 1:1, no filtering),
   // except defaultLanguageModelId carries no gpt-4o-family preference (see
-  // lmModelSelection.ts) and translateResponse's default is
-  // env.language !== "en", same as those two panels.
+  // lmModelSelection.ts). English UI locales omit the response-language
+  // checkbox and force translateResponse false; other locales default it on.
   languageModels: LabelValueItem[];
   languageModelId: string;
   translateResponse: boolean;
+  translateResponseLabel?: string;
 };
 
 // RDB view model (2026-08-24 follow-up: split out of the formerly-flat
