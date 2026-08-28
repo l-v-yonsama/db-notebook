@@ -77,7 +77,32 @@ export class Uri {
   }
 }
 
+export enum ProgressLocation {
+  SourceControl = 1,
+  Window = 10,
+  Notification = 15,
+}
+
 export const window = {
+  withProgress: vi.fn(
+    async (
+      _options: unknown,
+      task: (
+        progress: { report: (value: unknown) => void },
+        token: {
+          isCancellationRequested: boolean;
+          onCancellationRequested: (listener: () => void) => { dispose: () => void };
+        }
+      ) => Promise<unknown>
+    ) =>
+      task(
+        { report: () => {} },
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: () => ({ dispose: () => {} }),
+        }
+      )
+  ),
   visibleNotebookEditors: [] as unknown[],
   activeNotebookEditor: undefined as unknown,
   activeTextEditor: undefined as unknown,

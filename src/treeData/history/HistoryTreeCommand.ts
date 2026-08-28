@@ -35,6 +35,7 @@ import {
 
 import {
   AwsDriver,
+  BaseSQLSupportDriver,
   ConnectionSetting,
   DBType,
   DbDynamoTable,
@@ -389,7 +390,11 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       return;
     }
 
-    const driver = await createRDSDriver(connectionSetting, true);
+    // A PartiQL history entry is dbType:Aws with request.kind "sql", so it has
+    // to resolve through the SQL-support driver - createRDSDriver() rejects
+    // Aws outright ("Aws is not a relational database"). This mirrors how the
+    // notebook's own SQL kernel executes the same statement.
+    const driver = await createSQLSupportDriver(connectionSetting, true);
     const toPositionedParameter = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
     const { query, binds } = normalizeQuery({
@@ -407,7 +412,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
         cancellable: true,
       },
       async (progress, token) => {
-        let driverForKill: RDSBaseDriver | undefined = undefined;
+        let driverForKill: BaseSQLSupportDriver | undefined = undefined;
 
         token.onCancellationRequested(() => {
           driverForKill?.kill();
@@ -418,7 +423,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
           increment: 50,
         });
 
-        const r = await workflow<RDSBaseDriver, ResultSetData>(
+        const r = await workflow<BaseSQLSupportDriver, ResultSetData>(
           connectionSetting,
           async (driver) => {
             driverForKill = driver;
