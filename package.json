@@ -754,6 +754,11 @@
           "group": "inline"
         },
         {
+          "command": "database-notebook.histories.resetPerformance",
+          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory.*Success$/",
+          "group": "inline"
+        },
+        {
           "command": "database-notebook.histories.open",
           "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory(Success|Error)$/",
           "group": "inline"
@@ -782,6 +787,11 @@
           "command": "database-notebook.histories.startPerformanceTuning",
           "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory.*Success$/",
           "group": "history@4"
+        },
+        {
+          "command": "database-notebook.histories.resetPerformance",
+          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory.*Success$/",
+          "group": "history@5"
         },
         {
           "command": "database-notebook.start-mcp-server",
@@ -1495,6 +1505,12 @@
         "title": "Delete selected sql",
         "shortTitle": "Delete",
         "icon": "$(trash)"
+      },
+      {
+        "command": "database-notebook.histories.resetPerformance",
+        "title": "Reset performance statistics",
+        "shortTitle": "Reset statistics",
+        "icon": "$(debug-restart)"
       },
       {
         "command": "database-notebook.histories.openAsNotebook",
