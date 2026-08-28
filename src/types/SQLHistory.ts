@@ -1,21 +1,14 @@
 import type { QueryItemsAtClientInputParams } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { RdhMeta, RdhSummary } from "@l-v-yonsama/rdh";
 
-// Discriminates what kind of statement produced this history entry. Absent
-// (or "sql") means the existing PartiQL/RDB path: sqlDoc is the statement's
-// canonical source and is what re-execution/Notebook-export/performance
-// analysis all use. "dynamodbQuery" is a native DynamoDB Query issued by the
-// Query Panel - see misc/specs/
-// dynamodb-query-panel-history-performance-implementation-plan.ja.md §4.1.
-// A stored history with no `request` field at all predates this type and is
-// treated exactly like `{ kind: "sql" }` - no batch migration is performed.
+// Native Query history stores executable input separately from display-only sqlDoc.
 export type SQLHistoryRequest =
   | {
       kind: "sql";
     }
   | {
       kind: "dynamodbQuery";
-      // Identifies which UI can safely invert the saved native input back
+      // Identifies which UI can safely restore the saved native input.
       // into editable controls. Future native-query producers must not
       // automatically inherit the Query Panel's expression-shape contract.
       origin: "dynamoQueryPanel";

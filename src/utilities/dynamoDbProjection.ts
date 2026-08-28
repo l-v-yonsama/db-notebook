@@ -4,15 +4,9 @@ import type {
   DynamoQueryProjectionMode,
 } from "../shared/DynamoDBConditionParams";
 
-// See misc/specs/dynamodb-query-panel-history-performance-implementation-plan.ja.md
-// §6.1/§6.2/§6.5. Host-only (imports DbDynamoTable from db-drivers) - the
-// webview-safe constraint *shape* lives in shared/DynamoDBConditionParams.ts
-// instead, since webview-ui re-exports src/shared/* directly into its own
-// bundle and can't depend on a Node-only db-drivers import.
+// Host-only Projection/consistency rules; the webview-safe shape lives in shared types.
 
-// Computes what Projection/Consistent Read choices are actually valid for
-// `target` (a DynamoQueryPanel target string: "$table", "$lsi:<name>", or
-// "$gsi:<name>") against `tableRes`'s known metadata.
+// Target values are "$table", "$lsi:<name>", or "$gsi:<name>".
 export function computeDynamoProjectionConstraint(
   tableRes: DbDynamoTable,
   target: string
@@ -180,8 +174,10 @@ export function selectionNeedsBaseTableFetch(
     return false;
   }
   if (mode === "allTableAttributes") {
-    return constraint.allowAllTableAttributesOption &&
-      constraint.projectedAttributes.length < constraint.availableAttributes.length;
+    return (
+      constraint.allowAllTableAttributesOption &&
+      constraint.projectedAttributes.length < constraint.availableAttributes.length
+    );
   }
   if (mode !== "specific") {
     return false;

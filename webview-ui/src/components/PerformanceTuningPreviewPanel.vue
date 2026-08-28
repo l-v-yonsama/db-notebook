@@ -1,10 +1,5 @@
 <script setup lang="ts">
-// Shared shell (2026-08-24 follow-up, DynamoDB support - design doc §11.3's
-// 3-component split). Owns the toolbar, AI options, AI Analysis, Collection
-// issues/Information (both already-engine-agnostic view models), and Full
-// context JSON - see RelationalPerformanceTuningView.vue's top comment for
-// why each per-engine child is mounted twice (part="header"/"body") rather
-// than owning a `<section>` of its own.
+// Shared toolbar, diagnostics, comparison, AI analysis, and raw-context shell.
 import type {
   DynamoDbPerformanceTuningInitializeViewModel,
   LabelValueItem,
@@ -48,42 +43,29 @@ const benchmarkBoundDescription = computed(
   () => dynamodb.value?.context.benchmark?.boundDescription
 );
 const formatMs = (value: number): string => `${Number(value.toFixed(2)).toLocaleString()} ms`;
-// Whichever of the two is currently set. Only the shell-owned fields shared
-// by both (PerformanceTuningPreviewShellFields in MessageEventData.ts:
-// jsonHtml/plainTextPrompt/.../languageModels/...) are ever read through
-// this union; every per-engine field is read from relational/dynamodb
-// directly instead (see the child component invocations below).
+// Shared shell fields from whichever engine is active.
 const active = computed(() => relational.value ?? dynamodb.value);
 
 const diagnosticGroups = computed(() => active.value?.diagnosticGroups ?? []);
-// buildPerformanceTuningDiagnosticGroups()/buildDynamoDbPerformanceTuningDiagnosticGroups()
-// (extension-side) already sort information before warnings and never mix
-// severities within one group - this just splits that single ordered list
-// into the two display sections. Neither list is re-sorted or re-derived here.
+// Host-side formatters already group and sort diagnostics by severity.
 const infoGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "info"));
 const issueGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "warning"));
 
 const contextJson = computed(() =>
   active.value ? JSON.stringify(active.value.context, null, 2) : ""
 );
-// Raw byte size is diagnostic metadata, shown only inside the collapsed Full
-// context JSON details. Model fit is communicated separately in tokens.
 
 // AI options are available as soon as a context is loaded.
 const languageModels = ref<LabelValueItem[]>([]);
 const languageModelId = ref("");
 const translateResponse = ref(false);
-// "Copy Prompt for Other AI" (2026-08-21 follow-up) - see
-// MessageEventData.ts's own doc comment on this field.
 const plainTextPrompt = ref("");
 const translatedPlainTextPrompt = ref("");
 const copyPromptForOtherAi = computed(() =>
   translateResponse.value ? translatedPlainTextPrompt.value : plainTextPrompt.value
 );
 
-// Baseline comparison (§12). Host-owned state: every transition (select,
-// change, clear, and a rebuild after the Current context was re-collected)
-// arrives as a "comparison-update", so the webview never derives it.
+// Comparison state is host-owned and arrives fully derived.
 const comparison = ref<PerformanceTuningComparisonViewState>({ status: "idle" });
 
 // A fresh context invalidates the previous analysis.
@@ -246,9 +228,7 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
       if (value.comparison) {
         comparison.value = value.comparison;
       }
-      // Selecting or clearing a baseline changes what "Copy Prompt for Other
-      // AI" has to contain, and the host precomputes it - so it arrives
-      // rebuilt alongside the comparison rather than going stale here.
+      // The host rebuilds external-AI prompts with each baseline transition.
       if (value.plainTextPrompt !== undefined) {
         plainTextPrompt.value = value.plainTextPrompt;
       }
@@ -257,11 +237,7 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
       }
       break;
     case "stop-progress":
-      // "Run Explain Analyze"/"Run Observed Read" cancelled or failed - a
-      // successful run instead arrives as a fresh "initialize" above, which
-      // already resets this itself. The failure/cancellation reason (if
-      // any) was already shown as a native VS Code notification,
-      // extension-side.
+      // Successful runs reset through initialize; failures are shown by the host.
       isRunningSecondaryAction.value = false;
       break;
   }
@@ -288,12 +264,7 @@ const saveAiAnalysisAsNotebook = (): void => {
   });
 };
 
-// The confirmation itself is entirely host-side (a modal
-// window.showWarningMessage - see PerformanceTuningPreviewPanel.ts's
-// runActualPlan()/runObservedRead()); these only set the optimistic
-// "running" state so the button disables itself immediately -
-// stop-progress above resets it again if the user declines that modal or
-// the run fails.
+// Confirmation is host-side; optimistic state disables the action immediately.
 const runActualPlan = (): void => {
   isRunningSecondaryAction.value = true;
   vscode.postCommand({
@@ -334,12 +305,14 @@ const benchmarkItems = computed<SecondaryItem[]>(() =>
 );
 
 const runBenchmark = (selection: unknown): void => {
-  const runs = typeof selection === "object" && selection !== null && "runs" in selection
-    ? (selection as { runs: unknown }).runs
-    : selection;
-  const mode = typeof selection === "object" && selection !== null && "mode" in selection
-    ? (selection as { mode?: "page" | "completeResult" }).mode
-    : undefined;
+  const runs =
+    typeof selection === "object" && selection !== null && "runs" in selection
+      ? (selection as { runs: unknown }).runs
+      : selection;
+  const mode =
+    typeof selection === "object" && selection !== null && "mode" in selection
+      ? (selection as { mode?: "page" | "completeResult" }).mode
+      : undefined;
   if (runs !== 3 && runs !== 5) {
     return;
   }
@@ -350,8 +323,7 @@ const runBenchmark = (selection: unknown): void => {
   });
 };
 
-// The file picker itself is host-side (window.showOpenDialog) - the webview
-// never handles a path (§6.1).
+// The host owns the file picker; the webview never receives a path.
 const selectBaseline = (): void => {
   vscode.postCommand({ command: "selectPerformanceTuningBaseline", params: {} });
 };
@@ -382,9 +354,6 @@ const evidenceLabel = (
   if (evidence.diagnosticCode) {
     parts.push(`Diagnostic: ${evidence.diagnosticCode}`);
   }
-  // DynamoDB counterpart (design doc §12) - DynamoDB evidence has no
-  // schema/table/index/plan-node identity of its own to point at the same
-  // way (PerformanceTuningAiEvidenceRef.contextPath's own doc comment).
   if (evidence.contextPath) {
     parts.push(`Context: ${evidence.contextPath}`);
   }
@@ -455,14 +424,7 @@ defineExpose({
         >
           <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
         </VsCodeButton>
-        <!-- "Copy Prompt for Other AI" (2026-08-21 follow-up) - for a user
-             whose vscode.lm-exposed models are too limited (this extension
-             only queries `vendor: "copilot"`, so this is only ever whatever
-             models Copilot itself exposes) but who already has a ChatGPT/
-             Claude.ai/Claude Code/Codex subscription they'd rather paste
-             into directly. Copies the same domain-guided prompt as "Analyze
-             with AI", just asking for a plain-text answer instead of JSON -
-             no vscode.lm call happens for this button. -->
+        <!-- Copies an equivalent plain-text prompt without invoking vscode.lm. -->
         <CopyToClipboardButton
           appearance="secondary"
           :content="copyPromptForOtherAi"
@@ -470,12 +432,7 @@ defineExpose({
         >
           <fa icon="comment-dots" />Copy Prompt for Other AI
         </CopyToClipboardButton>
-        <!-- Save as Notebook - one shared button; PerformanceTuningPreviewPanel.ts's
-             saveAnalysisAsNotebook() picks the RDB or DynamoDB report
-             builder itself based on the currently-held context. -->
-        <!-- Enabled by either a successful AI analysis or a baseline
-             comparison: §14 of the comparison plan requires a comparison
-             report to be savable without ever running an AI analysis. -->
+        <!-- The host selects the engine-specific report builder. -->
         <VsCodeButton
           appearance="secondary"
           :disabled="!canSaveNotebook"
@@ -559,12 +516,18 @@ defineExpose({
           class="completion-banner"
           :class="benchmarkIsComplete ? 'complete' : 'incomplete'"
         >
-          <span class="codicon" :class="benchmarkIsComplete ? 'codicon-pass-filled' : 'codicon-warning'"></span>
+          <span
+            class="codicon"
+            :class="benchmarkIsComplete ? 'codicon-pass-filled' : 'codicon-warning'"
+          ></span>
           <strong>{{ benchmarkIsComplete ? "COMPLETE" : "INCOMPLETE" }}</strong>
           <span>
-            {{ benchmarkIsComplete
-              ? "Every benchmark run reached the end of the result."
-              : benchmarkBoundDescription ?? "At least one run stopped before the full result was evaluated." }}
+            {{
+              benchmarkIsComplete
+                ? "Every benchmark run reached the end of the result."
+                : benchmarkBoundDescription ??
+                  "At least one run stopped before the full result was evaluated."
+            }}
           </span>
         </div>
         <p class="section-note">
@@ -573,9 +536,11 @@ defineExpose({
             >EXPLAIN ANALYZE was collected first and is excluded from these timings.</span
           >
           <span v-else>
-            {{ "mode" in benchmark && benchmark.mode === "completeResult"
-              ? "Each sample followed continuation tokens up to the complete-result safety limits."
-              : "Each sample measured one bounded API response." }}
+            {{
+              "mode" in benchmark && benchmark.mode === "completeResult"
+                ? "Each sample followed continuation tokens up to the complete-result safety limits."
+                : "Each sample measured one bounded API response."
+            }}
           </span>
         </p>
         <p class="section-note">
@@ -619,21 +584,14 @@ defineExpose({
         </p>
       </div>
 
-      <!-- Baseline comparison (§12) - always rendered, so the
-           "Compare with Baseline…" affordance has a visible home even before
-           anything is selected, the same reasoning as the AI Analysis
-           section's own idle state below. -->
+      <!-- Always render the comparison entry point, including its idle state. -->
       <PerformanceTuningComparisonView
         :state="comparison"
         @select="selectBaseline"
         @clear="clearBaseline"
       />
 
-      <!-- AI Analysis is always rendered, even at idle: a first-time user
-           had no on-screen indication of *where* the result would show up
-           until after clicking "Analyze with AI" - this idle-state hint
-           gives that area a visible home from the start, doubling as a hint
-           for the evidence-first, Analyze-with-AI-second workflow. -->
+      <!-- Keep the result area visible before the first AI request. -->
       <div class="section ai-analysis ai-analysis-section">
         <div class="section-title-row">
           <h3 class="section-title">AI Analysis</h3>
@@ -681,10 +639,7 @@ defineExpose({
         </div>
 
         <div v-else-if="analysis.status === 'success' && analysis.result">
-          <!-- The baseline changed after this result was produced, so it
-               never saw the comparison now on screen. Saying so is required
-               rather than presenting the old text as current commentary
-               (§12). -->
+          <!-- Mark AI output stale when it predates the current baseline. -->
           <p v-if="comparison.analysisStale" class="analysis-stale">
             <fa icon="triangle-exclamation" />
             Baseline changed; run Analyze with AI again. The analysis below was produced before the
@@ -950,19 +905,14 @@ defineExpose({
     display: flex;
     flex-direction: column;
 
-    /* Keep the visible reading order aligned with the saved DBN report -
-       see RelationalPerformanceTuningView.vue's/DynamoDbPerformanceTuningView.vue's
-       own <style> for their sections' order values (1 and 4-7 respectively;
-       only one of the two is ever mounted at a time, so their numbering
-       never has to avoid colliding with each other, only with these). */
+    /* Keep visible section order aligned with the saved report. */
     .collection-issues-section {
       order: 2;
     }
     .information-section {
       order: 3;
     }
-    /* The deterministic comparison sits directly above AI Analysis, which is
-       a consumer of it rather than a peer (§19). */
+    /* Deterministic comparison precedes the AI interpretation. */
     .comparison-section {
       order: 8;
     }

@@ -1,6 +1,3 @@
-// §17.3 of
-// misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 import { describe, expect, it } from "vitest";
 import type {

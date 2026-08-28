@@ -6,8 +6,7 @@ import type {
 import type { RdhDynamoDbCapacityAmount, RdhDynamoDbConsumedCapacity } from "@l-v-yonsama/rdh";
 import type { SQLHistory } from "../types/SQLHistory";
 
-// See misc/specs/dynamodb-query-panel-history-performance-implementation-plan.ja.md
-// §9.1. Pure functions only - no vscode import.
+// Converts the latest native Query history summary into one observation.
 
 function toPerformanceCapacityAmount(
   amount: RdhDynamoDbCapacityAmount | undefined
@@ -15,10 +14,7 @@ function toPerformanceCapacityAmount(
   if (!amount) {
     return undefined;
   }
-  // Explicit field-by-field mapping (design doc §9.1's "型castだけで済ませ
-  // ない") - the two types happen to share these three field names today,
-  // but that is not guaranteed to stay true, and a cast would silently stop
-  // catching a future rename on either side.
+  // Map fields explicitly so future source/target changes remain type-checked.
   return {
     capacityUnits: amount.capacityUnits,
     readCapacityUnits: amount.readCapacityUnits,
@@ -80,7 +76,9 @@ export function toPerformanceCapacityBreakdown(
 // that case is never fabricated into a "complete" observation (design doc
 // §7.4/§9.1's "古い履歴でtoken状態が不明な場合は完全観測と断定しない", applied
 // one step earlier: no dynamoDb evidence at all means no Observation).
-export function buildObservationFromHistory(history: SQLHistory): DynamoDbReadObservation | undefined {
+export function buildObservationFromHistory(
+  history: SQLHistory
+): DynamoDbReadObservation | undefined {
   if (
     history.performance?.statisticsSince !== undefined &&
     (history.executedAt === undefined || history.executedAt < history.performance.statisticsSince)
@@ -98,15 +96,13 @@ export function buildObservationFromHistory(history: SQLHistory): DynamoDbReadOb
       ? returnedItemCount / evaluatedItemCount
       : undefined;
 
-  // 'complete': continuationTokenPresent === false - the execution
-  // definitely evaluated everything a continuation key could have covered.
-  // 'bounded': continuationTokenPresent === true - a later key range was
-  // never evaluated.
-  // 'unknown': continuationTokenPresent itself is undefined (e.g. an entry
-  // saved by an intermediate build of this feature) - never treated as
-  // 'complete'.
+  // Missing continuation evidence remains unknown rather than implying completion.
   const completeness: DynamoDbReadObservation["completeness"] =
-    continuationTokenPresent === true ? "bounded" : continuationTokenPresent === false ? "complete" : "unknown";
+    continuationTokenPresent === true
+      ? "bounded"
+      : continuationTokenPresent === false
+      ? "complete"
+      : "unknown";
 
   return {
     source: "sqlHistory",
@@ -119,18 +115,14 @@ export function buildObservationFromHistory(history: SQLHistory): DynamoDbReadOb
     filterPassRate,
     consumedCapacity: toPerformanceCapacityBreakdown(dynamoDb.consumedCapacity),
     hasMorePages: continuationTokenPresent,
-    // `bounded` is the pre-existing boolean-only compat field (design doc
-    // §9.1) - both 'bounded' and 'unknown' set it true so an older reader
-    // that only understands `bounded` still shows a cautionary note rather
-    // than implying a completeness this entry can't actually back up; only
-    // a definite 'complete' sets it false.
+    // Keep older readers conservative by mapping unknown to bounded=true.
     bounded: completeness !== "complete",
     boundDescription:
       completeness === "bounded"
         ? "The execution stopped while a continuation key remained; the later key range was not evaluated."
         : completeness === "unknown"
-          ? "Whether this execution's result was complete could not be determined from the saved history entry."
-          : undefined,
+        ? "Whether this execution's result was complete could not be determined from the saved history entry."
+        : undefined,
     completeness,
   };
 }

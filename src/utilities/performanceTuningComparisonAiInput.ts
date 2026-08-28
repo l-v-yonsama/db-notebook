@@ -1,15 +1,4 @@
-// Projects a Comparison Evidence down to what an AI actually needs
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §13). The Baseline's whole Full Context is never sent: §2 item 2 rules out
-// handing the model two complete contexts, and §13.1 lists exactly what the
-// projection keeps instead - both query bodies, the structural differences,
-// the already-computed numbers, and the per-metric comparability verdicts.
-//
-// Pure functions, no VS Code API. The shrink levels below are the only place
-// that decides what to drop, and every drop is recorded in `omittedFields` so
-// the model (and a later reader of the saved report) can see what is missing
-// rather than silently reasoning over a truncated picture (§13.1's closing
-// rule).
+// Projects comparison evidence into explicit, size-bounded AI inputs.
 
 import type {
   ComparisonAiInputDetail,
@@ -132,7 +121,7 @@ export function buildComparisonAiInput(
       ? evidence.comparability.reasons.filter((reason) => reason.level !== "comparable")
       : evidence.comparability.reasons;
   const rejectedDecisions = evidence.comparability.metricDecisions.filter(
-    (decision) => decision.comparability === "notComparable",
+    (decision) => decision.comparability === "notComparable"
   );
   const rejectedMetricGroups = new Map<string | undefined, string[]>();
   for (const decision of rejectedDecisions) {
@@ -320,7 +309,9 @@ function structureOf(
   return structure;
 }
 
-function describeStep(step: { operation: string; indexName?: string } | undefined): string | undefined {
+function describeStep(
+  step: { operation: string; indexName?: string } | undefined
+): string | undefined {
   if (!step) {
     return undefined;
   }

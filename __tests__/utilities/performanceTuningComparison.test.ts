@@ -1,7 +1,3 @@
-// §17.2 of
-// misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// - the deterministic primitives every engine builder shares.
-
 import { describe, expect, it } from "vitest";
 import type { IndexSnapshot } from "../../src/shared/PerformanceTuningComparison";
 import {

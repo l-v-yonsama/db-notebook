@@ -1,11 +1,4 @@
-// Display-only helpers for the Preview's comparison section
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §12). Rounding happens here and nowhere else: the Comparison Evidence keeps
-// the raw and unrounded values, and only what is rendered is shortened
-// (§10.1's closing rule).
-//
-// Every label pairs an icon name with text. §12 forbids distinguishing
-// improved / regressed / unchanged / not comparable by color alone.
+// Display-only rounding and accessible labels for comparison evidence.
 
 import type {
   ComparabilityLevel,
@@ -68,7 +61,9 @@ export function formatMetricValue(value: number | undefined, unit: string): stri
   if (value === undefined) {
     return "—";
   }
-  return `${formatNumber(value)}${unit && unit !== "ratio" && unit !== "fraction" ? ` ${unit}` : ""}`;
+  return `${formatNumber(value)}${
+    unit && unit !== "ratio" && unit !== "fraction" ? ` ${unit}` : ""
+  }`;
 }
 
 function formatNumber(value: number): string {
@@ -150,9 +145,7 @@ export function keyImprovements(
     .filter((entry) => entry.improvement !== "");
 }
 
-export function allMetrics(
-  evidence: PerformanceTuningComparisonEvidence
-): NumericComparison[] {
+export function allMetrics(evidence: PerformanceTuningComparisonEvidence): NumericComparison[] {
   return [...evidence.common.workload.metrics, ...evidence.engineSpecific.value.metrics];
 }
 
@@ -206,7 +199,9 @@ export function describeIndexChange(change: IndexChange): {
     case "definitionChanged":
       return {
         label: `Definition differs (${change.changedFields.join(", ")})`,
-        detail: `${describeIndexSnapshot(change.baseline)} → ${describeIndexSnapshot(change.current)}`,
+        detail: `${describeIndexSnapshot(change.baseline)} → ${describeIndexSnapshot(
+          change.current
+        )}`,
         icon: "circle-arrow-right",
       };
   }

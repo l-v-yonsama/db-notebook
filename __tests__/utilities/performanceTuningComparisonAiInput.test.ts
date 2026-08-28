@@ -1,7 +1,4 @@
-// §17.6 of
-// misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// - what the AI is and is not allowed to receive, and what the shrink ladder
-// is allowed to drop.
+// Verifies AI data boundaries and the explicit shrink ladder.
 
 import { describe, expect, it } from "vitest";
 import type { PerformanceTuningComparisonEvidence } from "../../src/shared/PerformanceTuningComparison";

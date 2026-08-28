@@ -600,11 +600,7 @@ export type PerformanceTuningAiAnalysisViewState = {
 };
 
 /**
- * Baseline comparison state for the Preview
- * (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
- * §12). Tagged the same way PerformanceTuningAiAnalysisViewState is, and for
- * the same reason: a half-set selection plus a stale evidence would render as
- * a comparison that is not actually the one on screen.
+ * Tagged baseline comparison state for the Preview.
  *
  * Every section of the comparison renders from `evidence` alone, with no AI
  * involved - "AI 分析前から全セクションを表示可能にする" (§12).

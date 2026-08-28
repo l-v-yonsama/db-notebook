@@ -4,14 +4,12 @@ import type {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { formatUtcWithLocal } from "../shared/dateTimeDisplay";
 import { validateDynamoDbPerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
-import { NotebookCellData, Uri, ViewColumn, workspace } from "vscode";
-import { openNotebookFile, writeNotebookFile } from "../notebook/notebookFileUtil";
+import { NotebookCellData } from "vscode";
 import type { PerformanceTuningAiAnalysisResult } from "../shared/PerformanceTuningAiAnalysis";
 import type { DynamoDbPerformanceTuningHumanSummary } from "../shared/DynamoDbPerformanceTuningHumanSummary";
 import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "./dynamoDbPerformanceTuningDiagnosticFormatter";
 import { buildDynamoDbPerformanceTuningHumanSummary } from "./dynamoDbPerformanceTuningHumanSummary";
 import { buildDynamoDbAiAnalysisPrompt } from "./dynamoDbPerformanceTuningAiPrompt";
-import { createDirectory, existsUri } from "./fsUtil";
 import {
   buildPerformanceTuningNotebookFilename,
   buildAnalysisMarkdown,
@@ -26,8 +24,11 @@ import {
   markupCell,
   type NotebookTocEntry,
   type PerformanceTuningReportInput,
-  type SaveAiAnalysisAsNotebookResult,
 } from "./performanceTuningAiNotebook";
+import {
+  savePerformanceTuningNotebookFile,
+  type SavePerformanceTuningNotebookResult,
+} from "./performanceTuningNotebookFile";
 import type { ComparisonAiInput } from "./performanceTuningComparisonAiInput";
 import {
   buildComparisonJsonAppendixMarkdown,
@@ -35,14 +36,7 @@ import {
   type PerformanceTuningComparisonReportInput,
 } from "./performanceTuningComparisonReport";
 
-// DynamoDB counterpart of performanceTuningAiNotebook.ts (design doc §13).
-// Reuses that file's engine-agnostic helpers (NotebookCellData construction,
-// diagnostic-group/analysis markdown, the JSON appendix framing) rather than
-// duplicating them - see each import's origin for why it's safe to share.
-// The saved report is intentionally conclusion-first for beginners: TOC →
-// overview/target/collection status → summary and recommendations → detailed
-// DynamoDB evidence → appendices.  Query flow is generated from this exact
-// Context rather than using a fixed illustrative diagram.
+// DynamoDB reports reuse the engine-neutral cell and analysis builders.
 
 function escapeMermaidText(value: string): string {
   return value
@@ -56,7 +50,9 @@ function mermaidCard(title: string, details: string[]): string {
   return [title, ...details].map(escapeMermaidText).join("<br/>");
 }
 
-function accessPathLabel(path: DynamoDbPerformanceTuningContext["accessPattern"]["accessPath"]): string {
+function accessPathLabel(
+  path: DynamoDbPerformanceTuningContext["accessPattern"]["accessPath"]
+): string {
   switch (path) {
     case "tableQuery":
       return "Table Query";
@@ -75,7 +71,9 @@ function accessPathLabel(path: DynamoDbPerformanceTuningContext["accessPattern"]
 export function buildDynamoDbQueryFlowMermaid(context: DynamoDbPerformanceTuningContext): string {
   const { accessPattern, observation, table } = context;
   const requestKind = context.statement.language === "partiql" ? "PartiQL SELECT" : "Native Query";
-  const targetDetails = [context.service.indexName ? `${accessPattern.indexType ?? "Index"} target` : "Table target"];
+  const targetDetails = [
+    context.service.indexName ? `${accessPattern.indexType ?? "Index"} target` : "Table target",
+  ];
   if (table.itemCount?.value !== undefined) {
     targetDetails.push(`Approx. ${formatNumber(table.itemCount.value)} items (AWS estimate)`);
   }
@@ -83,13 +81,15 @@ export function buildDynamoDbQueryFlowMermaid(context: DynamoDbPerformanceTuning
   const keyConditions: string[] = [];
   if (accessPattern.partitionKey?.conditionPresent) {
     keyConditions.push(
-      `PK ${accessPattern.partitionKey.attributeName} ${accessPattern.partitionKey.operator ?? "="}`,
+      `PK ${accessPattern.partitionKey.attributeName} ${accessPattern.partitionKey.operator ?? "="}`
     );
   } else {
     keyConditions.push("No partition-key equality");
   }
   if (accessPattern.sortKey?.conditionPresent) {
-    keyConditions.push(`SK ${accessPattern.sortKey.attributeName} ${accessPattern.sortKey.operator ?? "condition"}`);
+    keyConditions.push(
+      `SK ${accessPattern.sortKey.attributeName} ${accessPattern.sortKey.operator ?? "condition"}`
+    );
   }
 
   const filterDetails = accessPattern.postReadFilter.present
@@ -117,16 +117,20 @@ export function buildDynamoDbQueryFlowMermaid(context: DynamoDbPerformanceTuning
     resultDetails.push("Single bounded response");
   }
 
-  const evaluatedLabel = observation?.evaluatedItemCount !== undefined
-    ? `${formatNumber(observation.evaluatedItemCount)} evaluated`
-    : observation && context.statement.language === "partiql"
+  const evaluatedLabel =
+    observation?.evaluatedItemCount !== undefined
+      ? `${formatNumber(observation.evaluatedItemCount)} evaluated`
+      : observation && context.statement.language === "partiql"
       ? "Evaluated count unavailable in PartiQL"
       : "Evaluation not measured";
-  const returnedLabel = observation?.returnedItemCount !== undefined
-    ? `${formatNumber(observation.returnedItemCount)} returned${
-        observation.filterPassRate !== undefined ? ` (${(observation.filterPassRate * 100).toFixed(2)}% pass)` : ""
-      }`
-    : "Return count not measured";
+  const returnedLabel =
+    observation?.returnedItemCount !== undefined
+      ? `${formatNumber(observation.returnedItemCount)} returned${
+          observation.filterPassRate !== undefined
+            ? ` (${(observation.filterPassRate * 100).toFixed(2)}% pass)`
+            : ""
+        }`
+      : "Return count not measured";
 
   return [
     "flowchart LR",
@@ -139,7 +143,9 @@ export function buildDynamoDbQueryFlowMermaid(context: DynamoDbPerformanceTuning
     `  Access["${mermaidCard("Step 3: Key access", [accessPathLabel(accessPattern.accessPath)])}"]`,
     `  Filter["${mermaidCard("Step 4: Filter", filterDetails)}"]`,
     `  Result["${mermaidCard("Step 5: Result", resultDetails)}"]`,
-    `  Request -->|"${escapeMermaidText(context.service.indexName ? "Index request" : "Table request")}"| Target`,
+    `  Request -->|"${escapeMermaidText(
+      context.service.indexName ? "Index request" : "Table request"
+    )}"| Target`,
     `  Target -->|"${escapeMermaidText(keyConditions.join(" · "))}"| Access`,
     `  Access -->|"${escapeMermaidText(evaluatedLabel)}"| Filter`,
     `  Filter -->|"${escapeMermaidText(returnedLabel)}"| Result`,
@@ -170,13 +176,13 @@ function targetRef(context: DynamoDbPerformanceTuningContext): string {
 
 function buildOverviewMarkdown(
   context: DynamoDbPerformanceTuningContext,
-  analysis: PerformanceTuningAiAnalysisResult | undefined,
+  analysis: PerformanceTuningAiAnalysisResult | undefined
 ): string {
   const lines: string[] = [];
   lines.push("## 1. Overview");
   lines.push("");
   lines.push(
-    "_This report analyzes one DynamoDB read and keeps the detailed access, observation, and CloudWatch evidence after the summary for verification._",
+    "_This report analyzes one DynamoDB read and keeps the detailed access, observation, and CloudWatch evidence after the summary for verification._"
   );
   lines.push("");
   lines.push("| Item | Detail |");
@@ -187,20 +193,24 @@ function buildOverviewMarkdown(
   }
   lines.push(`| Collected at | ${formatUtcWithLocal(context.collection.collectedAt)} |`);
   lines.push(`| Collection status | ${context.collection.status} |`);
-  // A comparison-only report is saved without ever running an AI analysis
-  // (comparison implementation plan §14).
+  // Comparison and evidence reports may not include an AI run.
   if (analysis) {
-    lines.push(`| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`);
     lines.push(
-      `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact" : "Full"} |`,
+      `| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`
+    );
+    lines.push(
+      `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact" : "Full"} |`
     );
     const tokenUsage = analysis.request?.tokenUsage;
     if (tokenUsage) {
-      const percentage = tokenUsage.maxInputTokens > 0
-        ? `${((tokenUsage.inputTokens / tokenUsage.maxInputTokens) * 100).toFixed(1)}%`
-        : "-";
+      const percentage =
+        tokenUsage.maxInputTokens > 0
+          ? `${((tokenUsage.inputTokens / tokenUsage.maxInputTokens) * 100).toFixed(1)}%`
+          : "-";
       lines.push(
-        `| Estimated AI input | ${formatNumber(tokenUsage.inputTokens)} / ${formatNumber(tokenUsage.maxInputTokens)} tokens (${percentage}) |`,
+        `| Estimated AI input | ${formatNumber(tokenUsage.inputTokens)} / ${formatNumber(
+          tokenUsage.maxInputTokens
+        )} tokens (${percentage}) |`
       );
       lines.push(`| Token safety margin | ${formatNumber(tokenUsage.safetyMargin)} tokens |`);
     }
@@ -217,7 +227,11 @@ function buildTargetRequestMarkdown(context: DynamoDbPerformanceTuningContext): 
   if (context.statement.text) {
     lines.push("```sql", context.statement.text, "```");
   } else {
-    lines.push(`Native Query on ${escapeMdCell(targetRef(context))}. See Access pattern below for the resolved key condition/filter/projection.`);
+    lines.push(
+      `Native Query on ${escapeMdCell(
+        targetRef(context)
+      )}. See Access pattern below for the resolved key condition/filter/projection.`
+    );
   }
   return lines.join("\n");
 }
@@ -234,7 +248,9 @@ function buildQueryFlowMarkdown(context: DynamoDbPerformanceTuningContext): stri
   ].join("\n");
 }
 
-export function buildDynamoDbPerformanceSnapshotMarkdown(summary: DynamoDbPerformanceTuningHumanSummary): string {
+export function buildDynamoDbPerformanceSnapshotMarkdown(
+  summary: DynamoDbPerformanceTuningHumanSummary
+): string {
   const lines = [
     "### 4.1. Performance snapshot",
     "",
@@ -242,7 +258,11 @@ export function buildDynamoDbPerformanceSnapshotMarkdown(summary: DynamoDbPerfor
     "",
     "| Operation | Access path | Target | Evidence | Collection |",
     "|---|---|---|---|---|",
-    `| ${summary.profile.operation} | ${summary.profile.accessPath}${summary.profile.confidence === "unknown" ? " (unresolved)" : ""} | ${escapeMdCell(summary.profile.targetRef)} | ${summary.profile.evidence} | ${summary.profile.collectionStatus} |`,
+    `| ${summary.profile.operation} | ${summary.profile.accessPath}${
+      summary.profile.confidence === "unknown" ? " (unresolved)" : ""
+    } | ${escapeMdCell(summary.profile.targetRef)} | ${summary.profile.evidence} | ${
+      summary.profile.collectionStatus
+    } |`,
     "",
     "#### 4.1.1. Observed signals",
     "",
@@ -251,7 +271,9 @@ export function buildDynamoDbPerformanceSnapshotMarkdown(summary: DynamoDbPerfor
   ];
   summary.signals.forEach((signal) => {
     lines.push(
-      `| ${signal.level} | ${escapeMdCell(signal.title)} | ${escapeMdCell(signal.summary)} | ${escapeMdCell(signal.rawDataPath)} |`,
+      `| ${signal.level} | ${escapeMdCell(signal.title)} | ${escapeMdCell(
+        signal.summary
+      )} | ${escapeMdCell(signal.rawDataPath)} |`
     );
   });
   return lines.join("\n");
@@ -263,7 +285,7 @@ function buildDiagnosticSections(context: DynamoDbPerformanceTuningContext): {
 } {
   const groups = buildDynamoDbPerformanceTuningDiagnosticGroups(
     context.collection.diagnostics,
-    context.collection.unavailableSections,
+    context.collection.unavailableSections
   );
   const issues = groups.filter((group) => group.severity === "warning");
   const information = groups.filter((group) => group.severity === "info");
@@ -278,19 +300,20 @@ function buildDiagnosticSections(context: DynamoDbPerformanceTuningContext): {
         ? diagnosticGroupsMarkdown(issues)
         : ["_No collection issues were reported._"]),
     ].join("\n"),
-    information: information.length > 0
-      ? [
-          "## 10. Additional information",
-          "",
-          "_The items below describe access-pattern/collection characteristics. On their own, they don't indicate a confirmed performance problem — see each item's technical details._",
-          "",
-          ...diagnosticGroupsMarkdown(information),
-        ].join("\n")
-      : [
-          "## 10. Additional information",
-          "",
-          "_No additional access-pattern or collection information was reported._",
-        ].join("\n"),
+    information:
+      information.length > 0
+        ? [
+            "## 10. Additional information",
+            "",
+            "_The items below describe access-pattern/collection characteristics. On their own, they don't indicate a confirmed performance problem — see each item's technical details._",
+            "",
+            ...diagnosticGroupsMarkdown(information),
+          ].join("\n")
+        : [
+            "## 10. Additional information",
+            "",
+            "_No additional access-pattern or collection information was reported._",
+          ].join("\n"),
   };
 }
 
@@ -300,7 +323,7 @@ export function buildAccessPatternMarkdown(context: DynamoDbPerformanceTuningCon
   if (accessPattern.confidence === "unknown") {
     lines.push(
       "_This statement's access path could not be safely classified. Treat the read cost as unknown._",
-      "",
+      ""
     );
   }
   lines.push("| Field | Value |", "|---|---|");
@@ -315,30 +338,35 @@ export function buildAccessPatternMarkdown(context: DynamoDbPerformanceTuningCon
               : " (no condition)"
           }`
         : "-"
-    } |`,
+    } |`
   );
   if (accessPattern.sortKey) {
     lines.push(
       `| Sort key | ${accessPattern.sortKey.attributeName}${
-        accessPattern.sortKey.conditionPresent ? ` ${accessPattern.sortKey.operator ?? ""}` : " (no condition)"
-      } |`,
+        accessPattern.sortKey.conditionPresent
+          ? ` ${accessPattern.sortKey.operator ?? ""}`
+          : " (no condition)"
+      } |`
     );
   }
   lines.push(
     `| Post-read filter | ${
       accessPattern.postReadFilter.present
-        ? escapeMdCell(accessPattern.postReadFilter.attributes.join(", ") || "present (attributes not resolved)")
+        ? escapeMdCell(
+            accessPattern.postReadFilter.attributes.join(", ") ||
+              "present (attributes not resolved)"
+          )
         : "None"
-    } |`,
+    } |`
   );
   lines.push(
     `| Projection | ${
       accessPattern.projection.mode === "allAttributes" || accessPattern.projection.allAttributes
         ? "All table attributes"
         : accessPattern.projection.mode === "allProjectedAttributes"
-          ? "All projected index attributes"
-          : escapeMdCell(accessPattern.projection.attributes.join(", ") || "Specific (not resolved)")
-    } |`,
+        ? "All projected index attributes"
+        : escapeMdCell(accessPattern.projection.attributes.join(", ") || "Specific (not resolved)")
+    } |`
   );
   lines.push(`| Consistency | ${accessPattern.consistentRead} |`);
   if (accessPattern.limit !== undefined) {
@@ -358,10 +386,12 @@ export function buildTableDefinitionMarkdown(context: DynamoDbPerformanceTuningC
   const lines = ["## 8. Table and index information", "", "| Field | Value |", "|---|---|"];
   lines.push(`| Billing mode | ${table.billingMode} |`);
   lines.push(
-    `| Partition key | ${table.keySchema.partitionKey.attributeName} (${table.keySchema.partitionKey.attributeType}) |`,
+    `| Partition key | ${table.keySchema.partitionKey.attributeName} (${table.keySchema.partitionKey.attributeType}) |`
   );
   if (table.keySchema.sortKey) {
-    lines.push(`| Sort key | ${table.keySchema.sortKey.attributeName} (${table.keySchema.sortKey.attributeType}) |`);
+    lines.push(
+      `| Sort key | ${table.keySchema.sortKey.attributeName} (${table.keySchema.sortKey.attributeType}) |`
+    );
   }
   if (table.itemCount) {
     lines.push(`| Item count | ${formatNumber(table.itemCount.value)} (approximate) |`);
@@ -370,7 +400,11 @@ export function buildTableDefinitionMarkdown(context: DynamoDbPerformanceTuningC
     lines.push(`| Table size | ${formatNumber(table.tableSizeBytes.value)} bytes (approximate) |`);
   }
   if (table.ttl) {
-    lines.push(`| TTL | ${table.ttl.status}${table.ttl.attributeName ? ` (${table.ttl.attributeName})` : ""} |`);
+    lines.push(
+      `| TTL | ${table.ttl.status}${
+        table.ttl.attributeName ? ` (${table.ttl.attributeName})` : ""
+      } |`
+    );
   }
 
   const allIndexes = [...table.localSecondaryIndexes, ...table.globalSecondaryIndexes];
@@ -380,11 +414,17 @@ export function buildTableDefinitionMarkdown(context: DynamoDbPerformanceTuningC
       "### 8.1. Indexes",
       "",
       "| Name | Type | Partition key | Sort key | Projection |",
-      "|---|---|---|---|---|",
+      "|---|---|---|---|---|"
     );
     allIndexes.forEach((idx) => {
       lines.push(
-        `| ${escapeMdCell(idx.indexName)} | ${idx.indexType} | ${idx.keySchema.partitionKey.attributeName} | ${idx.keySchema.sortKey?.attributeName ?? "-"} | ${idx.projection.projectionType}${idx.projection.nonKeyAttributes && idx.projection.nonKeyAttributes.length > 0 ? ` (${escapeMdCell(idx.projection.nonKeyAttributes.join(", "))})` : ""} |`,
+        `| ${escapeMdCell(idx.indexName)} | ${idx.indexType} | ${
+          idx.keySchema.partitionKey.attributeName
+        } | ${idx.keySchema.sortKey?.attributeName ?? "-"} | ${idx.projection.projectionType}${
+          idx.projection.nonKeyAttributes && idx.projection.nonKeyAttributes.length > 0
+            ? ` (${escapeMdCell(idx.projection.nonKeyAttributes.join(", "))})`
+            : ""
+        } |`
       );
     });
   }
@@ -393,8 +433,8 @@ export function buildTableDefinitionMarkdown(context: DynamoDbPerformanceTuningC
     lines.push(
       "",
       `_Contributor Insights: ${escapeMdCell(
-        table.contributorInsights.map((ci) => `${ci.indexName ?? "table"}: ${ci.status}`).join(", "),
-      )}_`,
+        table.contributorInsights.map((ci) => `${ci.indexName ?? "table"}: ${ci.status}`).join(", ")
+      )}_`
     );
   }
   return lines.join("\n");
@@ -408,7 +448,11 @@ export function buildObservedRequestMarkdown(context: DynamoDbPerformanceTuningC
   } else {
     lines.push("| Field | Value |", "|---|---|");
     lines.push(
-      `| Result coverage | ${observation.completeness === "complete" && !observation.bounded ? "✅ **COMPLETE** — the read reached the end of the result" : "⚠️ **INCOMPLETE** — the full result was not observed"} |`,
+      `| Result coverage | ${
+        observation.completeness === "complete" && !observation.bounded
+          ? "✅ **COMPLETE** — the read reached the end of the result"
+          : "⚠️ **INCOMPLETE** — the full result was not observed"
+      } |`
     );
     lines.push(`| Source | ${observation.source} |`);
     if (observation.observedAt) {
@@ -427,19 +471,26 @@ export function buildObservedRequestMarkdown(context: DynamoDbPerformanceTuningC
     if (observation.clientElapsedTimeMs !== undefined) {
       lines.push(`| Client elapsed time | ${formatNumber(observation.clientElapsedTimeMs)} ms |`);
     }
-    lines.push(`| Request / retry count | ${observation.requestCount ?? "-"} / ${observation.retryCount ?? "-"} |`);
+    lines.push(
+      `| Request / retry count | ${observation.requestCount ?? "-"} / ${
+        observation.retryCount ?? "-"
+      } |`
+    );
     if (observation.bounded) {
       lines.push(
         "",
-        `_${observation.boundDescription ?? "This observation is bounded and may not reflect the statement's full result."}_`,
+        `_${
+          observation.boundDescription ??
+          "This observation is bounded and may not reflect the statement's full result."
+        }_`
       );
     }
   }
   if (context.benchmark) {
     const benchmark = context.benchmark;
     const benchmarkStates = [...new Set(benchmark.samples.map((sample) => sample.completeness))];
-    const benchmarkCompleteness = benchmark.completeness ??
-      (benchmarkStates.length === 1 ? benchmarkStates[0] : "mixed");
+    const benchmarkCompleteness =
+      benchmark.completeness ?? (benchmarkStates.length === 1 ? benchmarkStates[0] : "mixed");
     const benchmarkComplete = benchmarkCompleteness === "complete";
     lines.push(
       "",
@@ -451,28 +502,44 @@ export function buildObservedRequestMarkdown(context: DynamoDbPerformanceTuningC
       "",
       "| Item | Value |",
       "|---|---|",
-      `| Result coverage | ${benchmarkComplete ? "✅ **COMPLETE** — every run reached the end of the result" : `⚠️ **INCOMPLETE** — ${benchmark.boundDescription ?? `benchmark coverage was ${benchmarkCompleteness}`}`} |`,
+      `| Result coverage | ${
+        benchmarkComplete
+          ? "✅ **COMPLETE** — every run reached the end of the result"
+          : `⚠️ **INCOMPLETE** — ${
+              benchmark.boundDescription ?? `benchmark coverage was ${benchmarkCompleteness}`
+            }`
+      } |`,
       `| Started at | ${formatUtcWithLocal(benchmark.startedAt)} |`,
       `| Completed at | ${formatUtcWithLocal(benchmark.completedAt)} |`,
       `| Runs | ${benchmark.completedRuns} / ${benchmark.requestedRuns} completed |`,
       `| Median | ${formatNumber(benchmark.medianClientElapsedTimeMs)} ms |`,
       `| Average | ${formatNumber(benchmark.averageClientElapsedTimeMs)} ms |`,
-      `| Min / Max | ${formatNumber(benchmark.minClientElapsedTimeMs)} / ${formatNumber(benchmark.maxClientElapsedTimeMs)} ms |`,
+      `| Min / Max | ${formatNumber(benchmark.minClientElapsedTimeMs)} / ${formatNumber(
+        benchmark.maxClientElapsedTimeMs
+      )} ms |`,
       "",
       "| Run | Client elapsed | Returned / evaluated | Consumed read capacity |",
       "|---|---|---|---|",
       ...benchmark.samples.map(
         (sample) =>
-          `| ${sample.run} | ${formatNumber(sample.clientElapsedTimeMs)} ms | ${formatNumber(sample.returnedItemCount)} / ${formatNumber(sample.evaluatedItemCount)} | ${sample.consumedCapacity ? formatCapacity(sample.consumedCapacity) : "-"} |`,
+          `| ${sample.run} | ${formatNumber(sample.clientElapsedTimeMs)} ms | ${formatNumber(
+            sample.returnedItemCount
+          )} / ${formatNumber(sample.evaluatedItemCount)} | ${
+            sample.consumedCapacity ? formatCapacity(sample.consumedCapacity) : "-"
+          } |`
       ),
-      "",
+      ""
     );
   }
   return lines.join("\n");
 }
 
-function seriesScopeLabel(series: NonNullable<DynamoDbPerformanceTuningContext["cloudWatch"]>["series"][number]): string {
-  return `${series.scope}${series.indexName ? ` (${series.indexName})` : ""}${series.operation ? ` / ${series.operation}` : ""}`;
+function seriesScopeLabel(
+  series: NonNullable<DynamoDbPerformanceTuningContext["cloudWatch"]>["series"][number]
+): string {
+  return `${series.scope}${series.indexName ? ` (${series.indexName})` : ""}${
+    series.operation ? ` / ${series.operation}` : ""
+  }`;
 }
 
 export function buildCloudWatchMarkdown(context: DynamoDbPerformanceTuningContext): string {
@@ -483,8 +550,12 @@ export function buildCloudWatchMarkdown(context: DynamoDbPerformanceTuningContex
     return lines.join("\n");
   }
   lines.push(
-    `Window: ${formatUtcWithLocal(cw.window.startTime)} – ${formatUtcWithLocal(cw.window.endTime)} (period ${cw.window.periodSeconds}s). Table/index/operation-level activity over that window, not only this statement.`,
-    "",
+    `Window: ${formatUtcWithLocal(cw.window.startTime)} – ${formatUtcWithLocal(
+      cw.window.endTime
+    )} (period ${
+      cw.window.periodSeconds
+    }s). Table/index/operation-level activity over that window, not only this statement.`,
+    ""
   );
   if (cw.series.length === 0) {
     lines.push("_No CloudWatch series were collected._");
@@ -494,19 +565,21 @@ export function buildCloudWatchMarkdown(context: DynamoDbPerformanceTuningContex
   cw.series.forEach((s) => {
     const scope = escapeMdCell(seriesScopeLabel(s));
     if (s.noData) {
-      lines.push(`| ${escapeMdCell(s.metricName)} | ${scope} | ${s.statistic} | no data | no data |`);
+      lines.push(
+        `| ${escapeMdCell(s.metricName)} | ${scope} | ${s.statistic} | no data | no data |`
+      );
       return;
     }
     const latest = s.values.length > 0 ? s.values[s.values.length - 1] : "-";
     const max = s.values.length > 0 ? Math.max(...s.values) : "-";
-    lines.push(`| ${escapeMdCell(s.metricName)} | ${scope} | ${s.statistic} | ${latest} | ${max} |`);
+    lines.push(
+      `| ${escapeMdCell(s.metricName)} | ${scope} | ${s.statistic} | ${latest} | ${max} |`
+    );
   });
   return lines.join("\n");
 }
 
-// "Appendix: Raw metrics" (§13 item 9) - the full per-datapoint series
-// behind the summarized (latest/max only) table above, kept as its own,
-// separate, later cell so the main CloudWatch section stays short.
+// Keep full datapoints in an appendix while the main CloudWatch section stays concise.
 function buildRawMetricsAppendixMarkdown(context: DynamoDbPerformanceTuningContext): string {
   const cw = context.cloudWatch;
   if (!cw || cw.series.length === 0) {
@@ -516,10 +589,20 @@ function buildRawMetricsAppendixMarkdown(context: DynamoDbPerformanceTuningConte
       "_No raw CloudWatch datapoints were collected._",
     ].join("\n");
   }
-  const lines = ["## Appendix A. Raw CloudWatch metrics", "", "_Full CloudWatch datapoints behind the summarized table above._", ""];
+  const lines = [
+    "## Appendix A. Raw CloudWatch metrics",
+    "",
+    "_Full CloudWatch datapoints behind the summarized table above._",
+    "",
+  ];
   let subsection = 1;
   cw.series.forEach((s) => {
-    lines.push(`### A.${subsection++}. ${escapeMdCell(s.metricName)} (${s.statistic}) - ${escapeMdCell(seriesScopeLabel(s))}`, "");
+    lines.push(
+      `### A.${subsection++}. ${escapeMdCell(s.metricName)} (${s.statistic}) - ${escapeMdCell(
+        seriesScopeLabel(s)
+      )}`,
+      ""
+    );
     if (s.noData || s.timestamps.length === 0) {
       lines.push("_No datapoints for this window._", "");
       return;
@@ -534,7 +617,7 @@ function buildRawMetricsAppendixMarkdown(context: DynamoDbPerformanceTuningConte
 function buildAiRequestMessagesJson(
   context: DynamoDbPerformanceTuningContext,
   analysis: PerformanceTuningAiAnalysisResult,
-  comparisonInput: ComparisonAiInput | undefined,
+  comparisonInput: ComparisonAiInput | undefined
 ): string {
   const request = analysis.request;
   const prompt = buildDynamoDbAiAnalysisPrompt(context, {
@@ -555,14 +638,14 @@ function buildAiRequestMessagesJson(
       ],
     },
     null,
-    2,
+    2
   );
 }
 
-/** Pure cell-construction step (§13) - kept separate from the write/open I/O below for unit testing. */
+/** Builds the complete DynamoDB report without performing file I/O. */
 export function buildDynamoDbAiAnalysisNotebookCells(
   context: DynamoDbPerformanceTuningContext,
-  input: PerformanceTuningReportInput,
+  input: PerformanceTuningReportInput
 ): NotebookCellData[] {
   const { analysis, comparison } = input;
   const reportKind = getPerformanceTuningReportKind(input);
@@ -595,12 +678,12 @@ export function buildDynamoDbAiAnalysisNotebookCells(
         reportKind === "comparison"
           ? "DynamoDB Performance Tuning Comparison Report"
           : reportKind === "analysis"
-            ? "DynamoDB Performance Tuning AI Analysis"
-            : "DynamoDB Performance Tuning Evidence Report",
+          ? "DynamoDB Performance Tuning AI Analysis"
+          : "DynamoDB Performance Tuning Evidence Report",
         tocEntries,
-        context.collection.status,
+        context.collection.status
       ),
-      { excludeFromHtml: true },
+      { excludeFromHtml: true }
     ),
     markupCell(buildOverviewMarkdown(context, analysis)),
     markupCell(buildTargetRequestMarkdown(context)),
@@ -609,10 +692,12 @@ export function buildDynamoDbAiAnalysisNotebookCells(
       [
         "## 4. Summary and recommendations",
         "",
-        buildDynamoDbPerformanceSnapshotMarkdown(buildDynamoDbPerformanceTuningHumanSummary(context)),
+        buildDynamoDbPerformanceSnapshotMarkdown(
+          buildDynamoDbPerformanceTuningHumanSummary(context)
+        ),
         "",
         buildAnalysisMarkdown(analysis),
-      ].join("\n"),
+      ].join("\n")
     ),
     markupCell(buildQueryFlowMarkdown(context)),
     markupCell(buildAccessPatternMarkdown(context)),
@@ -626,8 +711,8 @@ export function buildDynamoDbAiAnalysisNotebookCells(
             buildComparisonMarkdown(
               comparison.evidence,
               comparison.evidence.source.baseline.fileName,
-              { section: "11" },
-            ),
+              { section: "11" }
+            )
           ),
         ]
       : []),
@@ -638,7 +723,7 @@ export function buildDynamoDbAiAnalysisNotebookCells(
       ? [
           jsonCodeCell(
             buildAiRequestMessagesJson(context, analysis, input.analysisComparisonInput),
-            "AI request messages",
+            "AI request messages"
           ),
           jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON"),
         ]
@@ -649,10 +734,9 @@ export function buildDynamoDbAiAnalysisNotebookCells(
           jsonCodeCell(JSON.stringify(comparison.evidence, null, 2), "Comparison Evidence JSON"),
           jsonCodeCell(
             JSON.stringify(comparison.baselineContext, null, 2),
-            "Baseline Full context JSON",
+            "Baseline Full context JSON"
           ),
-          // Duplicates the unprefixed cell above on purpose - see the RDB
-          // builder's own comment on this pair (§6.2, §14).
+          // Keep both labels for compatibility and future baseline selection.
           jsonCodeCell(JSON.stringify(context, null, 2), "Current Full context JSON"),
         ]
       : []),
@@ -660,60 +744,26 @@ export function buildDynamoDbAiAnalysisNotebookCells(
   return cells;
 }
 
-const REPORTS_SUBPATH = ["reports", "performance-tuning"] as const;
-
-/**
- * Writes and opens a new Notebook under `<workspace root>/reports/performance-tuning/`
- * (auto-created if missing), containing the DynamoDB context and optional AI
- * analysis/comparison cells above (§13). Never appends to an existing Notebook and never
- * prompts a save dialog - same product decision as the RDB version (§16.1).
- * Re-validates the context immediately before writing
- * (validateDynamoDbPerformanceTuningContext()) as a last defense-in-depth
- * check that no Item/bind/LastEvaluatedKey data has somehow made it into
- * what's about to be saved (§13's own closing sentence) - this never
- * happens by construction elsewhere in the collection pipeline, so a
- * violation here indicates a bug upstream, not a normal user-facing error
- * path, but this still fails closed rather than saving anyway.
- */
+/** Validates, writes, and opens a DynamoDB performance report. */
 export async function saveDynamoDbAiAnalysisAsNotebook(
   context: DynamoDbPerformanceTuningContext,
-  input: PerformanceTuningReportInput,
-): Promise<SaveAiAnalysisAsNotebookResult> {
+  input: PerformanceTuningReportInput
+): Promise<SavePerformanceTuningNotebookResult> {
   const violations = validateDynamoDbPerformanceTuningContext(context);
   if (violations.length > 0) {
     return {
       ok: false,
-      message: `Refusing to save: the collected context failed validation (${violations.join("; ")}).`,
+      message: `Refusing to save: the collected context failed validation (${violations.join(
+        "; "
+      )}).`,
     };
   }
-  const wsFolder = workspace.workspaceFolders?.[0];
-  if (!wsFolder) {
-    return {
-      ok: false,
-      message:
-        "No workspace folder is open, so the performance tuning report cannot be saved. Open a workspace folder and try again.",
-    };
-  }
-
-  const dirUri = Uri.joinPath(wsFolder.uri, ...REPORTS_SUBPATH);
-  let filename = buildPerformanceTuningNotebookFilename(
+  const filename = buildPerformanceTuningNotebookFilename(
     context.service.tableName,
-    getPerformanceTuningReportKind(input),
+    getPerformanceTuningReportKind(input)
   );
-  let targetUri = Uri.joinPath(dirUri, filename);
-
-  await createDirectory(dirUri);
-  // Timestamp resolution is seconds, so a collision is extremely unlikely -
-  // guarded anyway so a same-second double-click never silently clobbers a
-  // prior save.
-  if (await existsUri(targetUri)) {
-    filename = filename.replace(/\.dbn$/, `-${Date.now()}.dbn`);
-    targetUri = Uri.joinPath(dirUri, filename);
-  }
-
-  const cells = buildDynamoDbAiAnalysisNotebookCells(context, input);
-  await writeNotebookFile(cells, targetUri);
-  await openNotebookFile(targetUri, { viewColumn: ViewColumn.Two });
-
-  return { ok: true, relativePath: [...REPORTS_SUBPATH, filename].join("/"), uri: targetUri };
+  return savePerformanceTuningNotebookFile({
+    filename,
+    cells: buildDynamoDbAiAnalysisNotebookCells(context, input),
+  });
 }

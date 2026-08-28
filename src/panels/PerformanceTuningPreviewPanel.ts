@@ -48,7 +48,10 @@ import {
   type ComparisonAiInput,
 } from "../utilities/performanceTuningComparisonAiInput";
 import { buildDynamoDbAccessPatternViewModel } from "../utilities/dynamoDbPerformanceTuningAccessPatternFormatter";
-import { buildDynamoDbAiAnalysisPrompt, buildDynamoDbPlainTextAnalysisPrompt } from "../utilities/dynamoDbPerformanceTuningAiPrompt";
+import {
+  buildDynamoDbAiAnalysisPrompt,
+  buildDynamoDbPlainTextAnalysisPrompt,
+} from "../utilities/dynamoDbPerformanceTuningAiPrompt";
 import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "../utilities/dynamoDbPerformanceTuningDiagnosticFormatter";
 import { buildDynamoDbPerformanceTuningHumanSummary } from "../utilities/dynamoDbPerformanceTuningHumanSummary";
 import { saveDynamoDbAiAnalysisAsNotebook } from "../utilities/dynamoDbPerformanceTuningNotebook";
@@ -67,7 +70,10 @@ import {
   saveAiAnalysisAsNotebook,
   type PerformanceTuningReportInput,
 } from "../utilities/performanceTuningAiNotebook";
-import { buildAiAnalysisPrompt, buildPlainTextAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
+import {
+  buildAiAnalysisPrompt,
+  buildPlainTextAnalysisPrompt,
+} from "../utilities/performanceTuningAiPrompt";
 import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
 import { findPossibleDuplicateIndex } from "../utilities/performanceTuningIndexDuplication";
 import { buildPerformanceTuningHumanSummary } from "../utilities/performanceTuningHumanSummary";
@@ -89,21 +95,10 @@ import type { PerformanceTuningPreviewRequest } from "../utilities/performanceTu
 import type { DynamoDbPerformanceTuningPreviewRequest } from "../utilities/dynamoDbPerformanceTuningPreview";
 import { BasePanel } from "./BasePanel";
 
-// countTokens() is model-specific, but message framing added by the provider
-// is not always visible in that count. Keep a small buffer so a request that
-// is mathematically at the advertised boundary does not still fail at send.
+// Reserve a small buffer for provider message framing not reflected by countTokens().
 const AI_INPUT_TOKEN_SAFETY_MARGIN = 128;
 
-// What one successful rung of the shrink ladder produced: the messages to
-// send, whether the Current context was compacted, and the Comparison Input
-// that actually travelled (undefined when no baseline is selected). The last
-// field is what the saved analysis's request metadata records (§13.1).
-//
-// `baseline` pins the selection this request was built against. Nothing stops
-// the user from picking a different baseline while the model is still
-// streaming - the baseline buttons stay enabled and renderGeneration does not
-// change - so reading `this.baseline` when the response lands would record
-// (and mark fresh) a baseline the model never saw.
+// Captures the exact request, context detail, and baseline sent to the model.
 type PreparedAiRequest = {
   messages: LanguageModelChatMessage[];
   compact: boolean;
@@ -112,8 +107,6 @@ type PreparedAiRequest = {
   safetyMargin: number;
   comparison?: ComparisonAiInput;
   baseline?: PerformanceTuningBaselineSelection;
-  // The evidence the Comparison Input above was projected from, pinned for
-  // the same reason.
   evidence?: PerformanceTuningComparisonEvidence;
 };
 
@@ -122,54 +115,33 @@ class AiInputLimitError extends Error {
     message: string,
     readonly tokenUsage?: PerformanceTuningAiTokenUsage,
     readonly contextDetail?: "full" | "compact",
-    readonly comparisonDetail?: ComparisonAiInputDetail,
+    readonly comparisonDetail?: ComparisonAiInputDetail
   ) {
     super(message);
     this.name = "AiInputLimitError";
   }
 }
 
-/**
- * The comparison an AI result was actually produced against, captured when
- * the request was built. A saved report uses this rather than whatever is
- * selected at save time: the "AI request messages" cell claims to be the
- * exact prompt that was sent, so rebuilding it from a newer comparison would
- * make that claim false (§14).
- */
+/** Comparison state captured with the exact AI request that used it. */
 type AnalysisComparisonSnapshot = {
   evidence: PerformanceTuningComparisonEvidence;
   baselineContext: AnyPerformanceTuningContext;
   aiInput: ComparisonAiInput;
 };
 
-// Host-side state and orchestration for the Preview and AI analysis. Build
-// user-facing diagnostic groups here so rendering stays simple and testable.
-// One panel class, shared by both engines (design doc §11.3's "共通 shell") -
-// see renderSub()'s isDynamoDbPerformanceTuningContext() branch for where
-// the two diverge.
+// Host-side orchestration shared by relational and DynamoDB previews.
 export class PerformanceTuningPreviewPanel extends BasePanel {
   public static currentPanel: PerformanceTuningPreviewPanel | undefined;
 
-  /**
-   * One rung of the shrink ladder: which Current-context projection and
-   * which Comparison Input projection this attempt used. Recorded on the
-   * saved analysis so a reader can tell exactly what the model was shown
-   * (§13.1's "無言で切り捨てない").
-   */
+  /** Builds one documented context/comparison projection for an AI request. */
   private comparisonAttempt(
     detail: ComparisonAiInputDetail,
-    evidence: PerformanceTuningComparisonEvidence | undefined = this.comparison.evidence,
+    evidence: PerformanceTuningComparisonEvidence | undefined = this.comparison.evidence
   ): ComparisonAiInput | undefined {
     return evidence ? buildComparisonAiInput(evidence, detail) : undefined;
   }
 
-  /**
-   * The order §13.1 prescribes for fitting a request into a model's input
-   * window: switch the Current context to its compact projection first, then
-   * drop the comparison's raw diff hunks (never the two query bodies), then
-   * drop its collection differences and comparable-level notes. Without a
-   * baseline this collapses to the original full/compact pair.
-   */
+  /** Orders request projections from full evidence to the smallest safe form. */
   private rdbAttemptLadder(hasComparison: boolean = Boolean(this.comparison.evidence)): Array<{
     contextDetail: "full" | "compact";
     comparisonDetail: ComparisonAiInputDetail;
@@ -194,7 +166,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     translateResponse: boolean,
     token: CancellationTokenSource["token"],
     baseline: PerformanceTuningBaselineSelection | undefined,
-    evidence: PerformanceTuningComparisonEvidence | undefined,
+    evidence: PerformanceTuningComparisonEvidence | undefined
   ): Promise<PreparedAiRequest> {
     const maximum = model.maxInputTokens;
     if (!Number.isFinite(maximum) || maximum <= AI_INPUT_TOKEN_SAFETY_MARGIN) {
@@ -202,7 +174,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     }
 
     let smallest:
-      | { inputTokens: number; contextDetail: "full" | "compact"; comparisonDetail: ComparisonAiInputDetail }
+      | {
+          inputTokens: number;
+          contextDetail: "full" | "compact";
+          comparisonDetail: ComparisonAiInputDetail;
+        }
       | undefined;
     for (const { contextDetail, comparisonDetail } of this.rdbAttemptLadder(Boolean(evidence))) {
       const comparison = this.comparisonAttempt(comparisonDetail, evidence);
@@ -217,10 +193,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         LanguageModelChatMessage.User(prompt.user),
       ];
       const inputTokens = (
-        await Promise.all(messages.map((message) => model.countTokens(message, token)))).reduce(
-        (total, count) => total + count,
-        0,
-      );
+        await Promise.all(messages.map((message) => model.countTokens(message, token)))
+      ).reduce((total, count) => total + count, 0);
       if (inputTokens + AI_INPUT_TOKEN_SAFETY_MARGIN <= maximum) {
         return {
           messages,
@@ -240,8 +214,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
     throw new AiInputLimitError(
       evidence
-        ? `The selected model accepts at most ${maximum} input tokens, but even the smallest context and comparison require ${smallest?.inputTokens ?? "more"} tokens. Clear the baseline, or choose a model with a larger input window.`
-        : `The selected model accepts at most ${maximum} input tokens, but even the compact performance context requires ${smallest?.inputTokens ?? "more"} tokens.`,
+        ? `The selected model accepts at most ${maximum} input tokens, but even the smallest context and comparison require ${
+            smallest?.inputTokens ?? "more"
+          } tokens. Clear the baseline, or choose a model with a larger input window.`
+        : `The selected model accepts at most ${maximum} input tokens, but even the compact performance context requires ${
+            smallest?.inputTokens ?? "more"
+          } tokens.`,
       smallest
         ? {
             inputTokens: smallest.inputTokens,
@@ -250,7 +228,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           }
         : undefined,
       smallest?.contextDetail,
-      smallest?.comparisonDetail,
+      smallest?.comparisonDetail
     );
   }
 
@@ -265,7 +243,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     translateResponse: boolean,
     token: CancellationTokenSource["token"],
     baseline: PerformanceTuningBaselineSelection | undefined,
-    evidence: PerformanceTuningComparisonEvidence | undefined,
+    evidence: PerformanceTuningComparisonEvidence | undefined
   ): Promise<PreparedAiRequest> {
     const maximum = model.maxInputTokens;
     if (!Number.isFinite(maximum) || maximum <= AI_INPUT_TOKEN_SAFETY_MARGIN) {
@@ -291,7 +269,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           { contextDetail: "compact", comparisonDetail: "full" },
         ];
     let smallest:
-      | { inputTokens: number; contextDetail: "full" | "compact"; comparisonDetail: ComparisonAiInputDetail }
+      | {
+          inputTokens: number;
+          contextDetail: "full" | "compact";
+          comparisonDetail: ComparisonAiInputDetail;
+        }
       | undefined;
     for (const { contextDetail, comparisonDetail } of ladder) {
       const comparison = this.comparisonAttempt(comparisonDetail, evidence);
@@ -306,10 +288,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         LanguageModelChatMessage.User(prompt.user),
       ];
       const inputTokens = (
-        await Promise.all(messages.map((message) => model.countTokens(message, token)))).reduce(
-        (total, count) => total + count,
-        0,
-      );
+        await Promise.all(messages.map((message) => model.countTokens(message, token)))
+      ).reduce((total, count) => total + count, 0);
       if (inputTokens + AI_INPUT_TOKEN_SAFETY_MARGIN <= maximum) {
         return {
           messages,
@@ -329,8 +309,12 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
     throw new AiInputLimitError(
       evidence
-        ? `The selected model accepts at most ${maximum} input tokens, but the smallest DynamoDB context and comparison still require ${smallest?.inputTokens ?? "more"} tokens. Clear the baseline, or choose a model with a larger input window.`
-        : `The selected model accepts at most ${maximum} input tokens, but even the compact DynamoDB performance context requires ${smallest?.inputTokens ?? "more"} tokens.`,
+        ? `The selected model accepts at most ${maximum} input tokens, but the smallest DynamoDB context and comparison still require ${
+            smallest?.inputTokens ?? "more"
+          } tokens. Clear the baseline, or choose a model with a larger input window.`
+        : `The selected model accepts at most ${maximum} input tokens, but even the compact DynamoDB performance context requires ${
+            smallest?.inputTokens ?? "more"
+          } tokens.`,
       smallest
         ? {
             inputTokens: smallest.inputTokens,
@@ -339,65 +323,31 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           }
         : undefined,
       smallest?.contextDetail,
-      smallest?.comparisonDetail,
+      smallest?.comparisonDetail
     );
   }
 
-  // The singleton panel can be re-render()ed with a new context before a
-  // prior renderSub() call's async syntax highlighting finishes (e.g. Query
-  // Statistics' 9b lets a user trigger back-to-back previews from different
-  // rows). Guards against the slower, older call posting its result after
-  // the newer one already has (§10 Phase 5 "PerformanceTuningPreviewPanel...
-  // にもrenderGenerationを持たせる"). Also reused as the AI analysis
-  // generation guard below - a fresh renderSub() (new context) invalidates
-  // any AI analysis that was still running against the previous one.
+  // Prevents asynchronous rendering or analysis from overwriting a newer context.
   private renderGeneration = 0;
 
-  // The context most recently rendered, and the most recent successful AI
-  // analysis of it (if any) - held as instance state because
-  // analyzePerformanceTuningWithAi/saveAiAnalysisAsNotebook carry no params
-  // (design doc §12): the webview never re-sends data the extension host
-  // already has. Union of both engines (2026-08-24 follow-up, DynamoDB
-  // support) - see isDynamoDbPerformanceTuningContext() for how methods below
-  // narrow it.
+  // The webview sends commands only; context and analysis remain host-side.
   private context: AnyPerformanceTuningContext | undefined;
   private lastAnalysis: PerformanceTuningAiAnalysisResult | undefined;
   private analysisCancellationSource: CancellationTokenSource | undefined;
-  // A provider may advertise a model through selectChatModels() and reject
-  // it only when sendRequest() reaches the backend. Quarantine that model for
-  // this Preview panel's lifetime; closing the panel creates a fresh instance
-  // and therefore retries against a newly queried provider list.
+  // Avoid retrying a model that the provider rejected during this panel session.
   private readonly unavailableLanguageModelIds = new Set<string>();
 
-  // Baseline comparison (§6, §12). The selection holds its own immutable
-  // Context snapshot, so nothing here ever re-reads the .dbn - a comparison
-  // already on screen stays reproducible even if that file is later moved or
-  // edited (§6.3). `comparison` is derived state, always rebuilt from
-  // `baseline` + `this.context` rather than cached across a re-collection.
-  // Both survive a renderSub() (an EXPLAIN ANALYZE / Observed Read re-run of
-  // the same preview) and are cleared by render()/renderDynamoDb() (a
-  // genuinely new preview, whose baseline may not even be the same engine).
+  // Baselines are immutable snapshots; comparison is always derived from baseline + context.
   private baseline: PerformanceTuningBaselineSelection | undefined;
   // Pinned at request-build time; see AnalysisComparisonSnapshot.
   private lastAnalysisComparison: AnalysisComparisonSnapshot | undefined;
   private comparison: PerformanceTuningComparisonViewState = { status: "idle" };
-  // The directory the last baseline was picked from, so the next dialog opens
-  // there. Panel-scoped on purpose: §6.1 allows remembering a directory but
-  // not persisting a baseline's absolute path into global settings.
+  // Remember the last folder for this panel without persisting an absolute path.
   private lastBaselineDirectory: Uri | undefined;
-  // The baseline the AI analysis currently on screen was produced under.
-  // Compared against the live selection to decide `analysisStale` - the
-  // Preview must never present an older analysis as commentary on a newer
-  // comparison (§12).
+  // Identifies analyses made stale by a later baseline change.
   private analysisBaselineSha256: string | undefined;
 
-  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - the original RDB request
-  // (everything getPerformanceTuningContext() needs besides plan.mode
-  // itself) and this connection's static capability to even do it at all,
-  // both set once by render() and reused by runActualPlan() below so the
-  // webview never needs to send either back. Not reset by renderSub() (the
-  // analyze-mode re-run's own render path) since both stay constant across
-  // the estimate/analyze pair for the same preview.
+  // Original requests stay host-side for confirmed reruns.
   private request: PerformanceTuningPreviewRequest | undefined;
   private analyzedExecutionPlan: CapabilityStatus = { available: false };
   // "Run Observed Read" - the DynamoDB counterpart of the two fields above,
@@ -473,8 +423,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     panel.renderSub(context);
   }
 
-  // DynamoDB counterpart of render() (design doc §11.3's shared shell -
-  // startDynamoDbPerformanceTuningPreview()'s own entry point).
+  // DynamoDB entry point for the shared preview shell.
   public static renderDynamoDb(
     extensionUri: Uri,
     context: DynamoDbPerformanceTuningContext,
@@ -497,25 +446,16 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   private async renderSub(context: AnyPerformanceTuningContext): Promise<void> {
     const myGeneration = ++this.renderGeneration;
 
-    // A new context invalidates any AI analysis in flight or already shown
-    // for the previous one - cancel the in-flight request (if any) and
-    // clear the stale result so a stray "Save as Notebook" can't save
-    // analysis text for a statement no longer on screen.
+    // Cancel work tied to the previous context before replacing it.
     this.analysisCancellationSource?.cancel();
     this.analysisCancellationSource = undefined;
-    // A new context (a fresh preview, or this same preview's own re-run
-    // replacing itself) invalidates a still-running EXPLAIN ANALYZE/Run
-    // Observed Read the same way - never let a stale one's result land after
-    // this one.
     this.secondaryExecutionController?.abort();
     this.secondaryExecutionController = undefined;
     this.context = context;
     this.lastAnalysis = undefined;
     this.lastAnalysisComparison = undefined;
     this.analysisBaselineSha256 = undefined;
-    // A re-run (EXPLAIN ANALYZE / Observed Read) replaces the Current side of
-    // an existing comparison, so the evidence has to be rebuilt against the
-    // new numbers rather than kept (§16 Phase 2).
+    // Rebuild comparison evidence because a rerun replaces the current side.
     this.rebuildComparison();
 
     if (isDynamoDbPerformanceTuningContext(context)) {
@@ -525,20 +465,14 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     await this.renderRelationalSub(context, myGeneration);
   }
 
-  private async renderRelationalSub(context: PerformanceTuningContext, myGeneration: number): Promise<void> {
-    // Computed here (not in the webview) so the number shown always matches
-    // what RDSBaseDriver.enforcePayloadBudget() itself measured the result
-    // against.
+  private async renderRelationalSub(
+    context: PerformanceTuningContext,
+    myGeneration: number
+  ): Promise<void> {
     const contextJson = JSON.stringify(context, null, 2);
     const payloadBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
 
-    // "Copy Prompt for Other AI" (2026-08-21 follow-up): precomputed here,
-    // like sqlHtml/jsonHtml below, so the toolbar button can copy it
-    // instantly with no round-trip - it's a pure string build, not an actual
-    // vscode.lm call, so there's nothing to await.
-    // Built through the shared helper so a re-run that kept its baseline
-    // (renderSub() rebuilds the comparison before this point) carries the
-    // same Comparison Input the Copilot path would send (§13.2).
+    // Precompute external-AI prompts with the same comparison input as Copilot.
     const { plainTextPrompt, translatedPlainTextPrompt } = this.buildPlainTextPrompts()!;
 
     const [sqlHtml, jsonHtml, models] = await Promise.all([
@@ -548,8 +482,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     ]);
 
     if (myGeneration !== this.renderGeneration) {
-      // A newer render() call started (and possibly already finished) while
-      // this one was highlighting - never let the older result win.
+      // A newer render superseded this asynchronous preparation.
       return;
     }
 
@@ -558,9 +491,6 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
       context.collection.unavailableSections
     );
 
-    // Execution plan display (2026-08-19 follow-up, design doc). Two
-    // separate renderers for two separate data shapes - see
-    // performanceTuningPlanFormatter.ts's top comment.
     const planTreeText = context.executionPlan.normalizedPlan
       ? formatPlanTree(context.executionPlan.normalizedPlan)
       : undefined;
@@ -569,10 +499,6 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const humanSummary = buildPerformanceTuningHumanSummary(context);
     const queryDiagram = createPerformanceQueryDiagram(context);
 
-    // "Language model"/"Translate response" defaults for Analyze with AI
-    // (2026-08-19 follow-up, design doc §0). No gpt-4o-family preference
-    // (deliberately - see lmModelSelection.ts); translateResponse defaults
-    // off only for an English display language.
     const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(
       models.filter((model) => !this.unavailableLanguageModelIds.has(model.id))
     );
@@ -608,16 +534,17 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     this.getWebviewPanel().webview.postMessage(msg);
   }
 
-  private async renderDynamoDbSub(context: DynamoDbPerformanceTuningContext, myGeneration: number): Promise<void> {
+  private async renderDynamoDbSub(
+    context: DynamoDbPerformanceTuningContext,
+    myGeneration: number
+  ): Promise<void> {
     const contextJson = JSON.stringify(context, null, 2);
     const payloadBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
 
-    // Same shared helper as the RDB path - see its comment there.
     const { plainTextPrompt, translatedPlainTextPrompt } = this.buildPlainTextPrompts()!;
 
     const [sqlHtml, jsonHtml, models] = await Promise.all([
-      // Only a PartiQL statement has SQL-like text to highlight - see
-      // DynamoDbPerformanceTuningInitializeViewModel.sqlHtml's own comment.
+      // Only PartiQL has SQL-like text to highlight.
       context.statement.text
         ? createCodeHtmlString({ code: context.statement.text, lang: "sql" })
         : Promise.resolve(undefined),
@@ -631,13 +558,14 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
     const diagnosticGroups = buildDynamoDbPerformanceTuningDiagnosticGroups(
       context.collection.diagnostics,
-      context.collection.unavailableSections,
+      context.collection.unavailableSections
     );
     const humanSummary = buildDynamoDbPerformanceTuningHumanSummary(context);
     const accessPattern = buildDynamoDbAccessPatternViewModel(context.accessPattern);
-    const nativeQuery = this.dynamoDbRequest?.statement.request.kind === "query"
-      ? buildDynamoDbNativeQueryViewModel(this.dynamoDbRequest.statement.request.input)
-      : undefined;
+    const nativeQuery =
+      this.dynamoDbRequest?.statement.request.kind === "query"
+        ? buildDynamoDbNativeQueryViewModel(this.dynamoDbRequest.statement.request.input)
+        : undefined;
     const { languageModels, defaultLanguageModelId } = buildLanguageModelSelection(
       models.filter((model) => !this.unavailableLanguageModelIds.has(model.id))
     );
@@ -703,11 +631,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     }
   }
 
-  // "Compare with Baseline..." / "Change Baseline..." (§6.1). A failed pick
-  // deliberately leaves the previous selection in place: replacing a working
-  // comparison with nothing because the user opened the wrong file is a worse
-  // outcome than an error message next to the comparison that still stands
-  // (§17.5).
+  // Preserve the existing baseline when a replacement cannot be loaded.
   private async selectBaseline(): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.context) {
@@ -718,12 +642,10 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
     const loaded = await promptForBaselineSelection({ lastDirectory: this.lastBaselineDirectory });
     if (myGeneration !== this.renderGeneration) {
-      // A newer preview replaced this one while the dialog was open - its own
-      // render already published a fresh comparison state.
+      // A newer preview replaced this one while the dialog was open.
       return;
     }
     if (!loaded.ok) {
-      // A cancelled dialog is not an error; it just restores what was there.
       this.comparison = {
         ...this.comparison,
         status: this.baseline ? "ready" : "idle",
@@ -765,11 +687,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     this.comparison = { status: "idle", analysisStale: this.isAnalysisStale() };
   }
 
-  /**
-   * Recomputes the evidence against whatever `this.context` now holds. Called
-   * from renderSub() so a re-collected Current side never leaves the previous
-   * run's numbers on screen labelled as the current ones.
-   */
+  /** Recomputes baseline evidence against the current context. */
   private rebuildComparison(): void {
     const baseline = this.baseline;
     if (!baseline || !this.context) {
@@ -778,9 +696,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     }
     const built = buildPerformanceTuningComparisonEvidence({ baseline, current: this.context });
     if (!built.ok) {
-      // Only reachable if a re-run somehow produced a different engine, which
-      // the request state makes impossible - handled rather than asserted so
-      // the panel degrades to "no comparison" instead of showing a stale one.
+      // Fail closed instead of showing evidence derived from an incompatible context.
       this.baseline = undefined;
       this.comparison = { status: "idle", errorMessage: built.message };
       return;
@@ -793,10 +709,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     };
   }
 
-  /**
-   * True when an AI result is on screen and the baseline it was produced
-   * under is not the one selected now (including "none" in either direction).
-   */
+  /** True when the visible AI result used a different baseline. */
   private isAnalysisStale(): boolean {
     if (!this.lastAnalysis) {
       return false;
@@ -804,13 +717,10 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     return this.analysisBaselineSha256 !== this.baseline?.source.contextSha256;
   }
 
-  /**
-   * "Copy Prompt for Other AI" is precomputed host-side, so it has to be
-   * rebuilt whenever the baseline changes - §13.2 requires the external-AI
-   * path to carry the same Comparison Input as the Copilot path, at full
-   * detail (a manual paste has no token limit to shrink against).
-   */
-  private buildPlainTextPrompts(): { plainTextPrompt: string; translatedPlainTextPrompt: string } | undefined {
+  /** Builds full-detail external-AI prompts for the current baseline. */
+  private buildPlainTextPrompts():
+    | { plainTextPrompt: string; translatedPlainTextPrompt: string }
+    | undefined {
     const context = this.context;
     if (!context) {
       return undefined;
@@ -848,38 +758,20 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     await this.getWebviewPanel().webview.postMessage(msg);
   }
 
-  // Step 10 "Analyze with AI" (design doc §6.1/§7/§11). Builds the prompt
-  // from the currently-rendered context (never re-fetched, never re-sent by
-  // the webview), calls the model directly through vscode.lm rather than a
-  // LanguageModelTool. This is a
-  // single deterministic request/response, not a conversational tool call),
-  // and posts the parsed structured result back. Never throws past this
-  // method - every failure path ends in an "error" analysis-update instead.
-  // Shared by both engines: PerformanceTuningAiAnalysisResult is the same
-  // response shape either way (design doc §12), only the prompt differs.
+  // Runs one structured AI analysis against the currently rendered context.
   private async analyzeWithAi(languageModelId: string, translateResponse: boolean): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.context) {
       return;
     }
     const context = this.context;
-    // Pin the selected baseline and its derived evidence at the instant the
-    // analysis starts. Model lookup and token counting both await, while the
-    // baseline controls remain interactive; every prompt rung and the saved
-    // request metadata must therefore use this one immutable pair.
+    // Pin the baseline because controls remain interactive during model I/O.
     const baseline = this.baseline;
     const evidence = this.comparison.evidence;
 
     await this.postAnalysisUpdate(myGeneration, { status: "running" });
 
-    // Standard VS Code progress + cancel affordance, same convention as
-    // startPerformanceTuningPreview() (this feature's own Step 9a/9b code)
-    // and HistoryTreeCommand.ts's EXECUTE_SQL_HISTORY - not a bespoke
-    // in-panel Cancel button. `cts` (below) is still needed alongside this:
-    // it's what lets renderSub() (a newer preview replacing this one) and
-    // preDispose() (panel closed) cancel an in-flight request from *outside*
-    // this method, which the notification's own token cannot do on its own -
-    // token.onCancellationRequested bridges the two.
+    // Bridge notification cancellation with context replacement and panel disposal.
     await window.withProgress(
       {
         location: ProgressLocation.Notification,
@@ -895,10 +787,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
         let model;
         try {
-          // By-id resolution against the model the user picked in the
-          // dropdown (2026-08-19 follow-up) - same send-time lookup pattern
-          // used by the preview, instead of the old hardcoded
-          // `{ vendor: "copilot" }` + first-result pick.
+          // Resolve the selected model again at send time.
           [model] = await lm.selectChatModels(
             languageModelId ? { id: languageModelId } : { vendor: "copilot" }
           );
@@ -928,7 +817,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
                 translateResponse,
                 cts.token,
                 baseline,
-                evidence,
+                evidence
               )
             : await this.buildMessagesWithinModelInputLimit(
                 model,
@@ -936,7 +825,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
                 translateResponse,
                 cts.token,
                 baseline,
-                evidence,
+                evidence
               );
         } catch (e) {
           if (this.analysisCancellationSource === cts) {
@@ -944,7 +833,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           }
           await this.postAnalysisUpdate(myGeneration, {
             status: "error",
-            errorMessage: `The AI request could not fit this model's input limit: ${getErrorMessage(e)}`,
+            errorMessage: `The AI request could not fit this model's input limit: ${getErrorMessage(
+              e
+            )}`,
             ...(e instanceof AiInputLimitError
               ? {
                   tokenUsage: e.tokenUsage,
@@ -995,7 +886,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
                 status: "error",
                 errorMessage: MODEL_NOT_SUPPORTED_ERROR_MESSAGE,
               },
-              model.id,
+              model.id
             );
             return;
           }
@@ -1012,9 +903,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
         progress.report({ message: "Parsing AI response..." });
 
-        // The model is only asked for these five fields (§7) - formatVersion/
-        // model/generatedAt are filled in here, host-side, never trusted from
-        // the model's own reply.
+        // Host code owns metadata fields that are not part of the model response.
         let parsed: Partial<
           Pick<
             PerformanceTuningAiAnalysisResult,
@@ -1032,7 +921,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           return;
         }
 
-        const recommendations = (Array.isArray(parsed.recommendations) ? parsed.recommendations : []).map((r) => ({
+        const recommendations = (
+          Array.isArray(parsed.recommendations) ? parsed.recommendations : []
+        ).map((r) => ({
           ...r,
           possibleDuplicateOfIndex: isDynamoDbPerformanceTuningContext(context)
             ? undefined
@@ -1049,14 +940,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           formatVersion: 1,
           summary: typeof parsed.summary === "string" ? parsed.summary : "",
           findings: Array.isArray(parsed.findings) ? parsed.findings : [],
-          // possibleDuplicateOfIndex (2026-08-21 follow-up, summary.md's
-          // Full Context improvement item 4) is host-computed here, never
-          // trusted from the model's own JSON - a deterministic backstop
-          // for the model's own duplicate-index self-check (prompt item 3),
-          // independent of whether the model actually followed it. RDB
-          // only (design doc §12: "possibleDuplicateOfIndex の host-side
-          // CREATE INDEX 検査は RDB Context の場合だけ実行する") - DynamoDB has
-          // no CREATE INDEX concept at all to check against.
+          // Duplicate-index detection is deterministic host-side RDB validation.
           recommendations: recommendationReview.recommendations,
           ...(recommendationReview.qualityIssues.length > 0
             ? { qualityIssues: recommendationReview.qualityIssues }
@@ -1065,8 +949,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
             recommendationReview.qualityIssues.length > 0
               ? "low"
               : parsed.confidence === "high" || parsed.confidence === "medium"
-                ? parsed.confidence
-                : "low",
+              ? parsed.confidence
+              : "low",
           missingContext: Array.isArray(parsed.missingContext) ? parsed.missingContext : [],
           model: {
             id: model.id,
@@ -1085,9 +969,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
               maxInputTokens: prepared.maxInputTokens,
               safetyMargin: prepared.safetyMargin,
             },
-            // Records the rung of the shrink ladder this request actually
-            // used, so a saved report never implies the model was shown more
-            // of the comparison than it was (§13.1).
+            // Record the exact comparison projection sent to the model.
             ...(prepared.comparison && prepared.baseline
               ? {
                   comparison: {
@@ -1103,14 +985,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         };
 
         if (myGeneration !== this.renderGeneration) {
-          // A newer preview replaced this one while the request was in flight -
-          // don't let a stale result become the one "Save as Notebook" would save.
+          // Discard a response for a superseded preview.
           return;
         }
         this.lastAnalysis = result;
-        // Records which baseline this result was produced under - the one the
-        // request was actually built from, which may no longer be the selected
-        // one if the user changed it mid-flight (§12).
+        // Track the baseline actually sent, not the current control value.
         this.analysisBaselineSha256 = prepared.baseline?.source.contextSha256;
         this.lastAnalysisComparison =
           prepared.comparison && prepared.baseline && prepared.evidence
@@ -1121,21 +1000,14 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
               }
             : undefined;
         await this.postAnalysisUpdate(myGeneration, { status: "success", result });
-        // The comparison state carries `analysisStale`, which only becomes
-        // meaningful once an analysis exists - so it has to be re-published
-        // here, not just on the baseline transitions themselves.
+        // Publish staleness now that an analysis exists.
         this.comparison = { ...this.comparison, analysisStale: this.isAnalysisStale() };
         await this.postComparisonUpdate(myGeneration);
       }
     );
   }
 
-  // Step 10 "Save as Notebook" (design doc §8/§13). Always creates a brand
-  // new .dbn under reports/performance-tuning/ - never appends to an
-  // existing Notebook, never prompts a save dialog (both decided with the
-  // user, §16.1). DynamoDbPerformanceTuningContext gets its own report cell
-  // structure (design doc §13) via a separate builder rather than being
-  // forced through saveAiAnalysisAsNotebook()'s RDB-shaped cells.
+  // Saves a new engine-specific report under reports/performance-tuning/.
   private async saveAnalysisAsNotebook(): Promise<void> {
     const myGeneration = this.renderGeneration;
     const evidence = this.comparison.evidence;
@@ -1144,26 +1016,17 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     }
     const context = this.context;
 
-    // A stale analysis was produced against a different baseline than the one
-    // selected now. Folding it into a report whose comparison chapter is about
-    // the current baseline would present it as commentary on a comparison it
-    // never saw - exactly what §12 forbids - and would also make the "AI
-    // request messages" cell describe a prompt that was never sent. The
-    // deterministic comparison is still worth saving on its own, so the
-    // analysis is dropped rather than the whole save being refused.
+    // Omit stale AI text while retaining deterministic comparison evidence.
     const analysisIsStale = this.isAnalysisStale();
     const analysis = analysisIsStale ? undefined : this.lastAnalysis;
     const analysisComparison = analysisIsStale ? undefined : this.lastAnalysisComparison;
 
     const comparison =
-      evidence && this.baseline
-        ? { evidence, baselineContext: this.baseline.context }
-        : undefined;
+      evidence && this.baseline ? { evidence, baselineContext: this.baseline.context } : undefined;
     const input: PerformanceTuningReportInput = {
       analysis,
       comparison,
-      // The exact Comparison Input that travelled with the request above, so
-      // the saved messages are reproduced rather than rebuilt (§14).
+      // Preserve the exact Comparison Input that travelled with the request.
       analysisComparisonInput: analysisComparison?.aiInput,
     };
     const result = isDynamoDbPerformanceTuningContext(context)
@@ -1177,8 +1040,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const reportDescription = comparison
       ? "comparison report"
       : analysis
-        ? "AI analysis"
-        : "performance evidence report";
+      ? "AI analysis"
+      : "performance evidence report";
     window.showInformationMessage(
       analysisIsStale
         ? `Saved ${reportDescription} to ${result.relativePath}. The AI analysis on screen was produced against a different baseline, so it was left out - run Analyze with AI again to include it.`
@@ -1201,17 +1064,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     }
   }
 
-  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Actually executes the
-  // target SQL against the database (server-side, real I/O) to measure its
-  // real execution plan, replacing this panel's whole context with the
-  // analyze-mode result on success - never triggered without the user
-  // explicitly confirming that in the modal warning below, on top of the
-  // static warning text already shown next to the button in the webview
-  // (two-layer confirmation, per the design discussion this follows up on).
-  // v1 is SELECT-only by product decision; db-drivers' own
-  // validatePerformanceTuningContextParams() enforces that fail-closed
-  // regardless (isSingleSelectStatement()), so this method does not
-  // re-check the statement text itself.
+  // Executes confirmed SELECT-only EXPLAIN ANALYZE and replaces the current context.
   private async runActualPlan(): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.request || !this.analyzedExecutionPlan.available) {
@@ -1298,16 +1151,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     );
   }
 
-  // "Run Observed Read" - the DynamoDB counterpart of runActualPlan() above.
-  // Actually reads real items (server-side, real I/O, capped at a single API
-  // response / a small item count by db-drivers - see
-  // DynamoDbExecutionMetaTracker/DYNAMODB_OBSERVED_READ_MAX_ITEMS) to measure
-  // this statement's real Consumed Capacity and result shape. Same two-layer
-  // confirmation as runActualPlan() (static warning text in the webview, plus
-  // this modal). v1 only supports the PartiQL entry points (SQL History,
-  // executed Notebook cells) - see DynamoDbPerformanceTuningPreviewRequest's
-  // own doc comment for why the native-Query (Dynamo Query Panel) variant
-  // isn't wired in yet.
+  // Executes one confirmed, bounded DynamoDB read and replaces the current context.
   private async runObservedRead(): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.dynamoDbRequest || !this.observedReadCapability.available) {
@@ -1347,24 +1191,19 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         this.secondaryExecutionController = controller;
         token.onCancellationRequested(() => controller.abort());
 
-        // partiql: no `parameters` - observationEligibility.allowed already
-        // guarantees this statement's text has no unresolved `?` marker to
-        // bind (§7.1/§7.4, Decision 1 of the design review). query: the
-        // *real* QueryItemsAtClientInputParams (= QueryCommandInput,
-        // ExpressionAttributeValues included) this.dynamoDbRequest already
-        // holds - this is the one call in the whole flow that genuinely
-        // needs real values, since it actually executes.
+        // Native Query values are supplied only to the execution path.
         const execution: DynamoDbPerformanceTuningCallOptions["execution"] =
           request.statement.request.kind === "partiql"
             ? { kind: "partiql" }
             : { kind: "query", input: request.statement.request.input };
-        // The static `statement.request` sent alongside it, in contrast,
-        // always uses the values-free mirror - same reasoning as
-        // startDynamoDbPerformanceTuningPreview()'s own staticRequest.
+        // Static collection receives a values-free request mirror.
         const staticRequest =
           request.statement.request.kind === "partiql"
             ? request.statement.request
-            : { kind: "query" as const, input: toDynamoDbQueryAnalysisInput(request.statement.request.input) };
+            : {
+                kind: "query" as const,
+                input: toDynamoDbQueryAnalysisInput(request.statement.request.input),
+              };
 
         const { ok, message, result } = await workflow<AwsDriver, DynamoDbPerformanceTuningContext>(
           request.connectionSetting,
@@ -1430,12 +1269,20 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const myGeneration = this.renderGeneration;
     const request = this.request;
     const context = this.context;
-    if (!request || !context || isDynamoDbPerformanceTuningContext(context) || !this.analyzedExecutionPlan.available) {
+    if (
+      !request ||
+      !context ||
+      isDynamoDbPerformanceTuningContext(context) ||
+      !this.analyzedExecutionPlan.available
+    ) {
       await this.postStopProgress();
       return;
     }
     if (context.statement.analyzeEligibility?.allowed === false) {
-      void window.showErrorMessage(context.statement.analyzeEligibility.reason ?? "Benchmark is limited to a single SELECT statement.");
+      void window.showErrorMessage(
+        context.statement.analyzeEligibility.reason ??
+          "Benchmark is limited to a single SELECT statement."
+      );
       await this.postStopProgress();
       return;
     }
@@ -1450,7 +1297,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     }
 
     await window.withProgress(
-      { location: ProgressLocation.Notification, cancellable: true, title: `Running benchmark (${runs} runs)...` },
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+        title: `Running benchmark (${runs} runs)...`,
+      },
       async (progress, token) => {
         const controller = new AbortController();
         this.secondaryExecutionController = controller;
@@ -1534,12 +1385,20 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const myGeneration = this.renderGeneration;
     const request = this.dynamoDbRequest;
     const context = this.context;
-    if (!request || !context || !isDynamoDbPerformanceTuningContext(context) || !this.observedReadCapability.available) {
+    if (
+      !request ||
+      !context ||
+      !isDynamoDbPerformanceTuningContext(context) ||
+      !this.observedReadCapability.available
+    ) {
       await this.postStopProgress();
       return;
     }
     if (!context.statement.observationEligibility.allowed) {
-      void window.showErrorMessage(context.statement.observationEligibility.reason ?? "Benchmark is not available for this statement.");
+      void window.showErrorMessage(
+        context.statement.observationEligibility.reason ??
+          "Benchmark is not available for this statement."
+      );
       await this.postStopProgress();
       return;
     }
@@ -1557,7 +1416,11 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     }
 
     await window.withProgress(
-      { location: ProgressLocation.Notification, cancellable: true, title: `Running DynamoDB benchmark (${runs} runs)...` },
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+        title: `Running DynamoDB benchmark (${runs} runs)...`,
+      },
       async (progress, token) => {
         const controller = new AbortController();
         this.secondaryExecutionController = controller;
@@ -1566,17 +1429,27 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           request.statement.request.kind === "partiql"
             ? { kind: "partiql" }
             : { kind: "query", input: request.statement.request.input };
-        const staticRequest = request.statement.request.kind === "partiql"
-          ? request.statement.request
-          : { kind: "query" as const, input: toDynamoDbQueryAnalysisInput(request.statement.request.input) };
+        const staticRequest =
+          request.statement.request.kind === "partiql"
+            ? request.statement.request
+            : {
+                kind: "query" as const,
+                input: toDynamoDbQueryAnalysisInput(request.statement.request.input),
+              };
 
         const { ok, message, result } = await workflow<AwsDriver, DynamoDbPerformanceTuningContext>(
           request.connectionSetting,
           async (driver) => {
-            progress.report({ message: `Running observed read 1/${runs} and collecting context...` });
+            progress.report({
+              message: `Running observed read 1/${runs} and collecting context...`,
+            });
             const first = await driver.getDynamoDbPerformanceTuningContext(
               {
-                statement: { source: request.statement.source, request: staticRequest, workload: request.workload },
+                statement: {
+                  source: request.statement.source,
+                  request: staticRequest,
+                  workload: request.workload,
+                },
                 observation: {
                   mode: completeResult ? "executeComplete" : "executeOnce",
                   allowExecution: true,
@@ -1587,8 +1460,14 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
               },
               { signal: controller.signal, execution }
             );
-            if (!first.ok || !first.result?.observation || first.result.observation.clientElapsedTimeMs === undefined) {
-              throw new Error(first.message || "The first observed read did not return elapsed-time evidence.");
+            if (
+              !first.ok ||
+              !first.result?.observation ||
+              first.result.observation.clientElapsedTimeMs === undefined
+            ) {
+              throw new Error(
+                first.message || "The first observed read did not return elapsed-time evidence."
+              );
             }
             const startedAt = first.result.observation.observedAt ?? new Date().toISOString();
             const samples: DynamoDbBenchmarkSample[] = [
@@ -1601,7 +1480,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
                 evaluatedItemCount: first.result.observation.evaluatedItemCount,
                 filterPassRate: first.result.observation.filterPassRate,
                 consumedCapacity: first.result.observation.consumedCapacity,
-                completeness: first.result.observation.completeness ?? (first.result.observation.bounded ? "bounded" : "complete"),
+                completeness:
+                  first.result.observation.completeness ??
+                  (first.result.observation.bounded ? "bounded" : "complete"),
               },
             ];
             for (let index = 1; index < runs; index += 1) {
@@ -1628,19 +1509,19 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
                       signal: controller.signal,
                     })
                 : execution.kind === "partiql"
-                  ? await driver.dynamoClient.observePartiqlRead({
-                      statement:
-                        request.statement.request.kind === "partiql"
-                          ? request.statement.request.text
-                          : "",
-                      maxEvaluatedItems: 100,
-                      signal: controller.signal,
-                    })
-                  : await driver.dynamoClient.observeNativeQueryRead({
-                      input: execution.input,
-                      maxEvaluatedItems: 100,
-                      signal: controller.signal,
-                    });
+                ? await driver.dynamoClient.observePartiqlRead({
+                    statement:
+                      request.statement.request.kind === "partiql"
+                        ? request.statement.request.text
+                        : "",
+                    maxEvaluatedItems: 100,
+                    signal: controller.signal,
+                  })
+                : await driver.dynamoClient.observeNativeQueryRead({
+                    input: execution.input,
+                    maxEvaluatedItems: 100,
+                    signal: controller.signal,
+                  });
               samples.push({
                 run: index + 1,
                 clientElapsedTimeMs: observed.clientElapsedTimeMs,
@@ -1711,7 +1592,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   private async postAnalysisUpdate(
     generation: number,
     analysis: PerformanceTuningAiAnalysisViewState,
-    unavailableLanguageModelId?: string,
+    unavailableLanguageModelId?: string
   ): Promise<void> {
     if (generation !== this.renderGeneration) {
       // Superseded by a newer preview - never let a stale analysis update

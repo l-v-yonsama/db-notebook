@@ -1,15 +1,4 @@
-// DynamoDB-specific half of the Performance Tuning before/after comparison
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §8.3, §9.3, §10.3, §11). Pure functions only - see the header of
-// performanceTuningComparison.ts, which owns every primitive used here and is
-// the only module that calls buildDynamoDbComparison().
-//
-// Two rules from §10.3 shape most of this file:
-//   - a CloudWatch series with `noData: true` is not "0 activity", so it never
-//     becomes a 0 and never produces an improvement figure; and
-//   - a bounded observation (Run Observed Read's cap, or a history sample that
-//     still had a continuation token) did not see the statement's full result,
-//     so pairing it against a complete one would manufacture an improvement.
+// DynamoDB comparison keeps noData and bounded observations out of improvement rates.
 
 import type {
   DynamoDbAccessPattern,
@@ -326,8 +315,7 @@ function benchmarkProtocolMismatch(
   const baselineMode = baseline.mode ?? "page";
   const currentMode = current.mode ?? "page";
   const bothComplete =
-    benchmarkCompleteness(baseline) === "complete" &&
-    benchmarkCompleteness(current) === "complete";
+    benchmarkCompleteness(baseline) === "complete" && benchmarkCompleteness(current) === "complete";
   if (baselineMode !== currentMode && !bothComplete) {
     return `The benchmark modes differ (baseline: ${baselineMode}, current: ${currentMode}). Raw elapsed time, item counts, and Capacity do not represent the same measurement protocol.`;
   }
@@ -363,22 +351,26 @@ function capacityPerReturnedItem(
 
 function benchmarkMissingDataGuidance(
   baseline: DynamoDbPerformanceTuningContext,
-  current: DynamoDbPerformanceTuningContext,
+  current: DynamoDbPerformanceTuningContext
 ): MetricMissingDataGuidance | undefined {
   if (baseline.benchmark && !current.benchmark) {
     const runs = baseline.benchmark.requestedRuns;
     const completeResult = baseline.benchmark.mode === "completeResult";
     return {
-      action: `Run ${completeResult ? "Complete-result " : "Page "}Benchmark (${runs} runs) for Current`,
-      detail:
-        `Current has no benchmark. This action performs ${runs} ${completeResult ? "continuation-aware reads up to the complete-result safety limits" : "bounded one-page reads"} using the same conditions; the first run also refreshes the collected context.`,
+      action: `Run ${
+        completeResult ? "Complete-result " : "Page "
+      }Benchmark (${runs} runs) for Current`,
+      detail: `Current has no benchmark. This action performs ${runs} ${
+        completeResult
+          ? "continuation-aware reads up to the complete-result safety limits"
+          : "bounded one-page reads"
+      } using the same conditions; the first run also refreshes the collected context.`,
     };
   }
   if (!baseline.benchmark && current.benchmark) {
     return {
       action: "Select a benchmarked baseline",
-      detail:
-        `The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (${current.benchmark.requestedRuns} runs).`,
+      detail: `The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (${current.benchmark.requestedRuns} runs).`,
     };
   }
   return undefined;
@@ -429,7 +421,11 @@ function buildReasons(params: {
     reasons.push({
       code: "STATEMENT_KIND_MISMATCH",
       level: "partiallyComparable",
-      message: `The baseline is a ${languageLabel(baseline.statement.language)} read and the current preview is a ${languageLabel(current.statement.language)} one. Access path and capacity still compare, but PartiQL responses carry no evaluated-item count at all.`,
+      message: `The baseline is a ${languageLabel(
+        baseline.statement.language
+      )} read and the current preview is a ${languageLabel(
+        current.statement.language
+      )} one. Access path and capacity still compare, but PartiQL responses carry no evaluated-item count at all.`,
     });
   }
 
@@ -437,7 +433,8 @@ function buildReasons(params: {
     reasons.push({
       code: "QUERY_CHANGED",
       level: "partiallyComparable",
-      message: "The request changed, so the two sides may not return the same items. Check the request diff before reading any improvement figure as a pure efficiency gain.",
+      message:
+        "The request changed, so the two sides may not return the same items. Check the request diff before reading any improvement figure as a pure efficiency gain.",
     });
   }
 
@@ -458,7 +455,9 @@ function buildReasons(params: {
     reasons.push({
       code: "WORKLOAD_VS_SINGLE_OBSERVATION",
       level: "partiallyComparable",
-      message: `Rolling workload statistics are present only on the ${baseline.workload ? "baseline" : "current"} side, so the workload rows have nothing to compare against.`,
+      message: `Rolling workload statistics are present only on the ${
+        baseline.workload ? "baseline" : "current"
+      } side, so the workload rows have nothing to compare against.`,
     });
   }
 
@@ -474,10 +473,7 @@ function buildReasons(params: {
     });
   }
 
-  const benchmarkProtocol = benchmarkProtocolMismatch(
-    baseline.benchmark,
-    current.benchmark
-  );
+  const benchmarkProtocol = benchmarkProtocolMismatch(baseline.benchmark, current.benchmark);
   if (benchmarkProtocol) {
     reasons.push({
       code: "BENCHMARK_PROTOCOL_DIFFERS",
@@ -486,10 +482,7 @@ function buildReasons(params: {
     });
   }
 
-  const benchmarkMismatch = benchmarkCompletenessMismatch(
-    baseline.benchmark,
-    current.benchmark
-  );
+  const benchmarkMismatch = benchmarkCompletenessMismatch(baseline.benchmark, current.benchmark);
   if (benchmarkMismatch) {
     reasons.push({
       code: "BENCHMARK_COMPLETENESS_DIFFERS",
@@ -509,19 +502,22 @@ function buildReasons(params: {
     reasons.push({
       code: "CLOUDWATCH_SCOPE_WIDER_THAN_STATEMENT",
       level: "comparable",
-      message: "CloudWatch aggregates every request against the table or index during the window, including traffic from other statements - it is not a measurement of this one request.",
+      message:
+        "CloudWatch aggregates every request against the table or index during the window, including traffic from other statements - it is not a measurement of this one request.",
     });
   }
 
   reasons.push({
     code: "DYNAMODB_METADATA_APPROXIMATE",
     level: "comparable",
-    message: "DescribeTable's item count and table size are approximate and refreshed roughly every six hours, so small differences are not evidence of a change.",
+    message:
+      "DescribeTable's item count and table size are approximate and refreshed roughly every six hours, so small differences are not evidence of a change.",
   });
   reasons.push({
     code: "ENVIRONMENT_MAY_DIFFER",
     level: "comparable",
-    message: "Even for an identical request, item volume, partition distribution, and concurrent load differ between two collection times.",
+    message:
+      "Even for an identical request, item volume, partition distribution, and concurrent load differ between two collection times.",
   });
 
   return reasons;
@@ -571,7 +567,11 @@ function observationCompletenessMismatch(
     code: "OBSERVATION_BOUNDS_DIFFER",
     message:
       baselineBound || currentBound
-        ? `Both observations stopped early, but at different points (baseline: ${baselineBound ?? "not recorded"}; current: ${currentBound ?? "not recorded"}), so their item counts and consumed capacity reflect the two cut-offs rather than the statements.`
+        ? `Both observations stopped early, but at different points (baseline: ${
+            baselineBound ?? "not recorded"
+          }; current: ${
+            currentBound ?? "not recorded"
+          }), so their item counts and consumed capacity reflect the two cut-offs rather than the statements.`
         : "Both observations stopped early and neither recorded where, so their item counts and consumed capacity cannot be shown to cover the same amount of work.",
   };
 }
@@ -593,7 +593,9 @@ function environmentMismatchReason(
     return undefined;
   }
   const label = (kind: string) => (kind === "aws" ? "real AWS" : "a local or custom endpoint");
-  return `The two sides were collected against different endpoints (baseline: ${label(b)}, current: ${label(c)}), so client timings reflect different environments.`;
+  return `The two sides were collected against different endpoints (baseline: ${label(
+    b
+  )}, current: ${label(c)}), so client timings reflect different environments.`;
 }
 
 function observationCompleteness(
@@ -643,7 +645,11 @@ function describeNativeQuery(pattern: DynamoDbAccessPattern): string {
     `${pattern.operation} ${pattern.tableName}${pattern.indexName ? `.${pattern.indexName}` : ""}`,
     `key: ${keyCondition(pattern.partitionKey) ?? "(none)"}`,
     `sort: ${keyCondition(pattern.sortKey) ?? "(none)"}`,
-    `filter: ${pattern.postReadFilter.present ? pattern.postReadFilter.attributes.join(", ") || "(present)" : "(none)"}`,
+    `filter: ${
+      pattern.postReadFilter.present
+        ? pattern.postReadFilter.attributes.join(", ") || "(present)"
+        : "(none)"
+    }`,
     `projection: ${describeProjection(pattern)}`,
     `consistentRead: ${pattern.consistentRead}`,
     `scanDirection: ${scanDirection(pattern)}`,
@@ -823,7 +829,9 @@ function indexCapacityInputs(
   });
   const baselineIndexes = collect(baseline);
   const currentIndexes = collect(current);
-  const names = [...new Set([...Object.keys(baselineIndexes), ...Object.keys(currentIndexes)])].sort();
+  const names = [
+    ...new Set([...Object.keys(baselineIndexes), ...Object.keys(currentIndexes)]),
+  ].sort();
   return names.map((name) => ({
     key: `dynamodb.observation.indexConsumedReadCapacity.${name}`,
     label: `Consumed read capacity (${name})`,
@@ -836,7 +844,10 @@ function indexCapacityInputs(
 }
 
 function readCapacity(
-  amount: { capacityUnits?: number; readCapacityUnits?: number } | DynamoDbCapacityBreakdown | undefined
+  amount:
+    | { capacityUnits?: number; readCapacityUnits?: number }
+    | DynamoDbCapacityBreakdown
+    | undefined
 ): number | undefined {
   // ReturnConsumedCapacity reports reads under readCapacityUnits when it
   // splits them out and under capacityUnits when it does not.
@@ -855,7 +866,9 @@ function buildCloudWatchWindowComparison(
     return undefined;
   }
   const describe = (context: DynamoDbCloudWatchContext | undefined) =>
-    context ? `${Math.round(windowDurationMs(context) / 60_000)} min @ ${context.window.periodSeconds}s` : undefined;
+    context
+      ? `${Math.round(windowDurationMs(context) / 60_000)} min @ ${context.window.periodSeconds}s`
+      : undefined;
   const windowMismatch =
     !baseline ||
     !current ||
@@ -921,7 +934,9 @@ function cloudWatchRejection(
     current?.noData ? "current" : undefined,
   ].filter((side): side is string => side !== undefined);
   if (noDataSides.length > 0) {
-    return `CloudWatch returned no datapoints on the ${noDataSides.join(" and ")} side, which is not the same as a measured 0.`;
+    return `CloudWatch returned no datapoints on the ${noDataSides.join(
+      " and "
+    )} side, which is not the same as a measured 0.`;
   }
   if (baseline && current && baseline.statistic !== current.statistic) {
     return `The two sides were aggregated differently (${baseline.statistic} vs ${current.statistic}).`;
@@ -955,8 +970,8 @@ function seriesLabel(series: DynamoDbCloudWatchSeries): string {
     series.scope === "gsi" && series.indexName
       ? `GSI ${series.indexName}`
       : series.scope === "operation" && series.operation
-        ? `${series.operation} operation`
-        : "table";
+      ? `${series.operation} operation`
+      : "table";
   return `CloudWatch ${series.metricName} (${series.statistic}, ${scope})`;
 }
 

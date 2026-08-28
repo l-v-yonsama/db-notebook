@@ -23,13 +23,7 @@ import { resolveMcpEnabledConnection } from "./mcpAccessControl";
 
 const PREFIX = "[lmTools/GetPerformanceTuningContextTool]";
 
-// Read-only context feed for Copilot Chat and MCP clients. It always requests
-// an estimated plan (SQL vendors) / static collection only (DynamoDB)
-// because analyze mode/Run Observed Read execute the target statement -
-// tool-triggered real execution is out of scope for both engines (design
-// doc §14: "静的コンテキスト対応" only). `sql` doubles as the PartiQL text
-// for a DynamoDB connection; `databaseName`/`schemaName` are SQL-only and
-// simply unused for one.
+// Read-only tools collect estimates for RDBs and static PartiQL evidence for DynamoDB.
 export type GetPerformanceTuningContextToolInput = {
   connectionName: string;
   sql: string;
@@ -56,22 +50,16 @@ export class GetPerformanceTuningContextTool
   }
 }
 
-/**
- * Fetches, formats, logs, and error-handles a performance tuning context
- * lookup in one place, so both callers (the Copilot Chat tool above and the
- * MCP server's tool handler) get identical behavior - same shared-
- * orchestrator pattern as GetSchemaTool.getSchemaText(). Never throws;
- * failures come back as a `❌ ...` result string.
- */
+/** Shared non-throwing formatter for Copilot Chat and MCP callers. */
 export async function getPerformanceTuningContextText(
   stateStorage: StateStorage,
   input: GetPerformanceTuningContextToolInput
 ): Promise<string> {
   const { connectionName, sql, databaseName, schemaName } = input;
   log(
-    `${PREFIX} invoked connectionName:[${connectionName}] databaseName:[${databaseName ?? ""}] schemaName:[${
-      schemaName ?? ""
-    }] sql:[${sql ? "yes" : "no"}]`
+    `${PREFIX} invoked connectionName:[${connectionName}] databaseName:[${
+      databaseName ?? ""
+    }] schemaName:[${schemaName ?? ""}] sql:[${sql ? "yes" : "no"}]`
   );
 
   let text: string;
@@ -79,7 +67,9 @@ export async function getPerformanceTuningContextText(
     const result = await fetchPerformanceTuningContext(stateStorage, input);
     text = formatPerformanceTuningContextResultForModel(result);
   } catch (e) {
-    text = `❌ Failed to get performance tuning context for "${connectionName}": ${getErrorMessage(e)}`;
+    text = `❌ Failed to get performance tuning context for "${connectionName}": ${getErrorMessage(
+      e
+    )}`;
   }
   log(`${PREFIX} result length:[${text.length}]`);
   return text;
@@ -167,12 +157,7 @@ async function fetchPerformanceTuningContext(
   return { ok: true, context: result.result };
 }
 
-// DynamoDB counterpart (design doc §14). Static collection only, mirroring
-// the RDB path's always-estimate-mode call above: `sql` is treated as a
-// PartiQL SELECT, and databaseName/schemaName (SQL-only) are neither
-// required nor consulted - the target table/index is resolved from the
-// PartiQL text itself (see DynamoDbPerformanceTuningProvider.ts's
-// extractDynamoPartiqlTarget()).
+// DynamoDB tools accept a PartiQL SELECT and collect static evidence only.
 async function fetchDynamoDbPerformanceTuningContext(
   setting: ConnectionSetting,
   sql: string

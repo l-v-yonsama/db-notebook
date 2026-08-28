@@ -184,12 +184,7 @@ export type RunPerformanceTuningBenchmarkActionCommand = BaseActionCommand<
   { runs: 3 | 5; mode?: "page" | "completeResult" }
 >;
 
-// "Compare with Baseline..." / "Change Baseline..."
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §6.1). No params: the file itself is picked by a host-side
-// window.showOpenDialog(), never by a path the webview types or sends, and
-// the Current Context is already host state. Both entry points send the same
-// command - "change" is just "select" over an existing selection.
+// The host owns baseline paths and the current Context, so the webview sends no parameters.
 export type SelectPerformanceTuningBaselineActionCommand =
   BaseActionCommand<"selectPerformanceTuningBaseline">;
 

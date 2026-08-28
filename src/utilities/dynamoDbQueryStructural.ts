@@ -1,10 +1,7 @@
 import type { QueryItemsAtClientInputParams } from "@l-v-yonsama/multi-platform-database-drivers";
 import { SQL_HISTORY_LABEL_MAX_LENGTH } from "../constant";
 
-// See misc/specs/dynamodb-query-panel-history-performance-implementation-plan.ja.md
-// §4.1/§4.2. Pure, host-and-webview-agnostic (no vscode import) - kept
-// separate from dynamoDbProjection.ts, which needs DbDynamoTable and is
-// host-only.
+// Pure structural identity and display helpers for native Query history.
 
 function sortKeysDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -57,7 +54,7 @@ const toValueFreeDisplayExpression = (
   names: QueryItemsAtClientInputParams["ExpressionAttributeNames"]
 ): string =>
   expression.replace(/#[A-Za-z0-9_]+|:[A-Za-z0-9_]+/g, (token) =>
-    token.startsWith("#") ? (names?.[token] ?? token) : "…"
+    token.startsWith("#") ? names?.[token] ?? token : "…"
   );
 
 const abbreviateEnd = (value: string, maxLength: number): string =>

@@ -1,12 +1,4 @@
-// Deterministic comparison primitives shared by the RDB and DynamoDB
-// comparison builders
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §7, §8, §9, §10, §11), plus the top-level dispatcher that turns a Baseline
-// selection plus the Current Context into a PerformanceTuningComparisonEvidence.
-//
-// Everything here is a pure function: no VS Code API, no file I/O, no webview
-// (§16 Phase 1). `crypto`'s createHash is the only Node dependency, matching
-// how the rest of the extension hashes (HarFilePanel.ts, MdhViewProvider.ts).
+// Pure comparison primitives and the RDB/DynamoDB dispatcher.
 
 import { createHash } from "crypto";
 import {
@@ -109,7 +101,17 @@ export type NumericMetricInput = {
  * display code rounds at render time (§10.1's closing rule).
  */
 export function compareNumericMetric(input: NumericMetricInput): NumericComparison {
-  const { key, label, unit, direction, baseline, current, isRatio, notComparable, missingDataGuidance } = input;
+  const {
+    key,
+    label,
+    unit,
+    direction,
+    baseline,
+    current,
+    isRatio,
+    notComparable,
+    missingDataGuidance,
+  } = input;
   const base: NumericComparison = {
     key,
     label,
@@ -138,8 +140,8 @@ export function compareNumericMetric(input: NumericMetricInput): NumericComparis
     percentChange === undefined || direction === "neutral"
       ? undefined
       : direction === "lowerIsBetter"
-        ? -percentChange
-        : percentChange;
+      ? -percentChange
+      : percentChange;
 
   return {
     ...base,
@@ -328,8 +330,7 @@ export function diffLines(
   );
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
-      lcs[i][j] =
-        a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
     }
   }
 
@@ -468,8 +469,12 @@ export function compareCollection(
       baseline.unavailableSections.length,
       current.unavailableSections.length
     ),
-    diagnosticCodesOnlyInBaseline: [...baselineCodes].filter((code) => !currentCodes.has(code)).sort(),
-    diagnosticCodesOnlyInCurrent: [...currentCodes].filter((code) => !baselineCodes.has(code)).sort(),
+    diagnosticCodesOnlyInBaseline: [...baselineCodes]
+      .filter((code) => !currentCodes.has(code))
+      .sort(),
+    diagnosticCodesOnlyInCurrent: [...currentCodes]
+      .filter((code) => !baselineCodes.has(code))
+      .sort(),
   };
 }
 
@@ -491,7 +496,9 @@ export function collectionPartialReason(
   return {
     code: "COLLECTION_PARTIAL",
     level: "partiallyComparable",
-    message: `Collection was incomplete on the ${sides.join(" and ")} side, so some evidence may be missing rather than absent.`,
+    message: `Collection was incomplete on the ${sides.join(
+      " and "
+    )} side, so some evidence may be missing rather than absent.`,
   };
 }
 
@@ -527,7 +534,11 @@ export function buildPerformanceTuningComparisonEvidence(
   if (baselineIsDynamo !== currentIsDynamo) {
     return {
       ok: false,
-      message: `The selected baseline is a ${baselineIsDynamo ? "DynamoDB" : "relational database"} report, but the current preview is a ${currentIsDynamo ? "DynamoDB" : "relational database"} one. Comparing across engines is not supported.`,
+      message: `The selected baseline is a ${
+        baselineIsDynamo ? "DynamoDB" : "relational database"
+      } report, but the current preview is a ${
+        currentIsDynamo ? "DynamoDB" : "relational database"
+      } one. Comparing across engines is not supported.`,
     };
   }
 

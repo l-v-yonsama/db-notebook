@@ -1,7 +1,4 @@
-// §17.1 of
-// misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// - only the pure extraction path is covered here; the open dialog and the
-// file read around it are thin VS Code wrappers with no logic of their own.
+// Covers pure extraction; the dialog and file read are thin wrappers.
 
 import { describe, expect, it } from "vitest";
 import {

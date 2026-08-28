@@ -1,15 +1,4 @@
-// Deterministic before/after comparison for Performance Tuning
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §7). Everything in this file is computed by the extension host from two
-// already-collected Contexts - never by an AI, and never by re-querying a
-// database or AWS. The AI is downstream of this type, not upstream of it: it
-// receives a projection of a Comparison Evidence (§13) and is instructed not
-// to recompute the numbers here (§13.3).
-//
-// Lives in src/shared/ because the Preview webview renders it directly (§12).
-// db-drivers Context types are imported type-only, matching
-// PerformanceTuningActualEvidence.ts's precedent - the comparison result
-// itself deliberately never travels back into db-drivers (§7).
+// Deterministic host-computed comparison evidence shared with the Preview webview.
 
 import type {
   DynamoDbAccessPath,

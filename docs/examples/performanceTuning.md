@@ -15,6 +15,7 @@ connection. Where supported, you can run the statement once to collect actual me
   - 3.2. [Collection issues and information](#32-collection-issues-and-information)
   - 3.3. [Execution plan](#33-execution-plan)
 - 4. [Run Explain Analyze](#4-run-explain-analyze)
+  - 4.1. [Run a relational benchmark](#41-run-a-relational-benchmark)
 - 5. [Analyze with AI](#5-analyze-with-ai)
 - 6. [Save and share the analysis](#6-save-and-share-the-analysis)
   - 6.1. [Full Context JSON](#61-full-context-json)
@@ -29,14 +30,16 @@ connection. Where supported, you can run the statement once to collect actual me
   - 8.2. [Start a preview](#82-start-a-preview)
   - 8.3. [Read the preview](#83-read-the-preview)
   - 8.4. [Run Observed Read](#84-run-observed-read)
-  - 8.5. [Analyze with AI and save the analysis](#85-analyze-with-ai-and-save-the-analysis)
-  - 8.6. [Constraints to keep in mind](#86-constraints-to-keep-in-mind)
+  - 8.5. [Run a DynamoDB benchmark](#85-run-a-dynamodb-benchmark)
+  - 8.6. [Analyze with AI and save the analysis](#86-analyze-with-ai-and-save-the-analysis)
+  - 8.7. [Constraints to keep in mind](#87-constraints-to-keep-in-mind)
 
 ## 1. Overview
 
 Use the preview to inspect the evidence needed to diagnose a slow statement:
 
 - Compare estimated and actual row counts when actual measurements are available.
+- Measure three or five ordinary executions and compare their distributions against a baseline.
 - Review indexes, optimizer statistics, and physical-maintenance signals.
 - Give Copilot or another AI the collected evidence to request improvement ideas.
 - Save the analysis as a Database Notebook (DBN) or export it as an HTML report.
@@ -100,6 +103,18 @@ continuing.
 Before running this in production, confirm the statement's expected load and your operational
 rules.
 
+### 4.1. Run a relational benchmark
+
+Open **Benchmark options** and choose `Benchmark (3 runs)` or `Benchmark (5 runs)`. After
+confirmation, Database Notebook collects one `EXPLAIN ANALYZE`, then runs the same `SELECT`
+normally three or five times.
+
+The instrumented `EXPLAIN ANALYZE` is plan evidence and is not included in the benchmark
+distribution. The Benchmark section shows every ordinary run plus median, average, minimum, and
+maximum client elapsed time. There is no hidden warm-up run, so cache state and concurrent load can
+still affect the result. Use the same run count and representative bind values on both sides of a
+baseline comparison.
+
 ## 5. Analyze with AI
 
 1. Run `Run Explain Analyze` first if actual measurements are needed and it is safe to do so.
@@ -117,8 +132,9 @@ also specifies the response language.
 
 ## 6. Save and share the analysis
 
-After an AI analysis succeeds, select `Save as Notebook` to create a DBN under
-`reports/performance-tuning/` in the workspace.
+Select `Save as Notebook` to create a DBN under `reports/performance-tuning/` in the workspace. The
+collected evidence can be saved before running AI; an available AI analysis, benchmark, and baseline
+comparison are included when present.
 
 The DBN starts with a linked table of contents and uses stable chapter numbers. For a quick review,
 start with **4. Summary and recommendations**, then follow its evidence references into the later
@@ -131,6 +147,7 @@ The saved DBN includes:
 - Collection issues and information.
 - A SQL-scoped ER diagram and related indexes.
 - Estimated and actual execution plans.
+- Benchmark samples and aggregate timing, when collected.
 - The AI analysis result.
 - Full context JSON, AI request messages, and AI analysis JSON.
 
@@ -160,6 +177,8 @@ For an RDB context, the main sections are:
 - `tables` — the definitions, indexes, statistics, and physical-health evidence for related tables.
 - `planTableMappings` — links plan nodes to tables/indexes and records row-estimate, access-fraction,
   and filter-selectivity evidence.
+- `benchmark` — the requested three- or five-run session and each ordinary measured sample, when
+  one has been run.
 
 For a DynamoDB context, `engine` is `dynamodb`, and the plan-oriented sections are replaced by:
 
@@ -175,6 +194,8 @@ For a DynamoDB context, `engine` is `dynamodb`, and the plan-oriented sections a
   `bounded`, or `unknown`) before treating it as representative of the full result — only `complete`
   means so. `bounded` is kept alongside it for backward compatibility (`true` for both `bounded` and
   `unknown`).
+- `benchmark` — Page or Complete-result samples, aggregate timing/Capacity values, and completion
+  status, when one has been run.
 - `cloudWatch` — table/index/operation-level time series when CloudWatch monitoring is collected. A
   series with `noData: true` is missing data, not measured zero activity.
 
@@ -246,7 +267,8 @@ what it can and cannot support:
   set of tables read, an estimate-only side paired with a measured one, a partial collection, a
   large gap in optimizer-statistics freshness, a different environment, or (DynamoDB) an observation
   that was bounded on only one side, two observations cut off at different points, or a differently
-  shaped CloudWatch window.
+  shaped CloudWatch window. Benchmark metrics are also qualified when the run count, mode, or
+  completion status differs.
 
 When the two sides came from different environments — a different `environment` label on a
 relational connection, or DynamoDB Local/LocalStack against real AWS — timings and host I/O counters
@@ -346,14 +368,14 @@ Open the DynamoDB performance tuning preview from either of these places:
 - An **executed Notebook cell** running PartiQL against a DynamoDB connection (same entry point as
   SQL History — the cell's toolbar reuses its own most recent matching history entry).
 Opening the preview from a SQL History entry (PartiQL or native `Query`) also carries over that
-entry's most recent execution as observed evidence automatically — see **Observed request** in 7.3
-and **Query flow** in 7.3 — without needing to run `Run Observed Read` again.
+entry's most recent execution as observed evidence automatically — see **Observed request** and
+**Query flow** in 8.3 — without needing to run `Run Observed Read` again.
 
 Unlike the SQL path, this never asks for bind values first: the preview never reads item data, so
 no value is needed to open it. If the PartiQL text still has an unresolved `?` placeholder (for
 example, a SQL History entry Database Notebook couldn't fully resolve from its recorded variables),
-the preview still opens normally — only `Run Observed Read` (7.4) is disabled for that statement,
-with the reason shown next to the button.
+the preview still opens normally — only `Run Observed Read` (8.4) and Benchmark are disabled for
+that statement, with the reason shown next to the button.
 
 ### 8.3. Read the preview
 
@@ -362,7 +384,7 @@ the execution plan:
 
 - **Performance snapshot** — access-path certainty, a rolling Capacity/timing trend from prior
   executions of this exact statement (when available), whether any read has been observed yet, and
-  recent throttling activity. `Evidence: Observed read` appears once either `Run Observed Read` (7.4)
+  recent throttling activity. `Evidence: Observed read` appears once either `Run Observed Read` (8.4)
   or a matching SQL History execution supplies one.
 - **Collection issues** and **Information** — the same two-tier diagnostics pattern as SQL,
   covering things like a permission failure on `DescribeTable`/`GetMetricData`, or that the
@@ -375,13 +397,13 @@ the execution plan:
   labeled separately so it is not mistaken for a count from that one request.
 - **Table and index definition** — key schema, Capacity mode, approximate item count/size, TTL
   status, and every LSI/GSI's own key schema and projection.
-- **Observed request** — empty until a read has actually been observed (7.4), or carries over
+- **Observed request** — empty until a read has actually been observed (8.4), or carries over
   evidence from a matching SQL History execution. A history-sourced observation whose result was cut
   short (a continuation key remained, or an older saved entry doesn't record that status at all) is
   never presented as the statement's complete result.
 - **CloudWatch window metrics** — when monitoring collection is enabled, the last hour's Consumed
   Capacity/throttle time series for the table/index/operation. This is *table-wide*, not scoped to
-  this one statement — see 7.6.
+  this one statement — see 8.7.
 
 CloudWatch metrics and Contributor Insights status are collected only when **CloudWatch is selected
 as a service for the connection and the connection uses the real AWS endpoint**. If CloudWatch is
@@ -402,12 +424,25 @@ guaranteed to contain a match. Running the observation again starts over from th
 than continuing from that marker. Like `Run Explain Analyze`, this is real I/O against the database,
 so read the confirmation dialog before continuing.
 
-The button is disabled, with a reason shown next to it, whenever the statement isn't eligible: a
-PartiQL statement with an unresolved `?` placeholder (7.2), or when this connection's IAM policy
-hasn't been verified to allow it yet — an `AccessDenied` only ever surfaces after you confirm the
-run, never as a pre-flight guess.
+The button is disabled, with a reason shown next to it, when the statement isn't eligible, such as a
+PartiQL statement with an unresolved `?` placeholder (8.2). IAM permission is not guessed in
+advance; an `AccessDenied` surfaces only after you confirm the run.
 
-### 8.5. Analyze with AI and save the analysis
+### 8.5. Run a DynamoDB benchmark
+
+Open **Benchmark options** and choose one of these confirmed measurement modes:
+
+- `Page Benchmark (3/5 runs)` measures one response per run, capped at 100 evaluated items. It is
+  intentionally bounded and is useful for comparing the cost of the same bounded access pattern.
+- `Complete-result Benchmark (3/5 runs)` follows continuation tokens, but each run stops at 10
+  pages, 1,000 evaluated items, or 30 seconds. If a limit is reached, the result is labelled
+  **INCOMPLETE** and must not be treated as the full result.
+
+The Benchmark section shows each run's client elapsed time, returned/evaluated counts, consumed read
+capacity, and aggregate median/average/min/max timing. There is no hidden warm-up run. Compare only
+sessions with the same mode, run count, and completion status.
+
+### 8.6. Analyze with AI and save the analysis
 
 `Analyze with AI` and `Copy Prompt for Other AI` work the same way as for SQL (5 above), with a
 DynamoDB-specific prompt: it distinguishes the static access-path classification from a one-off
@@ -418,13 +453,13 @@ AI treats that as the expected analysis scope rather than a collection failure o
 
 `Save as Notebook` (6 above) also works the same way, with a DynamoDB-shaped report: overview and
 target statement, a statement-specific query-flow diagram, performance snapshot, collection issues,
-access pattern, table/index definition, observed request, available CloudWatch metrics, the AI
-analysis, an appendix of the collected CloudWatch datapoints, and the full context/AI request/AI
-analysis JSON. When monitoring collection is outside the connection's configured scope, the
+access pattern, table/index definition, observed request, Benchmark, available CloudWatch metrics,
+the AI analysis, an appendix of the collected CloudWatch datapoints, and the full context/AI
+request/AI analysis JSON. When monitoring collection is outside the connection's configured scope, the
 CloudWatch section and raw-metrics appendix remain in the notebook and state that metrics or
 datapoints were not collected.
 
-### 8.6. Constraints to keep in mind
+### 8.7. Constraints to keep in mind
 
 These hold regardless of what the AI analysis suggests:
 

@@ -1,8 +1,4 @@
-// RDB-specific half of the Performance Tuning before/after comparison
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §8.2, §9.2, §10.2, §11). Pure functions only - see the header of
-// performanceTuningComparison.ts, which owns every primitive used here and is
-// the only module that calls buildRdbComparison().
+// Pure RDB-specific half of the before/after comparison.
 
 import type {
   MetricValue,
@@ -82,10 +78,7 @@ export function buildRdbComparison(
       currentActual ? "actual" : "estimate"
     ),
     accessPath: buildAccessPathComparison(baseline, current),
-    dominantCostNode: compareValue(
-      describeDominantNode(baseline),
-      describeDominantNode(current)
-    ),
+    dominantCostNode: compareValue(describeDominantNode(baseline), describeDominantNode(current)),
     metrics: engineMetrics,
   };
 
@@ -153,7 +146,9 @@ function buildReasons(params: {
       reasons.push({
         code: "TABLE_MISMATCH",
         level: "notComparable",
-        message: `The two statements read completely different tables (baseline: ${baselineTargets.join(", ")}; current: ${currentTargets.join(", ")}).`,
+        message: `The two statements read completely different tables (baseline: ${baselineTargets.join(
+          ", "
+        )}; current: ${currentTargets.join(", ")}).`,
       });
     } else if (
       baselineTargets.length !== currentTargets.length ||
@@ -162,7 +157,8 @@ function buildReasons(params: {
       reasons.push({
         code: "TARGET_SET_CHANGED",
         level: "partiallyComparable",
-        message: "The set of tables the statement reads changed, so row counts and timings cover different work on each side.",
+        message:
+          "The set of tables the statement reads changed, so row counts and timings cover different work on each side.",
         detail: `baseline: ${baselineTargets.join(", ")} / current: ${currentTargets.join(", ")}`,
       });
     }
@@ -184,7 +180,8 @@ function buildReasons(params: {
     reasons.push({
       code: "QUERY_CHANGED",
       level: "partiallyComparable",
-      message: "The statement text changed, so the two sides may not return the same rows. Check the query diff before reading any improvement figure as a pure speed-up.",
+      message:
+        "The statement text changed, so the two sides may not return the same rows. Check the query diff before reading any improvement figure as a pure speed-up.",
     });
   }
 
@@ -192,7 +189,9 @@ function buildReasons(params: {
     reasons.push({
       code: "PLAN_MODE_MIXED",
       level: "partiallyComparable",
-      message: `Only the ${baselineActual ? "baseline" : "current"} side has real execution evidence; the other side is an optimizer estimate. Execution-only metrics are reported as not comparable.`,
+      message: `Only the ${
+        baselineActual ? "baseline" : "current"
+      } side has real execution evidence; the other side is an optimizer estimate. Execution-only metrics are reported as not comparable.`,
     });
   }
 
@@ -219,10 +218,11 @@ function buildReasons(params: {
     reasons.push({
       code: "WORKLOAD_VS_SINGLE_OBSERVATION",
       level: "partiallyComparable",
-      message: `Rolling workload statistics are present only on the ${baseline.workload ? "baseline" : "current"} side, so the workload rows have nothing to compare against.`,
+      message: `Rolling workload statistics are present only on the ${
+        baseline.workload ? "baseline" : "current"
+      } side, so the workload rows have nothing to compare against.`,
     });
   }
-
 
   if (
     baseline.benchmark &&
@@ -239,12 +239,14 @@ function buildReasons(params: {
   reasons.push({
     code: "ENVIRONMENT_MAY_DIFFER",
     level: "comparable",
-    message: "Even for an identical statement, data volume, cache state, and concurrent load differ between two collection times.",
+    message:
+      "Even for an identical statement, data volume, cache state, and concurrent load differ between two collection times.",
   });
   reasons.push({
     code: "OPTIMIZER_STATISTICS_POINT_IN_TIME",
     level: "comparable",
-    message: "Optimizer statistics are a point-in-time snapshot, so estimated rows and costs reflect whatever the planner knew at each collection.",
+    message:
+      "Optimizer statistics are a point-in-time snapshot, so estimated rows and costs reflect whatever the planner knew at each collection.",
   });
 
   return reasons;
@@ -284,8 +286,11 @@ function statisticsFreshnessReason(
   return {
     code: "STATISTICS_FRESHNESS_GAP",
     level: "partiallyComparable",
-    message: "Optimizer statistics were far more stale on one side than the other, which alone can change estimated rows and plan shape.",
-    detail: `baseline: ${baselineAge.toFixed(1)} days old / current: ${currentAge.toFixed(1)} days old at collection time`,
+    message:
+      "Optimizer statistics were far more stale on one side than the other, which alone can change estimated rows and plan shape.",
+    detail: `baseline: ${baselineAge.toFixed(1)} days old / current: ${currentAge.toFixed(
+      1
+    )} days old at collection time`,
   };
 }
 
@@ -369,7 +374,17 @@ function tableIndexSnapshots(table: TableTuningContext): IndexSnapshot[] {
 function usedIndexes(context: PerformanceTuningContext): string[] {
   const fromPlan = walkPlan(context.executionPlan.normalizedPlan)
     .filter((node) => node.indexName)
-    .map((node) => `${node.relation ? `${tableRef({ schemaName: node.relation.schemaName, tableName: node.relation.tableName ?? "?" })}.` : ""}${node.indexName}`);
+    .map(
+      (node) =>
+        `${
+          node.relation
+            ? `${tableRef({
+                schemaName: node.relation.schemaName,
+                tableName: node.relation.tableName ?? "?",
+              })}.`
+            : ""
+        }${node.indexName}`
+    );
   const fromMappings = context.planTableMappings
     .filter((mapping) => mapping.indexName)
     .map((mapping) => `${tableRef(mapping)}.${mapping.indexName}`);
@@ -444,7 +459,10 @@ function describeDominantNode(context: PerformanceTuningContext): string | undef
   // Deliberately identified by its stable attributes, never by planNodeId -
   // node IDs do not survive a re-collection (§10.2).
   const relation = node.relation?.tableName
-    ? ` on ${tableRef({ schemaName: node.relation.schemaName, tableName: node.relation.tableName })}`
+    ? ` on ${tableRef({
+        schemaName: node.relation.schemaName,
+        tableName: node.relation.tableName,
+      })}`
     : "";
   const index = node.indexName ? ` using ${node.indexName}` : "";
   return `${node.operation}${relation}${index}`;
@@ -635,10 +653,10 @@ function buildPlanMetrics(params: {
         current.executionPlan.dominantCostPlanNode?.metric
           ? "One side's dominant node is measured in time and the other in estimated cost units."
           : // Only the 'actual' variant is a wall-clock figure; vendor cost
-            // units are a model output, not a machine measurement.
-            baseline.executionPlan.dominantCostPlanNode?.metric === "actual"
-            ? environmentMismatch
-            : undefined,
+          // units are a model output, not a machine measurement.
+          baseline.executionPlan.dominantCostPlanNode?.metric === "actual"
+          ? environmentMismatch
+          : undefined,
     },
   ];
 
@@ -662,21 +680,19 @@ function benchmarkMismatch(
 
 function benchmarkMissingDataGuidance(
   baseline: PerformanceTuningContext,
-  current: PerformanceTuningContext,
+  current: PerformanceTuningContext
 ): MetricMissingDataGuidance | undefined {
   if (baseline.benchmark && !current.benchmark) {
     const runs = baseline.benchmark.requestedRuns;
     return {
       action: `Run Benchmark (${runs} runs) for Current`,
-      detail:
-        `Current has no benchmark. This action automatically collects EXPLAIN ANALYZE first, then runs the ordinary query ${runs} times; the EXPLAIN ANALYZE duration is excluded from the samples.`,
+      detail: `Current has no benchmark. This action automatically collects EXPLAIN ANALYZE first, then runs the ordinary query ${runs} times; the EXPLAIN ANALYZE duration is excluded from the samples.`,
     };
   }
   if (!baseline.benchmark && current.benchmark) {
     return {
       action: "Select a benchmarked baseline",
-      detail:
-        `The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (${current.benchmark.requestedRuns} runs).`,
+      detail: `The baseline has no benchmark. Select or recreate a baseline report containing Benchmark (${current.benchmark.requestedRuns} runs).`,
     };
   }
   return undefined;
@@ -805,9 +821,7 @@ function buildTableMetrics(
  * count to decide whether the two sides can be matched one to one at all
  * (§10.2).
  */
-function mappingsByTable(
-  context: PerformanceTuningContext
-): Map<string, PlanTableMapping[]> {
+function mappingsByTable(context: PerformanceTuningContext): Map<string, PlanTableMapping[]> {
   const byTable = new Map<string, PlanTableMapping[]>();
   for (const mapping of context.planTableMappings) {
     const key = tableRef(mapping).toLocaleLowerCase();

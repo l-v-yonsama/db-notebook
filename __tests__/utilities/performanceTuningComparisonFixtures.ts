@@ -1,7 +1,4 @@
-// Shared Context builders for the Performance Tuning comparison tests
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §17). Both builders default to a "Seq Scan, no index" shape so each test
-// only has to state the one thing it is actually about.
+// Shared comparison fixtures default to a sequential scan without an index.
 
 import type {
   DynamoDbPerformanceTuningContext,

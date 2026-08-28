@@ -1,8 +1,4 @@
-// §12/§17.5 of
-// misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// - the Preview's display rules: rounding happens only here, an improvement
-// figure never appears for a metric the evidence rejected, and every verdict
-// carries an icon alongside its text.
+// Rounding stays display-only and every verdict includes text plus an icon.
 
 import { describe, expect, it } from "vitest";
 import type { NumericComparison } from "../../src/shared/PerformanceTuningComparison";

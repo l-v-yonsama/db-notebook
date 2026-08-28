@@ -2,19 +2,20 @@ import {
   createPerformanceQueryDiagram,
   type PerformanceTuningContext,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { NotebookCellData, NotebookCellKind, Uri, ViewColumn, workspace } from "vscode";
-import { openNotebookFile, writeNotebookFile } from "../notebook/notebookFileUtil";
+import { NotebookCellData, NotebookCellKind } from "vscode";
 import type {
   PerformanceTuningAiAnalysisResult,
   PerformanceTuningAiEvidenceRef,
   PerformanceTuningAiFinding,
   PerformanceTuningAiRecommendation,
 } from "../shared/PerformanceTuningAiAnalysis";
-import { actualExecutionEvidenceSource, hasActualExecutionEvidence } from "../shared/PerformanceTuningActualEvidence";
+import {
+  actualExecutionEvidenceSource,
+  hasActualExecutionEvidence,
+} from "../shared/PerformanceTuningActualEvidence";
 import type { PerformanceTuningHumanSummary } from "../shared/PerformanceTuningHumanSummary";
 import type { CellMeta } from "../types/Notebook";
 import { formatUtcWithLocal } from "../shared/dateTimeDisplay";
-import { createDirectory, existsUri } from "./fsUtil";
 import { buildAiAnalysisPrompt } from "./performanceTuningAiPrompt";
 import type { ComparisonAiInput } from "./performanceTuningComparisonAiInput";
 import {
@@ -25,10 +26,12 @@ import {
 import { buildPerformanceTuningDiagnosticGroups } from "./performanceTuningDiagnosticFormatter";
 import { buildPerformanceTuningHumanSummary } from "./performanceTuningHumanSummary";
 import { buildPlanTableMappingRows, formatPlanTree } from "./performanceTuningPlanFormatter";
+import {
+  savePerformanceTuningNotebookFile,
+  type SavePerformanceTuningNotebookResult,
+} from "./performanceTuningNotebookFile";
 
-// Report cells are built separately from notebook I/O so their contents stay
-// unit-testable without VS Code filesystem mocks.
-const REPORTS_SUBPATH = ["reports", "performance-tuning"] as const;
+// Report cells are built separately from notebook I/O for deterministic tests.
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -42,7 +45,10 @@ function formatTimestamp(now: Date): string {
 }
 
 /** Exported for tests; also usable if a caller ever wants to preview the target name. */
-export function buildAiAnalysisNotebookFilename(databaseName: string, now: Date = new Date()): string {
+export function buildAiAnalysisNotebookFilename(
+  databaseName: string,
+  now: Date = new Date()
+): string {
   return buildPerformanceTuningNotebookFilename(databaseName, "analysis", now);
 }
 
@@ -51,17 +57,13 @@ export type PerformanceTuningReportKind = "evidence" | "analysis" | "comparison"
 export function buildPerformanceTuningNotebookFilename(
   databaseName: string,
   kind: PerformanceTuningReportKind,
-  now: Date = new Date(),
+  now: Date = new Date()
 ): string {
   const safeDb = databaseName.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "db";
   return `perf-tuning-${kind}-${safeDb}-${formatTimestamp(now)}.dbn`;
 }
 
-// Exported (2026-08-24 follow-up, DynamoDB support): the report-building
-// helpers below are all engine-agnostic (NotebookCellData construction,
-// PerformanceTuningAiEvidenceRef/PerformanceTuningDiagnosticGroupViewModel
-// are already shared types), so dynamoDbPerformanceTuningNotebook.ts reuses
-// them directly rather than duplicating them.
+// Shared by the RDB and DynamoDB report builders.
 export function markupCell(value: string, metadata?: CellMeta): NotebookCellData {
   const cell = new NotebookCellData(NotebookCellKind.Markup, value, "markdown");
   if (metadata) {
@@ -70,9 +72,7 @@ export function markupCell(value: string, metadata?: CellMeta): NotebookCellData
   return cell;
 }
 
-// cellLabel (CellLabelProvider in statusBarProviders.ts) is what keeps these
-// two JSON cells from showing up as an unlabeled "json"+"Not executed" pair
-// in the notebook's TOC/HTML report - see getTocInfoHtml() in htmlGenerator.ts.
+// cellLabel supplies the notebook TOC and HTML report label.
 export function jsonCodeCell(value: string, cellLabel: string): NotebookCellData {
   const cell = new NotebookCellData(NotebookCellKind.Code, value, "json");
   cell.metadata = { cellLabel };
@@ -93,7 +93,7 @@ export type NotebookTocEntry = {
 export function buildNotebookTocMarkdown(
   title: string,
   entries: NotebookTocEntry[],
-  collectionStatus: "complete" | "partial",
+  collectionStatus: "complete" | "partial"
 ): string {
   const lines = [
     `# ${title}`,
@@ -107,7 +107,7 @@ export function buildNotebookTocMarkdown(
   if (collectionStatus === "partial") {
     lines.push(
       "",
-      "> ⚠️ Some evidence could not be collected. Read **3. Collection status** before relying on the summary.",
+      "> ⚠️ Some evidence could not be collected. Read **3. Collection status** before relying on the summary."
     );
   }
   return lines.join("\n");
@@ -149,9 +149,10 @@ function formatRatio(value: number | undefined): string {
   if (value === undefined) {
     return "-";
   }
-  const text = value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
-    ? value.toPrecision(3)
-    : value.toFixed(2);
+  const text =
+    value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
+      ? value.toPrecision(3)
+      : value.toFixed(2);
   return `${text}x`;
 }
 
@@ -160,7 +161,8 @@ function formatFractionAsPercent(value: number | undefined): string {
     return "-";
   }
   const percent = value * 100;
-  const text = percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
+  const text =
+    percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
   return `${text}%`;
 }
 
@@ -176,7 +178,9 @@ function buildOverviewMarkdown(
   lines.push("## 1. Overview");
   lines.push("");
   lines.push(
-    `_This report analyzes one SQL statement against ${escapeMdCell(context.database.vendor)} and keeps the detailed evidence after the summary for verification._`,
+    `_This report analyzes one SQL statement against ${escapeMdCell(
+      context.database.vendor
+    )} and keeps the detailed evidence after the summary for verification._`
   );
   lines.push("");
   lines.push("| Item | Detail |");
@@ -190,23 +194,28 @@ function buildOverviewMarkdown(
   );
   lines.push(`| Collected at | ${formatUtcWithLocal(context.collection.collectedAt)} |`);
   lines.push(`| Collection status | ${context.collection.status} |`);
-  // A comparison-only report is saved without ever running an AI analysis
-  // (comparison implementation plan §14), so these rows describe an AI run
-  // that may legitimately not have happened.
+  // Comparison and evidence reports may not include an AI run.
   if (analysis) {
     lines.push(
       `| AI model | ${analysis.model.name ?? analysis.model.family} (${analysis.model.vendor}) |`
     );
     lines.push(
-      `| AI input detail | ${analysis.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full"} |`
+      `| AI input detail | ${
+        analysis.request?.contextDetail === "compact"
+          ? "Compact (raw vendor artifacts omitted for model limit)"
+          : "Full"
+      } |`
     );
     const tokenUsage = analysis.request?.tokenUsage;
     if (tokenUsage) {
-      const percentage = tokenUsage.maxInputTokens > 0
-        ? `${((tokenUsage.inputTokens / tokenUsage.maxInputTokens) * 100).toFixed(1)}%`
-        : "-";
+      const percentage =
+        tokenUsage.maxInputTokens > 0
+          ? `${((tokenUsage.inputTokens / tokenUsage.maxInputTokens) * 100).toFixed(1)}%`
+          : "-";
       lines.push(
-        `| Estimated AI input | ${formatNumber(tokenUsage.inputTokens)} / ${formatNumber(tokenUsage.maxInputTokens)} tokens (${percentage}) |`
+        `| Estimated AI input | ${formatNumber(tokenUsage.inputTokens)} / ${formatNumber(
+          tokenUsage.maxInputTokens
+        )} tokens (${percentage}) |`
       );
       lines.push(`| Token safety margin | ${formatNumber(tokenUsage.safetyMargin)} tokens |`);
     }
@@ -230,7 +239,11 @@ export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHuman
     "",
     "| Statement | Evidence | Scope | Collection |",
     "|---|---|---|---|",
-    `| ${summary.profile.statementKind} | ${summary.profile.evidence === "actual" ? "Actual measured" : "Estimate only"} | ${summary.profile.tableCount} ${summary.profile.tableCount === 1 ? "table" : "tables"} | ${summary.profile.collectionStatus} |`,
+    `| ${summary.profile.statementKind} | ${
+      summary.profile.evidence === "actual" ? "Actual measured" : "Estimate only"
+    } | ${summary.profile.tableCount} ${summary.profile.tableCount === 1 ? "table" : "tables"} | ${
+      summary.profile.collectionStatus
+    } |`,
     "",
   ];
   if (summary.profile.tableRefs.length > 0) {
@@ -241,11 +254,13 @@ export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHuman
     "#### 4.1.1. Observed signals",
     "",
     "| Level | Signal | Table | Observation | Raw data |",
-    "|---|---|---|---|---|",
+    "|---|---|---|---|---|"
   );
   summary.signals.forEach((signal) => {
     lines.push(
-      `| ${signal.level} | ${escapeMdCell(signal.title)} | ${signal.tableRef ? escapeMdCell(signal.tableRef) : "-"} | ${escapeMdCell(signal.summary)} | ${escapeMdCell(signal.rawDataPath)} |`,
+      `| ${signal.level} | ${escapeMdCell(signal.title)} | ${
+        signal.tableRef ? escapeMdCell(signal.tableRef) : "-"
+      } | ${escapeMdCell(signal.summary)} | ${escapeMdCell(signal.rawDataPath)} |`
     );
   });
 
@@ -255,12 +270,20 @@ export function buildPerformanceSnapshotMarkdown(summary: PerformanceTuningHuman
       "#### 4.1.2. Table row flow",
       "",
       "| Table | Table rows | Accessed | Local filter output | Plan output | Access fraction | Filter pass rate | Raw data |",
-      "|---|---|---|---|---|---|---|---|",
+      "|---|---|---|---|---|---|---|---|"
     );
     const isDml = ["INSERT", "UPDATE", "DELETE"].includes(summary.profile.statementKind);
     summary.rowFlows.forEach((flow) => {
       lines.push(
-        `| ${escapeMdCell(flow.tableRef)} | ${formatNumber(flow.totalRows)}${flow.totalRows !== undefined && flow.totalRowsEstimated ? " (estimated)" : ""} | ${isDml ? "Not measured (DML)" : formatNumber(flow.accessedRows)} | ${isDml ? "Not measured (DML)" : formatNumber(flow.filterOutputRows)} | ${isDml ? "Not measured (DML)" : formatNumber(flow.planOutputRows)} | ${isDml ? "Not measured (DML)" : formatFractionAsPercent(flow.accessFraction)} | ${isDml ? "Not measured (DML)" : formatFractionAsPercent(flow.filterPassRate)} | ${escapeMdCell(flow.rawDataPath)} |`,
+        `| ${escapeMdCell(flow.tableRef)} | ${formatNumber(flow.totalRows)}${
+          flow.totalRows !== undefined && flow.totalRowsEstimated ? " (estimated)" : ""
+        } | ${isDml ? "Not measured (DML)" : formatNumber(flow.accessedRows)} | ${
+          isDml ? "Not measured (DML)" : formatNumber(flow.filterOutputRows)
+        } | ${isDml ? "Not measured (DML)" : formatNumber(flow.planOutputRows)} | ${
+          isDml ? "Not measured (DML)" : formatFractionAsPercent(flow.accessFraction)
+        } | ${
+          isDml ? "Not measured (DML)" : formatFractionAsPercent(flow.filterPassRate)
+        } | ${escapeMdCell(flow.rawDataPath)} |`
       );
     });
   }
@@ -291,35 +314,35 @@ function buildQueryStructureMarkdown(context: PerformanceTuningContext): string 
       "### 5.1. Indexes relevant to this SQL",
       "",
       "| Table | Index | Key columns | Included columns | Query relevance |",
-      "|---|---|---|---|---|",
+      "|---|---|---|---|---|"
     );
     diagram.relevantIndexes.forEach((index) => {
-      const tableRef = [index.schemaName, index.tableName].filter(Boolean).join(".") +
+      const tableRef =
+        [index.schemaName, index.tableName].filter(Boolean).join(".") +
         (index.alias ? ` (alias ${index.alias})` : "");
       const indexKind = index.primary ? "PRIMARY" : index.unique ? "UNIQUE" : undefined;
       const indexName = `${escapeMdCell(index.indexName)}${indexKind ? ` (${indexKind})` : ""}`;
       lines.push(
         `| ${escapeMdCell(tableRef)} | ${indexName} | ${escapeMdCell(index.columns.join(", "))} | ${
           index.includedColumns?.length ? escapeMdCell(index.includedColumns.join(", ")) : "-"
-        } | ${escapeMdCell(index.relevance.join("; "))} |`,
+        } | ${escapeMdCell(index.relevance.join("; "))} |`
       );
     });
   }
   if (diagram.warnings.length > 0) {
-    lines.push("", "### 5.2. Diagram notes", "", ...diagram.warnings.map((warning) => `- ${warning}`));
+    lines.push(
+      "",
+      "### 5.2. Diagram notes",
+      "",
+      ...diagram.warnings.map((warning) => `- ${warning}`)
+    );
   }
   return lines.join("\n");
 }
 
-// Exported (2026-08-24 follow-up) - operates only on the already
-// engine-agnostic PerformanceTuningDiagnosticGroupViewModel shape (the
-// `ReturnType<typeof buildPerformanceTuningDiagnosticGroups>` annotation is
-// just this file's own way of naming that type without a separate import;
-// buildDynamoDbPerformanceTuningDiagnosticGroups() returns the identical
-// shape), so dynamoDbPerformanceTuningNotebook.ts reuses this directly for
-// its own Collection issues/Information sections.
+// Shared by RDB and DynamoDB diagnostic report sections.
 export function diagnosticGroupsMarkdown(
-  groups: ReturnType<typeof buildPerformanceTuningDiagnosticGroups>,
+  groups: ReturnType<typeof buildPerformanceTuningDiagnosticGroups>
 ): string[] {
   const lines: string[] = [];
   groups.forEach((group) => {
@@ -331,9 +354,11 @@ export function diagnosticGroupsMarkdown(
     group.details.forEach((detail) => {
       const tableRef = [detail.schemaName, detail.tableName].filter(Boolean).join(".");
       lines.push(
-        `| ${escapeMdCell(detail.nodeId ?? "-")} | ${escapeMdCell(detail.operation ?? "-")} | ${
-          escapeMdCell(detail.objectName ?? "-")
-        } | ${escapeMdCell(tableRef || "-")} | ${escapeMdCell(detail.technicalMessage)} |`,
+        `| ${escapeMdCell(detail.nodeId ?? "-")} | ${escapeMdCell(
+          detail.operation ?? "-"
+        )} | ${escapeMdCell(detail.objectName ?? "-")} | ${escapeMdCell(
+          tableRef || "-"
+        )} | ${escapeMdCell(detail.technicalMessage)} |`
       );
     });
     lines.push("");
@@ -347,7 +372,7 @@ function buildDiagnosticSections(context: PerformanceTuningContext): {
 } {
   const groups = buildPerformanceTuningDiagnosticGroups(
     context.collection.diagnostics,
-    context.collection.unavailableSections,
+    context.collection.unavailableSections
   );
   const issues = groups.filter((group) => group.severity === "warning");
   const information = groups.filter((group) => group.severity === "info");
@@ -362,19 +387,20 @@ function buildDiagnosticSections(context: PerformanceTuningContext): {
         ? diagnosticGroupsMarkdown(issues)
         : ["_No collection issues were reported._"]),
     ].join("\n"),
-    information: information.length > 0
-      ? [
-          "## 7. Additional information",
-          "",
-          "_The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed performance problem — see each item's technical details._",
-          "",
-          ...diagnosticGroupsMarkdown(information),
-        ].join("\n")
-      : [
-          "## 7. Additional information",
-          "",
-          "_No additional execution-plan or collection information was reported._",
-        ].join("\n"),
+    information:
+      information.length > 0
+        ? [
+            "## 7. Additional information",
+            "",
+            "_The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed performance problem — see each item's technical details._",
+            "",
+            ...diagnosticGroupsMarkdown(information),
+          ].join("\n")
+        : [
+            "## 7. Additional information",
+            "",
+            "_No additional execution-plan or collection information was reported._",
+          ].join("\n"),
   };
 }
 
@@ -385,7 +411,9 @@ function findingsTable(findings: PerformanceTuningAiFinding[]): string[] {
   const lines = ["| Severity | Title | Detail | Evidence |", "|---|---|---|---|"];
   for (const f of findings) {
     lines.push(
-      `| ${f.severity} | ${escapeMdCell(f.title)} | ${escapeMdCell(f.detail)} | ${evidenceLine(f.evidence)} |`
+      `| ${f.severity} | ${escapeMdCell(f.title)} | ${escapeMdCell(f.detail)} | ${evidenceLine(
+        f.evidence
+      )} |`
     );
   }
   return lines;
@@ -401,13 +429,12 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
   ];
   for (const r of recommendations) {
     lines.push(
-      `| ${r.riskLevel ?? "-"} | ${escapeMdCell(r.title)} | ${escapeMdCell(r.detail)} | ${escapeMdCell(
-        r.rationale
-      )} | ${r.suggestedSql ? "`" + escapeMdCell(r.suggestedSql) + "`" : "-"} | ${
-        // Host-computed (findPossibleDuplicateIndex() in
-        // PerformanceTuningPreviewPanel.ts), never AI-authored - see
-        // PerformanceTuningAiRecommendation.possibleDuplicateOfIndex's own
-        // doc comment.
+      `| ${r.riskLevel ?? "-"} | ${escapeMdCell(r.title)} | ${escapeMdCell(
+        r.detail
+      )} | ${escapeMdCell(r.rationale)} | ${
+        r.suggestedSql ? "`" + escapeMdCell(r.suggestedSql) + "`" : "-"
+      } | ${
+        // Duplicate-index evidence is host-computed, never AI-authored.
         r.possibleDuplicateOfIndex ? "`" + escapeMdCell(r.possibleDuplicateOfIndex) + "`" : "-"
       } | ${evidenceLine(r.evidence)} |`
     );
@@ -415,10 +442,7 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
   return lines;
 }
 
-// Exported (2026-08-24 follow-up) - takes only `analysis`
-// (PerformanceTuningAiAnalysisResult, the shared response shape for both
-// engines), no RDB-specific field, so dynamoDbPerformanceTuningNotebook.ts
-// reuses it directly.
+// Shared by both engines because the analysis result is engine-neutral.
 export function buildAnalysisMarkdown(
   analysis: PerformanceTuningAiAnalysisResult | undefined
 ): string {
@@ -487,19 +511,15 @@ function planTableMappingsTable(rows: ReturnType<typeof buildPlanTableMappingRow
     lines.push(
       `| ${escapeMdCell(row.table)} | ${row.index ? escapeMdCell(row.index) : "-"} | ${
         row.estimatedRows ?? "-"
-      } | ${row.actualRows ?? "-"} | ${ratio} | ${accessFraction} | ${filterPassRate} | ${row.columnsUsed ? escapeMdCell(row.columnsUsed) : "-"} |`
+      } | ${row.actualRows ?? "-"} | ${ratio} | ${accessFraction} | ${filterPassRate} | ${
+        row.columnsUsed ? escapeMdCell(row.columnsUsed) : "-"
+      } |`
     );
   }
   return lines;
 }
 
-// 2026-08-19 follow-up: executionPlan.normalizedPlan is a tree, so it's
-// rendered as an EXPLAIN-style indented text block (a table would lose the
-// parent-child structure that's the whole point of an execution plan);
-// planTableMappings is genuinely flat, so that one becomes a table.
-// actualPlan is a third, independent piece of database-native runtime
-// evidence. It gets its own fenced block rather than being merged into the
-// normalized estimate tree or the table-mapping rows.
+// Preserve plan hierarchy as text while rendering flat mappings as a table.
 function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string {
   const planTreeText = context.executionPlan.normalizedPlan
     ? formatPlanTree(context.executionPlan.normalizedPlan)
@@ -528,7 +548,7 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string {
       "```actual-plan",
       actualPlan.content,
       "```",
-      "",
+      ""
     );
   }
   if (planTreeText) {
@@ -536,13 +556,13 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string {
       actualPlan
         ? subsectionHeading("Estimated plan topology")
         : hasActualEvidence
-          ? subsectionHeading(`Actual execution plan (${actualEvidenceSource})`)
-          : subsectionHeading("Execution plan topology"),
+        ? subsectionHeading(`Actual execution plan (${actualEvidenceSource})`)
+        : subsectionHeading("Execution plan topology"),
       "",
       "```text",
       planTreeText,
       "```",
-      "",
+      ""
     );
   }
   if (rows.length > 0) {
@@ -562,26 +582,25 @@ function buildExecutionPlanMarkdown(context: PerformanceTuningContext): string {
       `| Runs | ${benchmark.completedRuns} / ${benchmark.requestedRuns} completed |`,
       `| Median | ${formatNumber(benchmark.medianClientElapsedTimeMs)} ms |`,
       `| Average | ${formatNumber(benchmark.averageClientElapsedTimeMs)} ms |`,
-      `| Min / Max | ${formatNumber(benchmark.minClientElapsedTimeMs)} / ${formatNumber(benchmark.maxClientElapsedTimeMs)} ms |`,
+      `| Min / Max | ${formatNumber(benchmark.minClientElapsedTimeMs)} / ${formatNumber(
+        benchmark.maxClientElapsedTimeMs
+      )} ms |`,
       "",
       "| Run | Client elapsed | Returned rows |",
       "|---|---|---|",
       ...benchmark.samples.map(
         (sample) =>
-          `| ${sample.run} | ${formatNumber(sample.clientElapsedTimeMs)} ms | ${formatNumber(sample.returnedRowCount)} |`,
+          `| ${sample.run} | ${formatNumber(sample.clientElapsedTimeMs)} ms | ${formatNumber(
+            sample.returnedRowCount
+          )} |`
       ),
-      "",
+      ""
     );
   }
   return lines.join("\n");
 }
 
-// One shared lead-in for both JSON cells below (rather than one per cell) -
-// cellLabel alone (CellLabelProvider) makes the TOC/HTML report readable,
-// but doesn't explain *why* the raw data is there when reading the notebook
-// itself top to bottom.
-// Exported (2026-08-24 follow-up) - generic text, mentions no RDB-specific
-// concept, so dynamoDbPerformanceTuningNotebook.ts reuses it directly.
+// Shared lead-in explains why raw evidence is included in both engine reports.
 export function buildJsonAppendixMarkdown(appendixLabel = "Appendix A"): string {
   return [
     `## ${appendixLabel}. Raw data`,
@@ -622,39 +641,28 @@ function buildAiRequestMessagesJson(
   );
 }
 
-/**
- * What a saved report covers. Both fields are optional and independent
- * (comparison implementation plan §14): an AI analysis alone is the original
- * report, a comparison alone is a "what changed" report, and both together
- * is the full report. With neither, the collected context becomes a
- * deterministic evidence report.
- */
+/** Optional inputs independently compose analysis, comparison, and evidence reports. */
 export type PerformanceTuningReportInput = {
   analysis?: PerformanceTuningAiAnalysisResult;
   comparison?: PerformanceTuningComparisonReportInput;
-  // The exact Comparison Input that travelled with `analysis`'s own request,
-  // captured when that request was built. The "AI request messages" cell
-  // claims to be what was really sent, so it reproduces this verbatim instead
-  // of re-projecting `comparison.evidence` - which may have been recomputed
-  // since, against a re-collected Current side or a different baseline (§14).
+  // Preserve the exact comparison payload sent with the recorded AI request.
   analysisComparisonInput?: ComparisonAiInput;
 };
 
-export function getPerformanceTuningReportKind(input: PerformanceTuningReportInput): PerformanceTuningReportKind {
+export function getPerformanceTuningReportKind(
+  input: PerformanceTuningReportInput
+): PerformanceTuningReportKind {
   return input.comparison ? "comparison" : input.analysis ? "analysis" : "evidence";
 }
 
-/** Pure cell-construction step (§8.2) - kept separate from the write/open I/O below for unit testing. */
+/** Pure cell construction kept separate from file I/O. */
 export function buildAiAnalysisNotebookCells(
   context: PerformanceTuningContext,
   input: PerformanceTuningReportInput
 ): NotebookCellData[] {
   const { analysis, comparison } = input;
   const reportKind = getPerformanceTuningReportKind(input);
-  // The comparison is appended as its own chapter rather than inserted into
-  // the middle: §14 says a comparison *adds* to the normal report, and
-  // renumbering chapters 5-7 for one variant would break the anchors every
-  // already-saved report uses.
+  // Append comparison content so existing report chapter anchors remain stable.
   const tocEntries: NotebookTocEntry[] = [
     { label: "1. Overview", anchor: "1-overview" },
     { label: "2. Target SQL", anchor: "2-target-sql" },
@@ -678,12 +686,12 @@ export function buildAiAnalysisNotebookCells(
         reportKind === "comparison"
           ? "Performance Tuning Comparison Report"
           : reportKind === "analysis"
-            ? "Performance Tuning AI Analysis"
-            : "Performance Tuning Evidence Report",
+          ? "Performance Tuning AI Analysis"
+          : "Performance Tuning Evidence Report",
         tocEntries,
-        context.collection.status,
+        context.collection.status
       ),
-      { excludeFromHtml: true },
+      { excludeFromHtml: true }
     ),
     markupCell(buildOverviewMarkdown(context, analysis)),
     markupCell(buildTargetSqlMarkdown(context)),
@@ -695,7 +703,7 @@ export function buildAiAnalysisNotebookCells(
         buildPerformanceSnapshotMarkdown(buildPerformanceTuningHumanSummary(context)),
         "",
         buildAnalysisMarkdown(analysis),
-      ].join("\n"),
+      ].join("\n")
     ),
     markupCell(buildQueryStructureMarkdown(context)),
     markupCell(buildExecutionPlanMarkdown(context)),
@@ -706,8 +714,8 @@ export function buildAiAnalysisNotebookCells(
             buildComparisonMarkdown(
               comparison.evidence,
               comparison.evidence.source.baseline.fileName,
-              { section: "8" },
-            ),
+              { section: "8" }
+            )
           ),
         ]
       : []),
@@ -717,7 +725,7 @@ export function buildAiAnalysisNotebookCells(
       ? [
           jsonCodeCell(
             buildAiRequestMessagesJson(context, analysis, input.analysisComparisonInput),
-            "AI request messages",
+            "AI request messages"
           ),
           jsonCodeCell(JSON.stringify(analysis, null, 2), "AI analysis JSON"),
         ]
@@ -728,12 +736,9 @@ export function buildAiAnalysisNotebookCells(
           jsonCodeCell(JSON.stringify(comparison.evidence, null, 2), "Comparison Evidence JSON"),
           jsonCodeCell(
             JSON.stringify(comparison.baselineContext, null, 2),
-            "Baseline Full context JSON",
+            "Baseline Full context JSON"
           ),
-          // Duplicates the unprefixed cell above on purpose: existing readers
-          // keep working, and selecting this report as a baseline later
-          // resolves the Current side rather than reaching back to the older
-          // baseline (§6.2, §14).
+          // Keep both labels for compatibility and future baseline selection.
           jsonCodeCell(JSON.stringify(context, null, 2), "Current Full context JSON"),
         ]
       : []),
@@ -741,57 +746,19 @@ export function buildAiAnalysisNotebookCells(
   return cells;
 }
 
-export type SaveAiAnalysisAsNotebookResult =
-  | { ok: true; relativePath: string; uri: Uri }
-  | { ok: false; message: string };
+export type SaveAiAnalysisAsNotebookResult = SavePerformanceTuningNotebookResult;
 
-/**
- * Writes and opens a new Notebook under `<workspace root>/reports/performance-tuning/`
- * (auto-created if missing), containing the SQL/context overview, the AI
- * analysis, and both raw JSON payloads as evidence (§8). Never appends to an
- * existing Notebook and never prompts a save dialog - both decided with the
- * user (design doc §16.1).
- *
- * `input` may carry an AI analysis, a baseline comparison, both, or neither.
- * With neither, the deterministic collected context is saved as an evidence
- * report without calling a model.
- */
+/** Saves a new analysis, comparison, or evidence notebook under the workspace reports directory. */
 export async function saveAiAnalysisAsNotebook(
   context: PerformanceTuningContext,
   input: PerformanceTuningReportInput
 ): Promise<SaveAiAnalysisAsNotebookResult> {
-  const wsFolder = workspace.workspaceFolders?.[0];
-  if (!wsFolder) {
-    return {
-      ok: false,
-      message:
-        "No workspace folder is open, so the performance tuning report cannot be saved. Open a workspace folder and try again.",
-    };
-  }
-
-  const dirUri = Uri.joinPath(wsFolder.uri, ...REPORTS_SUBPATH);
-  let filename = buildPerformanceTuningNotebookFilename(
+  const filename = buildPerformanceTuningNotebookFilename(
     context.database.databaseName,
-    getPerformanceTuningReportKind(input),
+    getPerformanceTuningReportKind(input)
   );
-  let targetUri = Uri.joinPath(dirUri, filename);
-
-  await createDirectory(dirUri);
-  // Timestamp resolution is seconds, so a collision is extremely unlikely -
-  // guarded anyway so a same-second double-click never silently clobbers a
-  // prior save.
-  if (await existsUri(targetUri)) {
-    filename = filename.replace(/\.dbn$/, `-${Date.now()}.dbn`);
-    targetUri = Uri.joinPath(dirUri, filename);
-  }
-
-  const cells = buildAiAnalysisNotebookCells(context, input);
-  await writeNotebookFile(cells, targetUri);
-  // ViewColumn.Two, not Beside, matching cfnDiagramPreviewNotebook.ts's
-  // established convention for "open a generated Notebook next to whatever
-  // the user already has open" - Beside is relative to the *active* editor,
-  // which may not be the Preview Panel the user pressed Save from.
-  await openNotebookFile(targetUri, { viewColumn: ViewColumn.Two });
-
-  return { ok: true, relativePath: [...REPORTS_SUBPATH, filename].join("/"), uri: targetUri };
+  return savePerformanceTuningNotebookFile({
+    filename,
+    cells: buildAiAnalysisNotebookCells(context, input),
+  });
 }

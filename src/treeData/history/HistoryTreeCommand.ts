@@ -127,7 +127,11 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     const cells: NotebookCellData[] = [];
     if (history.variables && Object.keys(history.variables).length > 0) {
       cells.push(
-        new NotebookCellData(NotebookCellKind.Code, JSON.stringify(history.variables, null, 2), "json")
+        new NotebookCellData(
+          NotebookCellKind.Code,
+          JSON.stringify(history.variables, null, 2),
+          "json"
+        )
       );
     }
     cells.push(createNotebookSqlCellByHistory(history));
@@ -194,7 +198,9 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
     await stateStorage.resetSQLHistoryPerformanceByID(history.id);
     await historyTreeProvider.refresh(true);
-    window.showInformationMessage("Performance statistics were reset. Save a baseline report before resetting when you need to retain the previous evidence.");
+    window.showInformationMessage(
+      "Performance statistics were reset. Save a baseline report before resetting when you need to retain the previous evidence."
+    );
   });
 
   registerDisposableCommand(OPEN_SQL_HISTORY, async (history: SQLHistory) => {
@@ -322,10 +328,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
   });
 
-  // native Query re-execution (design doc §8.2) - never routed through
-  // normalizeQuery()/createRDSDriver()/requestSql(): sqlDoc is a value-free
-  // description text for this kind, not PartiQL/SQL, and the real, re-
-  // executable request already lives in history.request.input.
+  // Native Query history executes its stored input; sqlDoc is display text only.
   const executeDynamoQueryHistory = async (
     connectionSetting: ConnectionSetting,
     history: SQLHistory,
@@ -336,7 +339,10 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     const { ok, message, result } = await window.withProgress(
       { location: ProgressLocation.Notification, cancellable: false },
       async (progress) => {
-        progress.report({ message: `Execute DynamoDB Query: ${request.displayText}`, increment: 50 });
+        progress.report({
+          message: `Execute DynamoDB Query: ${request.displayText}`,
+          increment: 50,
+        });
         const r = await workflow<AwsDriver, ResultSetData>(
           connectionSetting,
           async (driver) => driver.dynamoClient.queryItemsAtClient(request.input),
@@ -512,38 +518,17 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
   });
 
-  // AWS/DynamoDB branch of START_PERFORMANCE_TUNING_FROM_HISTORY below -
-  // design doc §11.3: "AWS branch。databaseName不要、PartiQL bind を`?`に正規
-  // 化". Deliberately much shorter than the RDB branch: no databaseName
-  // resolution (DynamoDB has no such concept), no estimateBindParameters()/
-  // Bind Parameters Panel (Decision 1 of the design review - see
-  // openDynamoDbPerformanceTuningPreview()'s own doc comment for why), and no
-  // resolveTargetTables()/resolveTableAliasMap()/stateStorage.loadResource()/
-  // getFirstRdsDatabaseByName() (all RDB-only concepts; loadResource() in
-  // particular internally does a `Scan Limit 1` for attribute-type
-  // estimation, which would violate the static Preview's no-item-data-read
-  // guarantee - §11.3's own note on the AWS history branch).
+  // DynamoDB preview collection avoids RDB-only metadata and item-data reads.
   const startDynamoDbPerformanceTuningFromHistory = async (
     connectionSetting: ConnectionSetting,
     history: SQLHistory
   ): Promise<void> => {
-    // native Query history (design doc §8.4) carries its own real, value-ful
-    // input already - never routed through normalizeQuery() (sqlDoc is a
-    // value-free description text for this kind, not PartiQL). Preview's own
-    // static collection path (startDynamoDbPerformanceTuningPreview.ts)
-    // further strips this down to the values-free
-    // DynamoDbQueryAnalysisInput mirror the Context/AI actually receive -
-    // ExpressionAttributeValues never reach either from here.
+    // Native Query values remain execution-only and are sanitized before Context creation.
     let request: DynamoDbPerformanceTuningPreviewRequest["statement"]["request"];
     if (history.request?.kind === "dynamodbQuery") {
       request = { kind: "query", input: history.request.input };
     } else {
-      // normalizeQuery() converts db-notebook's canonical `:name` bind
-      // syntax into DynamoDB PartiQL's `?` positional markers - the same
-      // conversion EXECUTE_SQL_HISTORY above needs, and required regardless
-      // of whether every marker's value happens to be known: eligibility for
-      // Run Observed Read is decided later, driver-side, purely from
-      // whether the resulting *text* still contains a `?` (§7.1/§7.4).
+      // Convert canonical named binds to DynamoDB positional markers.
       const driver = await createSQLSupportDriver<AwsDriver>(connectionSetting, true);
       const toPositionedParameter = driver.isPositionedParameterAvailable();
       const toPositionalCharacter = driver.getPositionalCharacter();
@@ -555,61 +540,43 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       request = { kind: "partiql", text: nativeSql };
     }
 
-    // SQL History's rolling Capacity/timing aggregate for this exact
-    // statement (sqlHistoryUtil.ts) - the DynamoDB counterpart of the RDB
-    // branch's `statistics` below, folded into the collected Context as
-    // workload evidence (§6.5) rather than a separate statement-statistics
-    // surface (DynamoDB has none to route through - design doc §5.1).
-    // lastReturnedItemCount/lastEvaluatedItemCount are sourced from
-    // summary.dynamoDb (the DynamoDB API evidence's single source of truth
-    // as of the query-panel-history-performance plan §5.4) - selectedRows
-    // stays as the fallback for an older history entry saved before
-    // summary.dynamoDb existed.
-    //
-    // readObservationSampleCount..boundedObservationCount (§9.2) are the
-    // rolling multi-execution aggregate across repeated runs of this exact
-    // structure (performance.dynamoDb, built in StateStorage.addSQLHistory
-    // via sqlHistoryUtil's mergeDynamoDbPerformance) - a different, wider-
-    // but-shallower degree of evidence than `previousObservation` below
-    // (one specific recent execution). weightedFilterPassRate is derived
-    // here from the aggregate's own totals (design doc §7.3: "weighted pass
-    // rate は保存せず...から算出する"), never averaged from per-sample rates.
+    // Workload aggregates repeated history samples; previousObservation below is one execution.
     const dynamoDbPerf = history.performance?.dynamoDb;
-    const workload: DynamoDbWorkloadContext | undefined = history.performance && history.performance.sampleCount > 0
-      ? {
-          executionCount: history.performance.sampleCount,
-          totalClientElapsedTimeMs: history.performance.totalElapsedTimeMilli,
-          averageClientElapsedTimeMs: averageElapsedTimeMilli(history.performance),
-          maxClientElapsedTimeMs: history.performance.maxElapsedTimeMilli,
-          lastClientElapsedTimeMs: history.performance.lastElapsedTimeMilli,
-          capacitySampleCount: history.performance.capacitySampleCount,
-          totalCapacityUnits: history.performance.totalCapacityUnits,
-          averageCapacityUnits: averageCapacityUnits(history.performance),
-          maxCapacityUnits: history.performance.maxCapacityUnits,
-          lastCapacityUnits: history.performance.lastCapacityUnits,
-          lastReturnedItemCount: history.summary?.dynamoDb?.returnedItemCount ?? history.summary?.selectedRows,
-          lastEvaluatedItemCount: history.summary?.dynamoDb?.evaluatedItemCount,
-          source: "sqlHistory",
-          lastExecutedAt: history.executedAt ? new Date(history.executedAt).toISOString() : undefined,
-          readObservationSampleCount: dynamoDbPerf?.observationSampleCount,
-          evaluatedCountSampleCount: dynamoDbPerf?.evaluatedCountSampleCount,
-          totalReturnedItemCount: dynamoDbPerf?.totalReturnedItemCount,
-          totalEvaluatedItemCount: dynamoDbPerf?.totalEvaluatedItemCount,
-          weightedFilterPassRate:
-            dynamoDbPerf && dynamoDbPerf.totalEvaluatedItemCount > 0
-              ? dynamoDbPerf.totalReturnedItemCount / dynamoDbPerf.totalEvaluatedItemCount
+    const workload: DynamoDbWorkloadContext | undefined =
+      history.performance && history.performance.sampleCount > 0
+        ? {
+            executionCount: history.performance.sampleCount,
+            totalClientElapsedTimeMs: history.performance.totalElapsedTimeMilli,
+            averageClientElapsedTimeMs: averageElapsedTimeMilli(history.performance),
+            maxClientElapsedTimeMs: history.performance.maxElapsedTimeMilli,
+            lastClientElapsedTimeMs: history.performance.lastElapsedTimeMilli,
+            capacitySampleCount: history.performance.capacitySampleCount,
+            totalCapacityUnits: history.performance.totalCapacityUnits,
+            averageCapacityUnits: averageCapacityUnits(history.performance),
+            maxCapacityUnits: history.performance.maxCapacityUnits,
+            lastCapacityUnits: history.performance.lastCapacityUnits,
+            lastReturnedItemCount:
+              history.summary?.dynamoDb?.returnedItemCount ?? history.summary?.selectedRows,
+            lastEvaluatedItemCount: history.summary?.dynamoDb?.evaluatedItemCount,
+            source: "sqlHistory",
+            lastExecutedAt: history.executedAt
+              ? new Date(history.executedAt).toISOString()
               : undefined,
-          minFilterPassRate: dynamoDbPerf?.minFilterPassRate,
-          maxFilterPassRate: dynamoDbPerf?.maxFilterPassRate,
-          lastFilterPassRate: dynamoDbPerf?.lastFilterPassRate,
-          boundedObservationCount: dynamoDbPerf?.boundedObservationCount,
-        }
-      : undefined;
+            readObservationSampleCount: dynamoDbPerf?.observationSampleCount,
+            evaluatedCountSampleCount: dynamoDbPerf?.evaluatedCountSampleCount,
+            totalReturnedItemCount: dynamoDbPerf?.totalReturnedItemCount,
+            totalEvaluatedItemCount: dynamoDbPerf?.totalEvaluatedItemCount,
+            weightedFilterPassRate:
+              dynamoDbPerf && dynamoDbPerf.totalEvaluatedItemCount > 0
+                ? dynamoDbPerf.totalReturnedItemCount / dynamoDbPerf.totalEvaluatedItemCount
+                : undefined,
+            minFilterPassRate: dynamoDbPerf?.minFilterPassRate,
+            maxFilterPassRate: dynamoDbPerf?.maxFilterPassRate,
+            lastFilterPassRate: dynamoDbPerf?.lastFilterPassRate,
+            boundedObservationCount: dynamoDbPerf?.boundedObservationCount,
+          }
+        : undefined;
 
-    // The latest single execution's own read evidence (design doc §9.1) -
-    // Observation and Workload are deliberately kept distinct (one recent
-    // execution vs. a rolling multi-sample aggregate), never merged into one
-    // value.
     const previousObservation = buildObservationFromHistory(history);
 
     const result = await openDynamoDbPerformanceTuningPreview({
@@ -625,8 +592,6 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
           "Failed to collect DynamoDB performance tuning context."
       );
     }
-    // "cancelled" mirrors the RDB branch's own handling below - nothing
-    // further to show; "opened" needs no notification either.
   };
 
   registerDisposableCommand(START_PERFORMANCE_TUNING_FROM_HISTORY, async (history: SQLHistory) => {
@@ -647,50 +612,29 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     // database the plan/statistics should be collected against.
     const databaseName = history.meta?.useDatabase ?? connectionSetting.database;
     if (!databaseName) {
-      showWindowErrorMessage(
-        "Could not determine the target database for this SQL history entry."
-      );
+      showWindowErrorMessage("Could not determine the target database for this SQL history entry.");
       return;
     }
 
-    const statistics: SelectedStatementStatistics | undefined = history.performance && history.performance.sampleCount > 0
-      ? {
-          executionCount: history.performance.sampleCount,
-          totalElapsedTimeMs: history.performance.totalElapsedTimeMilli,
-          averageElapsedTimeMs:
-            history.performance.totalElapsedTimeMilli / history.performance.sampleCount,
-          maxElapsedTimeMs: history.performance.maxElapsedTimeMilli,
-          statisticsSince: history.performance.statisticsSince
-            ? new Date(history.performance.statisticsSince).toISOString()
-            : undefined,
-          lastExecutedAt: history.executedAt
-            ? new Date(history.executedAt).toISOString()
-            : undefined,
-          source: "sqlHistory",
-        }
-      : undefined;
+    const statistics: SelectedStatementStatistics | undefined =
+      history.performance && history.performance.sampleCount > 0
+        ? {
+            executionCount: history.performance.sampleCount,
+            totalElapsedTimeMs: history.performance.totalElapsedTimeMilli,
+            averageElapsedTimeMs:
+              history.performance.totalElapsedTimeMilli / history.performance.sampleCount,
+            maxElapsedTimeMs: history.performance.maxElapsedTimeMilli,
+            statisticsSince: history.performance.statisticsSince
+              ? new Date(history.performance.statisticsSince).toISOString()
+              : undefined,
+            lastExecutedAt: history.executedAt
+              ? new Date(history.executedAt).toISOString()
+              : undefined,
+            source: "sqlHistory",
+          }
+        : undefined;
 
-    // 2026-08-19 follow-up #2: history.sqlDoc always uses db-notebook's own
-    // canonical, named `:name` bind syntax - never the target vendor's
-    // native placeholder syntax - the same reason EXECUTE_SQL_HISTORY above
-    // (line ~254) always runs it through normalizeQuery() before actually
-    // executing it. Every performance-tuning Provider (e.g.
-    // PostgresPerformanceTuningProvider.collectExecutionPlan()) sends
-    // statement.sql straight to the database with no normalization of its
-    // own, so skipping this step here made any parameterized history entry
-    // fail with a vendor syntax error at the ":" (confirmed via debugger:
-    // "syntax error at or near \":\"" against a Postgres connection).
-    //
-    // Prefer converting *with* history.variables as bindParams (one call
-    // gives both the converted query text and a real, positionally-aligned
-    // binds array to pre-fill the confirm panel with) - this also lets an
-    // IN-clause array value expand to the right number of positions in the
-    // query text itself, which a bindParams-less conversion below can't know
-    // to do. Falls back to a bindParams-less (structural-only) conversion
-    // when history.variables is missing/empty, or doesn't cover every
-    // marker the SQL actually has (normalizeQuery() throws
-    // "Missing bind parameter[s]" in that case) - the confirm panel then
-    // opens with its normal blank fields instead of a pre-fill.
+    // Convert canonical binds with saved values when complete, otherwise preserve structure only.
     const driver = await createRDSDriver(connectionSetting, true);
     const toPositionedParameter = driver.isPositionedParameterAvailable();
     const toPositionalCharacter = driver.getPositionalCharacter();
@@ -723,16 +667,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       presetBindValues = undefined;
     }
 
-    // Shared with Query Statistics (9b) - see startPerformanceTuningPreview()'s
-    // own doc comment (§10 Phase 5 "Preview接続の共通化と競合防止").
-    // targetTables/tableAliasMap (§6.5/§6.6/§7.7 of performance-tuning-
-    // query-statistics-parameter-input-plan.ja.md): same MySQL aliased-table
-    // EXPLAIN gap Query Statistics has, and history.sqlDoc is just as
-    // likely to alias its FROM/JOIN tables as a Query Statistics row's SQL
-    // is. Parsed from nativeSql, not history.sqlDoc: a canonical `:name`
-    // marker isn't valid Postgres/MySQL syntax, so parsing the already-
-    // converted SQL can only help these helpers' AST-based alias resolution,
-    // never hurt it.
+    // Resolve tables and aliases from vendor-native SQL for plan mapping.
     const targetTables = resolveTargetTables({
       dbType: connectionSetting.dbType,
       sql: nativeSql,
@@ -742,34 +677,16 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       sql: nativeSql,
     });
 
-    // 2026-08-19 follow-up: this handler used to call
-    // startPerformanceTuningPreview() with no bind values at all, regardless
-    // of whether history.sqlDoc had any placeholders - a parameterized
-    // history entry could only ever fail to collect a plan. estimateBindParameters()
-    // needs the connection's resource tree for column-type estimation (the
-    // same reason ToolsViewProvider already requires an RdsDatabase for
-    // Query Statistics); load it before building the preview request.
+    // Resource metadata improves bind type estimates but is optional.
     let databaseResource = stateStorage.getFirstRdsDatabaseByName(history.connectionName);
     if (databaseResource === undefined) {
       const { ok, result } = await stateStorage.loadResource(history.connectionName, false, true);
-      databaseResource = ok ? (result?.db.find((d) => d instanceof RdsDatabase) as RdsDatabase) : undefined;
+      databaseResource = ok
+        ? (result?.db.find((d) => d instanceof RdsDatabase) as RdsDatabase)
+        : undefined;
     }
 
-    // estimateBindParameters() scans for the *target vendor's* native
-    // marker syntax per dbType ($N for Postgres, :name/:N for Oracle, ...) -
-    // not db-notebook's canonical :name convention - so it has to run
-    // against nativeSql (already converted above), not history.sqlDoc.
-    // Running it against the original canonical text (as this used to)
-    // pointed the scanner at the wrong syntax entirely: for any non-
-    // Oracle/SQL Server vendor it silently found no markers at all, which -
-    // combined with the syntax-error bug above - meant the confirm panel
-    // never even opened for a Postgres example that clearly had a
-    // `:channel` marker (confirmed via debugger: estimatedBindParameters
-    // came back `[]`). No `databaseResource ?` guard here either (unlike
-    // before): estimateBindParameters() already degrades gracefully with no
-    // column hints when it's undefined - skipping the scan entirely in that
-    // case used to silently skip the confirm panel too whenever the
-    // resource tree couldn't be loaded.
+    // Bind estimation scans vendor-native placeholder syntax.
     const estimatedBindParameters = estimateBindParameters({
       dbType: connectionSetting.dbType,
       sql: nativeSql,
@@ -793,9 +710,5 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
           "Failed to collect performance tuning context."
       );
     }
-    // "cancelled" mirrors standard VS Code progress-cancellation UX (the
-    // user asked to stop, so no further notification is shown); "deferred"
-    // means PerformanceTuningBindParametersPanel opened instead and now owns
-    // the rest of this flow - also nothing further to show here.
   });
 };

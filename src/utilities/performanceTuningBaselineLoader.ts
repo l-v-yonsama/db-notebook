@@ -1,12 +1,4 @@
-// Reads a previously saved Performance Tuning `.dbn` and extracts the Full
-// Context it holds, so the Preview can compare against it
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §6).
-//
-// Split deliberately in two: extractBaselineContext() is a pure function over
-// the file's text (everything §17.1 tests), and the VS Code pieces below it -
-// the open dialog and the file read - do nothing but hand that function a
-// string. The baseline .dbn is opened read-only and never written back (§1).
+// Extracts a validated Context snapshot from a read-only performance report.
 
 import {
   isDynamoDbPerformanceTuningContext,
@@ -121,7 +113,9 @@ function parseAndValidate(cellValue: string, label: string): BaselineExtractionR
     // a future format could move or redefine a field this comparison reads.
     return {
       ok: false,
-      message: `The selected notebook's context uses format version ${String(formatVersion)}, which this version of the extension cannot read (it supports version ${SUPPORTED_FORMAT_VERSION}).`,
+      message: `The selected notebook's context uses format version ${String(
+        formatVersion
+      )}, which this version of the extension cannot read (it supports version ${SUPPORTED_FORMAT_VERSION}).`,
     };
   }
 

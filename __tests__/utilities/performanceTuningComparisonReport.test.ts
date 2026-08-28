@@ -1,7 +1,4 @@
-// §17.7 of
-// misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// - what a saved report has to carry so a comparison stays verifiable after
-// the baseline file itself is gone.
+// Verifies reports remain self-contained after the baseline file is gone.
 
 import type { NotebookCellData } from "vscode";
 import { describe, expect, it } from "vitest";

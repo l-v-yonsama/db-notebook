@@ -1,13 +1,4 @@
-// Markdown for the comparison sections of a saved report
-// (misc/specs/performance-tuning-baseline-comparison-implementation-plan.ja.md
-// §14). Engine-agnostic on purpose: everything rendered here comes from the
-// Comparison Evidence, which the comparison builders already normalized into
-// shapes that do not depend on which engine produced them - so both
-// performanceTuningAiNotebook.ts and dynamoDbPerformanceTuningNotebook.ts
-// reuse this module rather than each growing its own copy.
-//
-// Pure string building, no VS Code API and no I/O, the same way the rest of
-// the report builders are structured for testability.
+// Engine-neutral, side-effect-free comparison report rendering.
 
 import type {
   AnyTuningContext,
@@ -92,15 +83,25 @@ function summaryTable(
     "| Item | Detail |",
     "|---|---|",
     `| Baseline report | ${escapeMdCell(baselineFileName)} |`,
-    `| Baseline collected at | ${evidence.source.baseline.collectedAt ? formatUtcWithLocal(evidence.source.baseline.collectedAt) : "unknown"} |`,
-    `| Current collected at | ${evidence.source.current.collectedAt ? formatUtcWithLocal(evidence.source.current.collectedAt) : "unknown"} |`,
+    `| Baseline collected at | ${
+      evidence.source.baseline.collectedAt
+        ? formatUtcWithLocal(evidence.source.baseline.collectedAt)
+        : "unknown"
+    } |`,
+    `| Current collected at | ${
+      evidence.source.current.collectedAt
+        ? formatUtcWithLocal(evidence.source.current.collectedAt)
+        : "unknown"
+    } |`,
     `| Comparability | ${comparabilityLabel(level)} |`,
     `| Engine | ${evidence.engine === "rdb" ? "Relational database" : "DynamoDB"} |`,
     `| Comparison generated at | ${formatUtcWithLocal(evidence.generatedAt)} |`,
   ];
 }
 
-function comparabilityLabel(level: PerformanceTuningComparisonEvidence["comparability"]["level"]): string {
+function comparabilityLabel(
+  level: PerformanceTuningComparisonEvidence["comparability"]["level"]
+): string {
   switch (level) {
     case "comparable":
       return "✅ Comparable";
@@ -140,7 +141,10 @@ function keyChanges(evidence: PerformanceTuningComparisonEvidence, n: string): s
     "|---|---|---|---|",
     ...ranked.map(
       (metric) =>
-        `| ${escapeMdCell(metric.label)} | ${formatValue(metric.baseline, metric.unit)} | ${formatValue(metric.current, metric.unit)} | ${improvementLabel(metric)} |`
+        `| ${escapeMdCell(metric.label)} | ${formatValue(
+          metric.baseline,
+          metric.unit
+        )} | ${formatValue(metric.current, metric.unit)} | ${improvementLabel(metric)} |`
     ),
   ];
 }
@@ -202,10 +206,12 @@ function accessPathChanges(evidence: PerformanceTuningComparisonEvidence, n: str
         const note = change.ambiguous
           ? `⚠️ ${change.baselineNodeCount} baseline step(s) / ${change.currentNodeCount} current step(s) - not matched one to one`
           : change.changed
-            ? "Changed"
-            : "No change";
+          ? "Changed"
+          : "No change";
         lines.push(
-          `| ${escapeMdCell(change.target)} | ${escapeMdCell(describeStep(change.baseline))} | ${escapeMdCell(describeStep(change.current))} | ${note} |`
+          `| ${escapeMdCell(change.target)} | ${escapeMdCell(
+            describeStep(change.baseline)
+          )} | ${escapeMdCell(describeStep(change.current))} | ${note} |`
         );
       }
     }
@@ -267,7 +273,9 @@ function engineStructureRows(evidence: PerformanceTuningComparisonEvidence): str
 
 function valueRow(label: string, value: ComparisonValue<unknown>): string {
   const marker = value.changed ? " ←" : "";
-  return `| ${escapeMdCell(label)} | ${escapeMdCell(formatSide(value.baseline))} | ${escapeMdCell(formatSide(value.current))}${marker} |`;
+  return `| ${escapeMdCell(label)} | ${escapeMdCell(formatSide(value.baseline))} | ${escapeMdCell(
+    formatSide(value.current)
+  )}${marker} |`;
 }
 
 function completionValueRow(label: string, value: ComparisonValue<unknown>): string {
@@ -275,10 +283,12 @@ function completionValueRow(label: string, value: ComparisonValue<unknown>): str
     side === "complete"
       ? "✅ COMPLETE"
       : side === undefined || side === "not measured"
-        ? "➖ NOT MEASURED"
-        : `⚠️ INCOMPLETE (${String(side)})`;
+      ? "➖ NOT MEASURED"
+      : `⚠️ INCOMPLETE (${String(side)})`;
   const marker = value.changed ? " ←" : "";
-  return `| ${escapeMdCell(label)} | ${escapeMdCell(format(value.baseline))} | ${escapeMdCell(format(value.current))}${marker} |`;
+  return `| ${escapeMdCell(label)} | ${escapeMdCell(format(value.baseline))} | ${escapeMdCell(
+    format(value.current)
+  )}${marker} |`;
 }
 
 function formatSide(value: unknown): string {
@@ -376,7 +386,12 @@ function metricTable(evidence: PerformanceTuningComparisonEvidence, n: string): 
     "|---|---|---|---|---|",
     ...metrics.map(
       (metric) =>
-        `| ${escapeMdCell(metric.label)} | ${formatValue(metric.baseline, metric.unit)} | ${formatValue(metric.current, metric.unit)} | ${formatChange(metric)} | ${assessmentLabel(metric)} |`
+        `| ${escapeMdCell(metric.label)} | ${formatValue(
+          metric.baseline,
+          metric.unit
+        )} | ${formatValue(metric.current, metric.unit)} | ${formatChange(
+          metric
+        )} | ${assessmentLabel(metric)} |`
     )
   );
   const guidance = new Map<string, NonNullable<NumericComparison["missingDataGuidance"]>>();
@@ -384,7 +399,7 @@ function metricTable(evidence: PerformanceTuningComparisonEvidence, n: string): 
     if (metric.missingDataGuidance) {
       guidance.set(
         `${metric.missingDataGuidance.action}\u0000${metric.missingDataGuidance.detail}`,
-        metric.missingDataGuidance,
+        metric.missingDataGuidance
       );
     }
   }
@@ -416,7 +431,9 @@ function formatChange(metric: NumericComparison): string {
   }
   if (metric.percentagePointDelta !== undefined) {
     parts.push(
-      `${metric.percentagePointDelta > 0 ? "+" : ""}${roundForDisplay(metric.percentagePointDelta)} pt`
+      `${metric.percentagePointDelta > 0 ? "+" : ""}${roundForDisplay(
+        metric.percentagePointDelta
+      )} pt`
     );
   } else if (metric.percentChange !== undefined) {
     parts.push(`${metric.percentChange > 0 ? "+" : ""}${roundForDisplay(metric.percentChange)}%`);
@@ -464,7 +481,11 @@ function comparabilityNotes(evidence: PerformanceTuningComparisonEvidence, n: st
   lines.push("| Level | Note |", "|---|---|");
   for (const reason of reasons) {
     const icon =
-      reason.level === "notComparable" ? "⛔" : reason.level === "partiallyComparable" ? "⚠️" : "ℹ️";
+      reason.level === "notComparable"
+        ? "⛔"
+        : reason.level === "partiallyComparable"
+        ? "⚠️"
+        : "ℹ️";
     const detail = reason.detail ? ` (${reason.detail})` : "";
     lines.push(`| ${icon} ${reason.code} | ${escapeMdCell(`${reason.message}${detail}`)} |`);
   }
