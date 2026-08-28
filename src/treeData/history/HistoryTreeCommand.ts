@@ -26,7 +26,6 @@ import {
   OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY,
   OPEN_MDH_VIEWER,
   OPEN_QUERY_HISTORIES_AS_NOTEBOOK,
-  OPEN_QUERY_HISTORY,
   REFRESH_QUERY_HISTORIES,
   RESET_QUERY_HISTORY_PERFORMANCE,
   SORT_QUERY_HISTORIES_BY_DURATION,
@@ -203,14 +202,6 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     );
   });
 
-  registerDisposableCommand(OPEN_QUERY_HISTORY, async (history: QueryHistory) => {
-    if (history.request?.kind === "dynamodbQuery") {
-      return;
-    }
-    const cells = createNotebookCellsForHistory(history);
-    commands.executeCommand(CREATE_NEW_NOTEBOOK, cells);
-  });
-
   registerDisposableCommand(
     OPEN_QUERY_HISTORIES_AS_NOTEBOOK,
     async (history: QueryHistory, selectedHistories?: QueryHistory[]) => {
@@ -279,7 +270,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   registerDisposableCommand(OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY, async (history: QueryHistory) => {
     const request = history.request;
     if (request?.kind !== "dynamodbQuery" || request.origin !== "dynamoQueryPanel") {
-      showWindowErrorMessage("This history entry was not created by Dynamo Query Panel.");
+      showWindowErrorMessage("This history entry was not created by DynamoDB Query Panel.");
       return;
     }
     const tableName = request.input.TableName;

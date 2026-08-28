@@ -73,7 +73,6 @@ export const DELETE_ALL_QUERY_HISTORY = `${EXTENSION_NAME}.delete-all-query-hist
 export const EXECUTE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.execute`;
 export const OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY = `${EXTENSION_NAME}.histories.openDynamoQueryPanel`;
 export const START_PERFORMANCE_TUNING_FROM_HISTORY = `${EXTENSION_NAME}.histories.startPerformanceTuning`;
-export const OPEN_QUERY_HISTORY = `${EXTENSION_NAME}.histories.open`;
 export const DELETE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.delete`;
 export const RESET_QUERY_HISTORY_PERFORMANCE = `${EXTENSION_NAME}.histories.resetPerformance`;
 export const OPEN_QUERY_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openAsNotebook`;

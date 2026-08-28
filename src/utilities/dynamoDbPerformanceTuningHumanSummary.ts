@@ -134,7 +134,7 @@ function buildObservationSignal(context: DynamoDbPerformanceTuningContext): Dyna
       ? "a confirmed Run Observed Read"
       : observation.source === "sqlHistory"
         ? "a prior Query History execution"
-        : "the Dynamo Query Panel";
+        : "the DynamoDB Query Panel";
   const boundedNote = observation.bounded
     ? ` This observation is bounded (${observation.boundDescription ?? "a single response"}) and may not reflect the statement's full result.`
     : "";

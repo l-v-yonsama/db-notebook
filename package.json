@@ -740,58 +740,43 @@
         },
         {
           "command": "database-notebook.histories.execute",
-          "when": "view == database-notebook-histories",
-          "group": "inline"
-        },
-        {
-          "command": "database-notebook.histories.openDynamoQueryPanel",
-          "when": "view == database-notebook-histories && viewItem =~ /^queryHistoryDynamoQueryPanel/",
-          "group": "inline"
-        },
-        {
-          "command": "database-notebook.histories.startPerformanceTuning",
-          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
-          "group": "inline"
-        },
-        {
-          "command": "database-notebook.histories.resetPerformance",
-          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
-          "group": "inline"
-        },
-        {
-          "command": "database-notebook.histories.open",
-          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory(Success|Error)$/",
-          "group": "inline"
-        },
-        {
-          "command": "database-notebook.histories.delete",
-          "when": "view == database-notebook-histories",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory/",
           "group": "inline"
         },
         {
           "command": "database-notebook.histories.openAsNotebook",
           "when": "view == database-notebook-histories && viewItem =~ /^queryHistory(Success|Error)$/",
-          "group": "history@1"
+          "group": "1_open@1"
         },
         {
           "command": "database-notebook.histories.appendToActiveNotebook",
           "when": "view == database-notebook-histories && viewItem =~ /^queryHistory(Success|Error)$/",
-          "group": "history@2"
+          "group": "1_open@2"
         },
         {
           "command": "database-notebook.histories.openDynamoQueryPanel",
           "when": "view == database-notebook-histories && viewItem =~ /^queryHistoryDynamoQueryPanel/",
-          "group": "history@3"
+          "group": "1_open@3"
+        },
+        {
+          "command": "database-notebook.histories.execute",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory/",
+          "group": "2_run@1"
         },
         {
           "command": "database-notebook.histories.startPerformanceTuning",
           "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
-          "group": "history@4"
+          "group": "3_tuning@1"
         },
         {
           "command": "database-notebook.histories.resetPerformance",
           "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
-          "group": "history@5"
+          "group": "3_tuning@2"
+        },
+        {
+          "command": "database-notebook.histories.delete",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory/",
+          "group": "9_danger@1"
         },
         {
           "command": "database-notebook.start-mcp-server",
@@ -1336,7 +1321,7 @@
       },
       {
         "command": "database-notebook.show-dynamo-query-panel",
-        "title": "Open Dynamo query panel",
+        "title": "Open DynamoDB Query Panel",
         "icon": "$(filter)"
       },
       {
@@ -1484,21 +1469,15 @@
       },
       {
         "command": "database-notebook.histories.openDynamoQueryPanel",
-        "title": "Open in Dynamo Query Panel",
+        "title": "Open in DynamoDB Query Panel",
         "shortTitle": "Open in Query Panel",
-        "icon": "$(edit)"
+        "icon": "$(filter)"
       },
       {
         "command": "database-notebook.histories.startPerformanceTuning",
-        "title": "Start performance tuning",
-        "shortTitle": "Tune",
+        "title": "Open Performance Tuning Preview",
+        "shortTitle": "Performance tuning",
         "icon": "$(pulse)"
-      },
-      {
-        "command": "database-notebook.histories.open",
-        "title": "Open selected query",
-        "shortTitle": "Open",
-        "icon": "$(book)"
       },
       {
         "command": "database-notebook.histories.delete",
@@ -1510,7 +1489,7 @@
         "command": "database-notebook.histories.resetPerformance",
         "title": "Reset performance statistics",
         "shortTitle": "Reset statistics",
-        "icon": "$(debug-restart)"
+        "icon": "$(clear-all)"
       },
       {
         "command": "database-notebook.histories.openAsNotebook",

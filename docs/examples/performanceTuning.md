@@ -360,7 +360,7 @@ measurement — it's shown even before any request is sent to DynamoDB.
 Open the DynamoDB performance tuning preview from either of these places:
 
 - **Query History**, for a previously-run PartiQL statement, or a native `Query` executed from the
-  Dynamo Query Panel — every Panel execution (success or failure) is saved to Query History
+  DynamoDB Query Panel — every Panel execution (success or failure) is saved to Query History
   automatically, shown with item-based wording and no SQL syntax attached (its history entry has no
   equivalent of a runnable SQL cell). Repeating the exact same table/index/key-condition/filter/
   Projection/consistency structure with different values merges into one history entry rather than
