@@ -218,7 +218,7 @@ const restoreProjection = (
   return { projectionMode: "specific", projectedAttributes };
 };
 
-// Converts only requests produced by Dynamo Query Panel. SQL History stores
+// Converts only requests produced by Dynamo Query Panel. Query History stores
 // the exact native QueryCommandInput for re-execution; this function is the
 // inverse of DynamoQueryPanel.resetByTarget(), making that input editable
 // again without persisting a second, potentially divergent UI-state object.

@@ -424,7 +424,7 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
     return ["_No recommendations were reported._"];
   }
   const lines = [
-    "| Risk | Title | Detail | Rationale | Suggested SQL | Possible duplicate | Evidence |",
+    "| Risk | Title | Detail | Rationale | Suggested Query | Possible duplicate | Evidence |",
     "|---|---|---|---|---|---|---|",
   ];
   for (const r of recommendations) {
@@ -432,7 +432,7 @@ function recommendationsTable(recommendations: PerformanceTuningAiRecommendation
       `| ${r.riskLevel ?? "-"} | ${escapeMdCell(r.title)} | ${escapeMdCell(
         r.detail
       )} | ${escapeMdCell(r.rationale)} | ${
-        r.suggestedSql ? "`" + escapeMdCell(r.suggestedSql) + "`" : "-"
+        r.suggestedQuery ? "`" + escapeMdCell(r.suggestedQuery) + "`" : "-"
       } | ${
         // Duplicate-index evidence is host-computed, never AI-authored.
         r.possibleDuplicateOfIndex ? "`" + escapeMdCell(r.possibleDuplicateOfIndex) + "`" : "-"

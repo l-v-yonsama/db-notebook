@@ -13,7 +13,7 @@ import {
 
 // 2026-08-19 follow-up (misc/design/performance-tuning-query-statistics-
 // parameter-input-plan.ja.md's successor design). Both Preview entry points
-// (Query Statistics' "Preview tuning data" and SQL History's
+// (Query Statistics' "Preview tuning data" and Query History's
 // histories.startPerformanceTuning) call this instead of
 // startPerformanceTuningPreview() directly now - it's the one place that
 // decides whether the target SQL's estimated bind parameters can be
@@ -30,7 +30,7 @@ export type OpenPerformanceTuningPreviewParams = Omit<StartPerformanceTuningPrev
   estimatedBindParameters: EstimatedBindParameter[];
   // Optional real values to pre-fill the confirm panel's rows with, parallel
   // to estimatedBindParameters by `position` (1-based, so index
-  // `position - 1`) - e.g. SQL History's last-executed variables. Ignored
+  // `position - 1`) - e.g. Query History's last-executed variables. Ignored
   // when estimatedBindParameters is empty (nothing to pre-fill). A caller
   // with no such source (Query Statistics) simply omits this, and the panel
   // falls back to its normal blank fields.

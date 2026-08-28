@@ -42,7 +42,7 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
   - Execute query (Default)
   - Execute explain plan (Generates a query plan).
   - Execute explain analyze (Displays actual execution time and statistics)
-- SQL history management
+- Query history management
 - Variable sharing between notebook cells
   - See practical SQL examples using shared variables (LIKE, IN, exact match):
     [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)

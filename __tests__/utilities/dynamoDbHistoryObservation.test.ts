@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { SQLHistory } from "../../src/types/SQLHistory";
+import type { QueryHistory } from "../../src/types/QueryHistory";
 import {
   buildObservationFromHistory,
   toPerformanceCapacityBreakdown,
 } from "../../src/utilities/dynamoDbHistoryObservation";
 
-const baseHistory = (overrides: Partial<SQLHistory> = {}): SQLHistory => ({
+const baseHistory = (overrides: Partial<QueryHistory> = {}): QueryHistory => ({
   id: "h1",
   sqlDoc: "DynamoDB Query orders",
   connectionName: "conn1",

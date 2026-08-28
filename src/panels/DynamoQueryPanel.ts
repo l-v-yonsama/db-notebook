@@ -24,7 +24,7 @@ import {
   CREATE_NEW_NOTEBOOK,
   NOTEBOOK_TYPE,
   OPEN_MDH_VIEWER,
-  REFRESH_SQL_HISTORIES,
+  REFRESH_QUERY_HISTORIES,
 } from "../constant";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
@@ -370,9 +370,9 @@ export class DynamoQueryPanel extends BasePanel {
     }, 100);
   }
 
-  // Saves a Query Panel execution (success or failure) to SQL History as a
+  // Saves a Query Panel execution (success or failure) to Query History as a
   // "dynamodbQuery"-kind entry (design doc §7.1/§7.2), and refreshes the
-  // History tree the same way every other addSQLHistory() caller does. A
+  // History tree the same way every other addQueryHistory() caller does. A
   // failed execution reuses the same structuralKey, so StateStorage's own
   // merge logic (never this method's job) folds it into the prior success
   // instead of overwriting it.
@@ -390,7 +390,7 @@ export class DynamoQueryPanel extends BasePanel {
     const displayText = buildDynamoQueryDisplayText(queryInput);
     const structuralKey = buildDynamoQueryStructuralKey(queryInput);
 
-    await DynamoQueryPanel.stateStorage.addSQLHistory({
+    await DynamoQueryPanel.stateStorage.addQueryHistory({
       connectionName,
       sqlDoc: displayText,
       request: {
@@ -406,7 +406,7 @@ export class DynamoQueryPanel extends BasePanel {
       status,
       errorMessage,
     });
-    commands.executeCommand(REFRESH_SQL_HISTORIES);
+    commands.executeCommand(REFRESH_QUERY_HISTORIES);
   }
 
   private resetByTarget() {

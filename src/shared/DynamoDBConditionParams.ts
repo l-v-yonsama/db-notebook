@@ -27,7 +27,7 @@ export type DynamoDBConditionParams = {
   projectedAttributes: string[];
   consistentRead: boolean;
   // Controls only the representation built for Preview/Notebook output.
-  // Execute remains a native Query so SQL History keeps Count/ScannedCount.
+  // Execute remains a native Query so Query History keeps Count/ScannedCount.
   buildMode: DynamoQueryBuildMode;
   openInNotebook?: boolean;
   inActiveNotebook?: boolean;

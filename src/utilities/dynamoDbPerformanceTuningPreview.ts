@@ -20,10 +20,11 @@ import { toDynamoDbQueryAnalysisInput } from "./dynamoDbQueryAnalysisInput";
 export type DynamoDbPerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
   statement: {
+    // db-drivers' union value - see PerformanceTuningPreviewRequest.
     source: "sqlHistory" | "editor";
     request:
       | { kind: "partiql"; text: string }
-      // A native Query selected from SQL History retains the *real*,
+      // A native Query selected from Query History retains the *real*,
       // value-ful query input (QueryItemsAtClientInputParams *is* the AWS
       // SDK's QueryCommandInput, a bare type alias in db-drivers - see
       // AwsDynamoServiceClient.ts). Kept real (not
@@ -37,7 +38,7 @@ export type DynamoDbPerformanceTuningPreviewRequest = {
       | { kind: "query"; input: QueryItemsAtClientInputParams };
     // The most recent execution's read evidence for this exact statement
     // (design doc §8.4/§9.1) - e.g. dynamoDbHistoryObservation.ts's
-    // buildObservationFromHistory(), built from SQL History's
+    // buildObservationFromHistory(), built from Query History's
     // summary.dynamoDb, values-free by construction (it never derives from
     // ExpressionAttributeValues). Optional, since an editor/Notebook-cell
     // preview may have no matching prior execution. Passed straight through to the driver's own
@@ -46,8 +47,8 @@ export type DynamoDbPerformanceTuningPreviewRequest = {
     // Observed Read (executeOnce mode) replaces it.
     previousObservation?: DynamoDbReadObservation;
   };
-  // SQL History's rolling Capacity/timing aggregate for this exact statement
-  // (sqlHistoryUtil.ts's mergeSQLHistoryPerformance/averageCapacityUnits) -
+  // Query History's rolling Capacity/timing aggregate for this exact statement
+  // (queryHistoryUtil.ts's mergeQueryHistoryPerformance/averageCapacityUnits) -
   // optional, since an editor/Notebook-cell preview may have no prior
   // history to aggregate.
   workload?: DynamoDbWorkloadContext;
@@ -72,7 +73,7 @@ const UNAVAILABLE_DYNAMODB_CAPABILITIES: DynamoDbPerformanceTuningCapabilities =
   observedRead: { available: false },
 };
 
-// Shared by SQL History and the executed-Notebook-cell entry point,
+// Shared by Query History and the executed-Notebook-cell entry point,
 // mirroring startPerformanceTuningPreview()'s own
 // role for RDB.
 export async function startDynamoDbPerformanceTuningPreview(

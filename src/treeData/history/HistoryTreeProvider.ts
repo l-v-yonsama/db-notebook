@@ -3,25 +3,25 @@ import dayjs from "dayjs";
 import { StateStorage } from "../../utilities/StateStorage";
 
 import { abbr } from "@l-v-yonsama/rdh";
-import { SQLHistory } from "../../types/SQLHistory";
+import { QueryHistory } from "../../types/QueryHistory";
 import { formatDuration } from "../toolActivity/ToolActivityTreeProvider";
-import { averageElapsedTimeMilli } from "../../utilities/sqlHistoryUtil";
+import { averageElapsedTimeMilli } from "../../utilities/queryHistoryUtil";
 import { toDynamoDbQueryAnalysisInput } from "../../utilities/dynamoDbQueryAnalysisInput";
 import { log } from "../../utilities/logger";
-import { SQL_HISTORY_LABEL_MAX_LENGTH } from "../../constant";
+import { QUERY_HISTORY_LABEL_MAX_LENGTH } from "../../constant";
 
 const PREFIX = "[HistoryTreeProvider]";
 
-export type SQLHistorySortOrder = "recent" | "duration";
+export type QueryHistorySortOrder = "recent" | "duration";
 
-export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> {
-  private _onDidChangeTreeData: vscode.EventEmitter<SQLHistory | undefined | void> =
-    new vscode.EventEmitter<SQLHistory | undefined | void>();
-  readonly onDidChangeTreeData: vscode.Event<SQLHistory | undefined | void> =
+export class HistoryTreeProvider implements vscode.TreeDataProvider<QueryHistory> {
+  private _onDidChangeTreeData: vscode.EventEmitter<QueryHistory | undefined | void> =
+    new vscode.EventEmitter<QueryHistory | undefined | void>();
+  readonly onDidChangeTreeData: vscode.Event<QueryHistory | undefined | void> =
     this._onDidChangeTreeData.event;
-  private historyResList: SQLHistory[] = [];
+  private historyResList: QueryHistory[] = [];
   private filterConnectionName: string | undefined;
-  private sortOrder: SQLHistorySortOrder = "recent";
+  private sortOrder: QueryHistorySortOrder = "recent";
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -29,10 +29,10 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
   ) {
     this.init();
   }
-  getTreeItem(element: SQLHistory): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    return new SQLHistoryItem(element);
+  getTreeItem(element: QueryHistory): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    return new QueryHistoryItem(element);
   }
-  getChildren(element?: SQLHistory | undefined): vscode.ProviderResult<SQLHistory[]> {
+  getChildren(element?: QueryHistory | undefined): vscode.ProviderResult<QueryHistory[]> {
     try {
       let list = this.filterConnectionName
         ? this.historyResList.filter((it) => it.connectionName === this.filterConnectionName)
@@ -63,11 +63,11 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
     this._onDidChangeTreeData.fire();
   }
 
-  getSortOrder(): SQLHistorySortOrder {
+  getSortOrder(): QueryHistorySortOrder {
     return this.sortOrder;
   }
 
-  setSortOrder(sortOrder: SQLHistorySortOrder): void {
+  setSortOrder(sortOrder: QueryHistorySortOrder): void {
     this.sortOrder = sortOrder;
     this._onDidChangeTreeData.fire();
   }
@@ -80,7 +80,7 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
     log(`${PREFIX} refresh`);
     if (withSettings) {
       this.historyResList.splice(0, this.historyResList.length);
-      const histories = await this.stateStorage.getSQLHistoryList();
+      const histories = await this.stateStorage.getQueryHistoryList();
       for (const history of histories) {
         this.historyResList.push(history);
       }
@@ -89,12 +89,12 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<SQLHistory> 
   }
 }
 
-export class SQLHistoryItem extends vscode.TreeItem {
-  constructor(resource: SQLHistory) {
+export class QueryHistoryItem extends vscode.TreeItem {
+  constructor(resource: QueryHistory) {
     const isDynamoQuery = resource.request?.kind === "dynamodbQuery";
     const normalizedSqlDoc = resource.sqlDoc.replace(/[ \r\n]+/g, " ").trim();
     super(
-      abbr(normalizedSqlDoc, SQL_HISTORY_LABEL_MAX_LENGTH) || "",
+      abbr(normalizedSqlDoc, QUERY_HISTORY_LABEL_MAX_LENGTH) || "",
       vscode.TreeItemCollapsibleState.None
     );
 
@@ -103,11 +103,11 @@ export class SQLHistoryItem extends vscode.TreeItem {
       resource.request.origin === "dynamoQueryPanel";
     this.contextValue = isDynamoQueryPanelHistory
       ? resource.status === "error"
-        ? "sqlHistoryDynamoQueryPanelError"
-        : "sqlHistoryDynamoQueryPanelSuccess"
+        ? "queryHistoryDynamoQueryPanelError"
+        : "queryHistoryDynamoQueryPanelSuccess"
       : resource.status === "error"
-        ? "sqlHistoryError"
-        : "sqlHistorySuccess";
+        ? "queryHistoryError"
+        : "queryHistorySuccess";
 
     const descriptionParts = [resource.connectionName];
 

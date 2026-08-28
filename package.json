@@ -333,7 +333,7 @@
         },
         {
           "id": "database-notebook-histories",
-          "name": "SQL histories",
+          "name": "Query histories",
           "visibility": "visible",
           "icon": "media/logo.png",
           "contextualTitle": "Histories"
@@ -745,22 +745,22 @@
         },
         {
           "command": "database-notebook.histories.openDynamoQueryPanel",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistoryDynamoQueryPanel/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistoryDynamoQueryPanel/",
           "group": "inline"
         },
         {
           "command": "database-notebook.histories.startPerformanceTuning",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory.*Success$/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
           "group": "inline"
         },
         {
           "command": "database-notebook.histories.resetPerformance",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory.*Success$/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
           "group": "inline"
         },
         {
           "command": "database-notebook.histories.open",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory(Success|Error)$/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory(Success|Error)$/",
           "group": "inline"
         },
         {
@@ -770,27 +770,27 @@
         },
         {
           "command": "database-notebook.histories.openAsNotebook",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory(Success|Error)$/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory(Success|Error)$/",
           "group": "history@1"
         },
         {
           "command": "database-notebook.histories.appendToActiveNotebook",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory(Success|Error)$/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory(Success|Error)$/",
           "group": "history@2"
         },
         {
           "command": "database-notebook.histories.openDynamoQueryPanel",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistoryDynamoQueryPanel/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistoryDynamoQueryPanel/",
           "group": "history@3"
         },
         {
           "command": "database-notebook.histories.startPerformanceTuning",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory.*Success$/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
           "group": "history@4"
         },
         {
           "command": "database-notebook.histories.resetPerformance",
-          "when": "view == database-notebook-histories && viewItem =~ /^sqlHistory.*Success$/",
+          "when": "view == database-notebook-histories && viewItem =~ /^queryHistory.*Success$/",
           "group": "history@5"
         },
         {
@@ -877,18 +877,18 @@
           "group": "navigation"
         },
         {
-          "command": "database-notebook.refresh-sql-histories",
+          "command": "database-notebook.refresh-query-histories",
           "when": "view == database-notebook-histories",
           "group": "navigation"
         },
         {
           "command": "database-notebook.histories.filterByConnection",
-          "when": "view == database-notebook-histories && !databaseNotebook.sqlHistoryFiltered",
+          "when": "view == database-notebook-histories && !databaseNotebook.queryHistoryFiltered",
           "group": "navigation"
         },
         {
           "command": "database-notebook.histories.clearConnectionFilter",
-          "when": "view == database-notebook-histories && databaseNotebook.sqlHistoryFiltered",
+          "when": "view == database-notebook-histories && databaseNotebook.queryHistoryFiltered",
           "group": "navigation"
         },
         {
@@ -898,16 +898,16 @@
         },
         {
           "command": "database-notebook.histories.sortByDuration",
-          "when": "view == database-notebook-histories && !databaseNotebook.sqlHistorySortByDuration",
+          "when": "view == database-notebook-histories && !databaseNotebook.queryHistorySortByDuration",
           "group": "navigation"
         },
         {
           "command": "database-notebook.histories.sortByRecent",
-          "when": "view == database-notebook-histories && databaseNotebook.sqlHistorySortByDuration",
+          "when": "view == database-notebook-histories && databaseNotebook.queryHistorySortByDuration",
           "group": "navigation"
         },
         {
-          "command": "database-notebook.delete-all-sql-histories",
+          "command": "database-notebook.delete-all-query-histories",
           "when": "view == database-notebook-histories",
           "group": "navigation"
         }
@@ -1465,20 +1465,20 @@
         "category": "DB Notebook HAR Viewer"
       },
       {
-        "command": "database-notebook.refresh-sql-histories",
-        "title": "Refresh SQL histories",
+        "command": "database-notebook.refresh-query-histories",
+        "title": "Refresh query histories",
         "shortTitle": "Refresh",
         "icon": "$(refresh)"
       },
       {
-        "command": "database-notebook.delete-all-sql-histories",
-        "title": "Delete all SQL histories",
+        "command": "database-notebook.delete-all-query-histories",
+        "title": "Delete all query histories",
         "shortTitle": "Delete all",
         "icon": "$(trash)"
       },
       {
         "command": "database-notebook.histories.execute",
-        "title": "Execute selected sql",
+        "title": "Execute selected query",
         "shortTitle": "Execute",
         "icon": "$(play)"
       },
@@ -1496,13 +1496,13 @@
       },
       {
         "command": "database-notebook.histories.open",
-        "title": "Open selected sql",
+        "title": "Open selected query",
         "shortTitle": "Open",
         "icon": "$(book)"
       },
       {
         "command": "database-notebook.histories.delete",
-        "title": "Delete selected sql",
+        "title": "Delete selected query",
         "shortTitle": "Delete",
         "icon": "$(trash)"
       },
@@ -1526,31 +1526,31 @@
       },
       {
         "command": "database-notebook.histories.filterByConnection",
-        "title": "Filter SQL histories by connection",
+        "title": "Filter query histories by connection",
         "shortTitle": "Filter by connection",
         "icon": "$(filter)"
       },
       {
         "command": "database-notebook.histories.clearConnectionFilter",
-        "title": "Clear SQL history connection filter",
+        "title": "Clear query history connection filter",
         "shortTitle": "Clear filter",
         "icon": "$(filter-filled)"
       },
       {
         "command": "database-notebook.histories.focusFilter",
-        "title": "Filter SQL histories",
+        "title": "Filter query histories",
         "shortTitle": "Filter",
         "icon": "$(search)"
       },
       {
         "command": "database-notebook.histories.sortByDuration",
-        "title": "Sort SQL histories by duration",
+        "title": "Sort query histories by duration",
         "shortTitle": "Sort by duration",
         "icon": "$(clock)"
       },
       {
         "command": "database-notebook.histories.sortByRecent",
-        "title": "Sort SQL histories by recent",
+        "title": "Sort query histories by recent",
         "shortTitle": "Sort by recent",
         "icon": "$(list-ordered)"
       },

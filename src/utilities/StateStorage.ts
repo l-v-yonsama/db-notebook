@@ -29,16 +29,16 @@ import ShortUniqueId from "short-unique-id";
 import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
 import { showStatusMessage } from "../statusBar";
-import { SQLHistory } from "../types/SQLHistory";
+import { QueryHistory } from "../types/QueryHistory";
 import { workflow } from "./driverResolver";
 import {
-  createInitialSQLHistoryPerformance,
-  isSQLHistoryTarget,
-  mergeSQLHistoryPerformance,
-  migrateStoredSQLHistory,
-  resetSQLHistoryPerformance,
-  StoredSQLHistory,
-} from "./sqlHistoryUtil";
+  createInitialQueryHistoryPerformance,
+  isQueryHistoryTarget,
+  mergeQueryHistoryPerformance,
+  migrateStoredQueryHistory,
+  resetQueryHistoryPerformance,
+  StoredQueryHistory,
+} from "./queryHistoryUtil";
 import { log } from "./logger";
 
 const uid = new ShortUniqueId();
@@ -47,7 +47,10 @@ const PREFIX = "[StateStorage]";
 
 export const DEFAULT_CON_NAME_KEY = `${EXTENSION_NAME}-DEFAULT-CON-NAME`;
 export const STORAGE_KEY = `${EXTENSION_NAME}-settings`;
-export const SQL_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
+// The stored value keeps its original `-sql-history` suffix even though the
+// view is now called Query History: renaming the globalState key itself would
+// orphan every existing user's saved history for no functional gain.
+export const QUERY_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
 export const PREV_SAVE_FOLDER = `${EXTENSION_NAME}-previous-save-folder`;
 export const MCP_ENABLED_CONNECTIONS_KEY = `${EXTENSION_NAME}-mcp-enabled-connections`;
 
@@ -356,32 +359,32 @@ export class StateStorage {
     this.context.globalState.update(PREV_SAVE_FOLDER, folderPath);
   }
 
-  async getSQLHistoryList(): Promise<SQLHistory[]> {
-    const storedList = this.context.globalState.get<StoredSQLHistory[]>(
-      SQL_HISTORY_STORAGE_KEY,
+  async getQueryHistoryList(): Promise<QueryHistory[]> {
+    const storedList = this.context.globalState.get<StoredQueryHistory[]>(
+      QUERY_HISTORY_STORAGE_KEY,
       []
     );
     const list = storedList.flatMap((stored) => {
-      const migrated = migrateStoredSQLHistory(stored);
+      const migrated = migrateStoredQueryHistory(stored);
       return migrated ? [migrated] : [];
     });
 
     // 読み込み時に旧sqlModeを除去し、performanceを補完する。Explain系の
     // 旧エントリもここで除外するため、再実行を待たず一度だけ移行できる。
     if (JSON.stringify(storedList) !== JSON.stringify(list)) {
-      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+      await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
     }
     return list;
   }
 
-  async addSQLHistory(
-    history: Omit<SQLHistory, "id" | "performance" | "lastErrorMessage" | "lastErrorAt">
+  async addQueryHistory(
+    history: Omit<QueryHistory, "id" | "performance" | "lastErrorMessage" | "lastErrorAt">
   ): Promise<boolean> {
     // 呼び出し元の実行モードだけに依存せず、保存境界でもraw EXPLAINを拒否する。
-    if (!isSQLHistoryTarget(history)) {
+    if (!isQueryHistoryTarget(history)) {
       return false;
     }
-    const list = await this.getSQLHistoryList();
+    const list = await this.getQueryHistoryList();
 
     // Identity: a native Query history entry is identified by its
     // structural key (design doc §4.2), never by sqlDoc - sqlDoc is only a
@@ -421,12 +424,12 @@ export class StateStorage {
       ? history.summary.dynamoDb.consumedCapacity?.totalCapacityUnits
       : history.summary?.capacityUnits;
     const performance = isNew
-      ? createInitialSQLHistoryPerformance(
+      ? createInitialQueryHistoryPerformance(
           history.summary?.elapsedTimeMilli,
           capacityUnits,
           history.summary?.dynamoDb
         )
-      : mergeSQLHistoryPerformance(
+      : mergeQueryHistoryPerformance(
           list[sameHistoryIndex],
           history.summary?.elapsedTimeMilli,
           capacityUnits,
@@ -457,23 +460,23 @@ export class StateStorage {
     if (list.length > maxHistory) {
       list.splice(maxHistory, list.length - maxHistory);
     }
-    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+    await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
     return isNew;
   }
 
-  async deleteSQLHistoryByID(id: string): Promise<boolean> {
-    const list = await this.getSQLHistoryList();
+  async deleteQueryHistoryByID(id: string): Promise<boolean> {
+    const list = await this.getQueryHistoryList();
     const idx = list.findIndex((it) => it.id === id);
     if (idx >= 0) {
       list.splice(idx, 1);
-      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+      await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
       return true;
     }
     return false;
   }
 
-  async resetSQLHistoryPerformanceByID(id: string, resetAt = Date.now()): Promise<boolean> {
-    const list = await this.getSQLHistoryList();
+  async resetQueryHistoryPerformanceByID(id: string, resetAt = Date.now()): Promise<boolean> {
+    const list = await this.getQueryHistoryList();
     const idx = list.findIndex((it) => it.id === id);
     if (idx < 0) {
       return false;
@@ -483,14 +486,14 @@ export class StateStorage {
       history.performance?.dynamoDb !== undefined || history.summary?.dynamoDb !== undefined;
     list[idx] = {
       ...history,
-      performance: resetSQLHistoryPerformance(resetAt, includeDynamoDbAggregate),
+      performance: resetQueryHistoryPerformance(resetAt, includeDynamoDbAggregate),
     };
-    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+    await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
     return true;
   }
 
-  async deleteAllSQLHistories(): Promise<boolean> {
-    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, []);
+  async deleteAllQueryHistories(): Promise<boolean> {
+    await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, []);
     return true;
   }
 

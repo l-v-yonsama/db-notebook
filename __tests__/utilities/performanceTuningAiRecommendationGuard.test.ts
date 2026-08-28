@@ -15,7 +15,7 @@ describe("performance tuning AI recommendation guard", () => {
       .not.toBe(normalizeSqlForRecommendationComparison("select * from t where c = 'web'"));
   });
 
-  it("excludes an unchanged suggested SQL and recommends another model", () => {
+  it("excludes an unchanged suggested query and recommends another model", () => {
     const result = excludeUnchangedSqlRecommendations({
       currentSql: "SELECT * FROM orders WHERE created_at >= '2025-12-01';",
       recommendations: [
@@ -23,20 +23,20 @@ describe("performance tuning AI recommendation guard", () => {
           title: "Rewrite the filter",
           detail: "Already done",
           rationale: "Already done",
-          suggestedSql: "select *\nfrom orders where created_at >= '2025-12-01'",
+          suggestedQuery: "select *\nfrom orders where created_at >= '2025-12-01'",
         },
         {
           title: "Review an index",
           detail: "Different action",
           rationale: "Different action",
-          suggestedSql: "CREATE INDEX idx_orders_created_at ON orders(created_at);",
+          suggestedQuery: "CREATE INDEX idx_orders_created_at ON orders(created_at);",
         },
       ],
     });
 
     expect(result.recommendations.map((item) => item.title)).toEqual(["Review an index"]);
     expect(result.qualityIssues).toHaveLength(1);
-    expect(result.qualityIssues[0].code).toBe("SUGGESTED_SQL_MATCHES_CURRENT");
+    expect(result.qualityIssues[0].code).toBe("SUGGESTED_QUERY_MATCHES_CURRENT");
     expect(result.qualityIssues[0].message).toContain("different model");
   });
 });

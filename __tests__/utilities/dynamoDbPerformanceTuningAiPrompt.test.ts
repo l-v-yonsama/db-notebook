@@ -273,11 +273,11 @@ describe("buildDynamoDbAiAnalysisPrompt", () => {
     expect(assistant).not.toContain("automatic scale-up within minutes");
   });
 
-  it("only allows suggestedSql for a standalone PartiQL rewrite, never a native Query", () => {
+  it("only allows suggestedQuery for a standalone PartiQL rewrite, never a native Query", () => {
     const { assistant } = buildDynamoDbAiAnalysisPrompt(context());
     expect(assistant).toContain("only appropriate for a PartiQL rewrite");
     expect(assistant).toContain("statement.language");
-    expect(assistant).toContain("Never put a rewrite suggestion in \"suggestedSql\" for a native Query/Scan statement");
+    expect(assistant).toContain("Never put a rewrite suggestion in \"suggestedQuery\" for a native Query/Scan statement");
   });
 
   it("instructs the model never to generate a CREATE INDEX statement", () => {

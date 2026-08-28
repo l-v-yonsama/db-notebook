@@ -42,7 +42,7 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
   - クエリ実行(デフォルト)
   - EXPLAINプラン実行(クエリプランを生成)
   - EXPLAIN ANALYZE実行(実際の実行時間と統計情報を表示)
-- SQL履歴管理
+- クエリ履歴管理
 - Notebookセル間の変数共有
   - 共有変数を使った実践的なSQLの例(LIKE, IN, 完全一致): [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
 - ER図を[mermaid形式](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)、または編集可能なdraw.io形式で生成

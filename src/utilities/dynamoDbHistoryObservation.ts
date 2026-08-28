@@ -4,7 +4,7 @@ import type {
   DynamoDbReadObservation,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { RdhDynamoDbCapacityAmount, RdhDynamoDbConsumedCapacity } from "@l-v-yonsama/rdh";
-import type { SQLHistory } from "../types/SQLHistory";
+import type { QueryHistory } from "../types/QueryHistory";
 
 // Converts the latest native Query history summary into one observation.
 
@@ -69,7 +69,7 @@ export function toPerformanceCapacityBreakdown(
   return breakdown;
 }
 
-// Builds a DynamoDbReadObservation from a SQL History entry's most recent
+// Builds a DynamoDbReadObservation from a Query History entry's most recent
 // execution (design doc §9.1) - the single source of truth is
 // summary.dynamoDb; undefined when it is absent (an older/dev-era history
 // entry saved before summary.dynamoDb existed, or a non-AWS connection) so
@@ -77,7 +77,7 @@ export function toPerformanceCapacityBreakdown(
 // §7.4/§9.1's "古い履歴でtoken状態が不明な場合は完全観測と断定しない", applied
 // one step earlier: no dynamoDb evidence at all means no Observation).
 export function buildObservationFromHistory(
-  history: SQLHistory
+  history: QueryHistory
 ): DynamoDbReadObservation | undefined {
   if (
     history.performance?.statisticsSince !== undefined &&

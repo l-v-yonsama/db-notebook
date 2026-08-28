@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { MarkdownString, ThemeIcon } from "vscode";
-import { SQLHistoryItem } from "../../../src/treeData/history/HistoryTreeProvider";
-import { SQL_HISTORY_LABEL_MAX_LENGTH } from "../../../src/constant";
+import { QueryHistoryItem } from "../../../src/treeData/history/HistoryTreeProvider";
+import { QUERY_HISTORY_LABEL_MAX_LENGTH } from "../../../src/constant";
 
-describe("SQLHistoryItem", () => {
+describe("QueryHistoryItem", () => {
   it("count/last/total/avg/maxをtooltipへ表示する", () => {
-    const item = new SQLHistoryItem({
+    const item = new QueryHistoryItem({
       id: "h1",
       connectionName: "conn1",
       sqlDoc: "select * from t",
@@ -27,7 +27,7 @@ describe("SQLHistoryItem", () => {
   });
 
   it("成功結果を保持した再実行エラーを警告表示する", () => {
-    const item = new SQLHistoryItem({
+    const item = new QueryHistoryItem({
       id: "h1",
       connectionName: "conn1",
       sqlDoc: "select * from t",
@@ -36,14 +36,14 @@ describe("SQLHistoryItem", () => {
       lastErrorAt: new Date("2026-08-16T00:00:00Z").getTime(),
     });
 
-    expect(item.contextValue).toBe("sqlHistorySuccess");
+    expect(item.contextValue).toBe("queryHistorySuccess");
     expect((item.iconPath as ThemeIcon).id).toBe("warning");
     expect((item.tooltip as MarkdownString).value).toContain("Last retry failed");
     expect((item.tooltip as MarkdownString).value).toContain("timeout");
   });
 
   it("native Query history shows 'items', not 'rows', and a values-free json tooltip", () => {
-    const item = new SQLHistoryItem({
+    const item = new QueryHistoryItem({
       id: "h2",
       connectionName: "local-dynamo",
       sqlDoc: "DDB orders_with…characters · K tenantId = … · F status = …",
@@ -70,7 +70,7 @@ describe("SQLHistoryItem", () => {
 
     expect(item.description).toContain("70 items");
     expect(item.description).not.toContain("rows");
-    expect(item.contextValue).toBe("sqlHistoryDynamoQueryPanelSuccess");
+    expect(item.contextValue).toBe("queryHistoryDynamoQueryPanelSuccess");
     expect(item.label).toContain("· F status = …");
 
     const tooltip = (item.tooltip as MarkdownString).value;
@@ -84,7 +84,7 @@ describe("SQLHistoryItem", () => {
   });
 
   it("a plain SQL/PartiQL history entry (no request field) still shows 'rows' and an sql fence", () => {
-    const item = new SQLHistoryItem({
+    const item = new QueryHistoryItem({
       id: "h3",
       connectionName: "conn1",
       sqlDoc: 'select "tenantId" from "orders"',
@@ -105,13 +105,13 @@ describe("SQLHistoryItem", () => {
       "SELECT tenant_id, order_id, status, created_at FROM application_orders WHERE tenant_id = 'T#001' ORDER BY created_at DESC",
       'SELECT * FROM "dynamo_performance_lab_orders" WHERE "tenantId" = \'T#001\' AND "status" = \'PENDING\'',
     ]) {
-      const item = new SQLHistoryItem({
+      const item = new QueryHistoryItem({
         id: sqlDoc,
         connectionName: "conn1",
         sqlDoc,
         status: "success",
       });
-      expect(String(item.label).length).toBeLessThanOrEqual(SQL_HISTORY_LABEL_MAX_LENGTH);
+      expect(String(item.label).length).toBeLessThanOrEqual(QUERY_HISTORY_LABEL_MAX_LENGTH);
     }
   });
 });

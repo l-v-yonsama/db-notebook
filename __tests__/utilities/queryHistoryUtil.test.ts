@@ -1,26 +1,26 @@
 import { describe, expect, it } from "vitest";
-import type { SQLHistory } from "../../src/types/SQLHistory";
+import type { QueryHistory } from "../../src/types/QueryHistory";
 import {
   averageCapacityUnits,
   averageElapsedTimeMilli,
   containsExplainStatement,
-  createInitialSQLHistoryPerformance,
-  isSQLHistoryTarget,
-  mergeSQLHistoryPerformance,
-  migrateStoredSQLHistory,
-  resetSQLHistoryPerformance,
-} from "../../src/utilities/sqlHistoryUtil";
+  createInitialQueryHistoryPerformance,
+  isQueryHistoryTarget,
+  mergeQueryHistoryPerformance,
+  migrateStoredQueryHistory,
+  resetQueryHistoryPerformance,
+} from "../../src/utilities/queryHistoryUtil";
 
-const baseHistory = (overrides: Partial<SQLHistory> = {}): SQLHistory => ({
+const baseHistory = (overrides: Partial<QueryHistory> = {}): QueryHistory => ({
   id: "h1",
   sqlDoc: "select 1",
   connectionName: "conn1",
   ...overrides,
 });
 
-describe("createInitialSQLHistoryPerformance", () => {
+describe("createInitialQueryHistoryPerformance", () => {
   it("elapsedTimeMilliが与えられればsampleCount=1で初期化する", () => {
-    expect(createInitialSQLHistoryPerformance(120)).toEqual({
+    expect(createInitialQueryHistoryPerformance(120)).toEqual({
       sampleCount: 1,
       totalElapsedTimeMilli: 120,
       maxElapsedTimeMilli: 120,
@@ -29,16 +29,16 @@ describe("createInitialSQLHistoryPerformance", () => {
   });
 
   it("elapsedTimeMilliがundefinedなら全て0で初期化する", () => {
-    expect(createInitialSQLHistoryPerformance(undefined)).toEqual({
+    expect(createInitialQueryHistoryPerformance(undefined)).toEqual({
       sampleCount: 0,
       totalElapsedTimeMilli: 0,
     });
   });
 });
 
-describe("resetSQLHistoryPerformance", () => {
+describe("resetQueryHistoryPerformance", () => {
   it("starts an empty measurement epoch without fabricated min/max/last values", () => {
-    expect(resetSQLHistoryPerformance(1234, true)).toEqual({
+    expect(resetQueryHistoryPerformance(1234, true)).toEqual({
       sampleCount: 0,
       totalElapsedTimeMilli: 0,
       capacitySampleCount: 0,
@@ -55,10 +55,10 @@ describe("resetSQLHistoryPerformance", () => {
   });
 });
 
-describe("mergeSQLHistoryPerformance", () => {
+describe("mergeQueryHistoryPerformance", () => {
   it("performanceもsummaryも無い旧エントリへ初回計測をマージするとsampleCount=1になる", () => {
     const previous = baseHistory();
-    expect(mergeSQLHistoryPerformance(previous, 100)).toEqual({
+    expect(mergeQueryHistoryPerformance(previous, 100)).toEqual({
       sampleCount: 1,
       totalElapsedTimeMilli: 100,
       maxElapsedTimeMilli: 100,
@@ -68,7 +68,7 @@ describe("mergeSQLHistoryPerformance", () => {
 
   it("performance未設定でもsummary.elapsedTimeMilliがあれば遅延移行してから加算する", () => {
     const previous = baseHistory({ summary: { elapsedTimeMilli: 80 } as any });
-    expect(mergeSQLHistoryPerformance(previous, 120)).toEqual({
+    expect(mergeQueryHistoryPerformance(previous, 120)).toEqual({
       sampleCount: 2,
       totalElapsedTimeMilli: 200,
       maxElapsedTimeMilli: 120,
@@ -81,7 +81,7 @@ describe("mergeSQLHistoryPerformance", () => {
       status: "error",
       summary: { elapsedTimeMilli: 80 } as any,
     });
-    expect(mergeSQLHistoryPerformance(previous, undefined)).toEqual({
+    expect(mergeQueryHistoryPerformance(previous, undefined)).toEqual({
       sampleCount: 0,
       totalElapsedTimeMilli: 0,
     });
@@ -96,7 +96,7 @@ describe("mergeSQLHistoryPerformance", () => {
         lastElapsedTimeMilli: 90,
       },
     });
-    expect(mergeSQLHistoryPerformance(previous, 200)).toEqual({
+    expect(mergeQueryHistoryPerformance(previous, 200)).toEqual({
       sampleCount: 4,
       totalElapsedTimeMilli: 500,
       maxElapsedTimeMilli: 200,
@@ -113,13 +113,13 @@ describe("mergeSQLHistoryPerformance", () => {
         lastElapsedTimeMilli: 80,
       },
     });
-    expect(mergeSQLHistoryPerformance(previous, undefined)).toEqual(previous.performance);
+    expect(mergeQueryHistoryPerformance(previous, undefined)).toEqual(previous.performance);
   });
 });
 
 describe("Capacity aggregation (DynamoDB)", () => {
-  it("createInitialSQLHistoryPerformance: capacityUnitsが与えられればcapacitySampleCount=1で初期化する", () => {
-    expect(createInitialSQLHistoryPerformance(120, 2.5)).toEqual({
+  it("createInitialQueryHistoryPerformance: capacityUnitsが与えられればcapacitySampleCount=1で初期化する", () => {
+    expect(createInitialQueryHistoryPerformance(120, 2.5)).toEqual({
       sampleCount: 1,
       totalElapsedTimeMilli: 120,
       maxElapsedTimeMilli: 120,
@@ -131,13 +131,13 @@ describe("Capacity aggregation (DynamoDB)", () => {
     });
   });
 
-  it("createInitialSQLHistoryPerformance: capacityUnitsが無ければcapacity系フィールドは含まれない(0埋めしない)", () => {
-    const result = createInitialSQLHistoryPerformance(120);
+  it("createInitialQueryHistoryPerformance: capacityUnitsが無ければcapacity系フィールドは含まれない(0埋めしない)", () => {
+    const result = createInitialQueryHistoryPerformance(120);
     expect(result.capacitySampleCount).toBeUndefined();
     expect(result.totalCapacityUnits).toBeUndefined();
   });
 
-  it("mergeSQLHistoryPerformance: capacityUnitsを繰り返しマージするとsum/max/lastが正しく更新される", () => {
+  it("mergeQueryHistoryPerformance: capacityUnitsを繰り返しマージするとsum/max/lastが正しく更新される", () => {
     const previous = baseHistory({
       performance: {
         sampleCount: 1,
@@ -150,7 +150,7 @@ describe("Capacity aggregation (DynamoDB)", () => {
         lastCapacityUnits: 2,
       },
     });
-    expect(mergeSQLHistoryPerformance(previous, 50, 5)).toEqual({
+    expect(mergeQueryHistoryPerformance(previous, 50, 5)).toEqual({
       sampleCount: 2,
       totalElapsedTimeMilli: 150,
       maxElapsedTimeMilli: 100,
@@ -162,7 +162,7 @@ describe("Capacity aggregation (DynamoDB)", () => {
     });
   });
 
-  it("mergeSQLHistoryPerformance: capacityUnitsがundefined(非AWSベンダー等)なら集計を変えない", () => {
+  it("mergeQueryHistoryPerformance: capacityUnitsがundefined(非AWSベンダー等)なら集計を変えない", () => {
     const previous = baseHistory({
       performance: {
         sampleCount: 1,
@@ -175,16 +175,16 @@ describe("Capacity aggregation (DynamoDB)", () => {
         lastCapacityUnits: 2,
       },
     });
-    const result = mergeSQLHistoryPerformance(previous, 50);
+    const result = mergeQueryHistoryPerformance(previous, 50);
     expect(result.capacitySampleCount).toBe(1);
     expect(result.totalCapacityUnits).toBe(2);
     expect(result.maxCapacityUnits).toBe(2);
     expect(result.lastCapacityUnits).toBe(2);
   });
 
-  it("mergeSQLHistoryPerformance: capacityUnits=0は欠落扱いしない", () => {
+  it("mergeQueryHistoryPerformance: capacityUnits=0は欠落扱いしない", () => {
     const previous = baseHistory();
-    const result = mergeSQLHistoryPerformance(previous, 10, 0);
+    const result = mergeQueryHistoryPerformance(previous, 10, 0);
     expect(result.capacitySampleCount).toBe(1);
     expect(result.totalCapacityUnits).toBe(0);
     expect(result.lastCapacityUnits).toBe(0);
@@ -192,13 +192,13 @@ describe("Capacity aggregation (DynamoDB)", () => {
 });
 
 describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
-  it("createInitialSQLHistoryPerformance: with no dynamoDb arg, the result has no dynamoDb key at all", () => {
-    const result = createInitialSQLHistoryPerformance(120, 2.5);
+  it("createInitialQueryHistoryPerformance: with no dynamoDb arg, the result has no dynamoDb key at all", () => {
+    const result = createInitialQueryHistoryPerformance(120, 2.5);
     expect(result).not.toHaveProperty("dynamoDb");
   });
 
-  it("createInitialSQLHistoryPerformance: a native Query summary seeds observationSampleCount/evaluatedCountSampleCount", () => {
-    const result = createInitialSQLHistoryPerformance(120, 2.5, {
+  it("createInitialQueryHistoryPerformance: a native Query summary seeds observationSampleCount/evaluatedCountSampleCount", () => {
+    const result = createInitialQueryHistoryPerformance(120, 2.5, {
       apiOperation: "Query",
       returnedItemCount: 5,
       evaluatedItemCount: 20,
@@ -219,7 +219,7 @@ describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
   });
 
   it("a PartiQL summary (evaluatedItemCount undefined) counts observationSampleCount but not evaluatedCountSampleCount", () => {
-    const result = createInitialSQLHistoryPerformance(120, undefined, {
+    const result = createInitialQueryHistoryPerformance(120, undefined, {
       apiOperation: "ExecuteStatement",
       returnedItemCount: 3,
     });
@@ -237,7 +237,7 @@ describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
     });
   });
 
-  it("mergeSQLHistoryPerformance: sums returned/evaluated across repeated native Query samples and tracks min/max pass rate", () => {
+  it("mergeQueryHistoryPerformance: sums returned/evaluated across repeated native Query samples and tracks min/max pass rate", () => {
     const previous = baseHistory({
       performance: {
         sampleCount: 1,
@@ -258,7 +258,7 @@ describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
         },
       },
     });
-    const result = mergeSQLHistoryPerformance(previous, 50, undefined, {
+    const result = mergeQueryHistoryPerformance(previous, 50, undefined, {
       apiOperation: "Query",
       returnedItemCount: 90,
       evaluatedItemCount: 100,
@@ -278,7 +278,7 @@ describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
     });
   });
 
-  it("mergeSQLHistoryPerformance: a failed retry with no summary leaves the DynamoDB aggregate untouched", () => {
+  it("mergeQueryHistoryPerformance: a failed retry with no summary leaves the DynamoDB aggregate untouched", () => {
     const previous = baseHistory({
       performance: {
         sampleCount: 1,
@@ -299,11 +299,11 @@ describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
         },
       },
     });
-    const result = mergeSQLHistoryPerformance(previous, undefined, undefined, undefined);
+    const result = mergeQueryHistoryPerformance(previous, undefined, undefined, undefined);
     expect(result.dynamoDb).toEqual(previous.performance!.dynamoDb);
   });
 
-  it("mergeSQLHistoryPerformance: a non-AWS history never gains a dynamoDb key", () => {
+  it("mergeQueryHistoryPerformance: a non-AWS history never gains a dynamoDb key", () => {
     const previous = baseHistory({
       performance: {
         sampleCount: 1,
@@ -312,7 +312,7 @@ describe("DynamoDB read-shape aggregation (performance.dynamoDb)", () => {
         lastElapsedTimeMilli: 100,
       },
     });
-    const result = mergeSQLHistoryPerformance(previous, 50);
+    const result = mergeQueryHistoryPerformance(previous, 50);
     expect(result).not.toHaveProperty("dynamoDb");
   });
 });
@@ -374,7 +374,7 @@ describe("averageElapsedTimeMilli", () => {
   });
 });
 
-describe("SQL History target classification", () => {
+describe("Query History target classification", () => {
   it.each([
     "EXPLAIN SELECT * FROM t",
     "-- comment\nEXPLAIN ANALYZE SELECT * FROM t",
@@ -382,7 +382,7 @@ describe("SQL History target classification", () => {
     "SELECT 1; EXPLAIN SELECT * FROM t",
   ])("Explain statementを検出する: %s", (sql) => {
     expect(containsExplainStatement(sql)).toBe(true);
-    expect(isSQLHistoryTarget({ sqlDoc: sql })).toBe(false);
+    expect(isQueryHistoryTarget({ sqlDoc: sql })).toBe(false);
   });
 
   it.each([
@@ -391,18 +391,18 @@ describe("SQL History target classification", () => {
     "SELECT 1 /* ; EXPLAIN SELECT 2 */",
   ])("literal/comment内のEXPLAINを誤検出しない: %s", (sql) => {
     expect(containsExplainStatement(sql)).toBe(false);
-    expect(isSQLHistoryTarget({ sqlDoc: sql })).toBe(true);
+    expect(isQueryHistoryTarget({ sqlDoc: sql })).toBe(true);
   });
 
   it("旧sqlModeとplan metadataでもExplain系を除外する", () => {
-    expect(isSQLHistoryTarget({ sqlDoc: "select 1", sqlMode: "Explain" })).toBe(false);
-    expect(isSQLHistoryTarget({ sqlDoc: "select 1", meta: { type: "analyze" } })).toBe(false);
+    expect(isQueryHistoryTarget({ sqlDoc: "select 1", sqlMode: "Explain" })).toBe(false);
+    expect(isQueryHistoryTarget({ sqlDoc: "select 1", meta: { type: "analyze" } })).toBe(false);
   });
 });
 
-describe("migrateStoredSQLHistory", () => {
+describe("migrateStoredQueryHistory", () => {
   it("adds DynamoQueryPanel provenance to native Query history saved before origin existed", () => {
-    const migrated = migrateStoredSQLHistory({
+    const migrated = migrateStoredQueryHistory({
       id: "legacy-native-query",
       connectionName: "dynamo",
       sqlDoc: "DynamoDB Query orders",

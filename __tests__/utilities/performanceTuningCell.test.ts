@@ -29,7 +29,7 @@ describe("performanceTuningCell", () => {
     expect(hasSuccessfulSqlCellRun(makeCell({ connectionName: "" }))).toBe(false);
   });
 
-  it("resolves only the matching successful SQL History entry", async () => {
+  it("resolves only the matching successful Query History entry", async () => {
     const matchingHistory = {
       id: "history-1",
       connectionName: "app",
@@ -37,7 +37,7 @@ describe("performanceTuningCell", () => {
       status: "success" as const,
     };
     const stateStorage = {
-      getSQLHistoryList: vi.fn(async () => [
+      getQueryHistoryList: vi.fn(async () => [
         { ...matchingHistory, id: "failed", status: "error" as const },
         matchingHistory,
       ]),

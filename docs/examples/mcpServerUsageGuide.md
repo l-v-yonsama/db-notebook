@@ -82,7 +82,7 @@ to check.
 ## 3. Starting the server
 
 The server never starts on its own. In the sidebar's **MCP Server** section (a sibling of DB
-Explorer/SQL histories/Help, not inside DB Explorer itself), click the broadcast icon
+Explorer/Query histories/Help, not inside DB Explorer itself), click the broadcast icon
 (**Start Database Notebook MCP Server**), or run it from the Command Palette as
 **Database Notebook: Start Database Notebook MCP Server**. A notification shows the server's URL
 and offers three actions (kept to three so VS Code doesn't shrink every label into an unreadable

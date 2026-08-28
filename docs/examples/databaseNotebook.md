@@ -11,7 +11,7 @@ This page shows an example of the use of the VS code extension "Database Noteboo
   - 2.1. [Inserting parent and child records in the same transaction](#21-inserting-parent-and-child-records-in-the-same-transaction)
 - 3. [Multi-language flow: SQL → JavaScript → Markdown](#3-multi-language-flow-sql--javascript--markdown)
 - 4. [DynamoDB Query Result](#4-dynamodb-query-result)
-  - 4.1. [Dynamo Query Panel: Projection, consistent read, and SQL History](#41-dynamo-query-panel-projection-consistent-read-and-sql-history)
+  - 4.1. [Dynamo Query Panel: Projection, consistent read, and Query History](#41-dynamo-query-panel-projection-consistent-read-and-query-history)
 
 ## 1. Query examples
 
@@ -250,7 +250,7 @@ A few things about this line are easy to misread:
   Notebook today, so this is a signal to add/raise a `LIMIT` or narrow the key condition rather than
   an indication anything went wrong.
 
-### 4.1. Dynamo Query Panel: Projection, consistent read, and SQL History
+### 4.1. Dynamo Query Panel: Projection, consistent read, and Query History
 
 Open the Dynamo Query Panel from a table's resource-tree context menu. Beyond the target
 (table/LSI/GSI), partition/sort key, sort direction, and filter expressions already covered above,
@@ -272,15 +272,15 @@ it also has:
   request; this caps the items kept in the combined result, not a single request's own `Limit`
   parameter or how many items DynamoDB evaluates across every request it makes.
 - **Build** — switches the Preview between the default native Query input and a standalone PartiQL
-  `SELECT`. `Execute` intentionally remains a native Query in either mode so its SQL History result
+  `SELECT`. `Execute` intentionally remains a native Query in either mode so its Query History result
   retains DynamoDB `Count`/`ScannedCount`. In PartiQL mode, **Open in Notebook** can add the generated
   statement to a new or active Notebook; the action is disabled in Native Query mode. Read
   consistency is an API option rather than PartiQL statement text, so that one option is not carried
   into the generated SQL cell.
 
-Every execution — successful or failed — is saved to **SQL History** automatically, labeled with an
+Every execution — successful or failed — is saved to **Query History** automatically, labeled with an
 item count instead of a row count and no attached SQL (there is nothing equivalent to run as a SQL
-cell). Native Query history therefore does not show the generic SQL History Notebook actions; use
+cell). Native Query history therefore does not show the generic Query History Notebook actions; use
 **Open in Dynamo Query Panel** to inspect or edit it instead. Re-running the same
 table/index/key-condition/filter/Projection/consistency
 structure with different partition/sort key values merges into that one history entry — the newest

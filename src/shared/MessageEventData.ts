@@ -773,7 +773,7 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
 >;
 
 // PerformanceTuningBindParametersPanel.vue (2026-08-19 follow-up) - the
-// shared "confirm bind values" panel both Query Statistics and SQL History
+// shared "confirm bind values" panel both Query Statistics and Query History
 // route through via openPerformanceTuningPreview() whenever the target SQL
 // has detected placeholders. See src/panels/PerformanceTuningBindParametersPanel.ts.
 export type PerformanceTuningBindParametersPanelEventData = BaseMessageEventData<
@@ -789,7 +789,7 @@ export type PerformanceTuningBindParametersPanelEventData = BaseMessageEventData
       estimatedBindParameters: EstimatedBindParameter[];
       // Real values to pre-fill each row's input with, parallel to
       // estimatedBindParameters by `position` (index position - 1) - e.g.
-      // SQL History's last-executed variables. Undefined for Query
+      // Query History's last-executed variables. Undefined for Query
       // Statistics (no such source), which keeps every row starting blank
       // exactly as before.
       presetBindValues?: unknown[];

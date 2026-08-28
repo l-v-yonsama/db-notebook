@@ -700,7 +700,7 @@ defineExpose({
               <p class="ai-card-rationale">
                 <span class="label-inline">Rationale:</span> {{ r.rationale }}
               </p>
-              <pre v-if="r.suggestedSql" class="ai-card-sql">{{ r.suggestedSql }}</pre>
+              <pre v-if="r.suggestedQuery" class="ai-card-sql">{{ r.suggestedQuery }}</pre>
               <!-- possibleDuplicateOfIndex is host-computed, never
                    AI-authored, and RDB-only (never set for a DynamoDB
                    context - see PerformanceTuningPreviewPanel.ts's

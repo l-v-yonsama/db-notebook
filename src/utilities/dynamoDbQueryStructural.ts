@@ -1,5 +1,5 @@
 import type { QueryItemsAtClientInputParams } from "@l-v-yonsama/multi-platform-database-drivers";
-import { SQL_HISTORY_LABEL_MAX_LENGTH } from "../constant";
+import { QUERY_HISTORY_LABEL_MAX_LENGTH } from "../constant";
 
 // Pure structural identity and display helpers for native Query history.
 
@@ -29,7 +29,7 @@ function stableStringify(value: unknown): string {
 
 // The fields that decide native Query history identity (design doc §4.2) -
 // deliberately excludes ExpressionAttributeValues/ExclusiveStartKey/
-// ReturnConsumedCapacity, mirroring how existing SQL History already treats
+// ReturnConsumedCapacity, mirroring how existing Query History already treats
 // bind variables as workload samples rather than identity.
 export function buildDynamoQueryStructuralKey(input: QueryItemsAtClientInputParams): string {
   return stableStringify({
@@ -76,7 +76,7 @@ const buildBoundedDisplayParts = (
   const decorationLength =
     sections.reduce((total, section) => total + section.prefix.length, 0) +
     separator.length * (sections.length - 1);
-  const valueBudget = Math.max(sections.length, SQL_HISTORY_LABEL_MAX_LENGTH - decorationLength);
+  const valueBudget = Math.max(sections.length, QUERY_HISTORY_LABEL_MAX_LENGTH - decorationLength);
   const totalWeight = sections.reduce((total, section) => total + section.weight, 0);
   let remainingBudget = valueBudget;
 
@@ -95,7 +95,7 @@ const buildBoundedDisplayParts = (
     .join(separator);
 };
 
-// Compact, value-free description stored in SQL History. It is optimized
+// Compact, value-free description stored in Query History. It is optimized
 // for finding a native Query in the Tree View; projection and other details
 // remain available in the structural JSON shown in the hover.
 export function buildDynamoQueryDisplayText(input: QueryItemsAtClientInputParams): string {

@@ -189,7 +189,7 @@ describe("buildDynamoDbPerformanceTuningHumanSummary", () => {
     const signal = buildDynamoDbPerformanceTuningHumanSummary(value).signals.find((s) => s.kind === "observation");
     expect(signal?.summary).toContain("evaluated 20");
     expect(signal?.summary).toContain("10%");
-    expect(signal?.summary).toContain("prior SQL History execution");
+    expect(signal?.summary).toContain("prior Query History execution");
   });
 
   it("flags throttling activity from diagnostics as attention, regardless of which throttle code fired", () => {

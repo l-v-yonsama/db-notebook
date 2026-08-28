@@ -118,7 +118,7 @@ function buildObservationSignal(context: DynamoDbPerformanceTuningContext): Dyna
       level: "unknown",
       title: "No observed read yet",
       summary:
-        "This context is based on static analysis only; no confirmed read (Run Observed Read, or a matching SQL History execution) has been recorded for this exact statement.",
+        "This context is based on static analysis only; no confirmed read (Run Observed Read, or a matching Query History execution) has been recorded for this exact statement.",
       rawDataPath: "Full context JSON → observation",
     };
   }
@@ -133,7 +133,7 @@ function buildObservationSignal(context: DynamoDbPerformanceTuningContext): Dyna
     observation.source === "observedRead"
       ? "a confirmed Run Observed Read"
       : observation.source === "sqlHistory"
-        ? "a prior SQL History execution"
+        ? "a prior Query History execution"
         : "the Dynamo Query Panel";
   const boundedNote = observation.bounded
     ? ` This observation is bounded (${observation.boundDescription ?? "a single response"}) and may not reflect the statement's full result.`

@@ -103,13 +103,13 @@ export function excludeUnchangedSqlRecommendations(params: {
   const recommendations: PerformanceTuningAiRecommendation[] = [];
   const qualityIssues: PerformanceTuningAiQualityIssue[] = [];
   for (const recommendation of params.recommendations) {
-    const suggestedSql = recommendation.suggestedSql;
-    if (suggestedSql && normalizeSqlForRecommendationComparison(suggestedSql) === current) {
+    const suggestedQuery = recommendation.suggestedQuery;
+    if (suggestedQuery && normalizeSqlForRecommendationComparison(suggestedQuery) === current) {
       qualityIssues.push({
-        code: "SUGGESTED_SQL_MATCHES_CURRENT",
+        code: "SUGGESTED_QUERY_MATCHES_CURRENT",
         recommendationTitle: recommendation.title,
         message:
-          `The recommendation "${recommendation.title}" was excluded because its suggested SQL is equivalent to the SQL already being analyzed. ` +
+          `The recommendation "${recommendation.title}" was excluded because its suggested query is equivalent to the statement already being analyzed. ` +
           "The selected model may not have understood the current context; try Analyze with AI again using a different model.",
       });
       continue;

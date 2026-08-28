@@ -13,24 +13,24 @@ import dayjs from "dayjs";
 import { StateStorage } from "../../utilities/StateStorage";
 
 import {
-  APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK,
-  CLEAR_SQL_HISTORIES_CONNECTION_FILTER,
+  APPEND_QUERY_HISTORIES_TO_ACTIVE_NOTEBOOK,
+  CLEAR_QUERY_HISTORIES_CONNECTION_FILTER,
   CREATE_NEW_NOTEBOOK,
-  DELETE_ALL_SQL_HISTORY,
-  DELETE_SQL_HISTORY,
-  EXECUTE_SQL_HISTORY,
-  FILTER_SQL_HISTORIES_BY_CONNECTION,
-  FOCUS_SQL_HISTORIES_FILTER,
+  DELETE_ALL_QUERY_HISTORY,
+  DELETE_QUERY_HISTORY,
+  EXECUTE_QUERY_HISTORY,
+  FILTER_QUERY_HISTORIES_BY_CONNECTION,
+  FOCUS_QUERY_HISTORIES_FILTER,
   HISTORY_VIEW_ID,
   NOTEBOOK_TYPE,
   OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY,
   OPEN_MDH_VIEWER,
-  OPEN_SQL_HISTORIES_AS_NOTEBOOK,
-  OPEN_SQL_HISTORY,
-  REFRESH_SQL_HISTORIES,
-  RESET_SQL_HISTORY_PERFORMANCE,
-  SORT_SQL_HISTORIES_BY_DURATION,
-  SORT_SQL_HISTORIES_BY_RECENT,
+  OPEN_QUERY_HISTORIES_AS_NOTEBOOK,
+  OPEN_QUERY_HISTORY,
+  REFRESH_QUERY_HISTORIES,
+  RESET_QUERY_HISTORY_PERFORMANCE,
+  SORT_QUERY_HISTORIES_BY_DURATION,
+  SORT_QUERY_HISTORIES_BY_RECENT,
   START_PERFORMANCE_TUNING_FROM_HISTORY,
 } from "../../constant";
 
@@ -52,7 +52,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, resolveCodeLabel } from "@l-v-yonsama/rdh";
 import { CellMeta } from "../../types/Notebook";
-import { SQLHistory } from "../../types/SQLHistory";
+import { QueryHistory } from "../../types/QueryHistory";
 import { MdhViewParams } from "../../types/views";
 import { showWindowErrorMessage } from "../../utilities/alertUtil";
 import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
@@ -65,7 +65,7 @@ import {
   openDynamoDbPerformanceTuningPreview,
   openPerformanceTuningPreview,
 } from "../../utilities/performanceTuningBindConfirmation";
-import { averageCapacityUnits, averageElapsedTimeMilli } from "../../utilities/sqlHistoryUtil";
+import { averageCapacityUnits, averageElapsedTimeMilli } from "../../utilities/queryHistoryUtil";
 import { HistoryTreeProvider } from "./HistoryTreeProvider";
 import { DynamoQueryPanel } from "../../panels/DynamoQueryPanel";
 
@@ -89,7 +89,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     context.subscriptions.push(disposable);
   };
 
-  const createNotebookSqlCellByHistory = (history: SQLHistory) => {
+  const createNotebookSqlCellByHistory = (history: QueryHistory) => {
     const sqlCell = new NotebookCellData(NotebookCellKind.Code, history.sqlDoc, "sql");
     const metadata: CellMeta = {
       connectionName: history.connectionName,
@@ -104,7 +104,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     return sqlCell;
   };
 
-  const createProvenanceMarkdownCellByHistory = (history: SQLHistory) => {
+  const createProvenanceMarkdownCellByHistory = (history: QueryHistory) => {
     const parts = [history.connectionName];
     if (history.executedAt) {
       parts.push(dayjs(history.executedAt).format("YYYY-MM-DD HH:mm"));
@@ -118,12 +118,12 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
     return new NotebookCellData(
       NotebookCellKind.Markup,
-      `_From SQL history: ${parts.join(" ・ ")}_`,
+      `_From Query History: ${parts.join(" ・ ")}_`,
       "markdown"
     );
   };
 
-  const createNotebookCellsForHistory = (history: SQLHistory): NotebookCellData[] => {
+  const createNotebookCellsForHistory = (history: QueryHistory): NotebookCellData[] => {
     const cells: NotebookCellData[] = [];
     if (history.variables && Object.keys(history.variables).length > 0) {
       cells.push(
@@ -138,7 +138,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     return cells;
   };
 
-  const createNotebookCellsByHistories = (histories: SQLHistory[]): NotebookCellData[] => {
+  const createNotebookCellsByHistories = (histories: QueryHistory[]): NotebookCellData[] => {
     const cells: NotebookCellData[] = [];
     for (const history of histories) {
       cells.push(createProvenanceMarkdownCellByHistory(history));
@@ -148,20 +148,20 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   };
 
   const resolveSelectedHistories = (
-    history: SQLHistory,
-    selectedHistories?: SQLHistory[]
-  ): SQLHistory[] =>
+    history: QueryHistory,
+    selectedHistories?: QueryHistory[]
+  ): QueryHistory[] =>
     (selectedHistories && selectedHistories.length > 0 ? selectedHistories : [history]).filter(
       (item) => item.request?.kind !== "dynamodbQuery"
     );
 
-  registerDisposableCommand(REFRESH_SQL_HISTORIES, () => {
+  registerDisposableCommand(REFRESH_QUERY_HISTORIES, () => {
     historyTreeProvider.refresh(true);
   });
 
-  registerDisposableCommand(DELETE_ALL_SQL_HISTORY, async () => {
+  registerDisposableCommand(DELETE_ALL_QUERY_HISTORY, async () => {
     const answer = await window.showInformationMessage(
-      `Are you sure to delete all sql histories?`,
+      `Are you sure to delete all query histories?`,
       "YES",
       "NO"
     );
@@ -169,11 +169,11 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       return;
     }
 
-    await stateStorage.deleteAllSQLHistories();
+    await stateStorage.deleteAllQueryHistories();
     historyTreeProvider.refresh(true);
   });
 
-  registerDisposableCommand(DELETE_SQL_HISTORY, async (history: SQLHistory) => {
+  registerDisposableCommand(DELETE_QUERY_HISTORY, async (history: QueryHistory) => {
     const answer = await window.showInformationMessage(
       `Are you sure to delete this history? ${history.sqlDoc}`,
       "YES",
@@ -183,27 +183,27 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       return;
     }
 
-    await stateStorage.deleteSQLHistoryByID(history.id);
+    await stateStorage.deleteQueryHistoryByID(history.id);
     historyTreeProvider.refresh(true);
   });
 
-  registerDisposableCommand(RESET_SQL_HISTORY_PERFORMANCE, async (history: SQLHistory) => {
+  registerDisposableCommand(RESET_QUERY_HISTORY_PERFORMANCE, async (history: QueryHistory) => {
     const answer = await window.showWarningMessage(
-      "Reset the accumulated performance statistics for this SQL History item? The SQL, bind values, and latest result remain available. New executions start a new measurement period.",
+      "Reset the accumulated performance statistics for this Query History item? The statement, bind values, and latest result remain available. New executions start a new measurement period.",
       { modal: true },
       "Reset"
     );
     if (answer !== "Reset") {
       return;
     }
-    await stateStorage.resetSQLHistoryPerformanceByID(history.id);
+    await stateStorage.resetQueryHistoryPerformanceByID(history.id);
     await historyTreeProvider.refresh(true);
     window.showInformationMessage(
       "Performance statistics were reset. Save a baseline report before resetting when you need to retain the previous evidence."
     );
   });
 
-  registerDisposableCommand(OPEN_SQL_HISTORY, async (history: SQLHistory) => {
+  registerDisposableCommand(OPEN_QUERY_HISTORY, async (history: QueryHistory) => {
     if (history.request?.kind === "dynamodbQuery") {
       return;
     }
@@ -212,8 +212,8 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   });
 
   registerDisposableCommand(
-    OPEN_SQL_HISTORIES_AS_NOTEBOOK,
-    async (history: SQLHistory, selectedHistories?: SQLHistory[]) => {
+    OPEN_QUERY_HISTORIES_AS_NOTEBOOK,
+    async (history: QueryHistory, selectedHistories?: QueryHistory[]) => {
       const histories = resolveSelectedHistories(history, selectedHistories);
       if (histories.length === 0) {
         return;
@@ -224,8 +224,8 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   );
 
   registerDisposableCommand(
-    APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK,
-    async (history: SQLHistory, selectedHistories?: SQLHistory[]) => {
+    APPEND_QUERY_HISTORIES_TO_ACTIVE_NOTEBOOK,
+    async (history: QueryHistory, selectedHistories?: QueryHistory[]) => {
       const histories = resolveSelectedHistories(history, selectedHistories);
       if (histories.length === 0) {
         return;
@@ -244,11 +244,11 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
   );
 
-  registerDisposableCommand(FILTER_SQL_HISTORIES_BY_CONNECTION, async () => {
+  registerDisposableCommand(FILTER_QUERY_HISTORIES_BY_CONNECTION, async () => {
     const showAllLabel = "$(list-flat) Show all connections";
     const connectionNames = historyTreeProvider.getConnectionNames();
     const picked = await window.showQuickPick([showAllLabel, ...connectionNames], {
-      placeHolder: "Filter SQL histories by connection",
+      placeHolder: "Filter query histories by connection",
     });
     if (picked === undefined) {
       return;
@@ -256,27 +256,27 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     historyTreeProvider.setConnectionFilter(picked === showAllLabel ? undefined : picked);
   });
 
-  registerDisposableCommand(CLEAR_SQL_HISTORIES_CONNECTION_FILTER, () => {
+  registerDisposableCommand(CLEAR_QUERY_HISTORIES_CONNECTION_FILTER, () => {
     historyTreeProvider.setConnectionFilter(undefined);
   });
 
   // Query-content search reuses VS Code's built-in tree find/filter widget,
   // the same way database-notebook.focus-filter does for the connections
   // view: focus the view, then let "list.find" take over.
-  registerDisposableCommand(FOCUS_SQL_HISTORIES_FILTER, async () => {
+  registerDisposableCommand(FOCUS_QUERY_HISTORIES_FILTER, async () => {
     await commands.executeCommand(`${HISTORY_VIEW_ID}.focus`);
     await commands.executeCommand("list.find");
   });
 
-  registerDisposableCommand(SORT_SQL_HISTORIES_BY_DURATION, () => {
+  registerDisposableCommand(SORT_QUERY_HISTORIES_BY_DURATION, () => {
     historyTreeProvider.setSortOrder("duration");
   });
 
-  registerDisposableCommand(SORT_SQL_HISTORIES_BY_RECENT, () => {
+  registerDisposableCommand(SORT_QUERY_HISTORIES_BY_RECENT, () => {
     historyTreeProvider.setSortOrder("recent");
   });
 
-  registerDisposableCommand(OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY, async (history: SQLHistory) => {
+  registerDisposableCommand(OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY, async (history: QueryHistory) => {
     const request = history.request;
     if (request?.kind !== "dynamodbQuery" || request.origin !== "dynamoQueryPanel") {
       showWindowErrorMessage("This history entry was not created by Dynamo Query Panel.");
@@ -331,8 +331,8 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   // Native Query history executes its stored input; sqlDoc is display text only.
   const executeDynamoQueryHistory = async (
     connectionSetting: ConnectionSetting,
-    history: SQLHistory,
-    request: Extract<NonNullable<SQLHistory["request"]>, { kind: "dynamodbQuery" }>
+    history: QueryHistory,
+    request: Extract<NonNullable<QueryHistory["request"]>, { kind: "dynamodbQuery" }>
   ): Promise<void> => {
     log(`${PREFIX} native Query:` + JSON.stringify(request.input));
 
@@ -360,7 +360,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       };
       commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
 
-      await stateStorage.addSQLHistory({
+      await stateStorage.addQueryHistory({
         connectionName: history.connectionName,
         sqlDoc: request.displayText,
         request,
@@ -372,7 +372,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     } else {
       showWindowErrorMessage(`Execute query Error: ${message}`);
 
-      await stateStorage.addSQLHistory({
+      await stateStorage.addQueryHistory({
         connectionName: history.connectionName,
         sqlDoc: request.displayText,
         request,
@@ -384,11 +384,11 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     historyTreeProvider.refresh(true);
   };
 
-  registerDisposableCommand(EXECUTE_SQL_HISTORY, async (history: SQLHistory) => {
+  registerDisposableCommand(EXECUTE_QUERY_HISTORY, async (history: QueryHistory) => {
     const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
     if (!connectionSetting) {
       showWindowErrorMessage("Missing connection " + history.connectionName);
-      await stateStorage.deleteSQLHistoryByID(history.id);
+      await stateStorage.deleteQueryHistoryByID(history.id);
       historyTreeProvider.refresh(true);
       return;
     }
@@ -489,7 +489,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
       };
       commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
 
-      await stateStorage.addSQLHistory({
+      await stateStorage.addQueryHistory({
         connectionName: history.connectionName,
         sqlDoc: history.sqlDoc,
         variables: history.variables,
@@ -504,7 +504,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     } else {
       showWindowErrorMessage(`Execute query Error: ${message}`);
 
-      await stateStorage.addSQLHistory({
+      await stateStorage.addQueryHistory({
         connectionName: history.connectionName,
         sqlDoc: history.sqlDoc,
         variables: history.variables,
@@ -521,7 +521,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
   // DynamoDB preview collection avoids RDB-only metadata and item-data reads.
   const startDynamoDbPerformanceTuningFromHistory = async (
     connectionSetting: ConnectionSetting,
-    history: SQLHistory
+    history: QueryHistory
   ): Promise<void> => {
     // Native Query values remain execution-only and are sanitized before Context creation.
     let request: DynamoDbPerformanceTuningPreviewRequest["statement"]["request"];
@@ -594,7 +594,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     }
   };
 
-  registerDisposableCommand(START_PERFORMANCE_TUNING_FROM_HISTORY, async (history: SQLHistory) => {
+  registerDisposableCommand(START_PERFORMANCE_TUNING_FROM_HISTORY, async (history: QueryHistory) => {
     const connectionSetting = await stateStorage.getConnectionSettingByName(history.connectionName);
     if (!connectionSetting) {
       showWindowErrorMessage("Missing connection " + history.connectionName);
@@ -612,7 +612,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     // database the plan/statistics should be collected against.
     const databaseName = history.meta?.useDatabase ?? connectionSetting.database;
     if (!databaseName) {
-      showWindowErrorMessage("Could not determine the target database for this SQL history entry.");
+      showWindowErrorMessage("Could not determine the target database for this query history entry.");
       return;
     }
 

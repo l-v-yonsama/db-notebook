@@ -17,7 +17,7 @@ import {
   workspace,
   WorkspaceEdit,
 } from "vscode";
-import { NOTEBOOK_TYPE, OPEN_CHARTS_VIEWER, REFRESH_SQL_HISTORIES } from "../constant";
+import { NOTEBOOK_TYPE, OPEN_CHARTS_VIEWER, REFRESH_QUERY_HISTORIES } from "../constant";
 import type {
   JSONCellValues,
   MqttPublishResult,
@@ -657,7 +657,7 @@ export class MainController {
         metadata.connectionName &&
         (resultRdhForHistory || r.status === "error")
       ) {
-        await this.stateStorage.addSQLHistory({
+        await this.stateStorage.addQueryHistory({
           connectionName: metadata.connectionName,
           sqlDoc: cell.document.getText(),
           variables: noteSession.kernel.getStoredVariables(),
@@ -669,7 +669,7 @@ export class MainController {
           status: r.status === "error" ? "error" : "success",
           errorMessage: r.status === "error" ? r.stderr : undefined,
         });
-        commands.executeCommand(REFRESH_SQL_HISTORIES);
+        commands.executeCommand(REFRESH_QUERY_HISTORIES);
       }
 
       return r;

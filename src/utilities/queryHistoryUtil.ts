@@ -1,25 +1,29 @@
 import type { RdhDynamoDbSummary } from "@l-v-yonsama/rdh";
-import type { SQLHistory, SQLHistoryDynamoDbPerformance, SQLHistoryPerformance } from "../types/SQLHistory";
+import type {
+  QueryHistory,
+  QueryHistoryDynamoDbPerformance,
+  QueryHistoryPerformance,
+} from "../types/QueryHistory";
 import type { SQLMode } from "../types/Notebook";
 
-export type StoredSQLHistory = SQLHistory & {
-  // M1の開発途中で保存された値。移行後のSQLHistoryには保持しない。
+export type StoredQueryHistory = QueryHistory & {
+  // M1の開発途中で保存された値。移行後のQueryHistoryには保持しない。
   sqlMode?: SQLMode;
 };
 
-type SQLHistoryTarget = Pick<SQLHistory, "sqlDoc" | "meta"> & {
+type QueryHistoryTarget = Pick<QueryHistory, "sqlDoc" | "meta"> & {
   sqlMode?: SQLMode;
 };
 
-const EMPTY_PERFORMANCE: SQLHistoryPerformance = {
+const EMPTY_PERFORMANCE: QueryHistoryPerformance = {
   sampleCount: 0,
   totalElapsedTimeMilli: 0,
 };
 
-export const resetSQLHistoryPerformance = (
+export const resetQueryHistoryPerformance = (
   resetAt = Date.now(),
   includeDynamoDbAggregate = false
-): SQLHistoryPerformance => ({
+): QueryHistoryPerformance => ({
   ...EMPTY_PERFORMANCE,
   ...(includeDynamoDbAggregate
     ? {
@@ -40,7 +44,7 @@ export const resetSQLHistoryPerformance = (
 // Older entries were created before `performance` existed. Derive an
 // equivalent starting point from the single `summary.elapsedTimeMilli`
 // value they already carried, so existing history isn't discarded.
-export const migrateLegacyPerformance = (previous: SQLHistory): SQLHistoryPerformance => {
+export const migrateLegacyPerformance = (previous: QueryHistory): QueryHistoryPerformance => {
   if (previous.performance) {
     return previous.performance;
   }
@@ -63,7 +67,7 @@ export const migrateLegacyPerformance = (previous: SQLHistory): SQLHistoryPerfor
   };
 };
 
-const isPlanMeta = (history: SQLHistoryTarget): boolean => {
+const isPlanMeta = (history: QueryHistoryTarget): boolean => {
   const type = history.meta?.type?.toLocaleLowerCase();
   return type === "explain" || type === "analyze";
 };
@@ -190,15 +194,15 @@ export const containsExplainStatement = (sql: string): boolean => {
   return false;
 };
 
-export const isSQLHistoryTarget = (history: SQLHistoryTarget): boolean => {
+export const isQueryHistoryTarget = (history: QueryHistoryTarget): boolean => {
   if (history.sqlMode !== undefined && history.sqlMode !== "Query") {
     return false;
   }
   return !isPlanMeta(history) && !containsExplainStatement(history.sqlDoc);
 };
 
-export const migrateStoredSQLHistory = (stored: StoredSQLHistory): SQLHistory | undefined => {
-  if (!isSQLHistoryTarget(stored)) {
+export const migrateStoredQueryHistory = (stored: StoredQueryHistory): QueryHistory | undefined => {
+  if (!isQueryHistoryTarget(stored)) {
     return undefined;
   }
 
@@ -219,11 +223,11 @@ export const migrateStoredSQLHistory = (stored: StoredSQLHistory): SQLHistory | 
 // Folds a new execution's Capacity reading into the base aggregates. A run
 // with no measurable capacityUnits (any non-AWS vendor, or an AWS run whose
 // summary didn't carry one) leaves these fields exactly as they were -
-// mirrors mergeSQLHistoryPerformance's own elapsedTimeMilli rule.
+// mirrors mergeQueryHistoryPerformance's own elapsedTimeMilli rule.
 const mergeCapacity = (
-  base: SQLHistoryPerformance,
+  base: QueryHistoryPerformance,
   capacityUnits: number | undefined
-): Partial<Pick<SQLHistoryPerformance, "capacitySampleCount" | "totalCapacityUnits" | "maxCapacityUnits" | "lastCapacityUnits">> => {
+): Partial<Pick<QueryHistoryPerformance, "capacitySampleCount" | "totalCapacityUnits" | "maxCapacityUnits" | "lastCapacityUnits">> => {
   if (capacityUnits === undefined) {
     return base.capacitySampleCount === undefined
       ? {}
@@ -266,9 +270,9 @@ function maxOptional(base: number | undefined, next: number | undefined): number
 // RdhDynamoDbSummary's own doc comment - so evaluatedCountSampleCount can be
 // smaller than observationSampleCount for a mixed-mode history.
 function mergeDynamoDbPerformance(
-  base: SQLHistoryDynamoDbPerformance | undefined,
+  base: QueryHistoryDynamoDbPerformance | undefined,
   dynamoDb: RdhDynamoDbSummary | undefined
-): SQLHistoryDynamoDbPerformance | undefined {
+): QueryHistoryDynamoDbPerformance | undefined {
   if (!dynamoDb) {
     return base;
   }
@@ -300,12 +304,12 @@ function mergeDynamoDbPerformance(
 // untouched, so failed re-runs don't skew avg/max; the Capacity and
 // DynamoDB aggregates follow the same rule independently via
 // mergeCapacity()/mergeDynamoDbPerformance().
-export const mergeSQLHistoryPerformance = (
-  previous: SQLHistory,
+export const mergeQueryHistoryPerformance = (
+  previous: QueryHistory,
   elapsedTimeMilli: number | undefined,
   capacityUnits?: number,
   dynamoDb?: RdhDynamoDbSummary
-): SQLHistoryPerformance => {
+): QueryHistoryPerformance => {
   const base = migrateLegacyPerformance(previous);
   const capacity = mergeCapacity(base, capacityUnits);
   const dynamoDbPerformance = mergeDynamoDbPerformance(base.dynamoDb, dynamoDb);
@@ -324,11 +328,11 @@ export const mergeSQLHistoryPerformance = (
   return dynamoDbPerformance ? { ...merged, dynamoDb: dynamoDbPerformance } : merged;
 };
 
-export const createInitialSQLHistoryPerformance = (
+export const createInitialQueryHistoryPerformance = (
   elapsedTimeMilli: number | undefined,
   capacityUnits?: number,
   dynamoDb?: RdhDynamoDbSummary
-): SQLHistoryPerformance => {
+): QueryHistoryPerformance => {
   const capacity =
     capacityUnits !== undefined
       ? { capacitySampleCount: 1, totalCapacityUnits: capacityUnits, maxCapacityUnits: capacityUnits, lastCapacityUnits: capacityUnits }
@@ -347,10 +351,10 @@ export const createInitialSQLHistoryPerformance = (
   return dynamoDbPerformance ? { ...initial, dynamoDb: dynamoDbPerformance } : initial;
 };
 
-export const averageElapsedTimeMilli = (performance: SQLHistoryPerformance): number =>
+export const averageElapsedTimeMilli = (performance: QueryHistoryPerformance): number =>
   performance.sampleCount > 0 ? performance.totalElapsedTimeMilli / performance.sampleCount : 0;
 
-export const averageCapacityUnits = (performance: SQLHistoryPerformance): number | undefined =>
+export const averageCapacityUnits = (performance: QueryHistoryPerformance): number | undefined =>
   performance.capacitySampleCount && performance.capacitySampleCount > 0
     ? (performance.totalCapacityUnits ?? 0) / performance.capacitySampleCount
     : undefined;

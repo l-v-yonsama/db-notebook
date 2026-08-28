@@ -56,7 +56,7 @@ function buildAnalysis(
         detail: "Create an index on orders.tenant_id.",
         rationale: "The predicate filters on tenant_id but no matching index exists.",
         riskLevel: "low",
-        suggestedSql: "CREATE INDEX idx_orders_tenant_id ON orders (tenant_id);",
+        suggestedQuery: "CREATE INDEX idx_orders_tenant_id ON orders (tenant_id);",
         evidence: { tableName: "orders" },
       },
     ],
@@ -303,7 +303,7 @@ describe("buildAiAnalysisNotebookCells", () => {
             detail: "Create an index on products.category.",
             rationale: "The predicate filters on category.",
             riskLevel: "medium",
-            suggestedSql: "CREATE INDEX idx_products_category ON products (category);",
+            suggestedQuery: "CREATE INDEX idx_products_category ON products (category);",
             possibleDuplicateOfIndex: "idx_products_category",
           },
         ],
@@ -337,7 +337,7 @@ describe("buildAiAnalysisNotebookCells", () => {
           confidence: "low",
           qualityIssues: [
             {
-              code: "SUGGESTED_SQL_MATCHES_CURRENT",
+              code: "SUGGESTED_QUERY_MATCHES_CURRENT",
               recommendationTitle: "Rewrite the filter",
               message: "The recommendation was excluded; try Analyze with AI again using a different model.",
             },
@@ -347,7 +347,7 @@ describe("buildAiAnalysisNotebookCells", () => {
     );
     const summary = findCell(cells, "AI response quality warning").value;
     expect(summary).toContain("different model");
-    expect(findJsonCell(cells, "AI analysis JSON").value).toContain("SUGGESTED_SQL_MATCHES_CURRENT");
+    expect(findJsonCell(cells, "AI analysis JSON").value).toContain("SUGGESTED_QUERY_MATCHES_CURRENT");
   });
 
   it("rebuilds the saved request with the language option used by the original analysis", () => {

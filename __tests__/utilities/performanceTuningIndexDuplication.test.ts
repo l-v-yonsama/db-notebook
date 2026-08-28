@@ -102,7 +102,7 @@ describe("findPossibleDuplicateIndex", () => {
     expect(match).toBeUndefined();
   });
 
-  it("returns undefined for a non-CREATE INDEX suggestedSql, or none at all, without throwing", () => {
+  it("returns undefined for a non-CREATE INDEX suggestedQuery, or none at all, without throwing", () => {
     const context = buildContext([
       table({ tableName: "orders", indexes: [{ indexName: "idx_a", unique: false, columns: [{ columnName: "status" }] }] }),
     ]);

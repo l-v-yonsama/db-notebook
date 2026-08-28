@@ -25,7 +25,7 @@ export type DynamoDbPerformanceTuningHumanProfile = {
   // webview can show it as a single line.
   targetRef: string;
   // What kind of read evidence (if any) backs this Context - a single
-  // confirmed Run Observed Read/SQL-History observation ("observed"), only a
+  // confirmed Run Observed Read/Query-History observation ("observed"), only a
   // rolling multi-execution Capacity/timing trend ("workload"), or neither
   // ("none" - static access-path classification only).
   evidence: "observed" | "workload" | "none";

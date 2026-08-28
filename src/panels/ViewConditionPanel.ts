@@ -26,7 +26,7 @@ import {
   CREATE_NEW_NOTEBOOK,
   NOTEBOOK_TYPE,
   OPEN_MDH_VIEWER,
-  REFRESH_SQL_HISTORIES,
+  REFRESH_QUERY_HISTORIES,
 } from "../constant";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
@@ -298,7 +298,7 @@ export class ViewConditionPanel extends BasePanel {
         limitClauseStyle: driver.getLimitClauseStyle(),
         idQuoteCharacter: driver.getIdQuoteCharacter(),
       });
-      await ViewConditionPanel.stateStorage.addSQLHistory({
+      await ViewConditionPanel.stateStorage.addQueryHistory({
         connectionName: conName,
         sqlDoc: query,
         variables: binds,
@@ -307,7 +307,7 @@ export class ViewConditionPanel extends BasePanel {
         executedAt: Date.now(),
         status: "success",
       });
-      commands.executeCommand(REFRESH_SQL_HISTORIES);
+      commands.executeCommand(REFRESH_QUERY_HISTORIES);
       if (editable) {
         this.rdhForUpdate = result;
         const msg: ViewConditionPanelEventData = {
@@ -333,7 +333,7 @@ export class ViewConditionPanel extends BasePanel {
         limitClauseStyle: driver.getLimitClauseStyle(),
         idQuoteCharacter: driver.getIdQuoteCharacter(),
       });
-      await ViewConditionPanel.stateStorage.addSQLHistory({
+      await ViewConditionPanel.stateStorage.addQueryHistory({
         connectionName: conName,
         sqlDoc: query,
         variables: binds,
@@ -341,7 +341,7 @@ export class ViewConditionPanel extends BasePanel {
         status: "error",
         errorMessage: message,
       });
-      commands.executeCommand(REFRESH_SQL_HISTORIES);
+      commands.executeCommand(REFRESH_QUERY_HISTORIES);
       showWindowErrorMessage(message);
       this.dispose();
     }

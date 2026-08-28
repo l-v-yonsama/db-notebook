@@ -140,10 +140,10 @@ export async function activate(context: ExtensionContext) {
   historyTreeProvider.onDidChangeTreeData(() => {
     const filter = historyTreeProvider.getConnectionFilter();
     historyTreeView.description = filter ? `Filtered by: ${filter}` : undefined;
-    commands.executeCommand("setContext", "databaseNotebook.sqlHistoryFiltered", !!filter);
+    commands.executeCommand("setContext", "databaseNotebook.queryHistoryFiltered", !!filter);
     commands.executeCommand(
       "setContext",
-      "databaseNotebook.sqlHistorySortByDuration",
+      "databaseNotebook.queryHistorySortByDuration",
       historyTreeProvider.getSortOrder() === "duration"
     );
   });

@@ -65,24 +65,24 @@ export const COPY_RESOURCE_NAME = `${EXTENSION_NAME}.copy-resource-name`;
 export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 
 //---------------------------------------------------
-// SQL HISTORIES TREE
+// QUERY HISTORIES TREE
 //---------------------------------------------------
-export const SQL_HISTORY_LABEL_MAX_LENGTH = 70;
-export const REFRESH_SQL_HISTORIES = `${EXTENSION_NAME}.refresh-sql-histories`;
-export const DELETE_ALL_SQL_HISTORY = `${EXTENSION_NAME}.delete-all-sql-histories`;
-export const EXECUTE_SQL_HISTORY = `${EXTENSION_NAME}.histories.execute`;
+export const QUERY_HISTORY_LABEL_MAX_LENGTH = 70;
+export const REFRESH_QUERY_HISTORIES = `${EXTENSION_NAME}.refresh-query-histories`;
+export const DELETE_ALL_QUERY_HISTORY = `${EXTENSION_NAME}.delete-all-query-histories`;
+export const EXECUTE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.execute`;
 export const OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY = `${EXTENSION_NAME}.histories.openDynamoQueryPanel`;
 export const START_PERFORMANCE_TUNING_FROM_HISTORY = `${EXTENSION_NAME}.histories.startPerformanceTuning`;
-export const OPEN_SQL_HISTORY = `${EXTENSION_NAME}.histories.open`;
-export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;
-export const RESET_SQL_HISTORY_PERFORMANCE = `${EXTENSION_NAME}.histories.resetPerformance`;
-export const OPEN_SQL_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openAsNotebook`;
-export const APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.histories.appendToActiveNotebook`;
-export const FILTER_SQL_HISTORIES_BY_CONNECTION = `${EXTENSION_NAME}.histories.filterByConnection`;
-export const CLEAR_SQL_HISTORIES_CONNECTION_FILTER = `${EXTENSION_NAME}.histories.clearConnectionFilter`;
-export const FOCUS_SQL_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFilter`;
-export const SORT_SQL_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
-export const SORT_SQL_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
+export const OPEN_QUERY_HISTORY = `${EXTENSION_NAME}.histories.open`;
+export const DELETE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.delete`;
+export const RESET_QUERY_HISTORY_PERFORMANCE = `${EXTENSION_NAME}.histories.resetPerformance`;
+export const OPEN_QUERY_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openAsNotebook`;
+export const APPEND_QUERY_HISTORIES_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.histories.appendToActiveNotebook`;
+export const FILTER_QUERY_HISTORIES_BY_CONNECTION = `${EXTENSION_NAME}.histories.filterByConnection`;
+export const CLEAR_QUERY_HISTORIES_CONNECTION_FILTER = `${EXTENSION_NAME}.histories.clearConnectionFilter`;
+export const FOCUS_QUERY_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFilter`;
+export const SORT_QUERY_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
+export const SORT_QUERY_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
 export const HISTORY_VIEW_ID = `${EXTENSION_NAME}-histories`;
 
 //---------------------------------------------------

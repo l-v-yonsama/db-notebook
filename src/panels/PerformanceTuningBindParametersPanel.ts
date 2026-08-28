@@ -13,7 +13,7 @@ import { BasePanel } from "./BasePanel";
 
 // 2026-08-19 follow-up to misc/design/performance-tuning-query-statistics-
 // parameter-input-plan.ja.md: Query Statistics (ToolsView.vue) had a working
-// Bind Parameters UI, but SQL History (HistoryTreeCommand.ts) had none at
+// Bind Parameters UI, but Query History (HistoryTreeCommand.ts) had none at
 // all - a parameterized History entry silently failed to collect a plan.
 // Rather than build a second, duplicate bind-input UI for History, or fold
 // bind collection into PerformanceTuningPreviewPanel itself (which would
@@ -29,7 +29,7 @@ export type PerformanceTuningBindParametersPanelParams = Omit<StartPerformanceTu
   // Real values to pre-fill the row table with (parallel to
   // estimatedBindParameters by `position`), when the caller has them - see
   // openPerformanceTuningPreview()'s own doc comment. Undefined for Query
-  // Statistics (no such source); SQL History passes its last-executed
+  // Statistics (no such source); Query History passes its last-executed
   // history.variables, converted to positional order.
   presetBindValues?: unknown[];
 };

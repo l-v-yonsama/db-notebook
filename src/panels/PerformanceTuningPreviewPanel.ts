@@ -927,7 +927,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           ...r,
           possibleDuplicateOfIndex: isDynamoDbPerformanceTuningContext(context)
             ? undefined
-            : findPossibleDuplicateIndex(r?.suggestedSql, context)?.matchedIndexName,
+            : findPossibleDuplicateIndex(r?.suggestedQuery, context)?.matchedIndexName,
         }));
         const recommendationReview = isDynamoDbPerformanceTuningContext(context)
           ? { recommendations, qualityIssues: [] }
