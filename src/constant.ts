@@ -36,6 +36,7 @@ export const GET_SESSIONS = `${EXTENSION_NAME}.get-sessions`;
 export const SHOW_QUERY_STATISTICS = `${EXTENSION_NAME}.show-query-statistics`;
 export const SHOW_CLOUDWATCH_METRICS = `${EXTENSION_NAME}.show-cloudwatch-metrics`;
 export const SHOW_CLOUDWATCH_METRICS_OVERVIEW = `${EXTENSION_NAME}.show-cloudwatch-metrics-overview`;
+export const SHOW_RDB_DASHBOARD = `${EXTENSION_NAME}.show-rdb-dashboard`;
 export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;
 export const VIEW_DATA = `${EXTENSION_NAME}.view-data`;
 export const VIEW_TOP_ROWS = `${EXTENSION_NAME}.view-top-rows`;

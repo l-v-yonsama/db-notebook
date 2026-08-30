@@ -11,7 +11,7 @@ const defaultMessage: Record<DashboardDisplayStatus, string> = {
   loading: "Loading dashboard data…",
   ready: "Dashboard data is ready.",
   partial: "Some series could not be collected. Available data is still shown.",
-  empty: "CloudWatch returned no datapoints for this time range.",
+  empty: "No datapoints are available for this view.",
   unconfigured: "Metrics are not configured for this target.",
   unavailable: "Metrics are unavailable for this target or endpoint.",
   error: "The dashboard could not be refreshed.",

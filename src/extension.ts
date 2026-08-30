@@ -48,6 +48,7 @@ import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { CfnDiagramSettingsPanel } from "./panels/CfnDiagramSettingsPanel";
 import { CloudWatchMetricsPanel } from "./panels/CloudWatchMetricsPanel";
+import { RdbDashboardPanel } from "./panels/RdbDashboardPanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
 import { DBDumpSettingsPanel } from "./panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "./panels/DBRestoreSettingsPanel";
@@ -128,6 +129,7 @@ export async function activate(context: ExtensionContext) {
   DBRestoreSettingsPanel.setStateStorage(stateStorage);
   CfnDiagramSettingsPanel.setStateStorage(stateStorage);
   CloudWatchMetricsPanel.setStateStorage(stateStorage);
+  RdbDashboardPanel.setStateStorage(stateStorage);
 
   activateLmTools(context, stateStorage);
   activateMcpServer(context, stateStorage);

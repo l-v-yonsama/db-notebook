@@ -220,9 +220,12 @@ export class CloudWatchMetricsPanel extends BasePanel {
   }
 
   private async replayLatestState(): Promise<void> {
-    if (this.lastInitialize) {
-      await this.post("initialize", this.latestRequestId, this.lastInitialize);
+    await this.post("loading", this.latestRequestId, { status: "loading" });
+    if (!this.lastInitialize) {
+      await this.refresh();
+      return;
     }
+    await this.post("initialize", this.latestRequestId, this.lastInitialize);
     if (this.lastMetrics) {
       await this.post("set-metrics", this.latestRequestId, this.lastMetrics);
     }

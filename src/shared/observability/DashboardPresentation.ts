@@ -11,9 +11,11 @@ export type DashboardDisplayStatus =
 export type DashboardTargetPresentation = {
   resourceKey: string;
   displayName: string;
+  /** Complete target name shown on hover when displayName is shortened for layout. */
+  fullDisplayName?: string;
   sourceLabel: string;
   environmentLabel?: string;
-  scope: { kind: string; label: string };
+  scope: { kind: string; label: string; fullLabel?: string };
 };
 
 export type DashboardNotice = {
@@ -47,6 +49,8 @@ export type DashboardTimeSeries = {
   id: string;
   label: string;
   unit: string;
+  /** Whether collecting this metric contributes to the value being shown. */
+  selfObservation?: "excluded" | "included" | "unknown";
   points: DashboardTimeSeriesPoint[];
   status: "complete" | "partial" | "no-data" | "unavailable" | "forbidden" | "failed";
   diagnostics?: Array<{ code?: string; message?: string }>;
@@ -56,7 +60,7 @@ export type DashboardPanelPresentation = {
   id: string;
   title: string;
   purpose: "workload" | "health" | "capacity" | "lifecycle" | "configuration";
-  scope: { kind: string; label: string };
+  scope: { kind: string; label: string; fullLabel?: string };
   visualization: "line" | "bar" | "stacked-area" | "stat-grid" | "table" | "state-card";
   caveat?: string;
   collapsedByDefault?: boolean;

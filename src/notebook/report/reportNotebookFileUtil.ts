@@ -3,6 +3,7 @@ import { createDirectory, existsUri, writeBytesToResource } from "../../utilitie
 import { DBNotebookReportSerializer } from "./reportSerializer";
 
 const CLOUDWATCH_REPORTS_SUBPATH = ["reports", "cw-metrics"] as const;
+const RDB_REPORTS_SUBPATH = ["reports", "rdb-dashboard"] as const;
 
 export type SaveReportNotebookResult =
   | { ok: true; relativePath: string; uri: Uri }
@@ -34,16 +35,38 @@ export async function saveCloudWatchReportNotebook(
   report: NotebookData,
   filename: string
 ): Promise<SaveReportNotebookResult> {
+  return saveReportNotebook(report, filename, {
+    subpath: CLOUDWATCH_REPORTS_SUBPATH,
+    noWorkspaceMessage:
+      "No workspace folder is open, so the CloudWatch metrics report cannot be saved. Open a workspace folder and try again.",
+  });
+}
+
+export async function saveRdbDashboardReportNotebook(
+  report: NotebookData,
+  filename: string
+): Promise<SaveReportNotebookResult> {
+  return saveReportNotebook(report, filename, {
+    subpath: RDB_REPORTS_SUBPATH,
+    noWorkspaceMessage:
+      "No workspace folder is open, so the database dashboard report cannot be saved. Open a workspace folder and try again.",
+  });
+}
+
+async function saveReportNotebook(
+  report: NotebookData,
+  filename: string,
+  options: { subpath: readonly string[]; noWorkspaceMessage: string }
+): Promise<SaveReportNotebookResult> {
   const wsFolder = workspace.workspaceFolders?.[0];
   if (!wsFolder) {
     return {
       ok: false,
-      message:
-        "No workspace folder is open, so the CloudWatch metrics report cannot be saved. Open a workspace folder and try again.",
+      message: options.noWorkspaceMessage,
     };
   }
 
-  const dirUri = Uri.joinPath(wsFolder.uri, ...CLOUDWATCH_REPORTS_SUBPATH);
+  const dirUri = Uri.joinPath(wsFolder.uri, ...options.subpath);
   await createDirectory(dirUri);
   let resolvedFilename = filename;
   let targetUri = Uri.joinPath(dirUri, resolvedFilename);
@@ -54,7 +77,7 @@ export async function saveCloudWatchReportNotebook(
   await writeAndOpenReportNotebook(report, targetUri, { viewColumn: ViewColumn.Two });
   return {
     ok: true,
-    relativePath: [...CLOUDWATCH_REPORTS_SUBPATH, resolvedFilename].join("/"),
+    relativePath: [...options.subpath, resolvedFilename].join("/"),
     uri: targetUri,
   };
 }

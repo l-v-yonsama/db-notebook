@@ -9,6 +9,7 @@ export function createReportChartViewParams(
   rdh: ResultSetData
 ): PreparedChartsViewParams {
   const labels = [...new Set(rdh.rows.map((row) => String(row.values[spec.xKey] ?? "")))];
+  const timeAxis = spec.xAxis?.type === "time";
   const points = new Map<string, Map<string, unknown>>();
   for (const row of rdh.rows) {
     const seriesId = String(row.values[spec.seriesKey] ?? "");
@@ -24,15 +25,15 @@ export function createReportChartViewParams(
   const backgroundColors = createColors(spec.series.length, 0.28);
   const borderColors = createColors(spec.series.length, 0.9);
   const stacked = spec.type === "stacked-area";
-  const timeAxis = spec.xAxis?.type === "time";
   const data: ExtChartData = {
     labels: timeAxis ? [] : labels,
     datasets: spec.series.map((series, index) => ({
       label: series.label,
-      data: labels.map((label) => {
-        const value = points.get(series.id)?.get(label) ?? null;
-        return timeAxis ? { x: label, y: value } : value;
-      }),
+      data: timeAxis
+        ? [...(points.get(series.id)?.entries() ?? [])]
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([timestamp, value]) => ({ x: timestamp, y: value }))
+        : labels.map((label) => points.get(series.id)?.get(label) ?? null),
       backgroundColor: backgroundColors[index],
       borderColor: borderColors[index],
       borderWidth: 2,

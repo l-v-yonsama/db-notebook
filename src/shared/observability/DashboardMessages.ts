@@ -45,6 +45,6 @@ export type DashboardHostMessage<
 > =
   | DashboardMessageEnvelope<"initialize", TInitialize>
   | DashboardMessageEnvelope<"set-dashboard", TInitialize>
-  | DashboardMessageEnvelope<"loading", { status: "loading" }>
+  | DashboardMessageEnvelope<"loading", { status: "loading"; preserveResults?: boolean }>
   | DashboardMessageEnvelope<"set-error", { message: string; notices?: DashboardNotice[] }>
   | DashboardMessageEnvelope<"refresh-cancelled", Record<string, never>>;

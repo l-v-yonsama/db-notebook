@@ -1,9 +1,9 @@
 <script setup lang="ts">
-defineProps<{ label: string }>();
+defineProps<{ label: string; fullLabel?: string }>();
 </script>
 
 <template>
-  <span class="scope-badge">{{ label }}</span>
+  <span class="scope-badge" :title="fullLabel ?? label">{{ label }}</span>
 </template>
 
 <style scoped>

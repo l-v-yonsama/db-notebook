@@ -70,6 +70,7 @@ import {
   SHOW_CONNECTION_SETTING,
   SHOW_CLOUDWATCH_METRICS,
   SHOW_CLOUDWATCH_METRICS_OVERVIEW,
+  SHOW_RDB_DASHBOARD,
   SHOW_DYNAMO_QUERY_PANEL,
   SHOW_PUBLISH_EDITOR_PANEL,
   SHOW_QUERY_STATISTICS,
@@ -87,6 +88,7 @@ import { SQLConfigurationViewProvider } from "../../form";
 import { MqttDriverManager } from "../../mqtt/MqttDriverManager";
 import { CfnDiagramSettingsPanel } from "../../panels/CfnDiagramSettingsPanel";
 import { CloudWatchMetricsPanel } from "../../panels/CloudWatchMetricsPanel";
+import { RdbDashboardPanel } from "../../panels/RdbDashboardPanel";
 import { CreateInsertScriptSettingsPanel } from "../../panels/CreateInsertScriptSettingsPanel";
 import { DBDumpSettingsPanel } from "../../panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "../../panels/DBRestoreSettingsPanel";
@@ -232,6 +234,12 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       return;
     }
     CloudWatchMetricsPanel.renderOverview(context.extensionUri, res);
+  });
+  commands.registerCommand(SHOW_RDB_DASHBOARD, async (res: DbResource) => {
+    if (!res) {
+      return;
+    }
+    RdbDashboardPanel.render(context.extensionUri, res);
   });
 
   commands.registerCommand(COPY_COLUMN_NAMES, async (tableRes: DbTable) => {

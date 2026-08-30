@@ -616,6 +616,11 @@
           "group": "db-resourc@4"
         },
         {
+          "command": "database-notebook.show-rdb-dashboard",
+          "when": "view == database-notebook-connections && viewItem =~ /,dashboard:rdb-database,/",
+          "group": "db-resourc@4"
+        },
+        {
           "command": "database-notebook.dump-database",
           "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,exportable.*/",
           "group": "io@6"
@@ -1316,6 +1321,11 @@
       {
         "command": "database-notebook.show-cloudwatch-metrics-overview",
         "title": "Show CloudWatch metrics overview",
+        "icon": "$(graph-line)"
+      },
+      {
+        "command": "database-notebook.show-rdb-dashboard",
+        "title": "Show database dashboard",
         "icon": "$(graph-line)"
       },
       {

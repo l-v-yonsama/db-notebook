@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CloudWatchAutoRefreshMinutes, DashboardSelector } from "@/utilities/vscode";
+import type { DashboardSelector } from "@/utilities/vscode";
 import VsCodeButton from "@/components/base/VsCodeButton.vue";
 
 defineProps<{
@@ -7,13 +7,13 @@ defineProps<{
   loading: boolean;
   queryCount?: number;
   autoRefreshAllowed?: boolean;
-  autoRefreshMinutes?: CloudWatchAutoRefreshMinutes;
+  autoRefreshMinutes?: number;
 }>();
 const emit = defineEmits<{
   (event: "select", selectorId: string, value: string): void;
   (event: "refresh"): void;
   (event: "cancel"): void;
-  (event: "set-auto-refresh", intervalMinutes: CloudWatchAutoRefreshMinutes): void;
+  (event: "set-auto-refresh", intervalMinutes: number): void;
   (event: "export"): void;
   (event: "close"): void;
 }>();
@@ -23,10 +23,7 @@ function selected(event: Event, selectorId: string): void {
 }
 
 function autoRefreshSelected(event: Event): void {
-  emit(
-    "set-auto-refresh",
-    Number((event.target as HTMLSelectElement).value) as CloudWatchAutoRefreshMinutes
-  );
+  emit("set-auto-refresh", Number((event.target as HTMLSelectElement).value));
 }
 </script>
 
@@ -75,7 +72,11 @@ function autoRefreshSelected(event: Event): void {
     <VsCodeButton v-else title="Refresh metrics" appearance="primary" @click="$emit('refresh')">
       Refresh
     </VsCodeButton>
-    <VsCodeButton title="Export current snapshot to notebook" appearance="secondary" @click="$emit('export')">
+    <VsCodeButton
+      title="Export current snapshot to notebook"
+      appearance="secondary"
+      @click="$emit('export')"
+    >
       Export to Notebook
     </VsCodeButton>
     <VsCodeButton title="Close dashboard" appearance="secondary" @click="$emit('close')">

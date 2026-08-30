@@ -14,14 +14,17 @@ defineProps<{
   <section class="dashboard-shell">
     <header>
       <div>
-        <h1>{{ target.displayName }}</h1>
+        <h1 :title="target.fullDisplayName ?? target.displayName">{{ target.displayName }}</h1>
         <p>
           {{ target.sourceLabel }}
           <span v-if="target.environmentLabel"> · {{ target.environmentLabel }}</span>
           <span v-if="collectedAt"> · Updated {{ new Date(collectedAt).toLocaleString() }}</span>
         </p>
       </div>
-      <DashboardScopeBadge :label="target.scope.label" />
+      <DashboardScopeBadge
+        :label="target.scope.label"
+        :full-label="target.scope.fullLabel"
+      />
     </header>
     <DashboardNoticeList :notices="notices" />
     <slot />
@@ -44,6 +47,7 @@ header {
 h1 {
   margin: 0;
   font-size: 1.45rem;
+  overflow-wrap: anywhere;
 }
 p {
   margin: 4px 0 0;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CloudWatchPanelPresentation, DashboardTimeSeries } from "@/utilities/vscode";
+import type { DashboardPanelPresentation, DashboardTimeSeries } from "@/utilities/vscode";
 import {
   Chart as ChartJS,
   BarElement,
@@ -11,6 +11,7 @@ import {
   TimeScale,
   Title,
   Tooltip,
+  type Chart,
   type ChartData,
   type ChartOptions,
 } from "chart.js";
@@ -31,19 +32,58 @@ ChartJS.register(
 );
 
 const props = defineProps<{
-  panel: CloudWatchPanelPresentation;
+  panel: DashboardPanelPresentation & {
+    thresholds?: Array<{ value: number; label: string; severity: "warn" | "error" }>;
+  };
   series: DashboardTimeSeries[];
+  resetMarkers?: Array<{ observedAt: string; reasonLabel: string }>;
 }>();
 
-const COLORS = ["#4f8cff", "#e06c75", "#48a868", "#d19a66", "#b477db", "#37a6a6"];
+function colorComponentsForSeries(seriesId: string): {
+  hue: number;
+  saturation: number;
+  lightness: number;
+} {
+  let hash = 0x811c9dc5;
+  for (const character of seriesId) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  const unsignedHash = hash >>> 0;
+  return {
+    hue: unsignedHash % 360,
+    saturation: 62 + ((unsignedHash >>> 9) % 12),
+    lightness: 48 + ((unsignedHash >>> 17) % 10),
+  };
+}
+
+function colorForSeries(seriesId: string, alpha?: number): string {
+  const { hue, saturation, lightness } = colorComponentsForSeries(seriesId);
+  return alpha === undefined
+    ? `hsl(${hue}, ${saturation}%, ${lightness}%)`
+    : `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+}
+
+const observerCaveat = computed(() => {
+  const included = props.series.filter((item) => item.selfObservation === "included");
+  const unknown = props.series.filter((item) => item.selfObservation === "unknown");
+  const parts = [];
+  if (included.length) {
+    parts.push(`included for ${included.map((item) => item.label).join(", ")}`);
+  }
+  if (unknown.length) {
+    parts.push(`unknown for ${unknown.map((item) => item.label).join(", ")}`);
+  }
+  return parts.length ? `Observer impact is ${parts.join("; ")}.` : undefined;
+});
 
 const chartData = computed<ChartData<"line", Array<{ x: string; y: number | null }>>>(() => {
   const datasets: ChartData<"line", Array<{ x: string; y: number | null }>>["datasets"] =
-    props.series.map((item, index) => ({
+    props.series.map((item) => ({
       label: `${item.label} (${item.status})`,
       data: item.points,
-      borderColor: COLORS[index % COLORS.length],
-      backgroundColor: `${COLORS[index % COLORS.length]}33`,
+      borderColor: colorForSeries(item.id),
+      backgroundColor: colorForSeries(item.id, 0.2),
       borderDash: item.status === "partial" ? [6, 4] : undefined,
       pointRadius: 1.5,
       borderWidth: 2,
@@ -79,15 +119,42 @@ const chartData = computed<ChartData<"line", Array<{ x: string; y: number | null
 const renderData = computed(() => chartData.value as unknown as ChartData<"line">);
 
 const barData = computed<ChartData<"bar", Array<{ x: string; y: number | null }>>>(() => ({
-  datasets: props.series.map((item, index) => ({
+  datasets: props.series.map((item) => ({
     label: `${item.label} (${item.status})`,
     data: item.points,
-    borderColor: COLORS[index % COLORS.length],
-    backgroundColor: `${COLORS[index % COLORS.length]}88`,
+    borderColor: colorForSeries(item.id),
+    backgroundColor: colorForSeries(item.id, 0.53),
     borderWidth: 1,
   })),
 }));
 const renderBarData = computed(() => barData.value as unknown as ChartData<"bar">);
+
+const resetMarkerPlugin = {
+  id: "rdb-reset-markers",
+  afterDatasetsDraw(chart: Chart): void {
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    if (!xScale || !yScale) {
+      return;
+    }
+    const context = chart.ctx;
+    context.save();
+    context.strokeStyle = "#d9a441";
+    context.lineWidth = 1;
+    context.setLineDash([5, 4]);
+    for (const marker of props.resetMarkers ?? []) {
+      const x = xScale.getPixelForValue(Date.parse(marker.observedAt));
+      if (!Number.isFinite(x) || x < xScale.left || x > xScale.right) {
+        continue;
+      }
+      context.beginPath();
+      context.moveTo(x, yScale.top);
+      context.lineTo(x, yScale.bottom);
+      context.stroke();
+    }
+    context.restore();
+  },
+};
 
 const chartOptions = computed<ChartOptions<"line">>(() => ({
   responsive: true,
@@ -136,9 +203,23 @@ const barOptions = computed<ChartOptions<"bar">>(() => ({
 </script>
 
 <template>
-  <div class="chart" :aria-label="`${panel.title} time series chart`">
-    <Bar v-if="panel.visualization === 'bar'" :data="renderBarData" :options="barOptions" />
-    <Line v-else :data="renderData" :options="chartOptions" />
+  <div
+    class="chart-wrapper"
+    role="img"
+    :aria-label="`${panel.title} time series chart with ${series.length} series and ${
+      resetMarkers?.length ?? 0
+    } reset markers`"
+  >
+    <div class="chart">
+      <Bar
+        v-if="panel.visualization === 'bar'"
+        :data="renderBarData"
+        :options="barOptions"
+        :plugins="[resetMarkerPlugin]"
+      />
+      <Line v-else :data="renderData" :options="chartOptions" :plugins="[resetMarkerPlugin]" />
+    </div>
+    <p v-if="observerCaveat" class="observer-caveat">{{ observerCaveat }}</p>
   </div>
 </template>
 
@@ -147,5 +228,10 @@ const barOptions = computed<ChartOptions<"bar">>(() => ({
   position: relative;
   height: 280px;
   min-height: 220px;
+}
+.observer-caveat {
+  margin: 4px 0 0;
+  color: var(--vscode-editorWarning-foreground);
+  font-size: 0.9em;
 }
 </style>

@@ -1,6 +1,9 @@
 import { NotebookData, Uri, ViewColumn, window, workspace } from "vscode";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { saveCloudWatchReportNotebook } from "../../src/notebook/report/reportNotebookFileUtil";
+import {
+  saveCloudWatchReportNotebook,
+  saveRdbDashboardReportNotebook,
+} from "../../src/notebook/report/reportNotebookFileUtil";
 
 function createReport(): NotebookData {
   const report = new NotebookData([]);
@@ -52,5 +55,26 @@ describe("saveCloudWatchReportNotebook", () => {
 
     expect(result).toMatchObject({ ok: false });
     expect(workspace.fs.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("saves RDB dashboard reports beneath reports/rdb-dashboard", async () => {
+    const report = createReport();
+    report.metadata = { reportKind: "rdb-database" };
+
+    const result = await saveRdbDashboardReportNotebook(
+      report,
+      "metrics-postgres-app-20260830-120000.dbnr"
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      relativePath: "reports/rdb-dashboard/metrics-postgres-app-20260830-120000.dbnr",
+    });
+    expect(workspace.fs.writeFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fsPath: "/workspace/reports/rdb-dashboard/metrics-postgres-app-20260830-120000.dbnr",
+      }),
+      expect.any(Uint8Array)
+    );
   });
 });
