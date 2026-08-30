@@ -1,46 +1,25 @@
 <script setup lang="ts">
+import {
+  dashboardSelfObservationLabel,
+  dashboardSeriesDelta,
+  latestDashboardValue,
+} from "@/utilities/dashboardSeries";
 import type { DashboardTimeSeries } from "@/utilities/vscode";
 
 defineProps<{ series: DashboardTimeSeries[] }>();
 
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 });
 
-function latestValue(series: DashboardTimeSeries): number | null {
-  return series.points.at(-1)?.y ?? null;
-}
-
-function previousValue(series: DashboardTimeSeries): number | null {
-  return (
-    [...series.points]
-      .slice(0, -1)
-      .reverse()
-      .find((point) => point.y !== null)?.y ?? null
-  );
-}
-
 function formatValue(value: number | null): string {
   return value === null ? "Unavailable" : numberFormat.format(value);
 }
 
 function formatDelta(series: DashboardTimeSeries): string | undefined {
-  const latest = latestValue(series);
-  const previous = previousValue(series);
-  if (latest === null || previous === null) {
+  const delta = dashboardSeriesDelta(series);
+  if (delta === undefined) {
     return undefined;
   }
-  const delta = latest - previous;
   return `${delta >= 0 ? "+" : ""}${numberFormat.format(delta)}`;
-}
-
-function selfObservationLabel(series: DashboardTimeSeries): string | undefined {
-  switch (series.selfObservation) {
-    case "included":
-      return "Observer activity is included";
-    case "unknown":
-      return "Observer impact is unknown";
-    case "excluded":
-      return "Observer activity is excluded";
-  }
 }
 </script>
 
@@ -49,18 +28,18 @@ function selfObservationLabel(series: DashboardTimeSeries): string | undefined {
     <div v-for="item in series" :key="item.id" class="stat">
       <dt>{{ item.label }}</dt>
       <dd>
-        <strong>{{ formatValue(latestValue(item)) }}</strong>
-        <span v-if="latestValue(item) !== null">{{ item.unit }}</span>
+        <strong>{{ formatValue(latestDashboardValue(item)) }}</strong>
+        <span v-if="latestDashboardValue(item) !== null">{{ item.unit }}</span>
       </dd>
       <small v-if="formatDelta(item) !== undefined">
         Change {{ formatDelta(item) }} {{ item.unit }}
       </small>
       <small
-        v-if="selfObservationLabel(item)"
+        v-if="dashboardSelfObservationLabel(item)"
         class="observer-note"
         :class="{ warning: item.selfObservation !== 'excluded' }"
       >
-        {{ selfObservationLabel(item) }}
+        {{ dashboardSelfObservationLabel(item) }}
       </small>
       <small v-if="item.status !== 'complete'" class="status">{{ item.status }}</small>
     </div>

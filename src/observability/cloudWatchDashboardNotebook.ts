@@ -1,20 +1,17 @@
-import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
-import {
-  NotebookCellData,
-  NotebookCellKind,
-  NotebookCellOutput,
-  NotebookCellOutputItem,
-  NotebookData,
-} from "vscode";
-import type {
-  PersistedReportOutputMetadata,
-  ReportChartSpec,
-} from "../notebook/report/reportTypes";
+import { NotebookCellData, NotebookCellKind, NotebookData } from "vscode";
+import type { ReportChartSpec } from "../notebook/report/reportTypes";
 import type {
   CloudWatchDashboardInitializePayload,
   CloudWatchMetricsPayload,
   DashboardTimeSeries,
 } from "../shared/observability";
+import { isDashboardChartVisualization } from "../shared/observability";
+import {
+  createDashboardReportNotebook,
+  createPersistedDashboardResultSetCell,
+  dashboardTimestampSuffix,
+  sanitizeDashboardFilenamePart,
+} from "./report/dashboardReportUtil";
 
 export type CloudWatchDashboardNotebookData = {
   summary: Array<Record<string, unknown>>;
@@ -22,29 +19,18 @@ export type CloudWatchDashboardNotebookData = {
   diagnostics: Array<Record<string, unknown>>;
 };
 
-function safeFilenamePart(value: string, fallback: string): string {
-  return value.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || fallback;
-}
-
 export function buildCloudWatchReportFilename(
   initialize: CloudWatchDashboardInitializePayload,
   metrics: CloudWatchMetricsPayload,
   dashboardId = "aws-cloudwatch-metrics"
 ): string {
   const providerParts = initialize.providerId.split(".");
-  const service = safeFilenamePart(providerParts[1] ?? "aws", "aws").toLowerCase();
+  const service = sanitizeDashboardFilenamePart(providerParts[1] ?? "aws", "aws").toLowerCase();
   const overviewSuffix = dashboardId.endsWith("-overview") ? "-overview" : "";
-  const target = safeFilenamePart(initialize.target.displayName, "resource");
-  const collectedAt = new Date(metrics.collectedAt);
-  const pad2 = (value: number) => String(value).padStart(2, "0");
-  const timestamp =
-    `${collectedAt.getFullYear()}${pad2(collectedAt.getMonth() + 1)}${pad2(
-      collectedAt.getDate()
-    )}-` +
-    `${pad2(collectedAt.getHours())}${pad2(collectedAt.getMinutes())}${pad2(
-      collectedAt.getSeconds()
-    )}`;
-  return `metrics-${service}${overviewSuffix}-${target}-${timestamp}.dbnr`;
+  const target = sanitizeDashboardFilenamePart(initialize.target.displayName, "resource");
+  return `metrics-${service}${overviewSuffix}-${target}-${dashboardTimestampSuffix(
+    metrics.collectedAt
+  )}.dbnr`;
 }
 
 type MetricExportDefinition = {
@@ -64,10 +50,6 @@ function diagnosticSeverity(status: DashboardTimeSeries["status"]): "info" | "wa
 
 function hasObservedMetricValue(series: DashboardTimeSeries): boolean {
   return series.points.some((point) => point.y !== null);
-}
-
-function markdownCode(value: string): string {
-  return `\`${value.replace(/`/g, "'")}\``;
 }
 
 function summaryContextParts(initialize: CloudWatchDashboardInitializePayload): string[] {
@@ -184,62 +166,6 @@ export function buildCloudWatchDashboardNotebookData(
   };
 }
 
-function buildResultSet(rows: Array<Record<string, unknown>>): ResultSetData {
-  if (rows.length === 0) {
-    return ResultSetDataBuilder.createEmpty({ noRecordsReason: "No records" }).build();
-  }
-  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
-  const builder = new ResultSetDataBuilder(keys);
-  rows.forEach((row) => builder.addRow(row));
-  builder.resetKeyTypeByRows();
-  return builder.build();
-}
-
-function persistedResultSetCell(
-  rows: Array<Record<string, unknown>>,
-  label: string,
-  contextParts: string[],
-  reportChart?: ReportChartSpec
-): NotebookCellData {
-  const rdh = buildResultSet(rows);
-  const cell = new NotebookCellData(
-    NotebookCellKind.Code,
-    `Saved dashboard snapshot: ${label}. No AWS request is executed from this cell.`,
-    "plaintext"
-  );
-  cell.metadata = {
-    cellLabel: label,
-    inputCollapsed: true,
-    ...(reportChart ? { reportChart } : {}),
-  };
-  const metadata: PersistedReportOutputMetadata = {
-    schemaVersion: 1,
-    kind: "result-set",
-    rdh,
-  };
-  cell.outputs = [
-    new NotebookCellOutput(
-      [
-        NotebookCellOutputItem.text(
-          [
-            `### ${label}`,
-            "",
-            contextParts.map(markdownCode).join(" · "),
-            "",
-            "> Saved dashboard snapshot. No AWS request is executed from this cell.",
-            "",
-            `\`[Saved result]\` ${rows.length} row(s)`,
-            ResultSetDataBuilder.from(rdh).toMarkdown({ maxPrintLines: 10 }),
-          ].join("\n"),
-          "text/markdown"
-        ),
-      ],
-      metadata
-    ),
-  ];
-  return cell;
-}
-
 export function buildCloudWatchDashboardNotebookCells(
   initialize: CloudWatchDashboardInitializePayload,
   metrics: CloudWatchMetricsPayload,
@@ -314,13 +240,11 @@ export function buildCloudWatchDashboardNotebookCells(
     const rows = data.metricSeries.filter(
       (row) => row.panelId === panel.id && displayedSeriesIds.has(String(row.metricId))
     );
-    const chart: ReportChartSpec | undefined = ["line", "bar", "stacked-area"].includes(
-      panel.visualization
-    )
+    const chart: ReportChartSpec | undefined = isDashboardChartVisualization(panel.visualization)
       ? {
           version: 1,
           renderer: "chartjs",
-          type: panel.visualization as ReportChartSpec["type"],
+          type: panel.visualization,
           title: panel.title,
           dataShape: "long",
           xKey: "timestamp",
@@ -339,18 +263,24 @@ export function buildCloudWatchDashboardNotebookCells(
         ? `${displayedSeries.length} series`
         : `${displayedSeries.length} of ${panelSeries.length} series with datapoints`;
     return [
-      persistedResultSetCell(
+      createPersistedDashboardResultSetCell({
         rows,
-        panel.title,
-        [initialize.target.displayName, panel.emission, seriesSummary],
-        chart
-      ),
+        label: panel.title,
+        contextParts: [initialize.target.displayName, panel.emission, seriesSummary],
+        requestSourceLabel: "AWS",
+        reportChart: chart,
+      }),
     ];
   });
 
   const cells = [
     heading,
-    persistedResultSetCell(data.summary, "Dashboard summary", summaryContextParts(initialize)),
+    createPersistedDashboardResultSetCell({
+      rows: data.summary,
+      label: "Dashboard summary",
+      contextParts: summaryContextParts(initialize),
+      requestSourceLabel: "AWS",
+    }),
     ...panelCells,
   ];
   return cells;
@@ -361,14 +291,12 @@ export function buildCloudWatchDashboardReport(
   metrics: CloudWatchMetricsPayload,
   dashboardId = "aws-cloudwatch-metrics"
 ): NotebookData {
-  const report = new NotebookData(
-    buildCloudWatchDashboardNotebookCells(initialize, metrics, dashboardId)
+  return createDashboardReportNotebook(
+    buildCloudWatchDashboardNotebookCells(initialize, metrics, dashboardId),
+    {
+      reportKind: "aws-cloudwatch-metrics",
+      dashboardId,
+      collectedAt: metrics.collectedAt,
+    }
   );
-  report.metadata = {
-    formatVersion: 1,
-    reportKind: "aws-cloudwatch-metrics",
-    dashboardId,
-    collectedAt: metrics.collectedAt,
-  };
-  return report;
 }

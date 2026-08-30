@@ -8,9 +8,9 @@ import DashboardNoticeList from "@/components/observability/DashboardNoticeList.
 import RdbResetMarkerLegend from "@/components/observability/RdbResetMarkerLegend.vue";
 import RdbSamplingToolbar from "@/components/observability/RdbSamplingToolbar.vue";
 import VsCodeButton from "@/components/base/VsCodeButton.vue";
+import { isDashboardSeriesWarmup } from "@/utilities/dashboardSeries";
 import type {
   DashboardDisplayStatus,
-  DashboardMessageEnvelope,
   DashboardTimeSeries,
   RdbDashboardHostMessage,
   RdbDashboardInitializePayload,
@@ -18,6 +18,8 @@ import type {
   RdbDashboardSeriesPayload,
   RdbSamplingStatePayload,
 } from "@/utilities/vscode";
+import { isDashboardChartVisualization } from "@/utilities/vscode";
+import { useDashboardMessageChannel } from "@/utilities/dashboardMessageChannel";
 import { vscode } from "@/utilities/vscode";
 import { computed, onMounted, ref } from "vue";
 
@@ -27,8 +29,11 @@ const initialize = ref<RdbDashboardInitializePayload>();
 const sample = ref<RdbDashboardSeriesPayload>();
 const status = ref<DashboardDisplayStatus>("loading");
 const errorMessage = ref<string>();
-const currentRequestId = ref(-1);
-const currentResourceKey = ref("");
+const messageChannel = useDashboardMessageChannel({
+  dashboardIds: new Set([DASHBOARD_ID]),
+  initialDashboardId: DASHBOARD_ID,
+});
+const post = messageChannel.post;
 const sampling = ref<RdbSamplingStatePayload>({ state: "stopped", intervalMs: 10_000 });
 const backgroundRefreshing = ref(false);
 const loading = computed(() => status.value === "loading");
@@ -43,34 +48,17 @@ const sampleNotices = computed(() =>
   }))
 );
 
-function accept(message: RdbDashboardHostMessage): boolean {
-  if (message.dashboardId !== DASHBOARD_ID) {
-    return false;
-  }
-  if (message.command === "loading") {
-    if (message.requestId < currentRequestId.value) {
-      return false;
-    }
-    const changed = message.resourceKey !== currentResourceKey.value;
-    currentRequestId.value = message.requestId;
-    currentResourceKey.value = message.resourceKey;
-    if (changed) {
-      initialize.value = undefined;
-      sample.value = undefined;
-    }
-    return true;
-  }
-  return (
-    message.requestId === currentRequestId.value && message.resourceKey === currentResourceKey.value
-  );
-}
-
 function recieveMessage(message: RdbDashboardHostMessage): void {
-  if (!accept(message)) {
+  const acceptance = messageChannel.acceptEnvelope(message);
+  if (!acceptance.accepted) {
     return;
   }
   switch (message.command) {
     case "loading":
+      if (acceptance.targetChanged) {
+        initialize.value = undefined;
+        sample.value = undefined;
+      }
       backgroundRefreshing.value = message.payload.preserveResults === true && !!initialize.value;
       if (!backgroundRefreshing.value) {
         status.value = "loading";
@@ -104,41 +92,18 @@ function recieveMessage(message: RdbDashboardHostMessage): void {
   }
 }
 
-function post<T extends string, P>(command: T, payload: P): void {
-  if (!currentResourceKey.value) {
-    return;
-  }
-  const message: DashboardMessageEnvelope<T, P> = {
-    command,
-    dashboardId: DASHBOARD_ID,
-    requestId: currentRequestId.value,
-    resourceKey: currentResourceKey.value,
-    payload,
-  };
-  vscode.postMessage(message);
-}
-
 function series(panel: RdbDashboardPanelPresentation): DashboardTimeSeries[] {
   return sample.value?.panelSeries.find((item) => item.panelId === panel.id)?.series ?? [];
 }
 
 function isWarmup(panel: RdbDashboardPanelPresentation): boolean {
-  const values = series(panel);
-  return (
-    values.length > 0 &&
-    values.every((item) => item.points.every((point) => point.y === null)) &&
-    values.some((item) => item.diagnostics?.some((diagnostic) => diagnostic.code === "warming-up"))
-  );
+  return isDashboardSeriesWarmup(series(panel));
 }
 
 function resetMarkers(panel: RdbDashboardPanelPresentation) {
   return (sample.value?.resetMarkers ?? []).filter((marker) =>
     panel.metricIds.includes(marker.metricId)
   );
-}
-
-function supportsChart(panel: RdbDashboardPanelPresentation): boolean {
-  return ["line", "bar", "stacked-area"].includes(panel.visualization);
 }
 
 onMounted(() => vscode.postMessage({ command: "ready", dashboardId: DASHBOARD_ID }));
@@ -218,7 +183,7 @@ defineExpose({ recieveMessage });
             :series="series(panel)"
           />
           <DashboardTimeSeriesChart
-            v-else-if="supportsChart(panel)"
+            v-else-if="isDashboardChartVisualization(panel.visualization)"
             :panel="panel"
             :series="series(panel)"
             :reset-markers="resetMarkers(panel)"

@@ -10,9 +10,9 @@ import type {
   CloudWatchMetricsPayload,
   CloudWatchPanelPresentation,
   DashboardDisplayStatus,
-  DashboardMessageEnvelope,
   DashboardTimeSeries,
 } from "@/utilities/vscode";
+import { useDashboardMessageChannel } from "@/utilities/dashboardMessageChannel";
 import { vscode } from "@/utilities/vscode";
 import { computed, onMounted, ref } from "vue";
 
@@ -24,41 +24,22 @@ const initialize = ref<CloudWatchDashboardInitializePayload>();
 const metrics = ref<CloudWatchMetricsPayload>();
 const status = ref<DashboardDisplayStatus>("loading");
 const errorMessage = ref<string>();
-const currentRequestId = ref(-1);
-const currentResourceKey = ref("");
-const currentDashboardId = ref(DASHBOARD_ID);
+const messageChannel = useDashboardMessageChannel({
+  dashboardIds: DASHBOARD_IDS,
+  initialDashboardId: DASHBOARD_ID,
+});
+const post = messageChannel.post;
 
 const loading = computed(() => status.value === "loading");
 
-function acceptEnvelope(message: CloudWatchDashboardHostMessage): boolean {
-  if (!DASHBOARD_IDS.has(message.dashboardId)) {
-    return false;
-  }
-  if (message.command === "loading") {
-    if (message.requestId < currentRequestId.value) {
-      return false;
-    }
-    currentRequestId.value = message.requestId;
-    currentResourceKey.value = message.resourceKey;
-    currentDashboardId.value = message.dashboardId;
-    return true;
-  }
-  return (
-    message.requestId === currentRequestId.value && message.resourceKey === currentResourceKey.value
-  );
-}
-
 function recieveMessage(message: CloudWatchDashboardHostMessage): void {
-  const targetChanged =
-    message.command === "loading" &&
-    (message.resourceKey !== currentResourceKey.value ||
-      message.dashboardId !== currentDashboardId.value);
-  if (!acceptEnvelope(message)) {
+  const acceptance = messageChannel.acceptEnvelope(message);
+  if (!acceptance.accepted) {
     return;
   }
   switch (message.command) {
     case "loading":
-      if (targetChanged) {
+      if (acceptance.targetChanged) {
         initialize.value = undefined;
         metrics.value = undefined;
       }
@@ -82,20 +63,6 @@ function recieveMessage(message: CloudWatchDashboardHostMessage): void {
       status.value = "cancelled";
       return;
   }
-}
-
-function post<T extends string, P>(command: T, payload: P): void {
-  if (!currentResourceKey.value) {
-    return;
-  }
-  const message: DashboardMessageEnvelope<T, P> = {
-    command,
-    dashboardId: currentDashboardId.value,
-    requestId: currentRequestId.value,
-    resourceKey: currentResourceKey.value,
-    payload,
-  };
-  vscode.postMessage(message);
 }
 
 function select(selectorId: string, value: string): void {

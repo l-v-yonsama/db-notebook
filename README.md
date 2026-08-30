@@ -38,6 +38,11 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
   - See Redis/Memcached command cell examples: [Database Notebook Redis/Memcached command cell examples](/docs/examples/databaseNotebookRedisAndMemcached.md)
 - Access databases through Notebooks, Sidebars, and panel UIs
+- **Dashboards (Experimental)**
+  - Inspect live database statistics for MySQL, PostgreSQL, SQL Server, SQLite, and Oracle, or CloudWatch metrics for supported AWS resources, directly from the DB Explorer.
+  - Start/stop database sampling, refresh CloudWatch metrics, switch dashboard views, and export the collected snapshot to a read-only `.dbnr` report.
+  - This feature is experimental: available panels and metrics depend on the database version, permissions, endpoint, and AWS metric configuration, and the UI/report format may change.
+  - [Dashboard Guide](/docs/examples/dashboard.md)
 - Execute SQL mode
   - Execute query (Default)
   - Execute explain plan (Generates a query plan).
@@ -209,6 +214,7 @@ The Log Parse feature analyzes application logs and extracts structured SQL exec
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
+- [Dashboard Guide (Experimental)](/docs/examples/dashboard.md)
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 - [Performance Tuning Guide](/docs/examples/performanceTuning.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)

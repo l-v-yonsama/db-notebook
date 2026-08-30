@@ -3,19 +3,16 @@ import {
   ResolvedRdbDashboard,
   RdbProcessedSeries,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
-import {
-  NotebookCellData,
-  NotebookCellKind,
-  NotebookCellOutput,
-  NotebookCellOutputItem,
-  NotebookData,
-} from "vscode";
-import type {
-  PersistedReportOutputMetadata,
-  ReportChartSpec,
-} from "../notebook/report/reportTypes";
+import { NotebookCellData, NotebookCellKind, NotebookData } from "vscode";
+import type { ReportChartSpec } from "../notebook/report/reportTypes";
+import { isDashboardChartVisualization } from "../shared/observability";
 import { rdbDashboardDisplayLabels } from "./rdbDashboardDisplay";
+import {
+  createDashboardReportNotebook,
+  createPersistedDashboardResultSetCell,
+  dashboardTimestampSuffix,
+  sanitizeDashboardFilenamePart,
+} from "./report/dashboardReportUtil";
 
 export type RdbDashboardNotebookSnapshot = {
   dashboard: ResolvedRdbDashboard;
@@ -35,24 +32,6 @@ export type RdbDashboardNotebookData = {
   diagnostics: Array<Record<string, unknown>>;
 };
 
-function safeFilenamePart(value: string, fallback: string): string {
-  return (
-    value
-      .replace(/[^a-zA-Z0-9_-]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 80) || fallback
-  );
-}
-
-function timestampSuffix(value: string): string {
-  const date = new Date(value);
-  const pad2 = (part: number) => String(part).padStart(2, "0");
-  return (
-    `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}-` +
-    `${pad2(date.getHours())}${pad2(date.getMinutes())}${pad2(date.getSeconds())}`
-  );
-}
-
 function providerVendor(providerId: string): string {
   return providerId.split(".")[1]?.toLowerCase() || "rdb";
 }
@@ -67,76 +46,19 @@ function seriesLabel(series: RdbProcessedSeries): string {
     : series.metric.label;
 }
 
-function markdownCode(value: string): string {
-  return `\`${value.replace(/`/g, "'")}\``;
-}
-
-function buildResultSet(rows: Array<Record<string, unknown>>): ResultSetData {
-  if (rows.length === 0) {
-    return ResultSetDataBuilder.createEmpty({ noRecordsReason: "No records" }).build();
-  }
-  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
-  const builder = new ResultSetDataBuilder(keys);
-  rows.forEach((row) => builder.addRow(row));
-  builder.resetKeyTypeByRows();
-  return builder.build();
-}
-
-function persistedResultSetCell(
-  rows: Array<Record<string, unknown>>,
-  label: string,
-  contextParts: string[],
-  reportChart?: ReportChartSpec
-): NotebookCellData {
-  const rdh = buildResultSet(rows);
-  const cell = new NotebookCellData(
-    NotebookCellKind.Code,
-    `Saved dashboard snapshot: ${label}. No database request is executed from this cell.`,
-    "plaintext"
-  );
-  cell.metadata = {
-    cellLabel: label,
-    inputCollapsed: true,
-    ...(reportChart ? { reportChart } : {}),
-  };
-  const metadata: PersistedReportOutputMetadata = {
-    schemaVersion: 1,
-    kind: "result-set",
-    rdh,
-  };
-  cell.outputs = [
-    new NotebookCellOutput(
-      [
-        NotebookCellOutputItem.text(
-          [
-            `### ${label}`,
-            "",
-            contextParts.map(markdownCode).join(" · "),
-            "",
-            "> Saved dashboard snapshot. No database request is executed from this cell.",
-            "",
-            `\`[Saved result]\` ${rows.length} row(s)`,
-            ResultSetDataBuilder.from(rdh).toMarkdown({ maxPrintLines: 10 }),
-          ].join("\n"),
-          "text/markdown"
-        ),
-      ],
-      metadata
-    ),
-  ];
-  return cell;
-}
-
 export function buildRdbDashboardReportFilename(snapshot: RdbDashboardNotebookSnapshot): string {
   const { dashboard } = snapshot;
   const targetName = rdbDashboardDisplayLabels(
     dashboard.providerId,
     dashboard.target.displayName
   ).panelTitleName;
-  return `metrics-${safeFilenamePart(
+  return `metrics-${sanitizeDashboardFilenamePart(
     providerVendor(dashboard.providerId),
-    "rdb"
-  )}-${safeFilenamePart(targetName, "database")}-${timestampSuffix(snapshot.collectedAt)}.dbnr`;
+    "rdb",
+    80
+  )}-${sanitizeDashboardFilenamePart(targetName, "database", 80)}-${dashboardTimestampSuffix(
+    snapshot.collectedAt
+  )}.dbnr`;
 }
 
 export function buildRdbDashboardNotebookData(
@@ -263,13 +185,11 @@ export function buildRdbDashboardNotebookCells(
       }
       const seriesKeys = new Set(displayedSeries.map((series) => series.key));
       const rows = data.metricSeries.filter((row) => seriesKeys.has(String(row.seriesId)));
-      const chart: ReportChartSpec | undefined = ["line", "bar", "stacked-area"].includes(
-        panel.visualization
-      )
+      const chart: ReportChartSpec | undefined = isDashboardChartVisualization(panel.visualization)
         ? {
             version: 1,
             renderer: "chartjs",
-            type: panel.visualization as ReportChartSpec["type"],
+            type: panel.visualization,
             title: panel.title,
             dataShape: "long",
             xKey: "timestamp",
@@ -284,43 +204,63 @@ export function buildRdbDashboardNotebookCells(
           }
         : undefined;
       return [
-        persistedResultSetCell(
+        createPersistedDashboardResultSetCell({
           rows,
-          panel.title,
-          [dashboard.target.displayName, panel.scope.label, `${displayedSeries.length} series`],
-          chart
-        ),
+          label: panel.title,
+          contextParts: [
+            dashboard.target.displayName,
+            panel.scope.label,
+            `${displayedSeries.length} series`,
+          ],
+          requestSourceLabel: "database",
+          reportChart: chart,
+        }),
       ];
     })
   );
 
   return [
     heading,
-    persistedResultSetCell(data.summary, "Dashboard summary", [
-      dashboard.target.displayName,
-      dashboard.target.sourceLabel,
-    ]),
-    persistedResultSetCell(data.metricSeries, "Metric series", [
-      dashboard.target.displayName,
-      `${accumulated.series.length} series`,
-    ]),
+    createPersistedDashboardResultSetCell({
+      rows: data.summary,
+      label: "Dashboard summary",
+      contextParts: [dashboard.target.displayName, dashboard.target.sourceLabel],
+      requestSourceLabel: "database",
+    }),
+    createPersistedDashboardResultSetCell({
+      rows: data.metricSeries,
+      label: "Metric series",
+      contextParts: [dashboard.target.displayName, `${accumulated.series.length} series`],
+      requestSourceLabel: "database",
+    }),
     ...panelCells,
     ...(data.resetMarkers.length
-      ? [persistedResultSetCell(data.resetMarkers, "Reset markers", [dashboard.target.displayName])]
+      ? [
+          createPersistedDashboardResultSetCell({
+            rows: data.resetMarkers,
+            label: "Reset markers",
+            contextParts: [dashboard.target.displayName],
+            requestSourceLabel: "database",
+          }),
+        ]
       : []),
     ...(data.diagnostics.length
-      ? [persistedResultSetCell(data.diagnostics, "Diagnostics", [dashboard.target.displayName])]
+      ? [
+          createPersistedDashboardResultSetCell({
+            rows: data.diagnostics,
+            label: "Diagnostics",
+            contextParts: [dashboard.target.displayName],
+            requestSourceLabel: "database",
+          }),
+        ]
       : []),
   ];
 }
 
 export function buildRdbDashboardReport(snapshot: RdbDashboardNotebookSnapshot): NotebookData {
-  const report = new NotebookData(buildRdbDashboardNotebookCells(snapshot));
-  report.metadata = {
-    formatVersion: 1,
+  return createDashboardReportNotebook(buildRdbDashboardNotebookCells(snapshot), {
     reportKind: "rdb-database",
     dashboardId: "rdb-database",
     collectedAt: snapshot.collectedAt,
-  };
-  return report;
+  });
 }

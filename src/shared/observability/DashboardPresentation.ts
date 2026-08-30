@@ -39,6 +39,21 @@ export type DashboardTabPresentation = {
   title: string;
 };
 
+export const DASHBOARD_CHART_VISUALIZATIONS = ["line", "bar", "stacked-area"] as const;
+
+export type DashboardChartVisualization = (typeof DASHBOARD_CHART_VISUALIZATIONS)[number];
+export type DashboardVisualization =
+  | DashboardChartVisualization
+  | "stat-grid"
+  | "table"
+  | "state-card";
+
+export function isDashboardChartVisualization(
+  visualization: DashboardVisualization
+): visualization is DashboardChartVisualization {
+  return (DASHBOARD_CHART_VISUALIZATIONS as readonly string[]).includes(visualization);
+}
+
 export type DashboardTimeSeriesPoint = {
   x: string;
   /** null means missing data. An observed zero remains 0. */
@@ -61,7 +76,7 @@ export type DashboardPanelPresentation = {
   title: string;
   purpose: "workload" | "health" | "capacity" | "lifecycle" | "configuration";
   scope: { kind: string; label: string; fullLabel?: string };
-  visualization: "line" | "bar" | "stacked-area" | "stat-grid" | "table" | "state-card";
+  visualization: DashboardVisualization;
   caveat?: string;
   collapsedByDefault?: boolean;
 };

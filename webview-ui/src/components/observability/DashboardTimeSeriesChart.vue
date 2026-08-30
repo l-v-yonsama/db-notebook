@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { dashboardObserverCaveat, dashboardSeriesColor } from "@/utilities/dashboardSeries";
 import type { DashboardPanelPresentation, DashboardTimeSeries } from "@/utilities/vscode";
 import {
   Chart as ChartJS,
@@ -39,51 +40,15 @@ const props = defineProps<{
   resetMarkers?: Array<{ observedAt: string; reasonLabel: string }>;
 }>();
 
-function colorComponentsForSeries(seriesId: string): {
-  hue: number;
-  saturation: number;
-  lightness: number;
-} {
-  let hash = 0x811c9dc5;
-  for (const character of seriesId) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  const unsignedHash = hash >>> 0;
-  return {
-    hue: unsignedHash % 360,
-    saturation: 62 + ((unsignedHash >>> 9) % 12),
-    lightness: 48 + ((unsignedHash >>> 17) % 10),
-  };
-}
-
-function colorForSeries(seriesId: string, alpha?: number): string {
-  const { hue, saturation, lightness } = colorComponentsForSeries(seriesId);
-  return alpha === undefined
-    ? `hsl(${hue}, ${saturation}%, ${lightness}%)`
-    : `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
-}
-
-const observerCaveat = computed(() => {
-  const included = props.series.filter((item) => item.selfObservation === "included");
-  const unknown = props.series.filter((item) => item.selfObservation === "unknown");
-  const parts = [];
-  if (included.length) {
-    parts.push(`included for ${included.map((item) => item.label).join(", ")}`);
-  }
-  if (unknown.length) {
-    parts.push(`unknown for ${unknown.map((item) => item.label).join(", ")}`);
-  }
-  return parts.length ? `Observer impact is ${parts.join("; ")}.` : undefined;
-});
+const observerCaveat = computed(() => dashboardObserverCaveat(props.series));
 
 const chartData = computed<ChartData<"line", Array<{ x: string; y: number | null }>>>(() => {
   const datasets: ChartData<"line", Array<{ x: string; y: number | null }>>["datasets"] =
     props.series.map((item) => ({
       label: `${item.label} (${item.status})`,
       data: item.points,
-      borderColor: colorForSeries(item.id),
-      backgroundColor: colorForSeries(item.id, 0.2),
+      borderColor: dashboardSeriesColor(item.id),
+      backgroundColor: dashboardSeriesColor(item.id, 0.2),
       borderDash: item.status === "partial" ? [6, 4] : undefined,
       pointRadius: 1.5,
       borderWidth: 2,
@@ -122,8 +87,8 @@ const barData = computed<ChartData<"bar", Array<{ x: string; y: number | null }>
   datasets: props.series.map((item) => ({
     label: `${item.label} (${item.status})`,
     data: item.points,
-    borderColor: colorForSeries(item.id),
-    backgroundColor: colorForSeries(item.id, 0.53),
+    borderColor: dashboardSeriesColor(item.id),
+    backgroundColor: dashboardSeriesColor(item.id, 0.53),
     borderWidth: 1,
   })),
 }));
