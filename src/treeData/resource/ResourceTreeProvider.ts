@@ -43,6 +43,7 @@ import {
 import { getIconPath } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
+import { appendDashboardContextValues } from "../../observability/dashboardLaunch";
 
 const PREFIX = "[ResourceTreeProvider]";
 
@@ -667,7 +668,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
     this.iconPath = iconPath;
 
     this.description = description;
-    let contextValue = resource.resourceType;
+    let contextValue: string = resource.resourceType;
 
     if (resource.resourceType === ResourceType.Subscription) {
       const subscription = resource as DbSubscription;
@@ -697,6 +698,7 @@ export class DBDatabaseItem extends vscode.TreeItem {
     if (canViewLastRows) {
       contextValue += ",canViewLastRows";
     }
+    contextValue = appendDashboardContextValues(contextValue, resource);
     contextValue += ",tag:dbResource";
 
     if (tooltip) {

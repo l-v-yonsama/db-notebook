@@ -30,6 +30,7 @@ import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
 import { showStatusMessage } from "../statusBar";
 import { QueryHistory } from "../types/QueryHistory";
+import { stampDashboardConnectionName } from "../observability/dashboardLaunch";
 import { workflow } from "./driverResolver";
 import {
   createInitialQueryHistoryPerformance,
@@ -325,6 +326,7 @@ export class StateStorage {
               conName: conRes.name,
             };
           });
+        stampDashboardConnectionName(dbRes, conRes.name);
       }
       this.resMap.set(connectionName, { isInProgress: false, res: result });
       ret.result = { db: result, dbType };

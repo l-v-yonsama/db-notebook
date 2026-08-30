@@ -14,6 +14,7 @@ export * from "../../../src/shared/ExtChartJs";
 export * from "../../../src/shared/LabelValueItem";
 export * from "../../../src/shared/MessageEventData";
 export * from "../../../src/shared/ModeType";
+export * from "../../../src/shared/observability";
 export * from "../../../src/shared/PerformanceTuningAiAnalysis";
 export * from "../../../src/shared/PerformanceTuningActualEvidence";
 export * from "../../../src/shared/PerformanceTuningBinds";

@@ -34,6 +34,8 @@ export const CLEAR_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.clear-default-c
 export const GET_LOCKS = `${EXTENSION_NAME}.get-locks`;
 export const GET_SESSIONS = `${EXTENSION_NAME}.get-sessions`;
 export const SHOW_QUERY_STATISTICS = `${EXTENSION_NAME}.show-query-statistics`;
+export const SHOW_CLOUDWATCH_METRICS = `${EXTENSION_NAME}.show-cloudwatch-metrics`;
+export const SHOW_CLOUDWATCH_METRICS_OVERVIEW = `${EXTENSION_NAME}.show-cloudwatch-metrics-overview`;
 export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;
 export const VIEW_DATA = `${EXTENSION_NAME}.view-data`;
 export const VIEW_TOP_ROWS = `${EXTENSION_NAME}.view-top-rows`;
@@ -104,7 +106,7 @@ export const OPEN_LOG_PARSE_RESULT_VIEWER = `${EXTENSION_NAME}.open-log-parse-re
 //---------------------------------------------------
 // LOG
 //---------------------------------------------------
-export const OPEN_OUTPUT_CHANNEL= `${EXTENSION_NAME}.open-output-channel`;
+export const OPEN_OUTPUT_CHANNEL = `${EXTENSION_NAME}.open-output-channel`;
 export const SHOW_GETTING_STARTED = `${EXTENSION_NAME}.show-getting-started`;
 
 //---------------------------------------------------
@@ -115,6 +117,7 @@ export const CREATE_NOTEBOOK_FROM_SQL = `${EXTENSION_NAME}.create-dbn-from-sql`;
 export const CREATE_SQLITE_DEMO = `${EXTENSION_NAME}.create-sqlite-demo`;
 export const RESET_SQLITE_DEMO = `${EXTENSION_NAME}.reset-sqlite-demo`;
 export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
+export const NOTEBOOK_REPORT_TYPE = `${EXTENSION_NAME}-report-type`;
 
 // JS cell IntelliSense: URI scheme for the in-memory (prelude + cell body) document
 // forwarded to the built-in TypeScript language service. Never written to disk.
@@ -123,6 +126,7 @@ export const JS_VIRTUAL_DOC_SCHEME = "db-notebook-virtual-js";
 // NOTEBOOK TOOL-BAR COMMANDS
 export const SHOW_NOTEBOOK_ALL_VARIABLES = `${EXTENSION_NAME}.toolbar.show-all-variables`;
 export const SHOW_NOTEBOOK_ALL_RDH = `${EXTENSION_NAME}.toolbar.show-all-rdh`;
+export const SHOW_REPORT_ALL_CHARTS = `${EXTENSION_NAME}.toolbar.show-report-all-charts`;
 export const SPECIFY_CONNECTION_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-connection-all`;
 export const SPECIFY_USING_DB_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-using-database-all`;
 export const EXPORT_IN_HTML = `${EXTENSION_NAME}.toolbar.export-in-html`;
@@ -139,6 +143,7 @@ export const CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE = `${EXTENSION_NAME
 // for the first consumer (its Full Context JSON / AI analysis JSON cells).
 export const CELL_SPECIFY_LABEL = `${EXTENSION_NAME}.cell.specify-label`;
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
+export const CELL_OPEN_REPORT_CHART = `${EXTENSION_NAME}.cell.open-report-chart`;
 export const CELL_OPEN_HTTP_RESPONSE = `${EXTENSION_NAME}.cell.open-http-response`;
 export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;
 

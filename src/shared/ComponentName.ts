@@ -28,4 +28,5 @@ export type ComponentName =
   | "ToolsView"
   | "SubscriptionPayloadsView"
   | "PerformanceTuningPreviewPanel"
-  | "PerformanceTuningBindParametersPanel";
+  | "PerformanceTuningBindParametersPanel"
+  | "CloudWatchMetricsView";

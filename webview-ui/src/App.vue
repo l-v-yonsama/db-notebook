@@ -12,7 +12,10 @@ type MountedComponent = {
 const activeRef = ref<MountedComponent>();
 
 const currentComponentName = ref<ComponentName | null>(null);
-currentComponentName.value = window.document.title as ComponentName;
+const previewComponent = import.meta.env.DEV
+  ? new URLSearchParams(window.location.search).get("component")
+  : null;
+currentComponentName.value = (previewComponent ?? window.document.title) as ComponentName;
 
 const activeComponent = computed(() =>
   currentComponentName.value ? componentRegistry[currentComponentName.value] : undefined
@@ -20,6 +23,10 @@ const activeComponent = computed(() =>
 
 function messageListener(evt: MessageEvent<MessageEventData>) {
   const { data } = evt;
+  if ("dashboardId" in data) {
+    activeRef.value?.recieveMessage(data);
+    return;
+  }
   const { command, componentName, value } = data;
   console.log("[App.vue] at messageListener ", command, value);
 

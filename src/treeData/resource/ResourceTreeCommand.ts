@@ -68,6 +68,8 @@ import {
   RESTORE_DATABASE,
   SCAN_ITEMS,
   SHOW_CONNECTION_SETTING,
+  SHOW_CLOUDWATCH_METRICS,
+  SHOW_CLOUDWATCH_METRICS_OVERVIEW,
   SHOW_DYNAMO_QUERY_PANEL,
   SHOW_PUBLISH_EDITOR_PANEL,
   SHOW_QUERY_STATISTICS,
@@ -84,6 +86,7 @@ import {
 import { SQLConfigurationViewProvider } from "../../form";
 import { MqttDriverManager } from "../../mqtt/MqttDriverManager";
 import { CfnDiagramSettingsPanel } from "../../panels/CfnDiagramSettingsPanel";
+import { CloudWatchMetricsPanel } from "../../panels/CloudWatchMetricsPanel";
 import { CreateInsertScriptSettingsPanel } from "../../panels/CreateInsertScriptSettingsPanel";
 import { DBDumpSettingsPanel } from "../../panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "../../panels/DBRestoreSettingsPanel";
@@ -217,6 +220,18 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     } catch (e) {
       showWindowErrorMessage(e);
     }
+  });
+  commands.registerCommand(SHOW_CLOUDWATCH_METRICS, async (res: DbResource) => {
+    if (!res) {
+      return;
+    }
+    CloudWatchMetricsPanel.render(context.extensionUri, res);
+  });
+  commands.registerCommand(SHOW_CLOUDWATCH_METRICS_OVERVIEW, async (res: DbResource) => {
+    if (!res) {
+      return;
+    }
+    CloudWatchMetricsPanel.renderOverview(context.extensionUri, res);
   });
 
   commands.registerCommand(COPY_COLUMN_NAMES, async (tableRes: DbTable) => {

@@ -56,8 +56,10 @@ import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSumm
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
+import type { CloudWatchDashboardHostMessage } from "./observability";
 
 export type MessageEventData =
+  | CloudWatchDashboardHostMessage
   | ChartsViewEventData
   | CfnDiagramSettingsPanelEventData
   | CodeResolverEditorEventData

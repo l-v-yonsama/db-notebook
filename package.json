@@ -63,6 +63,7 @@
   },
   "activationEvents": [
     "onNotebook:database-notebook-type",
+    "onNotebook:database-notebook-report-type",
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
@@ -157,10 +158,12 @@
           "Database notebook"
         ],
         "filenames": [
-          "*.dbn"
+          "*.dbn",
+          "*.dbnr"
         ],
         "extensions": [
-          ".dbn"
+          ".dbn",
+          ".dbnr"
         ],
         "icon": {
           "dark": "media/dark/database.svg",
@@ -192,6 +195,15 @@
         "selector": [
           {
             "filenamePattern": "*.dbn"
+          }
+        ]
+      },
+      {
+        "type": "database-notebook-report-type",
+        "displayName": "Dashboard Notebook Report",
+        "selector": [
+          {
+            "filenamePattern": "*.dbnr"
           }
         ]
       }
@@ -594,6 +606,16 @@
           "group": "db-resourc@3"
         },
         {
+          "command": "database-notebook.show-cloudwatch-metrics",
+          "when": "view == database-notebook-connections && viewItem =~ /,dashboard:aws-cloudwatch-metrics,/",
+          "group": "db-resourc@4"
+        },
+        {
+          "command": "database-notebook.show-cloudwatch-metrics-overview",
+          "when": "view == database-notebook-connections && viewItem =~ /,dashboard:aws-cloudwatch-metrics-overview,/",
+          "group": "db-resourc@4"
+        },
+        {
           "command": "database-notebook.dump-database",
           "when": "view == database-notebook-connections && viewItem =~ /^RdsDatabase.*,exportable.*/",
           "group": "io@6"
@@ -958,6 +980,11 @@
           "when": "notebookType == 'database-notebook-type' && visibleRdh"
         },
         {
+          "command": "database-notebook.toolbar.show-report-all-charts",
+          "group": "navigation/execute@1",
+          "when": "notebookType == 'database-notebook-report-type'"
+        },
+        {
           "command": "database-notebook.toolbar.specify-using-database-all",
           "group": "more",
           "when": "notebookType == 'database-notebook-type' && hasSql"
@@ -970,7 +997,7 @@
         {
           "command": "database-notebook.toolbar.export-in-html",
           "group": "navigation/execute@1",
-          "when": "notebookType == 'database-notebook-type'"
+          "when": "notebookType == 'database-notebook-type' || notebookType == 'database-notebook-report-type'"
         }
       ],
       "notebook/cell/execute": [
@@ -1282,6 +1309,16 @@
         "icon": "$(graph-line)"
       },
       {
+        "command": "database-notebook.show-cloudwatch-metrics",
+        "title": "Show CloudWatch metrics",
+        "icon": "$(graph-line)"
+      },
+      {
+        "command": "database-notebook.show-cloudwatch-metrics-overview",
+        "title": "Show CloudWatch metrics overview",
+        "icon": "$(graph-line)"
+      },
+      {
         "command": "database-notebook.count-for-all-tables",
         "title": "Count Table Records",
         "shortTitle": "Count",
@@ -1372,6 +1409,12 @@
         "command": "database-notebook.toolbar.show-all-rdh",
         "title": "Open ResultSets",
         "icon": "$(table)"
+      },
+      {
+        "command": "database-notebook.toolbar.show-report-all-charts",
+        "title": "Open all charts",
+        "shortTitle": "Open charts",
+        "icon": "$(graph)"
       },
       {
         "command": "database-notebook.toolbar.specify-connection-all",

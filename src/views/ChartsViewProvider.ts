@@ -8,7 +8,7 @@ import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { ExtChartData, ExtChartOptions, PairPlotChartParams } from "../shared/ExtChartJs";
 import { ChartsViewEventData, ChartTabItem } from "../shared/MessageEventData";
-import { ChartsViewParams } from "../types/views";
+import { AnyChartsViewParams, PreparedChartsViewParams } from "../types/views";
 import { createChartJsParams, createPairPlotChartParams } from "../utilities/chartUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
@@ -34,7 +34,7 @@ export class ChartsViewProvider extends BaseViewProvider {
     return "ChartsView";
   }
 
-  async render(params: ChartsViewParams) {
+  async render(params: AnyChartsViewParams) {
     if (this.webviewView === undefined) {
       await commands.executeCommand("setContext", BOTTOM_CHARTS_VIEWID + ".visible", true);
     }
@@ -83,7 +83,7 @@ export class ChartsViewProvider extends BaseViewProvider {
     }
   }
 
-  private async renderSub(params: ChartsViewParams): Promise<void> {
+  private async renderSub(params: AnyChartsViewParams): Promise<void> {
     const { title } = params;
     let item = this.getTabByTitle(title);
     if (item) {
@@ -125,7 +125,7 @@ export class ChartsViewProvider extends BaseViewProvider {
     // return item;
   }
 
-  private async createTabItem(params: ChartsViewParams): Promise<ChartTabItem> {
+  private async createTabItem(params: AnyChartsViewParams): Promise<ChartTabItem> {
     const createTabId = () => createHash("md5").update(params.title).digest("hex");
     const tabId = createTabId();
 
@@ -133,7 +133,10 @@ export class ChartsViewProvider extends BaseViewProvider {
     let options: ExtChartOptions | undefined = undefined;
     let pairPlotChartParams: PairPlotChartParams | undefined = undefined;
 
-    if (params.type === "pairPlot") {
+    if (isPreparedChart(params)) {
+      data = params.preparedData;
+      options = params.preparedOptions;
+    } else if (params.type === "pairPlot") {
       pairPlotChartParams = createPairPlotChartParams(params);
     } else {
       const result = createChartJsParams({
@@ -161,4 +164,8 @@ export class ChartsViewProvider extends BaseViewProvider {
   private getTabByTitle(title: string): ChartTabItem | undefined {
     return this.items.find((it) => it.title === title);
   }
+}
+
+function isPreparedChart(params: AnyChartsViewParams): params is PreparedChartsViewParams {
+  return "preparedData" in params && "preparedOptions" in params;
 }

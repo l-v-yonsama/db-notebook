@@ -10,6 +10,7 @@ import LogParseResultView from "@/components/views/LogParseResultView/LogParseRe
 import MdhView from "@/components/views/MdhView.vue";
 import SubscriptionPayloadsView from "@/components/views/SubscriptionPayloadsView.vue";
 import ToolsView from "@/components/views/ToolsView.vue";
+import CloudWatchMetricsView from "@/components/CloudWatchMetricsView.vue";
 
 // ===== Panel(設定・入力フォーム系) =====
 import CfnDiagramSettings from "@/components/CfnDiagramSettings.vue";
@@ -39,7 +40,8 @@ import RecordRuleEditor from "@/components/RecordRuleEditor.vue";
 // Maps each ComponentName to the Vue component App.vue mounts for it.
 // Not every ComponentName has an entry (e.g. ExportHtmlParamsPanel has no
 // corresponding component yet), so lookups must handle a missing entry.
-export const componentRegistry: Partial<Record<ComponentName, Component>> = {
+export const componentRegistry: Partial<Record<ComponentName, Component>> &
+  Record<"CloudWatchMetricsView", Component> = {
   // ----- View -----
   DBFormView: DBFormView, // DB接続設定の作成・編集フォーム
   MdhView: MdhView, // クエリ実行結果(表形式)の表示
@@ -49,6 +51,7 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> = {
   ToolsView: ToolsView, // テーブル操作などの各種ツール
   LogParseResultView: LogParseResultView, // ログ解析結果の表示
   SubscriptionPayloadsView: SubscriptionPayloadsView, // MQTT等の受信ペイロード一覧表示
+  CloudWatchMetricsView: CloudWatchMetricsView, // CloudWatch metric dashboard
 
   // ----- Panel -----
   DBRestoreSettingsPanel: DBRestoreSettingsPanel, // DBリストア設定
