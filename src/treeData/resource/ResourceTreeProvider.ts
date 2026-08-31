@@ -44,6 +44,7 @@ import { getIconPath } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
 import { appendDashboardContextValues } from "../../observability/dashboardLaunch";
+import { getDynamoDbIndexKeyRoles } from "../../utilities/dynamoDbKeyRoles";
 
 const PREFIX = "[ResourceTreeProvider]";
 
@@ -211,7 +212,7 @@ export class ResourceTreeProvider
     if (element.hasChildren()) {
       state = vscode.TreeItemCollapsibleState.Collapsed;
     }
-    return new DBDatabaseItem(element, state, this.stateStorage);
+    return new DBDatabaseItem(element, state, this.stateStorage, this.parentMap.get(element.id));
   }
 
   getChildren(element?: DbResource): vscode.ProviderResult<DbResource[]> {
@@ -320,7 +321,8 @@ export class DBDatabaseItem extends vscode.TreeItem {
   constructor(
     public readonly resource: DbResource,
     state: vscode.TreeItemCollapsibleState,
-    private stateStorage: StateStorage
+    private stateStorage: StateStorage,
+    private readonly parentResource?: DbResource
   ) {
     super(resource.name, state);
 
@@ -633,11 +635,18 @@ export class DBDatabaseItem extends vscode.TreeItem {
           tooltip.isTrusted = true;
           if (c.pk) {
             description = "(pk)";
-            tooltip.appendMarkdown(`\\\nPARTIAL KEY`);
+            tooltip.appendMarkdown(`\\\nPARTITION KEY`);
           }
           if (c.sk) {
             description = "(sk)";
             tooltip.appendMarkdown(`\\\nSORT KEY`);
+          }
+          if (this.parentResource instanceof DbDynamoTable) {
+            for (const role of getDynamoDbIndexKeyRoles(this.parentResource, c.name)) {
+              tooltip.appendMarkdown(
+                `\\\n${role.indexType} "${encodeHtmlWeak(role.indexName)}": ${role.keyType}`
+              );
+            }
           }
           tooltip.appendMarkdown("\\\nTo know more, click '$(info)' icon.");
         }
