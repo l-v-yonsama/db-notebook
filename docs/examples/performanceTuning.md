@@ -1,5 +1,7 @@
 # Performance Tuning Guide
 
+> Verified against the extension and driver code on 2026-08-31.
+
 Database Notebook helps you investigate slow or expensive statements by gathering the relevant
 evidence in one place — the execution plan and related table metadata for MySQL, PostgreSQL, SQL
 Server, and Oracle, or a static access-path classification and Capacity evidence for DynamoDB.
@@ -46,11 +48,19 @@ Use the preview to inspect the evidence needed to diagnose a slow statement:
 
 ## 2. Start a performance tuning preview
 
-Open the performance tuning preview for the target statement from **Query History** or **Query
-Statistics**.
+Open the performance tuning preview for the target statement from one of these places:
 
-If the SQL contains placeholders, provide representative bind values. These values are used only to
-retrieve the plan; they are not written to the saved connection settings.
+- **Query History** — select `Open Performance Tuning Preview` for a saved execution.
+- **Query Statistics** — select a statement row, then select `Preview tuning data`.
+- An executed SQL cell in a Database Notebook — select `Performance tuning` from the cell toolbar.
+  The current cell text must have completed successfully and still have a matching successful Query
+  History entry.
+
+If the SQL contains placeholders, the **Bind Parameters** panel asks for representative values before
+collecting the preview. Values from Query History are prefilled when they are available. The values
+are held only for this preview's parameter-specific plan and any actual-plan or benchmark execution
+you explicitly confirm. They are not copied into the Full Context JSON, AI request, saved tuning
+report, connection settings, telemetry, or logs.
 
 The preview first collects an estimated plan and related metadata. `Status: complete` means the
 required collection has finished. If the status is `partial`, review **Collection issues** to see
@@ -134,9 +144,9 @@ also specifies the response language.
 
 ## 6. Save and share the analysis
 
-Select `Save as Notebook` to create a DBN under `reports/performance-tuning/` in the workspace. The
-collected evidence can be saved before running AI; an available AI analysis, benchmark, and baseline
-comparison are included when present.
+Select `Save as Notebook` to create a DBN under `reports/performance-tuning/` in the workspace. A
+workspace folder must be open. The collected evidence can be saved before running AI; an available
+AI analysis, benchmark, and baseline comparison are included when present.
 
 The DBN starts with a linked table of contents and uses stable chapter numbers. For a quick review,
 start with **4. Summary and recommendations**, then follow its evidence references into the later
@@ -147,7 +157,7 @@ The saved DBN includes:
 
 - The SQL statement and performance snapshot.
 - Collection issues and information.
-- A SQL-scoped ER diagram and related indexes.
+- A SQL-scoped ER diagram and related indexes, when the related resources can be resolved.
 - Estimated and actual execution plans.
 - Benchmark samples and aggregate timing, when collected.
 - The AI analysis result.
@@ -209,8 +219,15 @@ and does not indicate a missing IAM permission.
 
 Where a metric uses `{ value, estimated, source, unit }`, use `source` and `estimated` to judge how
 strong the evidence is. Also treat the JSON as potentially sensitive: RDB SQL/DDL and DynamoDB
-PartiQL text can contain literals and are not automatically redacted. DynamoDB bind values,
-`ExpressionAttributeValues`, returned items, and pagination keys are intentionally not stored.
+PartiQL text can contain literals and are not automatically redacted. RDB values entered in the
+**Bind Parameters** panel, DynamoDB `ExpressionAttributeValues`, returned item bodies, and pagination
+keys are excluded from the Full Context JSON, AI request, and saved tuning report.
+
+This exclusion does not make Query History itself value-free. For re-execution and editing, a native
+Query run from the DynamoDB Query Panel stores its latest executable input — including
+`ExpressionAttributeValues` — in local Query History, just as SQL history can retain bind variables.
+Protect local Query History accordingly. Performance Tuning converts that request to a value-free
+structural form before creating the context or AI input.
 
 The Full Context JSON remains complete in the notebook even if a large RDB vendor artifact had to
 be omitted from a compact AI request. Use **AI request messages** to see the exact prompt and context
@@ -362,11 +379,14 @@ measurement — it's shown even before any request is sent to DynamoDB.
 Open the DynamoDB performance tuning preview from either of these places:
 
 - **Query History**, for a previously-run PartiQL statement, or a native `Query` executed from the
-  DynamoDB Query Panel — every Panel execution (success or failure) is saved to Query History
-  automatically, shown with item-based wording and no SQL syntax attached (its history entry has no
-  equivalent of a runnable SQL cell). Repeating the exact same table/index/key-condition/filter/
-  Projection/consistency structure with different values merges into one history entry rather than
-  creating a new one each time.
+  DynamoDB Query Panel. For a native Query, first execute it in the Panel, then open its
+  automatically-created Query History entry. Every Panel execution (success or failure) is saved,
+  shown with item-based wording and no SQL syntax attached (its history entry has no equivalent of a
+  runnable SQL cell). Repeating the same table, index, key condition, filter, Projection,
+  consistency, scan direction, and result-item limit with different expression values merges into
+  one history entry rather than creating a new one. A successful rerun replaces the older executable
+  input. A failed retry after a success preserves the last successful input and result statistics,
+  and records the failure separately on that history entry.
 - An **executed Notebook cell** running PartiQL against a DynamoDB connection (same entry point as
   Query History — the cell's toolbar reuses its own most recent matching history entry).
 Opening the preview from a Query History entry (PartiQL or native `Query`) also carries over that
