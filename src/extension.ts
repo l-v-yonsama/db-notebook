@@ -43,6 +43,7 @@ import { HelpProvider } from "./treeData/help/HelpProvider";
 import { registerHistoryTreeCommand } from "./treeData/history/HistoryTreeCommand";
 import { activateLmTools } from "./aiTools/lmTools/activator";
 import { activateMcpServer } from "./aiTools/mcpServer/activator";
+import { configureAiDataMaskingPreview } from "./panels/AiDataMaskingPreviewPanel";
 import { onDidChangeRunningState } from "./aiTools/mcpServer/server";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
@@ -131,6 +132,7 @@ export async function activate(context: ExtensionContext) {
   CloudWatchMetricsPanel.setStateStorage(stateStorage);
   RdbDashboardPanel.setStateStorage(stateStorage);
 
+  configureAiDataMaskingPreview(context.extensionUri);
   activateLmTools(context, stateStorage);
   activateMcpServer(context, stateStorage);
 

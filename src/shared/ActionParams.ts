@@ -11,6 +11,7 @@ import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ModeType } from "./ModeType";
 import type { QueryStatisticsSearchParams } from "./QueryStatisticsParams";
 import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
+import type { AiMaskingLevel, AiPayloadFindingResolution } from "./AiDataMasking";
 
 export type TabIdParam = {
   tabId: string;
@@ -97,6 +98,13 @@ export type ActionCommand =
   | PreviewPerformanceTuningActionCommand
   | SubmitPerformanceTuningBindParametersActionCommand
   | AnalyzePerformanceTuningWithAiActionCommand
+  | CopyPerformanceTuningPromptWithMaskingActionCommand
+  | ResolvePerformanceTuningAiFindingActionCommand
+  | ApprovePerformanceTuningAiPayloadActionCommand
+  | CancelPerformanceTuningAiPayloadActionCommand
+  | ResolveAiPayloadFindingActionCommand
+  | ApproveAiPayloadActionCommand
+  | CancelAiPayloadActionCommand
   | SaveAiAnalysisAsNotebookActionCommand
   | RunActualPlanActionCommand
   | RunObservedDynamoDbReadActionCommand
@@ -154,7 +162,52 @@ export type SubmitPerformanceTuningBindParametersActionCommand = BaseActionComma
 // current model and translation selections.
 export type AnalyzePerformanceTuningWithAiActionCommand = BaseActionCommand<
   "analyzePerformanceTuningWithAi",
-  { languageModelId: string; translateResponse: boolean }
+  { languageModelId: string; translateResponse: boolean; maskingLevel?: AiMaskingLevel }
+>;
+
+export type CopyPerformanceTuningPromptWithMaskingActionCommand = BaseActionCommand<
+  "copyPerformanceTuningPromptWithMasking",
+  { translateResponse: boolean; maskingLevel: AiMaskingLevel }
+>;
+
+export type ResolvePerformanceTuningAiFindingActionCommand = BaseActionCommand<
+  "resolvePerformanceTuningAiFinding",
+  {
+    requestId: string;
+    findingId?: string;
+    resolution: AiPayloadFindingResolution;
+    allCandidates?: boolean;
+  }
+>;
+
+export type ApprovePerformanceTuningAiPayloadActionCommand = BaseActionCommand<
+  "approvePerformanceTuningAiPayload",
+  { requestId: string; payloadDigest: string }
+>;
+
+export type CancelPerformanceTuningAiPayloadActionCommand = BaseActionCommand<
+  "cancelPerformanceTuningAiPayload",
+  { requestId: string }
+>;
+
+export type ResolveAiPayloadFindingActionCommand = BaseActionCommand<
+  "resolveAiPayloadFinding",
+  {
+    requestId: string;
+    findingId?: string;
+    resolution: AiPayloadFindingResolution;
+    allCandidates?: boolean;
+  }
+>;
+
+export type ApproveAiPayloadActionCommand = BaseActionCommand<
+  "approveAiPayload",
+  { requestId: string; payloadDigest: string }
+>;
+
+export type CancelAiPayloadActionCommand = BaseActionCommand<
+  "cancelAiPayload",
+  { requestId: string }
 >;
 
 // Saves the most recent successful AI analysis (held as Panel instance
@@ -248,7 +301,10 @@ export type TestConnectionSettingActionCommand = {
 export type SaveConnectionSettingActionCommand = {
   command: "saveConnectionSetting";
   mode: ModeType;
-  params: ConnectionSetting & { mcpEnabled?: boolean };
+  params: ConnectionSetting & {
+    mcpEnabled?: boolean;
+    aiMaskingLevel?: AiMaskingLevel | "0" | "1" | "2";
+  };
 };
 
 export type CancelActionCommand = BaseActionCommand<"cancel">;

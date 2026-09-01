@@ -16,6 +16,7 @@ import {
   CancellationTokenSource,
   env,
   LanguageModelChatMessage,
+  LanguageModelTextPart,
   lm,
   ProgressLocation,
   Uri,
@@ -25,6 +26,11 @@ import {
   type LanguageModelChat,
 } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
+import type {
+  AiMaskingLevel,
+  AiPayloadFindingResolution,
+  PreparedAiPayload,
+} from "../shared/AiDataMasking";
 import { ComponentName } from "../shared/ComponentName";
 import {
   PerformanceTuningAiAnalysisViewState,
@@ -59,6 +65,7 @@ import { buildDynamoDbNativeQueryViewModel } from "../utilities/dynamoDbNativeQu
 import { toDynamoDbQueryAnalysisInput } from "../utilities/dynamoDbQueryAnalysisInput";
 import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
+import { AI_APPROVAL_TIMEOUT_MS, prepareAiTextPayload } from "../utilities/aiDataMasking";
 import { createCodeHtmlString } from "../utilities/highlighter";
 import {
   buildTranslateResponseLabel,
@@ -130,6 +137,18 @@ type AnalysisComparisonSnapshot = {
   baselineContext: AnyPerformanceTuningContext;
   aiInput: ComparisonAiInput;
 };
+
+type PendingAiApproval = {
+  rawPayload: string;
+  prepared: PreparedAiPayload;
+  resolutions: Map<string, AiPayloadFindingResolution>;
+  timer: ReturnType<typeof setTimeout>;
+  resolve: (payload: string | undefined) => void;
+};
+
+function normalizeAiMaskingLevel(value: unknown): AiMaskingLevel {
+  return value === 1 || value === "1" ? 1 : value === 2 || value === "2" ? 2 : 0;
+}
 
 // Host-side orchestration shared by relational and DynamoDB previews.
 export class PerformanceTuningPreviewPanel extends BasePanel {
@@ -348,6 +367,9 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   private lastBaselineDirectory: Uri | undefined;
   // Identifies analyses made stale by a later baseline change.
   private analysisBaselineSha256: string | undefined;
+  private pendingAiApproval: PendingAiApproval | undefined;
+  private aiApprovalQueueTail: Promise<void> = Promise.resolve();
+  private disposed = false;
 
   // Original requests stay host-side for confirmed reruns.
   private request: PerformanceTuningPreviewRequest | undefined;
@@ -451,6 +473,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     // Cancel work tied to the previous context before replacing it.
     this.analysisCancellationSource?.cancel();
     this.analysisCancellationSource = undefined;
+    this.finishPendingAiApproval(undefined);
     this.secondaryExecutionController?.abort();
     this.secondaryExecutionController = undefined;
     this.context = context;
@@ -473,9 +496,6 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   ): Promise<void> {
     const contextJson = JSON.stringify(context, null, 2);
     const payloadBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
-
-    // Precompute external-AI prompts with the same comparison input as Copilot.
-    const { plainTextPrompt, translatedPlainTextPrompt } = this.buildPlainTextPrompts()!;
 
     const [sqlHtml, jsonHtml, models] = await Promise.all([
       createCodeHtmlString({ code: context.statement.sql, lang: "sql" }),
@@ -521,14 +541,13 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           queryDiagramHasWarnings: (queryDiagram?.warnings.length ?? 0) > 0,
           sqlHtml,
           jsonHtml,
-          plainTextPrompt,
-          translatedPlainTextPrompt,
           payloadBytes,
           maxPayloadBytes: DEFAULT_MAX_PAYLOAD_BYTES,
           languageModels,
           languageModelId: defaultLanguageModelId,
           translateResponse: defaultTranslateResponse(env.language),
           translateResponseLabel: buildTranslateResponseLabel(env.language),
+          maskingLevel: this.request?.initialMaskingLevel ?? 0,
           analyzedExecutionPlan: this.analyzedExecutionPlan,
           comparison: this.comparison,
         },
@@ -543,8 +562,6 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   ): Promise<void> {
     const contextJson = JSON.stringify(context, null, 2);
     const payloadBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
-
-    const { plainTextPrompt, translatedPlainTextPrompt } = this.buildPlainTextPrompts()!;
 
     const [sqlHtml, jsonHtml, models] = await Promise.all([
       // Only PartiQL has SQL-like text to highlight.
@@ -586,8 +603,6 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           sqlHtml,
           nativeQuery,
           jsonHtml,
-          plainTextPrompt,
-          translatedPlainTextPrompt,
           payloadBytes,
           // Matches RDB's own default (DynamoDbPerformanceTuningProvider.ts's
           // DEFAULT_MAX_PAYLOAD_BYTES is intentionally the same value) - one
@@ -597,6 +612,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           languageModelId: defaultLanguageModelId,
           translateResponse: defaultTranslateResponse(env.language),
           translateResponseLabel: buildTranslateResponseLabel(env.language),
+          maskingLevel: this.dynamoDbRequest?.initialMaskingLevel ?? 0,
           observedReadCapability: this.observedReadCapability,
           comparison: this.comparison,
         },
@@ -611,7 +627,26 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         this.dispose();
         break;
       case "analyzePerformanceTuningWithAi":
-        await this.analyzeWithAi(message.params.languageModelId, message.params.translateResponse);
+        await this.analyzeWithAi(
+          message.params.languageModelId,
+          message.params.translateResponse,
+          normalizeAiMaskingLevel(message.params.maskingLevel)
+        );
+        break;
+      case "copyPerformanceTuningPromptWithMasking":
+        await this.copyPromptWithMasking(
+          message.params.translateResponse,
+          normalizeAiMaskingLevel(message.params.maskingLevel)
+        );
+        break;
+      case "resolvePerformanceTuningAiFinding":
+        await this.resolveAiFinding(message.params);
+        break;
+      case "approvePerformanceTuningAiPayload":
+        this.approveAiPayload(message.params.requestId, message.params.payloadDigest);
+        break;
+      case "cancelPerformanceTuningAiPayload":
+        this.cancelAiApproval(message.params.requestId);
         break;
       case "saveAiAnalysisAsNotebook":
         await this.saveAnalysisAsNotebook();
@@ -758,13 +793,168 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
     const msg: PerformanceTuningPreviewPanelEventData = {
       command: "comparison-update",
       componentName: "PerformanceTuningPreviewPanel",
-      value: { comparison: this.comparison, ...this.buildPlainTextPrompts() },
+      value: { comparison: this.comparison },
+    };
+    await this.getWebviewPanel().webview.postMessage(msg);
+  }
+
+  private async copyPromptWithMasking(
+    translateResponse: boolean,
+    maskingLevel: AiMaskingLevel
+  ): Promise<void> {
+    const prompts = this.buildPlainTextPrompts();
+    if (!prompts) {
+      return;
+    }
+    const rawPayload =
+      translateResponse && isResponseTranslationAvailable(env.language)
+        ? prompts.translatedPlainTextPrompt
+        : prompts.plainTextPrompt;
+    if (maskingLevel === 0) {
+      await env.clipboard.writeText(rawPayload);
+      return;
+    }
+    const approved = await this.requestAiApproval(rawPayload, maskingLevel, "clipboard");
+    if (approved !== undefined) {
+      await env.clipboard.writeText(approved);
+      void window.showInformationMessage("The approved masked prompt was copied to the clipboard.");
+    }
+  }
+
+  private async requestAiApproval(
+    rawPayload: string,
+    level: Exclude<AiMaskingLevel, 0>,
+    destination: PreparedAiPayload["destination"]
+  ): Promise<string | undefined> {
+    const expiresAt = Date.now() + AI_APPROVAL_TIMEOUT_MS;
+    const previous = this.aiApprovalQueueTail;
+    let releaseQueue!: () => void;
+    this.aiApprovalQueueTail = previous.then(
+      () => new Promise<void>((resolve) => (releaseQueue = resolve))
+    );
+    await previous;
+    try {
+      if (this.disposed || Date.now() >= expiresAt) {
+        return undefined;
+      }
+      return await this.startAiApproval(rawPayload, level, destination, expiresAt);
+    } finally {
+      releaseQueue();
+    }
+  }
+
+  private async startAiApproval(
+    rawPayload: string,
+    level: Exclude<AiMaskingLevel, 0>,
+    destination: PreparedAiPayload["destination"],
+    expiresAt: number
+  ): Promise<string | undefined> {
+    const prepared = prepareAiTextPayload(rawPayload, { level, destination, expiresAt });
+    return await new Promise<string | undefined>((resolve) => {
+      const timer = setTimeout(() => {
+        if (this.pendingAiApproval?.prepared.requestId === prepared.requestId) {
+          this.finishPendingAiApproval(undefined);
+          void window.showWarningMessage("The AI send preview expired after 5 minutes.");
+        }
+      }, Math.max(0, expiresAt - Date.now()));
+      this.pendingAiApproval = {
+        rawPayload,
+        prepared,
+        resolutions: new Map(),
+        timer,
+        resolve,
+      };
+      void this.postAiSendPreview(prepared).catch(() => {
+        if (this.pendingAiApproval?.prepared.requestId === prepared.requestId) {
+          this.finishPendingAiApproval(undefined);
+        }
+      });
+    });
+  }
+
+  private async resolveAiFinding(
+    params: Extract<ActionCommand, { command: "resolvePerformanceTuningAiFinding" }>["params"]
+  ): Promise<void> {
+    const pending = this.pendingAiApproval;
+    if (
+      !pending ||
+      pending.prepared.requestId !== params.requestId ||
+      Date.now() >= pending.prepared.expiresAt
+    ) {
+      return;
+    }
+    if (params.allCandidates) {
+      for (const finding of pending.prepared.findings) {
+        if (finding.disposition === "unreviewed") {
+          pending.resolutions.set(finding.id, params.resolution);
+        }
+      }
+    } else if (params.findingId) {
+      pending.resolutions.set(params.findingId, params.resolution);
+    }
+    pending.prepared = prepareAiTextPayload(pending.rawPayload, {
+      level: pending.prepared.level as 1 | 2,
+      destination: pending.prepared.destination,
+      requestId: pending.prepared.requestId,
+      expiresAt: pending.prepared.expiresAt,
+      resolutions: pending.resolutions,
+    });
+    await this.postAiSendPreview(pending.prepared);
+  }
+
+  private approveAiPayload(requestId: string, payloadDigest: string): void {
+    const pending = this.pendingAiApproval;
+    if (
+      !pending ||
+      pending.prepared.requestId !== requestId ||
+      pending.prepared.payloadDigest !== payloadDigest ||
+      Date.now() >= pending.prepared.expiresAt ||
+      pending.prepared.findings.some((finding) => finding.disposition === "unreviewed")
+    ) {
+      return;
+    }
+    this.finishPendingAiApproval(pending.prepared.payload);
+  }
+
+  private cancelAiApproval(requestId: string): void {
+    if (this.pendingAiApproval?.prepared.requestId === requestId) {
+      this.finishPendingAiApproval(undefined);
+    }
+  }
+
+  private finishPendingAiApproval(payload: string | undefined): void {
+    const pending = this.pendingAiApproval;
+    if (!pending) {
+      return;
+    }
+    this.pendingAiApproval = undefined;
+    clearTimeout(pending.timer);
+    pending.resolve(payload);
+    const msg: PerformanceTuningPreviewPanelEventData = {
+      command: "ai-send-preview-closed",
+      componentName: "PerformanceTuningPreviewPanel",
+      value: { aiSendPreviewClosedRequestId: pending.prepared.requestId },
+    };
+    void this.getWebviewPanel()
+      .webview.postMessage(msg)
+      .then(undefined, () => undefined);
+  }
+
+  private async postAiSendPreview(prepared: PreparedAiPayload): Promise<void> {
+    const msg: PerformanceTuningPreviewPanelEventData = {
+      command: "ai-send-preview",
+      componentName: "PerformanceTuningPreviewPanel",
+      value: { aiSendPreview: prepared },
     };
     await this.getWebviewPanel().webview.postMessage(msg);
   }
 
   // Runs one structured AI analysis against the currently rendered context.
-  private async analyzeWithAi(languageModelId: string, translateResponse: boolean): Promise<void> {
+  private async analyzeWithAi(
+    languageModelId: string,
+    translateResponse: boolean,
+    maskingLevel: AiMaskingLevel
+  ): Promise<void> {
     const myGeneration = this.renderGeneration;
     if (!this.context) {
       return;
@@ -781,7 +971,130 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
 
     await this.postAnalysisUpdate(myGeneration, { status: "running" });
 
-    // Bridge notification cancellation with context replacement and panel disposal.
+    // Preparation has its own progress lifetime. In particular, do not keep a
+    // notification open while the masking preview waits for user approval: a
+    // bottom-right notification can cover the preview's approval controls.
+    const preparation = await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        cancellable: true,
+        title: "Preparing performance tuning context for AI...",
+      },
+      async (progress, token) => {
+        const cts = new CancellationTokenSource();
+        this.analysisCancellationSource = cts;
+        token.onCancellationRequested(() => cts.cancel());
+        try {
+          progress.report({ message: "Looking up available AI models..." });
+          let model;
+          try {
+            // Resolve the selected model again for this analysis run.
+            [model] = await lm.selectChatModels(
+              languageModelId ? { id: languageModelId } : { vendor: "copilot" }
+            );
+          } catch (e) {
+            await this.postAnalysisUpdate(myGeneration, {
+              status: "error",
+              errorMessage: `Failed to look up available AI models: ${getErrorMessage(e)}`,
+            });
+            return undefined;
+          }
+          if (!model) {
+            await this.postAnalysisUpdate(myGeneration, {
+              status: "error",
+              errorMessage:
+                "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.",
+            });
+            return undefined;
+          }
+
+          progress.report({ message: `Checking input size for ${model.family}...` });
+          try {
+            const prepared = isDynamoDbPerformanceTuningContext(context)
+              ? await this.buildDynamoDbMessagesWithinModelInputLimit(
+                  model,
+                  context,
+                  effectiveTranslateResponse,
+                  cts.token,
+                  baseline,
+                  evidence
+                )
+              : await this.buildMessagesWithinModelInputLimit(
+                  model,
+                  context,
+                  effectiveTranslateResponse,
+                  cts.token,
+                  baseline,
+                  evidence
+                );
+            if (cts.token.isCancellationRequested) {
+              await this.postAnalysisUpdate(myGeneration, {
+                status: "error",
+                errorMessage: "The request was cancelled.",
+              });
+              return undefined;
+            }
+            return { model, prepared };
+          } catch (e) {
+            await this.postAnalysisUpdate(myGeneration, {
+              status: "error",
+              errorMessage: cts.token.isCancellationRequested
+                ? "The request was cancelled."
+                : `The AI request could not fit this model's input limit: ${getErrorMessage(e)}`,
+              ...(!cts.token.isCancellationRequested && e instanceof AiInputLimitError
+                ? {
+                    tokenUsage: e.tokenUsage,
+                    contextDetail: e.contextDetail,
+                    comparisonDetail: e.comparisonDetail,
+                  }
+                : {}),
+            });
+            return undefined;
+          }
+        } finally {
+          if (this.analysisCancellationSource === cts) {
+            this.analysisCancellationSource = undefined;
+          }
+          cts.dispose();
+        }
+      }
+    );
+
+    if (!preparation || myGeneration !== this.renderGeneration) {
+      return;
+    }
+    const { model, prepared } = preparation;
+    const { messages, compact } = prepared;
+
+    // This deliberate pause is outside window.withProgress so the approval
+    // dialog is never obscured by a progress notification (RDB and DynamoDB
+    // share this path).
+    if (maskingLevel !== 0) {
+      const userPart = messages[1]?.content[0];
+      if (!(userPart instanceof LanguageModelTextPart)) {
+        await this.postAnalysisUpdate(myGeneration, {
+          status: "error",
+          errorMessage: "The AI request could not be prepared for the masking preview.",
+        });
+        return;
+      }
+      const approvedPayload = await this.requestAiApproval(
+        userPart.value,
+        maskingLevel,
+        "copilot"
+      );
+      if (approvedPayload === undefined) {
+        await this.postAnalysisUpdate(myGeneration, {
+          status: "error",
+          errorMessage: "The masked AI payload was not approved.",
+        });
+        return;
+      }
+      messages[1] = LanguageModelChatMessage.User(approvedPayload);
+    }
+
+    // Sending and response processing get a fresh cancellation token; a
+    // completed preparation notification can no longer cancel this phase.
     await window.withProgress(
       {
         location: ProgressLocation.Notification,
@@ -793,71 +1106,6 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
         this.analysisCancellationSource = cts;
         token.onCancellationRequested(() => cts.cancel());
 
-        progress.report({ message: "Looking up available AI models..." });
-
-        let model;
-        try {
-          // Resolve the selected model again at send time.
-          [model] = await lm.selectChatModels(
-            languageModelId ? { id: languageModelId } : { vendor: "copilot" }
-          );
-        } catch (e) {
-          await this.postAnalysisUpdate(myGeneration, {
-            status: "error",
-            errorMessage: `Failed to look up available AI models: ${getErrorMessage(e)}`,
-          });
-          return;
-        }
-        if (!model) {
-          await this.postAnalysisUpdate(myGeneration, {
-            status: "error",
-            errorMessage:
-              "No models found. Please check your network connection and ensure Copilot is set up properly before trying again.",
-          });
-          return;
-        }
-
-        let prepared: PreparedAiRequest;
-        try {
-          progress.report({ message: `Checking input size for ${model.family}...` });
-          prepared = isDynamoDbPerformanceTuningContext(context)
-            ? await this.buildDynamoDbMessagesWithinModelInputLimit(
-                model,
-                context,
-                effectiveTranslateResponse,
-                cts.token,
-                baseline,
-                evidence
-              )
-            : await this.buildMessagesWithinModelInputLimit(
-                model,
-                context,
-                effectiveTranslateResponse,
-                cts.token,
-                baseline,
-                evidence
-              );
-        } catch (e) {
-          if (this.analysisCancellationSource === cts) {
-            this.analysisCancellationSource = undefined;
-          }
-          await this.postAnalysisUpdate(myGeneration, {
-            status: "error",
-            errorMessage: `The AI request could not fit this model's input limit: ${getErrorMessage(
-              e
-            )}`,
-            ...(e instanceof AiInputLimitError
-              ? {
-                  tokenUsage: e.tokenUsage,
-                  contextDetail: e.contextDetail,
-                  comparisonDetail: e.comparisonDetail,
-                }
-              : {}),
-          });
-          return;
-        }
-
-        const { messages, compact } = prepared;
         await this.postAnalysisUpdate(myGeneration, {
           status: "running",
           tokenUsage: {
@@ -909,6 +1157,7 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
           if (this.analysisCancellationSource === cts) {
             this.analysisCancellationSource = undefined;
           }
+          cts.dispose();
         }
 
         progress.report({ message: "Parsing AI response..." });
@@ -1618,6 +1867,8 @@ export class PerformanceTuningPreviewPanel extends BasePanel {
   }
 
   protected preDispose(): void {
+    this.disposed = true;
+    this.finishPendingAiApproval(undefined);
     this.analysisCancellationSource?.cancel();
     this.secondaryExecutionController?.abort();
     PerformanceTuningPreviewPanel.currentPanel = undefined;

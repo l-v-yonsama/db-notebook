@@ -8,8 +8,7 @@ const mockDatabaseConfig = (values: Record<string, unknown>) => {
       return { get: (_key: string, defaultValue?: unknown) => defaultValue } as never;
     }
     return {
-      get: (key: string, defaultValue?: unknown) =>
-        key in values ? values[key] : defaultValue,
+      get: (key: string, defaultValue?: unknown) => (key in values ? values[key] : defaultValue),
     } as never;
   });
 };

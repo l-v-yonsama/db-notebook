@@ -578,6 +578,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     const result = await openDynamoDbPerformanceTuningPreview({
       extensionUri: context.extensionUri,
       connectionSetting,
+      initialMaskingLevel: stateStorage.getAiMaskingLevelForConnection(connectionSetting.name),
       statement: { source: "sqlHistory", request, previousObservation },
       workload,
     });
@@ -692,6 +693,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     const result = await openPerformanceTuningPreview({
       extensionUri: context.extensionUri,
       connectionSetting,
+      initialMaskingLevel: stateStorage.getAiMaskingLevelForConnection(connectionSetting.name),
       databaseName,
       statement: { sql: nativeSql, source: "sqlHistory", statistics },
       targetTables: targetTables.length > 0 ? targetTables : undefined,

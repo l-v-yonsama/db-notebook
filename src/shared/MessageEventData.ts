@@ -52,6 +52,7 @@ import type {
   ComparisonAiInputDetail,
   PerformanceTuningComparisonEvidence,
 } from "./PerformanceTuningComparison";
+import type { AiMaskingLevel, PreparedAiPayload } from "./AiDataMasking";
 import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSummary";
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { RecordRule } from "./RecordRule";
@@ -81,6 +82,7 @@ export type MessageEventData =
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | PerformanceTuningPreviewPanelEventData
+  | AiDataMaskingPreviewPanelEventData
   | PerformanceTuningBindParametersPanelEventData
   | RecordRuleEditorEventData
   | ScanPanelEventData
@@ -97,6 +99,15 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
   componentName: U;
   value: V;
 };
+
+export type AiDataMaskingPreviewPanelEventData = BaseMessageEventData<
+  "initialize" | "ai-send-preview" | "ai-send-preview-closed",
+  "AiDataMaskingPreviewPanel",
+  {
+    aiSendPreview?: PreparedAiPayload;
+    aiSendPreviewClosedRequestId?: string;
+  }
+>;
 
 export type RdhViewConfig = {
   dateFormat: ToStringParam["dateFormat"];
@@ -634,18 +645,6 @@ type PerformanceTuningPreviewShellFields = {
   // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
   // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
   jsonHtml: string;
-  // "Copy Prompt for Other AI" (2026-08-21 follow-up) - a self-contained
-  // plain-text prompt (buildPlainTextAnalysisPrompt(), extension-side) for a
-  // manual paste into an external AI chat (ChatGPT/Claude.ai/Claude Code/
-  // Codex/...) the user already has a subscription for, bypassing vscode.lm/
-  // Copilot entirely. Precomputed here for the same reason jsonHtml is - a
-  // pure string build, ready to copy instantly with no round-trip to the
-  // extension host.
-  plainTextPrompt: string;
-  // The same external-AI prompt with the current UI language response
-  // instruction. The webview switches between these immediately when the
-  // response-language checkbox changes, without a host round trip.
-  translatedPlainTextPrompt: string;
   // Computed on the extension side (Buffer.byteLength) rather than
   // re-serialized/measured in the webview. This is retained as diagnostic
   // metadata under the collapsed Full context JSON details; model fit is
@@ -662,6 +661,7 @@ type PerformanceTuningPreviewShellFields = {
   languageModelId: string;
   translateResponse: boolean;
   translateResponseLabel?: string;
+  maskingLevel: AiMaskingLevel;
 };
 
 // RDB view model (2026-08-24 follow-up: split out of the formerly-flat
@@ -749,7 +749,11 @@ export type DynamoDbNativeQueryViewModel = {
 };
 
 export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "analysis-update" | "comparison-update",
+  | BaseMessageEventDataCommand
+  | "analysis-update"
+  | "comparison-update"
+  | "ai-send-preview"
+  | "ai-send-preview-closed",
   "PerformanceTuningPreviewPanel",
   {
     initialize?:
@@ -765,13 +769,8 @@ export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
     // changed, cleared, or the Current Context was re-collected underneath an
     // existing selection (§16 Phase 2).
     comparison?: PerformanceTuningComparisonViewState;
-    // Rebuilt and re-sent alongside a "comparison-update" because "Copy
-    // Prompt for Other AI" is precomputed host-side: selecting or clearing a
-    // baseline changes what that prompt has to contain, and §13.2 requires
-    // the external-AI path to carry the same Comparison Input as the Copilot
-    // one. Same two fields as the initialize payload's.
-    plainTextPrompt?: string;
-    translatedPlainTextPrompt?: string;
+    aiSendPreview?: PreparedAiPayload;
+    aiSendPreviewClosedRequestId?: string;
   }
 >;
 
@@ -992,7 +991,10 @@ export type DBFormEventDataValue = {
   subComponentName: "ConnectionSetting" | "ResourceProperties";
   connectionSetting?: {
     mode: ModeType;
-    setting: ConnectionSetting & { mcpEnabled?: boolean };
+    setting: ConnectionSetting & {
+      mcpEnabled?: boolean;
+      aiMaskingLevel?: AiMaskingLevel;
+    };
     prohibitedNames: string[];
   };
   resourceProperties?: {

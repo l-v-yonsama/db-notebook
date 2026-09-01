@@ -81,7 +81,11 @@ export async function startMcpServer(
  * server last used, so a restart keeps the same URL valid for already-registered MCP
  * clients; if that port is no longer free, falls back to a fresh OS-assigned one.
  */
-async function bind(server: http.Server, context: ExtensionContext, configuredPort: number): Promise<number> {
+async function bind(
+  server: http.Server,
+  context: ExtensionContext,
+  configuredPort: number
+): Promise<number> {
   if (configuredPort !== 0) {
     return listen(server, configuredPort);
   }
@@ -90,7 +94,11 @@ async function bind(server: http.Server, context: ExtensionContext, configuredPo
     try {
       return await listen(server, rememberedPort);
     } catch (e) {
-      log(`${PREFIX} previous port ${rememberedPort} is unavailable (${getErrorMessage(e)}); picking a new one`);
+      log(
+        `${PREFIX} previous port ${rememberedPort} is unavailable (${getErrorMessage(
+          e
+        )}); picking a new one`
+      );
     }
   }
   return listen(server, 0);
@@ -143,7 +151,9 @@ async function handleRequest(
     return;
   }
   if (!isAuthorized(req, token)) {
-    res.writeHead(401, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "Unauthorized" }));
+    res
+      .writeHead(401, { "Content-Type": "application/json" })
+      .end(JSON.stringify({ error: "Unauthorized" }));
     return;
   }
 
@@ -151,7 +161,9 @@ async function handleRequest(
   // own `simpleStatelessStreamableHttp` example. There is no persistent session to
   // manage, which keeps the singleton/lock-file story above simple.
   const server = new McpServer({ name: "database-notebook", version });
-  registerTools(server, stateStorage);
+  const cancellation = new AbortController();
+  req.on("aborted", () => cancellation.abort());
+  registerTools(server, stateStorage, cancellation.signal);
 
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -163,6 +175,7 @@ async function handleRequest(
     enableDnsRebindingProtection: true,
   });
   res.on("close", () => {
+    cancellation.abort();
     transport.close();
     server.server.close();
   });

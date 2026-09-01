@@ -17,6 +17,9 @@ import {
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
 import { formatConnectionEnvironmentLabel } from "../../utilities/connectionEnvironmentDisplay";
 import { getDatabaseConfig } from "../../utilities/configUtil";
+import { prepareAiRdhPayload } from "../../utilities/aiRdhMasking";
+import { requestAiPayloadApproval } from "../../panels/AiDataMaskingPreviewPanel";
+import { type AiToolOutputOptions, withConnectionMasking } from "../../utilities/aiToolOutput";
 import { workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { log } from "../../utilities/logger";
@@ -82,11 +85,14 @@ export class RunQueryTool implements LanguageModelTool<RunQueryToolInput> {
 
   async invoke(
     options: LanguageModelToolInvocationOptions<RunQueryToolInput>,
-    _token: CancellationToken
+    token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName, sql } = options.input;
     const text = await trackInvocation("lmTools", "RunQueryTool", options.input, () =>
-      runQueryText(this.stateStorage, connectionName, sql)
+      runQueryText(this.stateStorage, connectionName, sql, {
+        source: "lmTool",
+        cancellation: token,
+      })
     );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
@@ -101,9 +107,12 @@ export class RunQueryTool implements LanguageModelTool<RunQueryToolInput> {
 export async function runQueryText(
   stateStorage: StateStorage,
   connectionName: string,
-  sql: string
+  sql: string,
+  options?: AiRowOutputOptions
 ): Promise<string> {
-  log(`${PREFIX} invoked connectionName:[${connectionName}] sql:[${abbr(sql, LOGGED_SQL_MAX_LENGTH)}]`);
+  log(
+    `${PREFIX} invoked connectionName:[${connectionName}] sql:[${abbr(sql, LOGGED_SQL_MAX_LENGTH)}]`
+  );
   try {
     const result = await runQuery(stateStorage, connectionName, sql);
     if (!result.ok || !result.rdh) {
@@ -115,11 +124,18 @@ export async function runQueryText(
       log(`${PREFIX} result:[${lines.join(" ")}]`);
       return text;
     }
-    const text = formatRdhForModel(result.rdh, getDatabaseConfig().limitRows);
+    const text = await formatAiRowOutput(
+      result.rdh,
+      withConnectionMasking(stateStorage, connectionName, options)
+    );
     // Row data can contain PII/secrets, so only a row-count summary is logged, never the rows themselves.
     const affected = result.rdh.summary?.affectedRows;
     log(
-      `${PREFIX} result: ${affected !== undefined ? `${affected} row(s) affected` : `${result.rdh.rows.length} row(s) returned`}`
+      `${PREFIX} result: ${
+        affected !== undefined
+          ? `${affected} row(s) affected`
+          : `${result.rdh.rows.length} row(s) returned`
+      }`
     );
     return text;
   } catch (e) {
@@ -127,6 +143,35 @@ export async function runQueryText(
     log(`${PREFIX} result:[${message}]`);
     return message;
   }
+}
+
+export type AiRowOutputOptions = AiToolOutputOptions;
+
+export async function formatAiRowOutput(
+  rdh: ResultSetData,
+  options?: AiRowOutputOptions
+): Promise<string> {
+  const limit = getDatabaseConfig().limitRows;
+  const level = options?.maskingLevel ?? 0;
+  if (
+    !options ||
+    level === 0 ||
+    (rdh.rows.length === 0 && rdh.summary?.affectedRows !== undefined)
+  ) {
+    return formatRdhForModel(rdh, limit);
+  }
+  const approved = await requestAiPayloadApproval(
+    (resolutions, identity) =>
+      prepareAiRdhPayload(rdh, {
+        level,
+        limit,
+        destination: options.source,
+        resolutions,
+        ...identity,
+      }),
+    options.cancellation
+  );
+  return approved ?? "❌ AI result delivery was cancelled before approval.";
 }
 
 export async function runQuery(

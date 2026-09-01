@@ -15,6 +15,7 @@ import {
   LanguageModelToolResult,
 } from "vscode";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
+import { approveAiTextOutput, type AiToolOutputOptions } from "../../utilities/aiToolOutput";
 import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { log } from "../../utilities/logger";
@@ -38,13 +39,17 @@ export class GetPerformanceTuningContextTool
 
   async invoke(
     options: LanguageModelToolInvocationOptions<GetPerformanceTuningContextToolInput>,
-    _token: CancellationToken
+    token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const text = await trackInvocation(
       "lmTools",
       "GetPerformanceTuningContextTool",
       options.input,
-      () => getPerformanceTuningContextText(this.stateStorage, options.input)
+      () =>
+        getPerformanceTuningContextText(this.stateStorage, options.input, {
+          source: "lmTool",
+          cancellation: token,
+        })
     );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
@@ -53,7 +58,8 @@ export class GetPerformanceTuningContextTool
 /** Shared non-throwing formatter for Copilot Chat and MCP callers. */
 export async function getPerformanceTuningContextText(
   stateStorage: StateStorage,
-  input: GetPerformanceTuningContextToolInput
+  input: GetPerformanceTuningContextToolInput,
+  options?: AiToolOutputOptions
 ): Promise<string> {
   const { connectionName, sql, databaseName, schemaName } = input;
   log(
@@ -65,7 +71,11 @@ export async function getPerformanceTuningContextText(
   let text: string;
   try {
     const result = await fetchPerformanceTuningContext(stateStorage, input);
-    text = formatPerformanceTuningContextResultForModel(result);
+    const rawText = formatPerformanceTuningContextResultForModel(result);
+    text = result.ok
+      ? (await approveAiTextOutput(rawText, stateStorage, connectionName, options, "json")) ??
+        "❌ AI result delivery was cancelled before approval."
+      : rawText;
   } catch (e) {
     text = `❌ Failed to get performance tuning context for "${connectionName}": ${getErrorMessage(
       e

@@ -425,6 +425,7 @@ export class ToolsViewProvider extends BaseViewProvider {
     const result = await openPerformanceTuningPreview({
       extensionUri: this.context.extensionUri,
       connectionSetting: settings,
+      initialMaskingLevel: this.stateStorage.getAiMaskingLevelForConnection(settings.name),
       databaseName: queryStatisticsDatabase.databaseName,
       statement: {
         sql: resolved.sql,

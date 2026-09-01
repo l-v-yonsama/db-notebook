@@ -9,6 +9,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ProgressLocation, Uri, window } from "vscode";
 import { PerformanceTuningPreviewPanel } from "../panels/PerformanceTuningPreviewPanel";
+import type { AiMaskingLevel } from "../shared/AiDataMasking";
 import { createSQLSupportDriver, workflow } from "./driverResolver";
 import { toDynamoDbQueryAnalysisInput } from "./dynamoDbQueryAnalysisInput";
 
@@ -19,6 +20,8 @@ import { toDynamoDbQueryAnalysisInput } from "./dynamoDbQueryAnalysisInput";
 // PerformanceTuningPreviewRequest.
 export type DynamoDbPerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
+  /** Connection-scoped default; the Preview may override it for this invocation only. */
+  initialMaskingLevel: AiMaskingLevel;
   statement: {
     // db-drivers' union value - see PerformanceTuningPreviewRequest.
     source: "sqlHistory" | "editor";

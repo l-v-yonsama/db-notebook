@@ -41,6 +41,7 @@ import {
   StoredQueryHistory,
 } from "./queryHistoryUtil";
 import { log } from "./logger";
+import type { AiMaskingLevel } from "../shared/AiDataMasking";
 
 const uid = new ShortUniqueId();
 
@@ -54,6 +55,7 @@ export const STORAGE_KEY = `${EXTENSION_NAME}-settings`;
 export const QUERY_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
 export const PREV_SAVE_FOLDER = `${EXTENSION_NAME}-previous-save-folder`;
 export const MCP_ENABLED_CONNECTIONS_KEY = `${EXTENSION_NAME}-mcp-enabled-connections`;
+export const AI_MASKING_LEVEL_BY_CONNECTION_KEY = `${EXTENSION_NAME}-ai-masking-level-by-connection`;
 
 type DbResInfo = {
   isInProgress: boolean;
@@ -99,9 +101,9 @@ export class StateStorage {
     connectionName: string,
     reload: boolean,
     wait = false
-  ): Promise<GeneralResult<{ db: DbDatabase[]; dbType: DBType; }>> {
+  ): Promise<GeneralResult<{ db: DbDatabase[]; dbType: DBType }>> {
     // log(`${PREFIX} loadResource(${connectionName}, reload:${reload}, wait:${wait})`);
-    const ret: GeneralResult<{ db: DbDatabase[]; dbType: DBType; }> = {
+    const ret: GeneralResult<{ db: DbDatabase[]; dbType: DBType }> = {
       ok: false,
       message: "",
     };
@@ -201,11 +203,13 @@ export class StateStorage {
         // ResourceTreeProvider), but still needs conName stamped so the
         // "Create CloudFormation diagram" command can resolve a connection
         // setting from the tree item alone.
-        dbRes.findChildren<DbCfnStack>({ resourceType: ResourceType.CfnStack }).forEach((stackRes) => {
-          stackRes.meta = {
-            conName: conRes.name,
-          };
-        });
+        dbRes
+          .findChildren<DbCfnStack>({ resourceType: ResourceType.CfnStack })
+          .forEach((stackRes) => {
+            stackRes.meta = {
+              conName: conRes.name,
+            };
+          });
         // for ssm
         {
           const params = dbRes.findChildren<DbSsmParameter>({
@@ -335,7 +339,7 @@ export class StateStorage {
       log(`${PREFIX} loadResource Error:${message}`);
       this.resMap.set(connectionName, { isInProgress: false, res: undefined });
       ret.message = message;
-      showStatusMessage(message, 'warning');
+      showStatusMessage(message, "warning");
     }
     return ret;
   }
@@ -571,6 +575,33 @@ export class StateStorage {
     await this.context.globalState.update(MCP_ENABLED_CONNECTIONS_KEY, list);
   }
 
+  getAiMaskingLevelForConnection(name: string): AiMaskingLevel {
+    const levels = this.context.globalState.get<Record<string, AiMaskingLevel>>(
+      AI_MASKING_LEVEL_BY_CONNECTION_KEY,
+      {}
+    );
+    const value = levels[name];
+    return value === 0 || value === 1 || value === 2 ? value : 0;
+  }
+
+  async setAiMaskingLevelForConnection(
+    name: string,
+    level: AiMaskingLevel | undefined
+  ): Promise<void> {
+    const levels = {
+      ...this.context.globalState.get<Record<string, AiMaskingLevel>>(
+        AI_MASKING_LEVEL_BY_CONNECTION_KEY,
+        {}
+      ),
+    };
+    if (level === undefined) {
+      delete levels[name];
+    } else {
+      levels[name] = level;
+    }
+    await this.context.globalState.update(AI_MASKING_LEVEL_BY_CONNECTION_KEY, levels);
+  }
+
   getDBTypeByConnectionName(name: string): DBType | undefined {
     return this.getPasswordlessConnectionSettingByName(name)?.dbType;
   }
@@ -647,6 +678,7 @@ export class StateStorage {
     await this.context.globalState.update(STORAGE_KEY, list);
     this.resMap.delete(name);
     await this.setMcpEnabledForConnection(name, false);
+    await this.setAiMaskingLevelForConnection(name, undefined);
     return true;
   }
 

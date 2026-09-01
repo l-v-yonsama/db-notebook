@@ -7,11 +7,14 @@ import type {
   PerformanceTuningComparisonViewState,
   PerformanceTuningPreviewPanelEventData,
   RelationalPerformanceTuningInitializeViewModel,
+  PreparedAiPayload,
+  AiMaskingLevel,
 } from "@/utilities/vscode";
 import { formatUtcWithLocal, vscode } from "@/utilities/vscode";
 import { buildDynamoDbObservedReadNotice } from "@/utilities/dynamoDbObservedReadNotice";
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import type { SecondaryItem } from "@/types/Components";
+import AiPayloadFindingViewer from "./AiPayloadFindingViewer.vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
@@ -60,11 +63,62 @@ const languageModels = ref<LabelValueItem[]>([]);
 const languageModelId = ref("");
 const translateResponse = ref(false);
 const translateResponseLabel = ref<string | undefined>(undefined);
-const plainTextPrompt = ref("");
-const translatedPlainTextPrompt = ref("");
-const copyPromptForOtherAi = computed(() =>
-  translateResponse.value ? translatedPlainTextPrompt.value : plainTextPrompt.value
+const maskingLevel = ref<AiMaskingLevel>(0);
+const maskingLevelItems = [
+  { label: "Lv0 - No masking", value: 0 },
+  { label: "Lv1 - Sensitive candidates", value: 1 },
+  { label: "Lv2 - Broad literal masking", value: 2 },
+];
+const aiSendPreview = ref<PreparedAiPayload | undefined>(undefined);
+const aiPayloadFindingViewer = ref<InstanceType<typeof AiPayloadFindingViewer>>();
+const advanceAfterResolvedFindingId = ref<string>();
+const selectedAiFindingId = ref<string>();
+const aiCandidateListElement = ref<HTMLElement>();
+const aiCandidateElements = new Map<string, HTMLElement>();
+const isAiSendPreviewOpen = computed(() => aiSendPreview.value !== undefined);
+const unresolvedFindings = computed(
+  () =>
+    aiSendPreview.value?.findings.filter((finding) => finding.disposition === "unreviewed") ?? []
 );
+const allowedFindingCount = computed(
+  () =>
+    aiSendPreview.value?.findings.filter((finding) => finding.disposition === "allowed").length ?? 0
+);
+const canApproveAiPayload = computed(
+  () => Boolean(aiSendPreview.value) && unresolvedFindings.value.length === 0
+);
+
+const setAiCandidateElement = (element: unknown, findingId: string): void => {
+  if (element instanceof HTMLElement) {
+    aiCandidateElements.set(findingId, element);
+  }
+};
+
+const selectAiFindingRow = (findingId: string | undefined): void => {
+  selectedAiFindingId.value = findingId;
+  if (findingId) {
+    nextTick(() => {
+      const container = aiCandidateListElement.value;
+      const element = aiCandidateElements.get(findingId);
+      if (!container || !element) {
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      if (elementRect.top < containerRect.top) {
+        container.scrollTo({
+          top: container.scrollTop + elementRect.top - containerRect.top,
+          behavior: "smooth",
+        });
+      } else if (elementRect.bottom > containerRect.bottom) {
+        container.scrollTo({
+          top: container.scrollTop + elementRect.bottom - containerRect.bottom,
+          behavior: "smooth",
+        });
+      }
+    });
+  }
+};
 
 // Comparison state is host-owned and arrives fully derived.
 const comparison = ref<PerformanceTuningComparisonViewState>({ status: "idle" });
@@ -200,8 +254,7 @@ const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initiali
   languageModelId.value = v.languageModelId;
   translateResponse.value = v.translateResponse;
   translateResponseLabel.value = v.translateResponseLabel;
-  plainTextPrompt.value = v.plainTextPrompt;
-  translatedPlainTextPrompt.value = v.translatedPlainTextPrompt;
+  maskingLevel.value = v.maskingLevel;
   analysis.value = { status: "idle" };
   comparison.value = v.comparison;
   isRunningSecondaryAction.value = false;
@@ -230,12 +283,22 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
       if (value.comparison) {
         comparison.value = value.comparison;
       }
-      // The host rebuilds external-AI prompts with each baseline transition.
-      if (value.plainTextPrompt !== undefined) {
-        plainTextPrompt.value = value.plainTextPrompt;
+      break;
+    case "ai-send-preview":
+      if (value.aiSendPreview) {
+        aiCandidateElements.clear();
+        aiSendPreview.value = value.aiSendPreview;
+        const findingId = advanceAfterResolvedFindingId.value;
+        advanceAfterResolvedFindingId.value = undefined;
+        if (findingId) {
+          nextTick(() => aiPayloadFindingViewer.value?.focusNextAfterFinding(findingId));
+        }
       }
-      if (value.translatedPlainTextPrompt !== undefined) {
-        translatedPlainTextPrompt.value = value.translatedPlainTextPrompt;
+      break;
+    case "ai-send-preview-closed":
+      if (aiSendPreview.value?.requestId === value.aiSendPreviewClosedRequestId) {
+        aiSendPreview.value = undefined;
+        advanceAfterResolvedFindingId.value = undefined;
       }
       break;
     case "stop-progress":
@@ -255,8 +318,66 @@ const close = (): void => {
 const analyzeWithAi = (): void => {
   vscode.postCommand({
     command: "analyzePerformanceTuningWithAi",
-    params: { languageModelId: languageModelId.value, translateResponse: translateResponse.value },
+    params: {
+      languageModelId: languageModelId.value,
+      translateResponse: translateResponse.value,
+      maskingLevel: maskingLevel.value,
+    },
   });
+};
+
+const copyPromptWithMasking = (): void => {
+  vscode.postCommand({
+    command: "copyPerformanceTuningPromptWithMasking",
+    params: { translateResponse: translateResponse.value, maskingLevel: maskingLevel.value },
+  });
+};
+
+const resolveAiFinding = (
+  findingId: string | undefined,
+  disposition: "masked" | "allowed",
+  strategy?: "partial" | "full",
+  allCandidates = false
+): void => {
+  const preview = aiSendPreview.value;
+  if (!preview) return;
+  if (findingId && !allCandidates) {
+    advanceAfterResolvedFindingId.value = findingId;
+  }
+  vscode.postCommand({
+    command: "resolvePerformanceTuningAiFinding",
+    params: {
+      requestId: preview.requestId,
+      findingId,
+      resolution: { disposition, strategy },
+      allCandidates,
+    },
+  });
+};
+
+const approveAiPayload = (): void => {
+  const preview = aiSendPreview.value;
+  if (!preview || !canApproveAiPayload.value) return;
+  vscode.postCommand({
+    command: "approvePerformanceTuningAiPayload",
+    params: { requestId: preview.requestId, payloadDigest: preview.payloadDigest },
+  });
+};
+
+const cancelAiPayload = (): void => {
+  const preview = aiSendPreview.value;
+  if (!preview) return;
+  advanceAfterResolvedFindingId.value = undefined;
+  vscode.postCommand({
+    command: "cancelPerformanceTuningAiPayload",
+    params: { requestId: preview.requestId },
+  });
+};
+
+const findingPreview = (finding: PreparedAiPayload["findings"][number]): string => {
+  const range = finding.ranges[0];
+  if (!range || !aiSendPreview.value) return finding.label;
+  return aiSendPreview.value.payload.slice(range.start, range.end);
 };
 
 const saveAiAnalysisAsNotebook = (): void => {
@@ -420,20 +541,21 @@ defineExpose({
           @onSelect="runBenchmark"
         />
         <VsCodeButton
-          :disabled="isAnalyzing || languageModels.length === 0"
+          :disabled="isAnalyzing || isAiSendPreviewOpen || languageModels.length === 0"
           title="Analyze this context with AI"
           @click="analyzeWithAi"
         >
           <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
         </VsCodeButton>
         <!-- Copies an equivalent plain-text prompt without invoking vscode.lm. -->
-        <CopyToClipboardButton
+        <VsCodeButton
           appearance="secondary"
-          :content="copyPromptForOtherAi"
+          :disabled="isAiSendPreviewOpen"
           title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)"
+          @click="copyPromptWithMasking"
         >
           <fa icon="comment-dots" />Copy Prompt for Other AI
-        </CopyToClipboardButton>
+        </VsCodeButton>
         <!-- The host selects the engine-specific report builder. -->
         <VsCodeButton
           appearance="secondary"
@@ -489,6 +611,14 @@ defineExpose({
           v-model="languageModelId"
           :disabled="isAnalyzing || languageModels.length === 0"
           style="width: 220px"
+        />
+        <label for="maskingLevel" class="label-inline">AI data masking</label>
+        <VsCodeDropdown
+          id="maskingLevel"
+          :items="maskingLevelItems"
+          v-model="maskingLevel"
+          :disabled="isAnalyzing || isAiSendPreviewOpen"
+          style="width: 210px"
         />
         <VsCodeCheckbox
           v-if="translateResponseLabel"
@@ -790,6 +920,100 @@ defineExpose({
         </div>
       </details>
     </div>
+
+    <div v-if="aiSendPreview" class="ai-send-preview-backdrop">
+      <section class="ai-send-preview" role="dialog" aria-modal="true" aria-label="AI Send Preview">
+        <header>
+          <div>
+            <h2>AI Send Preview</h2>
+            <p>
+              Destination: {{ aiSendPreview.destination === "copilot" ? "Copilot" : "Clipboard" }} ·
+              Masking level: {{ aiSendPreview.level }}
+            </p>
+          </div>
+          <VsCodeButton
+            appearance="secondary"
+            title="Close preview"
+            aria-label="Close preview"
+            @click="cancelAiPayload"
+          >
+            <span class="codicon codicon-chrome-close" aria-hidden="true"></span>
+          </VsCodeButton>
+        </header>
+
+        <p class="preview-warning">
+          Review the complete payload below. Nothing is sent or copied until you approve it.
+        </p>
+        <p v-if="aiSendPreview.truncation" class="preview-warning">
+          Payload truncated: approximately
+          {{ aiSendPreview.truncation.omittedApproxBytes.toLocaleString() }} bytes omitted.
+        </p>
+
+        <div class="finding-summary">
+          <span
+            >Masked:
+            {{ aiSendPreview.findings.filter((f) => f.disposition === "masked").length }}</span
+          >
+          <span>Unreviewed: {{ unresolvedFindings.length }}</span>
+          <span>Allowed: {{ allowedFindingCount }}</span>
+          <VsCodeButton
+            v-if="unresolvedFindings.length"
+            appearance="secondary"
+            @click="resolveAiFinding(undefined, 'masked', 'full', true)"
+            >Mask all candidates</VsCodeButton
+          >
+        </div>
+
+        <div
+          v-if="unresolvedFindings.length"
+          ref="aiCandidateListElement"
+          class="candidate-list"
+        >
+          <div
+            v-for="finding in unresolvedFindings"
+            :key="finding.id"
+            :ref="(element) => setAiCandidateElement(element, finding.id)"
+            :class="['candidate-row', { selected: selectedAiFindingId === finding.id }]"
+            @click="aiPayloadFindingViewer?.focusFinding(finding.id)"
+          >
+            <code>{{ findingPreview(finding) }}</code>
+            <span>{{ finding.label }}</span>
+            <VsCodeButton
+              appearance="secondary"
+              @click.stop="resolveAiFinding(finding.id, 'masked', 'partial')"
+              >Partial</VsCodeButton
+            >
+            <VsCodeButton
+              appearance="secondary"
+              @click.stop="resolveAiFinding(finding.id, 'masked', 'full')"
+              >Full</VsCodeButton
+            >
+            <VsCodeButton appearance="secondary" @click.stop="resolveAiFinding(finding.id, 'allowed')"
+              >Keep unmasked</VsCodeButton
+            >
+          </div>
+        </div>
+
+        <AiPayloadFindingViewer
+          ref="aiPayloadFindingViewer"
+          :payload="aiSendPreview.payload"
+          :findings="aiSendPreview.findings"
+          @selection-change="selectAiFindingRow"
+        />
+
+        <footer>
+          <span v-if="allowedFindingCount" class="preview-warning">
+            {{ allowedFindingCount }} candidate(s) will be sent unmasked.
+          </span>
+          <VsCodeButton appearance="secondary" @click="cancelAiPayload">Cancel</VsCodeButton>
+          <VsCodeButton :disabled="!canApproveAiPayload" @click="approveAiPayload">
+            {{
+              aiSendPreview.destination === "clipboard" ? "Approve and Copy" : "Approve and Send"
+            }}
+          </VsCodeButton>
+        </footer>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -826,7 +1050,7 @@ defineExpose({
          instead is the standard fix for a row of mixed form controls. */
       &.ai-options {
         display: grid;
-        grid-template-columns: 110px max-content 220px max-content;
+        grid-template-columns: 110px max-content 220px max-content 210px max-content;
         align-items: center;
 
         .label {
@@ -839,6 +1063,89 @@ defineExpose({
       font-weight: 600;
       min-width: 110px;
       flex: 0 0 auto;
+    }
+  }
+
+  .ai-send-preview-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: color-mix(in srgb, var(--vscode-editor-background) 75%, transparent);
+  }
+
+  .ai-send-preview {
+    width: min(1100px, 96vw);
+    height: min(850px, 94vh);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+
+    header,
+    footer,
+    .finding-summary,
+    .candidate-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header {
+      justify-content: space-between;
+    }
+
+    h2,
+    p {
+      margin: 0;
+    }
+
+    .candidate-list {
+      // This row exists only while user decisions are required. Keep its
+      // controls readable and let the flexible payload viewer below give up
+      // the corresponding height; otherwise flexbox can shrink this list to
+      // a thin strip while preserving the payload's large intrinsic height.
+      flex: 0 0 auto;
+      max-height: min(180px, 25vh);
+      overflow: auto;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .candidate-row {
+      box-sizing: border-box;
+      min-height: 36px;
+      padding: 6px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      cursor: pointer;
+
+      &.selected {
+        background: color-mix(in srgb, var(--vscode-focusBorder) 12%, transparent);
+        box-shadow: inset 3px 0 var(--vscode-focusBorder);
+      }
+
+      code {
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      span {
+        flex: 1;
+      }
+    }
+
+    footer {
+      justify-content: flex-end;
+    }
+
+    .preview-warning {
+      color: var(--vscode-editorWarning-foreground);
     }
   }
 

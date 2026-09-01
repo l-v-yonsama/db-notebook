@@ -27,6 +27,7 @@ import LogParseSettingPanel from "@/components/LogParseSettingPanel/LogParseSett
 import NotebookCellMetadataPanel from "@/components/NotebookCellMetadataPanel.vue";
 import PerformanceTuningBindParametersPanel from "@/components/PerformanceTuningBindParametersPanel.vue";
 import PerformanceTuningPreviewPanel from "@/components/PerformanceTuningPreviewPanel.vue";
+import AiDataMaskingPreviewPanel from "@/components/AiDataMaskingPreviewPanel.vue";
 import PublishEditorPanel from "@/components/PublishEditorPanel.vue";
 import ScanPanel from "@/components/ScanPanel.vue";
 import SubscriptionSettingPanel from "@/components/SubscriptionSettingPanel.vue";
@@ -74,6 +75,7 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> &
   CfnDiagramSettingsPanel: CfnDiagramSettings, // CloudFormation構成図生成の設定
   NotebookCellMetadataPanel: NotebookCellMetadataPanel, // ノートブックセルのメタデータ(グラフ設定等)編集
   PerformanceTuningPreviewPanel: PerformanceTuningPreviewPanel, // getPerformanceTuningContext() の送信プレビュー
+  AiDataMaskingPreviewPanel: AiDataMaskingPreviewPanel, // LM/MCPツールの行データ送信プレビュー
   PerformanceTuningBindParametersPanel: PerformanceTuningBindParametersPanel, // Preview前のBind Parameters確認
 
   // ----- Editor -----

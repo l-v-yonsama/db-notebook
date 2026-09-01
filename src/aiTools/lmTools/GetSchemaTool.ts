@@ -15,6 +15,7 @@ import {
 } from "vscode";
 import { MqttDriverManager } from "../../mqtt/MqttDriverManager";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
+import { approveAiTextOutput, type AiToolOutputOptions } from "../../utilities/aiToolOutput";
 import { workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { log } from "../../utilities/logger";
@@ -47,18 +48,23 @@ export class GetSchemaTool implements LanguageModelTool<GetSchemaToolInput> {
 
   async invoke(
     options: LanguageModelToolInvocationOptions<GetSchemaToolInput>,
-    _token: CancellationToken
+    token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const { connectionName, schemaName, tableName, serviceType, resourceName, realmName } =
       options.input;
     const text = await trackInvocation("lmTools", "GetSchemaTool", options.input, () =>
-      getSchemaText(this.stateStorage, connectionName, {
-        schemaName,
-        tableName,
-        serviceType,
-        resourceName,
-        realmName,
-      })
+      getSchemaText(
+        this.stateStorage,
+        connectionName,
+        {
+          schemaName,
+          tableName,
+          serviceType,
+          resourceName,
+          realmName,
+        },
+        { source: "lmTool", cancellation: token }
+      )
     );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
@@ -74,7 +80,8 @@ export class GetSchemaTool implements LanguageModelTool<GetSchemaToolInput> {
 export async function getSchemaText(
   stateStorage: StateStorage,
   connectionName: string,
-  filters: GetSchemaFilters
+  filters: GetSchemaFilters,
+  options?: AiToolOutputOptions
 ): Promise<string> {
   const { schemaName, tableName, serviceType, resourceName, realmName } = filters;
   log(
@@ -87,11 +94,15 @@ export async function getSchemaText(
   let text: string;
   try {
     const result = await getSchemaInfo(stateStorage, connectionName, filters);
-    text = formatSchemaResultForModel(result);
+    const rawText = formatSchemaResultForModel(result);
+    text = result.ok
+      ? (await approveAiTextOutput(rawText, stateStorage, connectionName, options, "definition")) ??
+        "❌ AI result delivery was cancelled before approval."
+      : rawText;
   } catch (e) {
     text = `❌ Failed to get schema for "${connectionName}": ${getErrorMessage(e)}`;
   }
-  log(`${PREFIX} result:[${text}]`);
+  log(`${PREFIX} result length:[${text.length}]`);
   return text;
 }
 

@@ -42,8 +42,9 @@ import {
   buildRedisScanParams,
 } from "../../utilities/scanParamsBuilder";
 import { StateStorage } from "../../utilities/StateStorage";
+import { type AiToolOutputOptions, withConnectionMasking } from "../../utilities/aiToolOutput";
 import { resolveMcpEnabledConnection } from "./mcpAccessControl";
-import { formatRdhForModel } from "./resultFormatter";
+import { formatAiRowOutput } from "./RunQueryTool";
 
 const PREFIX = "[lmTools/ScanResourceTool]";
 
@@ -213,10 +214,10 @@ export class ScanResourceTool implements LanguageModelTool<ScanResourceToolInput
 
   async invoke(
     options: LanguageModelToolInvocationOptions<ScanResourceToolInput>,
-    _token: CancellationToken
+    token: CancellationToken
   ): Promise<LanguageModelToolResult> {
     const text = await trackInvocation("lmTools", "ScanResourceTool", options.input, () =>
-      scanResourceText(this.stateStorage, options.input)
+      scanResourceText(this.stateStorage, options.input, { source: "lmTool", cancellation: token })
     );
     return new LanguageModelToolResult([new LanguageModelTextPart(text)]);
   }
@@ -230,9 +231,14 @@ export class ScanResourceTool implements LanguageModelTool<ScanResourceToolInput
  */
 export async function scanResourceText(
   stateStorage: StateStorage,
-  input: ScanResourceToolInput
+  input: ScanResourceToolInput,
+  options?: AiToolOutputOptions
 ): Promise<string> {
-  log(`${PREFIX} invoked connectionName:[${input.connectionName}] kind:[${resolveScanKind(input).kind ?? ""}]`);
+  log(
+    `${PREFIX} invoked connectionName:[${input.connectionName}] kind:[${
+      resolveScanKind(input).kind ?? ""
+    }]`
+  );
   try {
     const result = await scanResource(stateStorage, input);
     if (!result.ok || !result.rdh) {
@@ -244,7 +250,10 @@ export async function scanResourceText(
       log(`${PREFIX} result:[${lines.join(" ")}]`);
       return text;
     }
-    const text = formatRdhForModel(result.rdh, getDatabaseConfig().limitRows);
+    const text = await formatAiRowOutput(
+      result.rdh,
+      withConnectionMasking(stateStorage, input.connectionName, options)
+    );
     log(`${PREFIX} result: ${result.rdh.rows.length} row(s) returned`);
     return text;
   } catch (e) {
@@ -263,12 +272,17 @@ function resolveScanKind(
 ): { ok: true; kind: ScanKind } | { ok: false; kind?: undefined; message: string } {
   const present = SCAN_KINDS.filter((k) => input[k] !== undefined);
   if (present.length === 0) {
-    return { ok: false, message: `Specify scan parameters under exactly one of: ${SCAN_KINDS.join(", ")}.` };
+    return {
+      ok: false,
+      message: `Specify scan parameters under exactly one of: ${SCAN_KINDS.join(", ")}.`,
+    };
   }
   if (present.length > 1) {
     return {
       ok: false,
-      message: `Specify scan parameters under only one of: ${present.join(", ")} (got ${present.length}).`,
+      message: `Specify scan parameters under only one of: ${present.join(", ")} (got ${
+        present.length
+      }).`,
     };
   }
   return { ok: true, kind: present[0] };
@@ -280,7 +294,11 @@ export async function scanResource(
 ): Promise<ScanRunResult> {
   const resolution = await resolveMcpEnabledConnection(stateStorage, input.connectionName);
   if (!resolution.ok) {
-    return { ok: false, message: resolution.message, availableConnectionNames: resolution.availableConnectionNames };
+    return {
+      ok: false,
+      message: resolution.message,
+      availableConnectionNames: resolution.availableConnectionNames,
+    };
   }
   const setting = resolution.setting;
 
@@ -432,7 +450,9 @@ export async function scanResource(
           if (!(driver instanceof AwsDriver)) {
             throw new Error(`Connection "${input.connectionName}" is not an AWS connection.`);
           }
-          const client = driver.getClientByResourceType<AwsSsmServiceClient>(ResourceType.SsmParameter);
+          const client = driver.getClientByResourceType<AwsSsmServiceClient>(
+            ResourceType.SsmParameter
+          );
           if (!client) {
             throw new Error("SSM is not configured for this connection.");
           }
@@ -467,7 +487,9 @@ export async function scanResource(
           if (!(driver instanceof AwsDriver)) {
             throw new Error(`Connection "${input.connectionName}" is not an AWS connection.`);
           }
-          const client = driver.getClientByResourceType<AwsCloudwatchServiceClient>(ResourceType.LogGroup);
+          const client = driver.getClientByResourceType<AwsCloudwatchServiceClient>(
+            ResourceType.LogGroup
+          );
           if (!client) {
             throw new Error("CloudWatch Logs is not configured for this connection.");
           }
@@ -486,7 +508,9 @@ export async function scanResource(
           if (!(driver instanceof AwsDriver)) {
             throw new Error(`Connection "${input.connectionName}" is not an AWS connection.`);
           }
-          const client = driver.getClientByResourceType<AwsCloudwatchServiceClient>(ResourceType.LogStream);
+          const client = driver.getClientByResourceType<AwsCloudwatchServiceClient>(
+            ResourceType.LogStream
+          );
           if (!client) {
             throw new Error("CloudWatch Logs is not configured for this connection.");
           }

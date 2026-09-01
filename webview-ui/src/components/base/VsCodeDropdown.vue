@@ -2,10 +2,10 @@
   <!-- <vscode-radio-group :value="modelValue || value" @change="handleOnChange">
     <slot></slot>
   </vscode-radio-group> -->
-  <vscode-dropdown :value="modelValue" :class="{ transparent, verr: isError }" :disabled="disabled"
+  <vscode-dropdown :value="selectedValue" :class="{ transparent, verr: isError }" :disabled="disabled"
     @change="handleOnChange" @focus="handleOnFocus" @blur="handleOnBlur" :style="dropdownStyle">
     <!-- <vscode-option value="" aria-disabled="true" style="display: none">-- Select --</vscode-option> -->
-    <vscode-option v-for="(item, index) in items" :key="index" :value="item.value">
+    <vscode-option v-for="(item, index) in items" :key="index" :value="String(item.value)">
       {{ item.label }}
     </vscode-option>
   </vscode-dropdown>
@@ -40,6 +40,10 @@ const props = withDefaults(defineProps<Props>(), {
 
 const hasFocus = ref(false);
 const isError = ref(false);
+// The toolkit's custom elements compare option values as strings even when
+// Vue receives a numeric model. Normalize only at that DOM boundary; change
+// events below map back to the original DropdownItem value type.
+const selectedValue = computed(() => String(props.modelValue ?? ""));
 
 const calcZIndex = computed((): number => props.baseZIndex + (hasFocus.value ? 100 : 0));
 
@@ -71,7 +75,9 @@ const emit = defineEmits<{
 }>();
 
 function handleOnChange(event: any) {
-  emit("update:modelValue", event.target.value);
+  const domValue = String(event.target.value ?? "");
+  const value = props.items.find((item) => String(item.value) === domValue)?.value ?? domValue;
+  emit("update:modelValue", value);
   emit("change", event);
 }
 
