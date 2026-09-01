@@ -2,6 +2,24 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [3.0.0] - 2026-09-02
+
+### Breaking Changes
+
+- Removed the Chat2Query panel and the LM prompt creation panel. These features are no longer available in the extension.
+
+### Added
+
+- Added DynamoDB performance-tuning support, including query and scan diagnostics, index/access-path analysis, and capacity and throttling evidence.
+- Added CloudWatch metrics dashboards and relational database dashboard views.
+- Added a data-masking preview and findings viewer for AI-oriented workflows.
+- Added PartiQL support in the DynamoDB query workflow, including projection handling, query history, and observed-read actions.
+
+### Changed
+
+- Updated `@l-v-yonsama/multi-platform-database-drivers` to 2.1.0 and `@l-v-yonsama/rdh` to 1.1.0.
+- Expanded the Performance Tuning Guide with DynamoDB coverage; the guide is marked experimental.
+
 ## [2.0.2] - 2026-08-15
 
 ### Fixed
