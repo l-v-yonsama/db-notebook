@@ -5,8 +5,7 @@ import type {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
 
-// One Bind Parameters input row (misc/design/performance-tuning-query-
-// statistics-parameter-input-plan.ja.md §5.2). Adds Vue row-key `id` and the
+// One Bind Parameters input row . Adds Vue row-key `id` and the
 // user's own input `value` on top of db-drivers' estimate; `location` is
 // widened to optional because a row the user added via "Add parameter" has
 // no real position in the SQL text to report (§7.3's Add helper).

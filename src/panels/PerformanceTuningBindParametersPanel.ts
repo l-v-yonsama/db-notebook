@@ -11,8 +11,7 @@ import {
 } from "../utilities/performanceTuningPreview";
 import { BasePanel } from "./BasePanel";
 
-// 2026-08-19 follow-up to misc/design/performance-tuning-query-statistics-
-// parameter-input-plan.ja.md: Query Statistics (ToolsView.vue) had a working
+// Query Statistics (ToolsView.vue) had a working
 // Bind Parameters UI, but Query History (HistoryTreeCommand.ts) had none at
 // all - a parameterized History entry silently failed to collect a plan.
 // Rather than build a second, duplicate bind-input UI for History, or fold

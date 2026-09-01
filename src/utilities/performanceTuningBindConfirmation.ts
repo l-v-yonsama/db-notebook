@@ -11,8 +11,7 @@ import {
   startPerformanceTuningPreview,
 } from "./performanceTuningPreview";
 
-// 2026-08-19 follow-up (misc/design/performance-tuning-query-statistics-
-// parameter-input-plan.ja.md's successor design). Both Preview entry points
+// 2026-08-19 follow-up . Both Preview entry points
 // (Query Statistics' "Preview tuning data" and Query History's
 // histories.startPerformanceTuning) call this instead of
 // startPerformanceTuningPreview() directly now - it's the one place that
