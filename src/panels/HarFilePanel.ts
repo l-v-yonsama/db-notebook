@@ -13,7 +13,7 @@ import { hideStatusMessage } from "../statusBar";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getRdhViewConfig } from "../utilities/configUtil";
 import { getIconPath, readResource } from "../utilities/fsUtil";
-import { createHtmlFromHarItem } from "../utilities/htmlGenerator";
+import { createHtmlFromHarItem } from "../utilities/html/htmlGenerator";
 import { toNodeRunAxiosEvent } from "../utilities/httpUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";

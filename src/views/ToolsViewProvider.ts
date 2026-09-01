@@ -29,14 +29,14 @@ import {
 } from "../shared/QueryStatisticsParams";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { workflow } from "../utilities/driverResolver";
-import { createBookFromList } from "../utilities/excelGenerator";
-import { createHtmlFromRdhList } from "../utilities/htmlGenerator";
-import { openPerformanceTuningPreview } from "../utilities/performanceTuningBindConfirmation";
-import { selectPlanSql } from "../utilities/queryStatisticsPlanSql";
+import { createBookFromList } from "../utilities/excel";
+import { createHtmlFromRdhList } from "../utilities/html/htmlGenerator";
+import { openPerformanceTuningPreview } from "../performanceTuning/preview/performanceTuningBindConfirmation";
+import { selectPlanSql } from "./queryStatistics/queryStatisticsPlanSql";
 import {
   MappedStatementStatisticsRow,
   mapStatementStatisticsRow,
-} from "../utilities/queryStatisticsRowMapper";
+} from "./queryStatistics/queryStatisticsRowMapper";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";

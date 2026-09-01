@@ -8,7 +8,7 @@ import { createCodeHtmlString } from "../utilities/highlighter";
 import {
   StartPerformanceTuningPreviewParams,
   startPerformanceTuningPreview,
-} from "../utilities/performanceTuningPreview";
+} from "../performanceTuning/preview/performanceTuningPreview";
 import { BasePanel } from "./BasePanel";
 
 // Query Statistics (ToolsView.vue) had a working
@@ -20,7 +20,7 @@ import { BasePanel } from "./BasePanel";
 // today), this is a small, dedicated, entry-point-agnostic panel - same
 // family as ViewConditionPanel.vue - that both entry points open via
 // openPerformanceTuningPreview()
-// (src/utilities/performanceTuningBindConfirmation.ts) whenever the target
+// (src/performanceTuning/preview/performanceTuningBindConfirmation.ts) whenever the target
 // SQL has detected placeholders. PerformanceTuningPreviewPanel itself is
 // completely unmodified by this change.
 export type PerformanceTuningBindParametersPanelParams = Omit<StartPerformanceTuningPreviewParams, "plan"> & {

@@ -44,7 +44,7 @@ import { getIconPath } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
 import { appendDashboardContextValues } from "../../observability/dashboardLaunch";
-import { getDynamoDbIndexKeyRoles } from "../../utilities/dynamoDbKeyRoles";
+import { getDynamoDbIndexKeyRoles } from "./dynamoDbKeyRoles";
 
 const PREFIX = "[ResourceTreeProvider]";
 

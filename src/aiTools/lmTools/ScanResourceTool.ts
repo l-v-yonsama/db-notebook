@@ -42,7 +42,7 @@ import {
   buildRedisScanParams,
 } from "../../utilities/scanParamsBuilder";
 import { StateStorage } from "../../utilities/StateStorage";
-import { type AiToolOutputOptions, withConnectionMasking } from "../../utilities/aiToolOutput";
+import { type AiToolOutputOptions, withConnectionMasking } from "./aiToolOutput";
 import { resolveMcpEnabledConnection } from "./mcpAccessControl";
 import { formatAiRowOutput } from "./RunQueryTool";
 

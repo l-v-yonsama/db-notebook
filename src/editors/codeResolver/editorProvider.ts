@@ -26,7 +26,7 @@ import { ComponentName } from "../../shared/ComponentName";
 import { CodeResolverEditorEventData } from "../../shared/MessageEventData";
 import { log } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
-import { createWebviewContent } from "../../utilities/webviewUtil";
+import { createWebviewContent } from "../../utilities/webview/webviewUtil";
 
 const PREFIX = "[CodeResolverEditorProvider]";
 const componentName: ComponentName = "CodeResolverEditor";

@@ -18,7 +18,7 @@ import { ComponentName } from "../../shared/ComponentName";
 import { RecordRuleEditorEventData } from "../../shared/MessageEventData";
 import { RecordRule } from "../../shared/RecordRule";
 import { StateStorage } from "../../utilities/StateStorage";
-import { createWebviewContent } from "../../utilities/webviewUtil";
+import { createWebviewContent } from "../../utilities/webview/webviewUtil";
 
 const PREFIX = "[RecordRuleEditorProvider]";
 const componentName: ComponentName = "RecordRuleEditor";

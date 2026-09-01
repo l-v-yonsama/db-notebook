@@ -59,12 +59,12 @@ import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utiliti
 import { existsFileOnWorkspace } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
 import { readCodeResolverFile, readRuleFile } from "../../utilities/notebookUtil";
-import { buildObservationFromHistory } from "../../utilities/dynamoDbHistoryObservation";
-import type { DynamoDbPerformanceTuningPreviewRequest } from "../../utilities/dynamoDbPerformanceTuningPreview";
+import { buildObservationFromHistory } from "./dynamoDbHistoryObservation";
+import type { DynamoDbPerformanceTuningPreviewRequest } from "../../performanceTuning/preview/dynamoDbPerformanceTuningPreview";
 import {
   openDynamoDbPerformanceTuningPreview,
   openPerformanceTuningPreview,
-} from "../../utilities/performanceTuningBindConfirmation";
+} from "../../performanceTuning/preview/performanceTuningBindConfirmation";
 import { averageCapacityUnits, averageElapsedTimeMilli } from "../../utilities/queryHistoryUtil";
 import { HistoryTreeProvider } from "./HistoryTreeProvider";
 import { DynamoQueryPanel } from "../../panels/DynamoQueryPanel";

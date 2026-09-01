@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import execa from "execa";
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
-import { buildPlainTextAnalysisPrompt } from "../utilities/performanceTuningAiPrompt";
+import { buildPlainTextAnalysisPrompt } from "../performanceTuning/ai/performanceTuningAiPrompt";
 
 // Personal performance-lab helper. Intentionally small: it receives an
 // already-collected Full Context JSON, sends the same db-notebook prompt to

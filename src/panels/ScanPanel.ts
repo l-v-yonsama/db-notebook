@@ -32,7 +32,7 @@ import { DiffMdhViewTabParam } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { copyAwsSecretValueToClipboard } from "../utilities/awsSecretValueUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
-import { createBookFromRdh } from "../utilities/excelGenerator";
+import { createBookFromRdh } from "../utilities/excel";
 import { log } from "../utilities/logger";
 import {
   buildAuth0ScanParams,

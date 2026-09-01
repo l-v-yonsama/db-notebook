@@ -553,7 +553,7 @@ export type PerformanceTuningDiagnosticGroupViewModel = {
 };
 
 // Built once, extension-side, by buildPlanTableMappingRows()
-// (src/utilities/performanceTuningPlanFormatter.ts) from
+// (src/performanceTuning/report/performanceTuningPlanFormatter.ts) from
 // PerformanceTuningContext.planTableMappings - see that file's top comment
 // for why the tree (normalizedPlan) and this flat per-table array get two
 // different renderers. Declared here for the same reason as the diagnostic
@@ -572,7 +572,7 @@ export type PlanTableMappingRowViewModel = {
 };
 
 // Built once, extension-side, by buildDynamoDbAccessPatternViewModel()
-// (src/utilities/dynamoDbPerformanceTuningAccessPatternFormatter.ts) from
+// (src/performanceTuning/report/dynamoDbPerformanceTuningAccessPatternFormatter.ts) from
 // DynamoDbPerformanceTuningContext.accessPattern - the DynamoDB counterpart
 // of PlanTableMappingRowViewModel above (RDB has no equivalent structure to
 // share this with; DynamoDB access patterns are a genuinely different shape,

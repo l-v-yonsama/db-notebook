@@ -9,7 +9,7 @@ import {
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { log } from "../utilities/logger";
-import { createWebviewContent } from "../utilities/webviewUtil";
+import { createWebviewContent } from "../utilities/webview/webviewUtil";
 
 export abstract class BaseViewProvider implements WebviewViewProvider {
   protected webviewView?: WebviewView;

@@ -15,7 +15,7 @@ import {
   LanguageModelToolResult,
 } from "vscode";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
-import { approveAiTextOutput, type AiToolOutputOptions } from "../../utilities/aiToolOutput";
+import { approveAiTextOutput, type AiToolOutputOptions } from "./aiToolOutput";
 import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { log } from "../../utilities/logger";

@@ -4,7 +4,7 @@ import { Disposable, Uri, ViewColumn, Webview, WebviewPanel, window } from "vsco
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { VariablesPanelEventData } from "../shared/MessageEventData";
-import { createWebviewContent } from "../utilities/webviewUtil";
+import { createWebviewContent } from "../utilities/webview/webviewUtil";
 
 const PREFIX = "[VariablesPanel]";
 

@@ -14,11 +14,11 @@ import { copyToClipboard } from "../utilities/clipboardUtil";
 import {
   buildDockerContainerItems,
   listRunningDockerContainers,
-} from "../utilities/dockerContainerUtil";
+} from "../utilities/databaseMaintenance/dockerContainerUtil";
 import { log } from "../utilities/logger";
-import { buildRestoreCommand } from "../utilities/restoreCommandBuilder";
+import { buildRestoreCommand } from "../utilities/databaseMaintenance/restoreCommandBuilder";
 import { StateStorage } from "../utilities/StateStorage";
-import { createPreferredTerminal } from "../utilities/terminalUtil";
+import { createPreferredTerminal } from "../utilities/databaseMaintenance/terminalUtil";
 import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[DBRestoreSettingsPanel]";

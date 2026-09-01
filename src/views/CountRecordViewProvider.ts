@@ -22,7 +22,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { CountRecordViewEventData } from "../shared/MessageEventData";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { workflow } from "../utilities/driverResolver";
-import { createBookFromList } from "../utilities/excelGenerator";
+import { createBookFromList } from "../utilities/excel";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";

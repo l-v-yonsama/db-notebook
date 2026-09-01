@@ -45,14 +45,14 @@ import {
   computeDynamoProjectionConstraint,
   resolveDynamoConsistentRead,
   resolveDynamoProjectionSelection,
-} from "../utilities/dynamoDbProjection";
+} from "../utilities/dynamoDbQuery/dynamoDbProjection";
 import {
   buildDynamoQueryDisplayText,
   buildDynamoQueryStructuralKey,
-} from "../utilities/dynamoDbQueryStructural";
-import { restoreDynamoQueryPanelState } from "../utilities/dynamoDbQueryPanelHistory";
-import { buildDynamoDbNativeQueryPreviewInput } from "../utilities/dynamoDbNativeQueryDisplay";
-import { buildDynamoPartiqlSelect } from "../utilities/dynamoDbPartiqlBuilder";
+} from "../utilities/dynamoDbQuery/dynamoDbQueryStructural";
+import { restoreDynamoQueryPanelState } from "../utilities/dynamoDbQuery/dynamoDbQueryPanelHistory";
+import { buildDynamoDbNativeQueryPreviewInput } from "../utilities/dynamoDbQuery/dynamoDbNativeQueryDisplay";
+import { buildDynamoPartiqlSelect } from "../utilities/dynamoDbQuery/dynamoDbPartiqlBuilder";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";

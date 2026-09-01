@@ -6,7 +6,7 @@ import { abbr } from "@l-v-yonsama/rdh";
 import { QueryHistory } from "../../types/QueryHistory";
 import { formatDuration } from "../toolActivity/ToolActivityTreeProvider";
 import { averageElapsedTimeMilli } from "../../utilities/queryHistoryUtil";
-import { toDynamoDbQueryAnalysisInput } from "../../utilities/dynamoDbQueryAnalysisInput";
+import { toDynamoDbQueryAnalysisInput } from "../../performanceTuning/preview/dynamoDbQueryAnalysisInput";
 import { log } from "../../utilities/logger";
 import { QUERY_HISTORY_LABEL_MAX_LENGTH } from "../../constant";
 

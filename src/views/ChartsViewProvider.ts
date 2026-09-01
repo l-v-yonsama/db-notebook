@@ -9,7 +9,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { ExtChartData, ExtChartOptions, PairPlotChartParams } from "../shared/ExtChartJs";
 import { ChartsViewEventData, ChartTabItem } from "../shared/MessageEventData";
 import { AnyChartsViewParams, PreparedChartsViewParams } from "../types/views";
-import { createChartJsParams, createPairPlotChartParams } from "../utilities/chartUtil";
+import { createChartJsParams, createPairPlotChartParams } from "../utilities/chart/chartUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { waitUntil } from "../utilities/waitUntil";
 import { BaseViewProvider } from "./BaseViewProvider";

@@ -22,11 +22,11 @@ import { copyToClipboard } from "../utilities/clipboardUtil";
 import {
   buildDockerContainerItems,
   listRunningDockerContainers,
-} from "../utilities/dockerContainerUtil";
-import { buildDumpCommand } from "../utilities/dumpCommandBuilder";
+} from "../utilities/databaseMaintenance/dockerContainerUtil";
+import { buildDumpCommand } from "../utilities/databaseMaintenance/dumpCommandBuilder";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
-import { createPreferredTerminal } from "../utilities/terminalUtil";
+import { createPreferredTerminal } from "../utilities/databaseMaintenance/terminalUtil";
 import { BasePanel } from "./BasePanel";
 
 const PREFIX = "[DBDumpSettingsPanel]";

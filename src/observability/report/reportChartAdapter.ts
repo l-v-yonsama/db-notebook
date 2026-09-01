@@ -2,7 +2,7 @@ import type { ResultSetData } from "@l-v-yonsama/rdh";
 import type { ReportChartSpec } from "../../notebook/report/reportTypes";
 import type { ExtChartData, ExtChartOptions } from "../../shared/ExtChartJs";
 import type { PreparedChartsViewParams } from "../../types/views";
-import { createColors } from "../../utilities/chartColorUtil";
+import { createColors } from "../../utilities/chart/chartColorUtil";
 
 export function createReportChartViewParams(
   spec: ReportChartSpec,

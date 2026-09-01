@@ -17,9 +17,9 @@ import {
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
 import { formatConnectionEnvironmentLabel } from "../../utilities/connectionEnvironmentDisplay";
 import { getDatabaseConfig } from "../../utilities/configUtil";
-import { prepareAiRdhPayload } from "../../utilities/aiRdhMasking";
+import { prepareAiRdhPayload } from "./aiRdhMasking";
 import { requestAiPayloadApproval } from "../../panels/AiDataMaskingPreviewPanel";
-import { type AiToolOutputOptions, withConnectionMasking } from "../../utilities/aiToolOutput";
+import { type AiToolOutputOptions, withConnectionMasking } from "./aiToolOutput";
 import { workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { log } from "../../utilities/logger";

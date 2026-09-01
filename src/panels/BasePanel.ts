@@ -2,7 +2,7 @@ import { Disposable, Uri, Webview, WebviewPanel } from "vscode";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { log } from "../utilities/logger";
-import { createWebviewContent } from "../utilities/webviewUtil";
+import { createWebviewContent } from "../utilities/webview/webviewUtil";
 
 export abstract class BasePanel {
   private _disposables: Disposable[] = [];

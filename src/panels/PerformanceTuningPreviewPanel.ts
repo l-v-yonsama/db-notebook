@@ -46,23 +46,23 @@ import type {
   PerformanceTuningBaselineSelection,
   PerformanceTuningComparisonEvidence,
 } from "../shared/PerformanceTuningComparison";
-import { promptForBaselineSelection } from "../utilities/performanceTuningBaselineLoader";
-import { buildPerformanceTuningComparisonEvidence } from "../utilities/performanceTuningComparison";
+import { promptForBaselineSelection } from "../performanceTuning/comparison/performanceTuningBaselineLoader";
+import { buildPerformanceTuningComparisonEvidence } from "../performanceTuning/comparison/performanceTuningComparison";
 import {
   buildComparisonAiInput,
   COMPARISON_AI_INPUT_DETAILS,
   type ComparisonAiInput,
-} from "../utilities/performanceTuningComparisonAiInput";
-import { buildDynamoDbAccessPatternViewModel } from "../utilities/dynamoDbPerformanceTuningAccessPatternFormatter";
+} from "../performanceTuning/ai/performanceTuningComparisonAiInput";
+import { buildDynamoDbAccessPatternViewModel } from "../performanceTuning/report/dynamoDbPerformanceTuningAccessPatternFormatter";
 import {
   buildDynamoDbAiAnalysisPrompt,
   buildDynamoDbPlainTextAnalysisPrompt,
-} from "../utilities/dynamoDbPerformanceTuningAiPrompt";
-import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "../utilities/dynamoDbPerformanceTuningDiagnosticFormatter";
-import { buildDynamoDbPerformanceTuningHumanSummary } from "../utilities/dynamoDbPerformanceTuningHumanSummary";
-import { saveDynamoDbAiAnalysisAsNotebook } from "../utilities/dynamoDbPerformanceTuningNotebook";
-import { buildDynamoDbNativeQueryViewModel } from "../utilities/dynamoDbNativeQueryDisplay";
-import { toDynamoDbQueryAnalysisInput } from "../utilities/dynamoDbQueryAnalysisInput";
+} from "../performanceTuning/ai/dynamoDbPerformanceTuningAiPrompt";
+import { buildDynamoDbPerformanceTuningDiagnosticGroups } from "../performanceTuning/report/dynamoDbPerformanceTuningDiagnosticFormatter";
+import { buildDynamoDbPerformanceTuningHumanSummary } from "../performanceTuning/report/dynamoDbPerformanceTuningHumanSummary";
+import { saveDynamoDbAiAnalysisAsNotebook } from "../performanceTuning/aiNotebook/dynamoDbPerformanceTuningNotebook";
+import { buildDynamoDbNativeQueryViewModel } from "../utilities/dynamoDbQuery/dynamoDbNativeQueryDisplay";
+import { toDynamoDbQueryAnalysisInput } from "../performanceTuning/preview/dynamoDbQueryAnalysisInput";
 import { workflow } from "../utilities/driverResolver";
 import { getErrorMessage } from "../utilities/errorUtil";
 import { AI_APPROVAL_TIMEOUT_MS, prepareAiTextPayload } from "../utilities/aiDataMasking";
@@ -74,34 +74,34 @@ import {
   isResponseTranslationAvailable,
   isModelNotSupportedError,
   MODEL_NOT_SUPPORTED_ERROR_MESSAGE,
-} from "../utilities/lmModelSelection";
+} from "../performanceTuning/ai/lmModelSelection";
 import {
   saveAiAnalysisAsNotebook,
   type PerformanceTuningReportInput,
-} from "../utilities/performanceTuningAiNotebook";
+} from "../performanceTuning/aiNotebook/performanceTuningAiNotebook";
 import {
   buildAiAnalysisPrompt,
   buildPlainTextAnalysisPrompt,
-} from "../utilities/performanceTuningAiPrompt";
-import { buildPerformanceTuningDiagnosticGroups } from "../utilities/performanceTuningDiagnosticFormatter";
-import { findPossibleDuplicateIndex } from "../utilities/performanceTuningIndexDuplication";
-import { buildPerformanceTuningHumanSummary } from "../utilities/performanceTuningHumanSummary";
-import { excludeUnchangedSqlRecommendations } from "../utilities/performanceTuningAiRecommendationGuard";
+} from "../performanceTuning/ai/performanceTuningAiPrompt";
+import { buildPerformanceTuningDiagnosticGroups } from "../performanceTuning/report/performanceTuningDiagnosticFormatter";
+import { findPossibleDuplicateIndex } from "../performanceTuning/ai/performanceTuningIndexDuplication";
+import { buildPerformanceTuningHumanSummary } from "../performanceTuning/report/performanceTuningHumanSummary";
+import { excludeUnchangedSqlRecommendations } from "../performanceTuning/ai/performanceTuningAiRecommendationGuard";
 import {
   buildDynamoDbBenchmarkSession,
   buildRdbBenchmarkSession,
   type BenchmarkRunCount,
-} from "../utilities/performanceTuningBenchmark";
+} from "../performanceTuning/comparison/performanceTuningBenchmark";
 import {
   buildPlanTableMappingRows,
   formatActualPlanForDisplay,
   formatPlanTree,
-} from "../utilities/performanceTuningPlanFormatter";
+} from "../performanceTuning/report/performanceTuningPlanFormatter";
 // Type-only: avoids a runtime circular import with performanceTuningPreview.ts/
 // dynamoDbPerformanceTuningPreview.ts, which import this class (the value)
 // the other way.
-import type { PerformanceTuningPreviewRequest } from "../utilities/performanceTuningPreview";
-import type { DynamoDbPerformanceTuningPreviewRequest } from "../utilities/dynamoDbPerformanceTuningPreview";
+import type { PerformanceTuningPreviewRequest } from "../performanceTuning/preview/performanceTuningPreview";
+import type { DynamoDbPerformanceTuningPreviewRequest } from "../performanceTuning/preview/dynamoDbPerformanceTuningPreview";
 import { BasePanel } from "./BasePanel";
 
 // Reserve a small buffer for provider message framing not reflected by countTokens().

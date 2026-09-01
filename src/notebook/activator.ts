@@ -69,9 +69,9 @@ import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getFormatterConfig } from "../utilities/configUtil";
 import { readResource } from "../utilities/fsUtil";
-import { createHtmlFromNotebook } from "../utilities/htmlGenerator";
+import { createHtmlFromNotebook } from "../utilities/html/htmlGenerator";
 import { log } from "../utilities/logger";
-import { findPerformanceTuningHistoryForCell } from "../utilities/performanceTuningCell";
+import { findPerformanceTuningHistoryForCell } from "./performanceTuningCell";
 import {
   getCompatibleConnectionSettings,
   getSelectedCells,
@@ -83,7 +83,7 @@ import {
   isMqttCell,
   isSqlCell,
 } from "../utilities/notebookUtil";
-import { rrmListToRdhList } from "../utilities/rrmUtil";
+import { rrmListToRdhList } from "./rrmUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { MainController, resetCellContext } from "./controller";
 import { activateIntellisense } from "./intellisense";

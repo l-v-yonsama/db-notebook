@@ -18,7 +18,7 @@ import { ComponentName } from "../shared/ComponentName";
 import { NotebookCellMetadataPanelEventData } from "../shared/MessageEventData";
 import { CellMeta } from "../types/Notebook";
 import { StateStorage } from "../utilities/StateStorage";
-import { createWebviewContent } from "../utilities/webviewUtil";
+import { createWebviewContent } from "../utilities/webview/webviewUtil";
 
 const PREFIX = "[NotebookCellMetadataPanel]";
 

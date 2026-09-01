@@ -18,7 +18,7 @@ vi.mock("../../../src/panels/DynamoQueryPanel", () => ({
   DynamoQueryPanel: { render: vi.fn() },
 }));
 
-vi.mock("../../../src/utilities/performanceTuningBindConfirmation", () => ({
+vi.mock("../../../src/performanceTuning/preview/performanceTuningBindConfirmation", () => ({
   openPerformanceTuningPreview: vi.fn(),
   openDynamoDbPerformanceTuningPreview: vi.fn(),
 }));

@@ -26,8 +26,8 @@ import {
   AI_UNMASKED_DATA_GUIDANCE_LINES,
   prepareAiTextPayload,
 } from "../../utilities/aiDataMasking";
-import { prepareAiRdhPayload } from "../../utilities/aiRdhMasking";
-import { type AiToolOutputOptions, withConnectionMasking } from "../../utilities/aiToolOutput";
+import { prepareAiRdhPayload } from "./aiRdhMasking";
+import { type AiToolOutputOptions, withConnectionMasking } from "./aiToolOutput";
 import { getDatabaseConfig } from "../../utilities/configUtil";
 import { formatConnectionEnvironmentLabel } from "../../utilities/connectionEnvironmentDisplay";
 import { flowTransaction } from "../../utilities/driverResolver";

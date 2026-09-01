@@ -15,7 +15,7 @@ import {
 } from "vscode";
 import { MqttDriverManager } from "../../mqtt/MqttDriverManager";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
-import { approveAiTextOutput, type AiToolOutputOptions } from "../../utilities/aiToolOutput";
+import { approveAiTextOutput, type AiToolOutputOptions } from "./aiToolOutput";
 import { workflow } from "../../utilities/driverResolver";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { log } from "../../utilities/logger";
