@@ -34,10 +34,14 @@ export const CLEAR_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.clear-default-c
 export const GET_LOCKS = `${EXTENSION_NAME}.get-locks`;
 export const GET_SESSIONS = `${EXTENSION_NAME}.get-sessions`;
 export const SHOW_QUERY_STATISTICS = `${EXTENSION_NAME}.show-query-statistics`;
+export const SHOW_CLOUDWATCH_METRICS = `${EXTENSION_NAME}.show-cloudwatch-metrics`;
+export const SHOW_CLOUDWATCH_METRICS_OVERVIEW = `${EXTENSION_NAME}.show-cloudwatch-metrics-overview`;
+export const SHOW_RDB_DASHBOARD = `${EXTENSION_NAME}.show-rdb-dashboard`;
 export const COUNT_FOR_ALL_TABLES = `${EXTENSION_NAME}.count-for-all-tables`;
 export const VIEW_DATA = `${EXTENSION_NAME}.view-data`;
 export const VIEW_TOP_ROWS = `${EXTENSION_NAME}.view-top-rows`;
 export const VIEW_LAST_ROWS = `${EXTENSION_NAME}.view-last-rows`;
+export const SCAN_ITEMS = `${EXTENSION_NAME}.scan-items`;
 export const FLUSH_DB = `${EXTENSION_NAME}.flush-db`;
 export const CREATE_CONNECTION_SETTING = `${EXTENSION_NAME}.create-connection-setting`;
 export const SHOW_CONNECTION_SETTING = `${EXTENSION_NAME}.show-connection-setting`;
@@ -64,21 +68,23 @@ export const COPY_RESOURCE_NAME = `${EXTENSION_NAME}.copy-resource-name`;
 export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 
 //---------------------------------------------------
-// SQL HISTORIES TREE
+// QUERY HISTORIES TREE
 //---------------------------------------------------
-export const REFRESH_SQL_HISTORIES = `${EXTENSION_NAME}.refresh-sql-histories`;
-export const DELETE_ALL_SQL_HISTORY = `${EXTENSION_NAME}.delete-all-sql-histories`;
-export const EXECUTE_SQL_HISTORY = `${EXTENSION_NAME}.histories.execute`;
+export const QUERY_HISTORY_LABEL_MAX_LENGTH = 70;
+export const REFRESH_QUERY_HISTORIES = `${EXTENSION_NAME}.refresh-query-histories`;
+export const DELETE_ALL_QUERY_HISTORY = `${EXTENSION_NAME}.delete-all-query-histories`;
+export const EXECUTE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.execute`;
+export const OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY = `${EXTENSION_NAME}.histories.openDynamoQueryPanel`;
 export const START_PERFORMANCE_TUNING_FROM_HISTORY = `${EXTENSION_NAME}.histories.startPerformanceTuning`;
-export const OPEN_SQL_HISTORY = `${EXTENSION_NAME}.histories.open`;
-export const DELETE_SQL_HISTORY = `${EXTENSION_NAME}.histories.delete`;
-export const OPEN_SQL_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openAsNotebook`;
-export const APPEND_SQL_HISTORIES_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.histories.appendToActiveNotebook`;
-export const FILTER_SQL_HISTORIES_BY_CONNECTION = `${EXTENSION_NAME}.histories.filterByConnection`;
-export const CLEAR_SQL_HISTORIES_CONNECTION_FILTER = `${EXTENSION_NAME}.histories.clearConnectionFilter`;
-export const FOCUS_SQL_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFilter`;
-export const SORT_SQL_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
-export const SORT_SQL_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
+export const DELETE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.delete`;
+export const RESET_QUERY_HISTORY_PERFORMANCE = `${EXTENSION_NAME}.histories.resetPerformance`;
+export const OPEN_QUERY_HISTORIES_AS_NOTEBOOK = `${EXTENSION_NAME}.histories.openAsNotebook`;
+export const APPEND_QUERY_HISTORIES_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.histories.appendToActiveNotebook`;
+export const FILTER_QUERY_HISTORIES_BY_CONNECTION = `${EXTENSION_NAME}.histories.filterByConnection`;
+export const CLEAR_QUERY_HISTORIES_CONNECTION_FILTER = `${EXTENSION_NAME}.histories.clearConnectionFilter`;
+export const FOCUS_QUERY_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFilter`;
+export const SORT_QUERY_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
+export const SORT_QUERY_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
 export const HISTORY_VIEW_ID = `${EXTENSION_NAME}-histories`;
 
 //---------------------------------------------------
@@ -101,7 +107,7 @@ export const OPEN_LOG_PARSE_RESULT_VIEWER = `${EXTENSION_NAME}.open-log-parse-re
 //---------------------------------------------------
 // LOG
 //---------------------------------------------------
-export const OPEN_OUTPUT_CHANNEL= `${EXTENSION_NAME}.open-output-channel`;
+export const OPEN_OUTPUT_CHANNEL = `${EXTENSION_NAME}.open-output-channel`;
 export const SHOW_GETTING_STARTED = `${EXTENSION_NAME}.show-getting-started`;
 
 //---------------------------------------------------
@@ -112,6 +118,7 @@ export const CREATE_NOTEBOOK_FROM_SQL = `${EXTENSION_NAME}.create-dbn-from-sql`;
 export const CREATE_SQLITE_DEMO = `${EXTENSION_NAME}.create-sqlite-demo`;
 export const RESET_SQLITE_DEMO = `${EXTENSION_NAME}.reset-sqlite-demo`;
 export const NOTEBOOK_TYPE = `${EXTENSION_NAME}-type`;
+export const NOTEBOOK_REPORT_TYPE = `${EXTENSION_NAME}-report-type`;
 
 // JS cell IntelliSense: URI scheme for the in-memory (prelude + cell body) document
 // forwarded to the built-in TypeScript language service. Never written to disk.
@@ -120,6 +127,7 @@ export const JS_VIRTUAL_DOC_SCHEME = "db-notebook-virtual-js";
 // NOTEBOOK TOOL-BAR COMMANDS
 export const SHOW_NOTEBOOK_ALL_VARIABLES = `${EXTENSION_NAME}.toolbar.show-all-variables`;
 export const SHOW_NOTEBOOK_ALL_RDH = `${EXTENSION_NAME}.toolbar.show-all-rdh`;
+export const SHOW_REPORT_ALL_CHARTS = `${EXTENSION_NAME}.toolbar.show-report-all-charts`;
 export const SPECIFY_CONNECTION_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-connection-all`;
 export const SPECIFY_USING_DB_TO_ALL_CELLS = `${EXTENSION_NAME}.toolbar.specify-using-database-all`;
 export const EXPORT_IN_HTML = `${EXTENSION_NAME}.toolbar.export-in-html`;
@@ -136,6 +144,7 @@ export const CELL_SPECIFY_LOG_GROUP_START_TIME_OFFSET_TO_USE = `${EXTENSION_NAME
 // for the first consumer (its Full Context JSON / AI analysis JSON cells).
 export const CELL_SPECIFY_LABEL = `${EXTENSION_NAME}.cell.specify-label`;
 export const CELL_OPEN_MDH = `${EXTENSION_NAME}.cell.open-mdh`;
+export const CELL_OPEN_REPORT_CHART = `${EXTENSION_NAME}.cell.open-report-chart`;
 export const CELL_OPEN_HTTP_RESPONSE = `${EXTENSION_NAME}.cell.open-http-response`;
 export const CELL_MARK_CELL_AS_PRE_EXECUTION = `${EXTENSION_NAME}.cell.mark-cell-as-pre-execution`;
 

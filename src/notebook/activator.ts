@@ -50,6 +50,7 @@ import {
   CREATE_SQLITE_DEMO,
   EXPORT_IN_HTML,
   NOTEBOOK_TYPE,
+  NOTEBOOK_REPORT_TYPE,
   OPEN_MDH_VIEWER,
   RESET_SQLITE_DEMO,
   SHOW_NOTEBOOK_ALL_RDH,
@@ -87,6 +88,9 @@ import { StateStorage } from "../utilities/StateStorage";
 import { MainController, resetCellContext } from "./controller";
 import { activateIntellisense } from "./intellisense";
 import { DBNotebookSerializer } from "./serializer";
+import { ReportNotebookController } from "./report/reportController";
+import { DBNotebookReportSerializer } from "./report/reportSerializer";
+import { registerReportNotebookStatusBarProviders } from "./report/reportStatusBarProviders";
 import { createSqliteDemo, resetSqliteDemo, SqliteDemoOptions } from "./sqliteDemo";
 
 const PREFIX = "[notebook/activator]";
@@ -122,6 +126,15 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
       transientOutputs: true,
     })
   );
+  context.subscriptions.push(
+    workspace.registerNotebookSerializer(
+      NOTEBOOK_REPORT_TYPE,
+      new DBNotebookReportSerializer(),
+      { transientOutputs: false }
+    )
+  );
+  new ReportNotebookController(context);
+  registerReportNotebookStatusBarProviders(context);
 
   controller = new MainController(context, stateStorage);
   context.subscriptions.push(controller);

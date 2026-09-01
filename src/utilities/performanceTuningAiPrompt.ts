@@ -1,4 +1,8 @@
 import type { PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
+import {
+  buildComparisonInstructions,
+  type ComparisonAiInput,
+} from "./performanceTuningComparisonAiInput";
 
 // Builds deterministic assistant/user prompt pairs without calling vscode.lm.
 
@@ -9,6 +13,8 @@ Base every finding and recommendation only on the information given in the conte
 
 Never claim a recommendation is guaranteed to work: this is one point-in-time context snapshot, not a live benchmark, and the user must verify and apply any change themselves - do not suggest that you or the user should run any SQL automatically as part of this analysis.
 
+When "benchmark" is present, it is an explicitly requested series of ordinary SELECT executions collected immediately after one EXPLAIN ANALYZE. Treat its median client elapsed time as stronger before/after latency evidence than the rolling "workload" aggregate or the instrumented executionPlan execution time. The EXPLAIN ANALYZE duration is not one of benchmark.samples. Cite the run count and spread, and only calculate an improvement when the supplied comparison marks the benchmark metrics comparable.
+
 If the context's "executionPlan" has an "actualPlan" artifact, that is the database's own real runtime-plan evidence - the SQL was actually executed to measure it. Its "source" and "format" identify whether it is database text, XML, or JSON. It is separate from "executionPlan.normalizedPlan", which can remain an *estimate* even when actualPlan is present: treat it as ordinary evidence you may quote or paraphrase in a finding/recommendation's "detail"/"rationale", but do not invent a "planNodeId" from its visual/tree order - that field must only ever reference an id that actually appears in executionPlan.normalizedPlan or planTableMappings. When "aiInput.omittedFields" is present, raw vendor artifacts were deliberately left out only to fit this model's input limit; this is not missing runtime collection. Use the retained structured metrics (especially planTableMappings' actualRows and selectivity values), and do not invent facts from omitted raw content.
 
 If a "CARDINALITY_MISESTIMATE" diagnostic is present, treat it as factual measured evidence that the optimizer estimate needs separate investigation. Distinguish a statistics/cardinality remedy (including correlated predicate columns) from an access-path/index remedy; evaluate both where supported by the context instead of presenting an index as the only explanation.
@@ -17,11 +23,13 @@ Before recommending an index or SQL rewrite, review every target table's "physic
 
 An index is not always the right fix. If a WHERE/JOIN/GROUP BY predicate wraps a column in a function (e.g. LOWER(col), DATE(col), CAST(col AS ...)), a plain index on that column cannot be used for it at all (the predicate is not sargable) - in that case, prefer recommending a sargable rewrite of the predicate itself (for example, rewriting a DATE(created_at) = X range check as created_at >= X AND created_at < X + one day) as the primary recommendation, and only add a supporting index once the predicate is sargable. Do not recommend an index on a function-wrapped column (e.g. CREATE INDEX ... (LOWER(col))) without first checking its selectivity per the next paragraph.
 
-When a recommendation rewrites the target SQL, its "suggestedSql" is required. It must be a complete, standalone, executable replacement statement: retain the target statement's SELECT/INSERT/UPDATE/DELETE form and every unaffected FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT/OFFSET, and locking clause. Change only what the recommendation requires. Never put only a predicate, a clause fragment, an ellipsis, or pseudocode in "suggestedSql". Omit "suggestedSql" only when the recommendation has no executable SQL (for example, a workload review or a request for missing information).
+When a recommendation rewrites the target SQL, its "suggestedQuery" is required. It must be a complete, standalone, executable replacement statement: retain the target statement's SELECT/INSERT/UPDATE/DELETE form and every unaffected FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT/OFFSET, and locking clause. Change only what the recommendation requires. Never put only a predicate, a clause fragment, an ellipsis, or pseudocode in "suggestedQuery". Omit "suggestedQuery" only when the recommendation has no executable SQL (for example, a workload review or a request for missing information).
+
+Before returning a rewrite recommendation, compare its complete "suggestedQuery" with the current "statement.sql", not the baseline SQL. Never recommend a rewrite that the current SQL has already applied, and never return "suggestedQuery" that is equivalent to the current SQL; describe an already-applied baseline-to-current rewrite as an observed improvement instead.
 
 Before recommending an index, distinguish the two independent metrics on the relevant "planTableMappings" entry: "tableAccessFraction" is the table-access candidate set relative to the whole table, while "predicateFilterSelectivity" is the pass rate of a local Filter after that access. Never call one evidence for the other, and never invent either metric when absent. A non-covering index on a predicate matching roughly 20% or more of a table's rows is often ignored by the query optimizer, or can make performance worse than a full scan. State the specific metric and figure you used explicitly in the recommendation's "rationale".
 
-Before finalizing any CREATE INDEX in "suggestedSql", check "tables[].definition.indexes" for the target table and do not propose an index whose column set already exists verbatim - that is a wasted, sometimes outright invalid, suggestion.
+Before finalizing any CREATE INDEX in "suggestedQuery", check "tables[].definition.indexes" for the target table and do not propose an index whose column set already exists verbatim - that is a wasted, sometimes outright invalid, suggestion.
 
 When proposing a composite index, place equality-condition columns before range-condition columns (for example, for WHERE status = 'X' AND created_at > Y, prefer (status, created_at), not (created_at, status)).
 
@@ -52,7 +60,7 @@ The response must be a single JSON object with exactly this shape:
       "detail": "what to change",
       "rationale": "why this should help, referencing specific facts from the context",
       "riskLevel": "low" | "medium" | "high",
-      "suggestedSql": "required for an SQL rewrite; then a complete standalone replacement statement, never a clause fragment. Otherwise optional executable SQL (e.g. a candidate CREATE INDEX statement); omit only when no SQL is applicable",
+      "suggestedQuery": "required for an SQL rewrite; then a complete standalone replacement statement, never a clause fragment. Otherwise optional executable SQL (e.g. a candidate CREATE INDEX statement); omit only when no SQL is applicable",
       "evidence": { "...": "same shape as above, all optional" }
     }
   ],
@@ -98,6 +106,10 @@ export type BuildAiAnalysisPromptOptions = {
   // Full is deliberately the default so saved Notebooks and manual-copy
   // prompts retain the complete, reproducible database artifact.
   contextDetail?: "full" | "compact";
+  // Baseline comparison (comparison implementation plan §13.1). Already
+  // projected down by buildComparisonAiInput() - this file never receives,
+  // and therefore can never send, the baseline's whole Full Context.
+  comparison?: ComparisonAiInput;
 };
 
 /**
@@ -140,7 +152,11 @@ export function buildCompactAiAnalysisContext(context: PerformanceTuningContext)
 // split) and buildPlainTextAnalysisPrompt() (folded into one combined
 // string, since a manual copy/paste has no separate system-message
 // channel) - identical content either way, just assembled differently.
-function buildContextSection(context: PerformanceTuningContext, contextForAi: unknown = context): string {
+function buildContextSection(
+  context: PerformanceTuningContext,
+  contextForAi: unknown = context,
+  comparison?: ComparisonAiInput
+): string {
   const contextJson = JSON.stringify(contextForAi, null, 2);
 
   const dmlSafety = context.statement.analyzeEligibility?.allowed === false
@@ -169,6 +185,18 @@ function buildContextSection(context: PerformanceTuningContext, contextForAi: un
     contextJson,
     "```",
     "",
+    // Appended after the Current context, so the model reads what is on
+    // screen now first and the comparison as commentary on it (§13.1).
+    ...(comparison
+      ? [
+          "# Comparison input (JSON)",
+          "",
+          "```json",
+          JSON.stringify(comparison, null, 2),
+          "```",
+          "",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -176,21 +204,28 @@ export function buildAiAnalysisPrompt(
   context: PerformanceTuningContext,
   options: BuildAiAnalysisPromptOptions = {}
 ): PerformanceTuningAiPrompt {
-  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT, "", RESPONSE_FORMAT_INSTRUCTIONS];
+  const assistantParts = [ASSISTANT_ANALYSIS_PROMPT];
+  if (options.comparison) {
+    assistantParts.push("", buildComparisonInstructions("rdb"));
+  }
+  assistantParts.push("", RESPONSE_FORMAT_INSTRUCTIONS);
   if (options.translateResponse && options.language) {
     assistantParts.push(
       "",
       `Write "summary", each finding's "title" and "detail", each recommendation's "title", "detail", and ` +
         `"rationale", and each "missingContext" entry in the following language: ${options.language}. Do not ` +
         `translate JSON field names, the fixed English values of "severity"/"confidence"/"riskLevel", ` +
-        `"suggestedSql" (it is SQL code), or any evidence identifier (schemaName/tableName/indexName/` +
+        `"suggestedQuery" (it is SQL code), or any evidence identifier (schemaName/tableName/indexName/` +
         `planNodeId/diagnosticCode) - leave those in English/unchanged.`
     );
   }
   const assistant = [...assistantParts, ""].join("\n");
 
   const contextForAi = options.contextDetail === "compact" ? buildCompactAiAnalysisContext(context) : context;
-  return { assistant, user: buildContextSection(context, contextForAi) };
+  return {
+    assistant,
+    user: buildContextSection(context, contextForAi, options.comparison),
+  };
 }
 
 // "Copy Prompt for Other AI" toolbar action (PerformanceTuningPreviewPanel.ts) -
@@ -203,17 +238,22 @@ export function buildAiAnalysisPrompt(
 // JSON fields used by buildAiAnalysisPrompt().
 export function buildPlainTextAnalysisPrompt(
   context: PerformanceTuningContext,
-  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language"> = {}
+  options: Pick<BuildAiAnalysisPromptOptions, "translateResponse" | "language" | "comparison"> = {}
 ): string {
   const translationInstruction = options.translateResponse && options.language
     ? `Answer all human-readable prose in the following language: ${options.language}. Do not translate SQL code, database identifiers, or evidence identifiers.`
     : undefined;
   return [
     ASSISTANT_ANALYSIS_PROMPT,
+    // The external-AI path gets the same Comparison Input and the same
+    // instructions as the Copilot path, so the two are analyzing under
+    // identical conditions - §13.2 rules out concatenating two full contexts
+    // here just because there is no token limit to respect.
+    ...(options.comparison ? ["", buildComparisonInstructions("rdb")] : []),
     "",
     PLAIN_TEXT_RESPONSE_INSTRUCTIONS,
     ...(translationInstruction ? ["", translationInstruction] : []),
     "",
-    buildContextSection(context),
+    buildContextSection(context, context, options.comparison),
   ].join("\n");
 }

@@ -13,7 +13,7 @@ function newRowId(): string {
 // Turns a freshly-selected row's estimate (from ToolsViewProvider, always
 // value: "") into the editable rows the table starts from. `presetValues`,
 // when given, is a real-value array parallel to `estimates` by `position`
-// (1-based, so index position - 1) - e.g. SQL History's last-executed bind
+// (1-based, so index position - 1) - e.g. Query History's last-executed bind
 // values (PerformanceTuningBindParametersPanel.vue's own caller) - used to
 // pre-fill a row's value instead of leaving it blank. Query Statistics
 // passes nothing here and keeps today's all-blank behavior unchanged.

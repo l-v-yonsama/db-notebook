@@ -52,6 +52,10 @@ export async function createRDSDriver<T extends RDSBaseDriver>(
   return DBDriverResolver.getInstance().createRDSDriver<T>(resolved);
 }
 
+export function removeDriver(driver: BaseDriver): void {
+  DBDriverResolver.getInstance().removeDriver(driver);
+}
+
 export async function createSQLSupportDriver<T extends BaseSQLSupportDriver>(
   setting: ConnectionSetting,
   interactive: boolean

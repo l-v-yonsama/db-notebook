@@ -1,156 +1,263 @@
 <script setup lang="ts">
+// Shared toolbar, diagnostics, comparison, AI analysis, and raw-context shell.
 import type {
+  DynamoDbPerformanceTuningInitializeViewModel,
   LabelValueItem,
   PerformanceTuningAiAnalysisViewState,
-  PerformanceTuningDiagnosticGroupViewModel,
-  PerformanceTuningHumanSummary,
+  PerformanceTuningComparisonViewState,
   PerformanceTuningPreviewPanelEventData,
-  PlanTableMappingRowViewModel,
+  RelationalPerformanceTuningInitializeViewModel,
+  PreparedAiPayload,
+  AiMaskingLevel,
 } from "@/utilities/vscode";
-import { actualExecutionEvidenceSource, hasActualExecutionEvidence, vscode } from "@/utilities/vscode";
-import type { CapabilityStatus, PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
-import { computed, ref } from "vue";
+import { formatUtcWithLocal, vscode } from "@/utilities/vscode";
+import { buildDynamoDbObservedReadNotice } from "@/utilities/dynamoDbObservedReadNotice";
+import { computed, nextTick, ref } from "vue";
+import type { SecondaryItem } from "@/types/Components";
+import AiPayloadFindingViewer from "./AiPayloadFindingViewer.vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import DiagnosticGroupCard from "./base/DiagnosticGroupCard.vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
-import PerformanceTuningSnapshot from "./base/PerformanceTuningSnapshot.vue";
+import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import DynamoDbPerformanceTuningView from "./DynamoDbPerformanceTuningView.vue";
+import PerformanceTuningComparisonView from "./PerformanceTuningComparisonView.vue";
+import RelationalPerformanceTuningView from "./RelationalPerformanceTuningView.vue";
 
-const context = ref<PerformanceTuningContext | undefined>(undefined);
-const diagnosticGroups = ref<PerformanceTuningDiagnosticGroupViewModel[]>([]);
-const planTreeText = ref<string | undefined>(undefined);
-const actualPlanDisplayText = ref<string | undefined>(undefined);
-const planTableMappingRows = ref<PlanTableMappingRowViewModel[]>([]);
-const humanSummary = ref<PerformanceTuningHumanSummary | undefined>(undefined);
-const queryDiagramAvailable = ref(false);
-const queryDiagramHasWarnings = ref(false);
-const sqlHtml = ref("");
-const jsonHtml = ref("");
-// "Copy Prompt for Other AI" (2026-08-21 follow-up) - see
-// MessageEventData.ts's own doc comment on this field.
-const plainTextPrompt = ref("");
-const translatedPlainTextPrompt = ref("");
-const payloadBytes = ref(0);
-const maxPayloadBytes = ref(0);
+const relational = ref<RelationalPerformanceTuningInitializeViewModel | undefined>(undefined);
+const dynamodb = ref<DynamoDbPerformanceTuningInitializeViewModel | undefined>(undefined);
+const engine = computed(() =>
+  relational.value ? "relational" : dynamodb.value ? "dynamodb" : undefined
+);
+const benchmark = computed(
+  () => relational.value?.context.benchmark ?? dynamodb.value?.context.benchmark
+);
+const benchmarkCompleteness = computed(() => {
+  const session = dynamodb.value?.context.benchmark;
+  if (!session) return undefined;
+  if (session.completeness) return session.completeness;
+  const values = [...new Set(session.samples.map((sample) => sample.completeness))];
+  return values.length === 1 ? values[0] : "mixed";
+});
+const benchmarkIsComplete = computed(() => benchmarkCompleteness.value === "complete");
+const benchmarkBoundDescription = computed(
+  () => dynamodb.value?.context.benchmark?.boundDescription
+);
+const formatMs = (value: number): string => `${Number(value.toFixed(2)).toLocaleString()} ms`;
+// Shared shell fields from whichever engine is active.
+const active = computed(() => relational.value ?? dynamodb.value);
+
+const diagnosticGroups = computed(() => active.value?.diagnosticGroups ?? []);
+// Host-side formatters already group and sort diagnostics by severity.
+const infoGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "info"));
+const issueGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "warning"));
+
+const contextJson = computed(() =>
+  active.value ? JSON.stringify(active.value.context, null, 2) : ""
+);
 
 // AI options are available as soon as a context is loaded.
 const languageModels = ref<LabelValueItem[]>([]);
 const languageModelId = ref("");
 const translateResponse = ref(false);
+const translateResponseLabel = ref<string | undefined>(undefined);
+const maskingLevel = ref<AiMaskingLevel>(0);
+const maskingLevelItems = [
+  { label: "Lv0 - No masking", value: 0 },
+  { label: "Lv1 - Sensitive candidates", value: 1 },
+  { label: "Lv2 - Broad literal masking", value: 2 },
+];
+const aiSendPreview = ref<PreparedAiPayload | undefined>(undefined);
+const aiPayloadFindingViewer = ref<InstanceType<typeof AiPayloadFindingViewer>>();
+const advanceAfterResolvedFindingId = ref<string>();
+const selectedAiFindingId = ref<string>();
+const aiCandidateListElement = ref<HTMLElement>();
+const aiCandidateElements = new Map<string, HTMLElement>();
+const isAiSendPreviewOpen = computed(() => aiSendPreview.value !== undefined);
+const unresolvedFindings = computed(
+  () =>
+    aiSendPreview.value?.findings.filter((finding) => finding.disposition === "unreviewed") ?? []
+);
+const allowedFindingCount = computed(
+  () =>
+    aiSendPreview.value?.findings.filter((finding) => finding.disposition === "allowed").length ?? 0
+);
+const canApproveAiPayload = computed(
+  () => Boolean(aiSendPreview.value) && unresolvedFindings.value.length === 0
+);
+
+const setAiCandidateElement = (element: unknown, findingId: string): void => {
+  if (element instanceof HTMLElement) {
+    aiCandidateElements.set(findingId, element);
+  }
+};
+
+const selectAiFindingRow = (findingId: string | undefined): void => {
+  selectedAiFindingId.value = findingId;
+  if (findingId) {
+    nextTick(() => {
+      const container = aiCandidateListElement.value;
+      const element = aiCandidateElements.get(findingId);
+      if (!container || !element) {
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      if (elementRect.top < containerRect.top) {
+        container.scrollTo({
+          top: container.scrollTop + elementRect.top - containerRect.top,
+          behavior: "smooth",
+        });
+      } else if (elementRect.bottom > containerRect.bottom) {
+        container.scrollTo({
+          top: container.scrollTop + elementRect.bottom - containerRect.bottom,
+          behavior: "smooth",
+        });
+      }
+    });
+  }
+};
+
+// Comparison state is host-owned and arrives fully derived.
+const comparison = ref<PerformanceTuningComparisonViewState>({ status: "idle" });
 
 // A fresh context invalidates the previous analysis.
 const analysis = ref<PerformanceTuningAiAnalysisViewState>({ status: "idle" });
-
-// "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). Whether this connection's
-// Provider even supports analyze mode at all - drives the button's disabled
-// state and its tooltip when it is disabled. isRunningActualPlan has no
-// "success" branch of its own: a
-// successful run replaces the whole panel via a fresh "initialize" instead
-// (see initialize() below, which is also what resets this back to false).
-const analyzedExecutionPlan = ref<CapabilityStatus>({ available: false });
-const isRunningActualPlan = ref(false);
-
-// Only used for the "Copy JSON" button (needs plain text, not the
-// highlighted HTML) - kept in sync with what the extension side rendered
-// into jsonHtml since both stringify the same context with the same args.
-const contextJson = computed(() => (context.value ? JSON.stringify(context.value, null, 2) : ""));
-
-const payloadExceeded = computed(
-  () => maxPayloadBytes.value > 0 && payloadBytes.value > maxPayloadBytes.value
+const isAnalyzing = computed(() => analysis.value.status === "running");
+const analysisJson = computed(() =>
+  analysis.value.result ? JSON.stringify(analysis.value.result, null, 2) : ""
 );
-const copyPromptForOtherAi = computed(() =>
-  translateResponse.value ? translatedPlainTextPrompt.value : plainTextPrompt.value
+const isRunningSecondaryAction = ref(false);
+const tokenUsage = computed(
+  () => analysis.value.result?.request?.tokenUsage ?? analysis.value.tokenUsage
 );
+const tokenUsagePercentage = computed(() => {
+  const usage = tokenUsage.value;
+  return usage && usage.maxInputTokens > 0
+    ? (usage.inputTokens / usage.maxInputTokens) * 100
+    : undefined;
+});
+const estimatedTokenUsage = computed(() => {
+  const usage = tokenUsage.value;
+  if (!usage) {
+    return undefined;
+  }
+  const percentage =
+    tokenUsagePercentage.value !== undefined ? tokenUsagePercentage.value.toFixed(1) : "-";
+  return `${usage.inputTokens.toLocaleString()} / ${usage.maxInputTokens.toLocaleString()} tokens (${percentage}%)`;
+});
+const tokenUsageNearLimit = computed(
+  () => tokenUsagePercentage.value !== undefined && tokenUsagePercentage.value >= 80
+);
+const tokenUsageTitle = computed(() =>
+  tokenUsage.value
+    ? `A ${tokenUsage.value.safetyMargin.toLocaleString()}-token safety margin is reserved for provider-side message framing.`
+    : undefined
+);
+const aiInputDetail = computed(() => {
+  const contextDetail =
+    analysis.value.result?.request?.contextDetail ?? analysis.value.contextDetail;
+  const comparisonDetail =
+    analysis.value.result?.request?.comparison?.detail ?? analysis.value.comparisonDetail;
+  const contextReduced = contextDetail === "compact";
+  const comparisonReduced = comparisonDetail !== undefined && comparisonDetail !== "full";
+  if (contextReduced && comparisonReduced) {
+    return "Context and comparison reduced to fit this model";
+  }
+  if (contextReduced) {
+    return "Context reduced to fit this model";
+  }
+  if (comparisonReduced) {
+    return "Comparison reduced to fit this model";
+  }
+  return contextDetail === "full" ? "Full context included" : undefined;
+});
+
+// The collected context is useful evidence by itself. AI analysis and a
+// baseline comparison enrich the report, but neither is a prerequisite.
+// Avoid saving while an AI/benchmark refresh is in flight so the user never
+// gets an ambiguous snapshot of the preceding state.
+const canSaveNotebook = computed(
+  () => Boolean(active.value) && !isAnalyzing.value && !isRunningSecondaryAction.value
+);
+const saveNotebookTitle = computed(() => {
+  if (isAnalyzing.value || isRunningSecondaryAction.value) {
+    return "Wait for the current analysis or measurement to finish before saving";
+  }
+  if (comparison.value.status === "ready") {
+    if (analysis.value.status === "success" && !comparison.value.analysisStale) {
+      return "Save the AI analysis and baseline comparison as a new Notebook under reports/performance-tuning/";
+    }
+    return "Save the baseline comparison as a new Notebook under reports/performance-tuning/";
+  }
+  if (analysis.value.status === "success" && !comparison.value.analysisStale) {
+    return "Save the AI analysis as a new Notebook under reports/performance-tuning/";
+  }
+  return "Save the collected performance evidence as a new Notebook under reports/performance-tuning/";
+});
+
+// "Run Explain Analyze" (RDB) / "Run Observed Read" (DynamoDB) - one shared
+// running flag + host round trip, since the two are mutually exclusive per
+// engine (only one of the two buttons below is ever shown) and behave
+// identically from the shell's perspective: optimistic true on click, reset
+// by "stop-progress" or a fresh "initialize" (a successful run always
+// replaces the whole panel via the latter, never a "success" branch of its
+// own here).
 const statementAllowsActualPlan = computed(
-  () => context.value?.statement.analyzeEligibility?.allowed ?? true
-);
-const isDmlEstimate = computed(
-  () => context.value?.statement.kind !== undefined && context.value.statement.kind !== "select"
-);
-const hasActualEvidence = computed(
-  () => context.value !== undefined && hasActualExecutionEvidence(context.value),
-);
-const actualEvidenceSource = computed(
-  () => context.value ? actualExecutionEvidenceSource(context.value) : undefined,
+  () => relational.value?.context.statement.analyzeEligibility?.allowed ?? true
 );
 const actualPlanButtonTitle = computed(() => {
   if (!statementAllowsActualPlan.value) {
-    return context.value?.statement.analyzeEligibility?.reason ?? "Explain Analyze is limited to a single SELECT statement.";
+    return (
+      relational.value?.context.statement.analyzeEligibility?.reason ??
+      "Explain Analyze is limited to a single SELECT statement."
+    );
   }
-  return analyzedExecutionPlan.value.available
+  return relational.value?.analyzedExecutionPlan.available
     ? "Run this SQL for real to measure its actual execution plan (real query execution - see the note below)"
-    : (analyzedExecutionPlan.value.message ?? "Not available for this database");
+    : relational.value?.analyzedExecutionPlan.message ?? "Not available for this database";
 });
 
-// Keep meaningful very small runtime ratios visible. A fixed two-decimal
-// display turns a valid nested-loop inner access such as 1 / 30,000 into
-// "0.00x" or "0.00%", which looks like missing/zero evidence instead of a
-// highly selective access.
-const formatRatio = (value: number | undefined): string => {
-  if (value === undefined) {
-    return "-";
+const observationEligibility = computed(
+  () => dynamodb.value?.context.statement.observationEligibility
+);
+const observedReadNotice = computed(() =>
+  buildDynamoDbObservedReadNotice(dynamodb.value?.context.observation)
+);
+const observedReadButtonTitle = computed(() => {
+  if (observationEligibility.value?.allowed === false) {
+    return (
+      observationEligibility.value.reason ?? "This statement is not eligible for Run Observed Read."
+    );
   }
-  const text = value !== 0 && (Math.abs(value) < 0.01 || Math.abs(value) >= 1_000)
-    ? value.toPrecision(3)
-    : value.toFixed(2);
-  return `${text}x`;
-};
-
-const formatFractionAsPercent = (value: number | undefined): string => {
-  if (value === undefined) {
-    return "-";
-  }
-  const percent = value * 100;
-  const text = percent !== 0 && Math.abs(percent) < 0.01 ? percent.toPrecision(3) : percent.toFixed(2);
-  return `${text}%`;
-};
-const formatActualRows = (value: number | undefined): string =>
-  value === undefined && isDmlEstimate.value ? "Not measured (DML)" : (value ?? "-").toString();
-const formatRuntimeMetric = (value: number | undefined, format: (value: number | undefined) => string): string =>
-  value === undefined && isDmlEstimate.value ? "Not measured (DML)" : format(value);
-
-// buildPerformanceTuningDiagnosticGroups() (extension-side) already sorts
-// information before warnings and never mixes severities within one group -
-// this just splits that single ordered list into the two display sections
-// §6.1 puts in different places. Neither list is re-sorted or re-derived
-// here (§7: grouping/copy stays entirely in that one pure function).
-const infoGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "info"));
-const issueGroups = computed(() => diagnosticGroups.value.filter((g) => g.severity === "warning"));
-
-// §6.4: "partial なのに画面上に理由が1件も表示されない状態を禁止する" - status
-// is derived driver-side from unavailableSections/diagnostics together
-// (db-drivers §2.2), so whenever it's 'partial', issueGroups is guaranteed
-// non-empty by construction (every unavailableSections entry and every
-// affectsCompleteness diagnostic becomes a warning-severity group). Nothing
-// extra to compute here; this comment just records the invariant this
-// template relies on.
+  return dynamodb.value?.observedReadCapability.available
+    ? dynamodb.value.context.observation
+      ? "Run another real read to refresh the observed measurements (real query execution - see the note below)"
+      : "Read real items to measure this statement's actual Consumed Capacity and result shape (real query execution - see the note below)"
+    : dynamodb.value?.observedReadCapability.message ?? "Not available for this connection";
+});
 
 const initialize = (v: PerformanceTuningPreviewPanelEventData["value"]["initialize"]): void => {
   if (v === undefined) {
     return;
   }
-  context.value = v.context;
-  diagnosticGroups.value = v.diagnosticGroups;
-  planTreeText.value = v.planTreeText;
-  actualPlanDisplayText.value = v.actualPlanDisplayText;
-  planTableMappingRows.value = v.planTableMappingRows;
-  humanSummary.value = v.humanSummary;
-  queryDiagramAvailable.value = v.queryDiagramAvailable;
-  queryDiagramHasWarnings.value = v.queryDiagramHasWarnings;
-  sqlHtml.value = v.sqlHtml;
-  jsonHtml.value = v.jsonHtml;
-  plainTextPrompt.value = v.plainTextPrompt;
-  translatedPlainTextPrompt.value = v.translatedPlainTextPrompt;
-  payloadBytes.value = v.payloadBytes;
-  maxPayloadBytes.value = v.maxPayloadBytes;
+  if (v.engine === "relational") {
+    relational.value = v;
+    dynamodb.value = undefined;
+  } else {
+    dynamodb.value = v;
+    relational.value = undefined;
+  }
   languageModels.value = v.languageModels;
   languageModelId.value = v.languageModelId;
   translateResponse.value = v.translateResponse;
+  translateResponseLabel.value = v.translateResponseLabel;
+  maskingLevel.value = v.maskingLevel;
   analysis.value = { status: "idle" };
-  analyzedExecutionPlan.value = v.analyzedExecutionPlan;
-  isRunningActualPlan.value = false;
+  comparison.value = v.comparison;
+  isRunningSecondaryAction.value = false;
 };
 
 const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
@@ -163,13 +270,40 @@ const recieveMessage = (data: PerformanceTuningPreviewPanelEventData) => {
       if (value.analysis) {
         analysis.value = value.analysis;
       }
+      if (value.unavailableLanguageModelId) {
+        languageModels.value = languageModels.value.filter(
+          (model) => model.value !== value.unavailableLanguageModelId
+        );
+        if (languageModelId.value === value.unavailableLanguageModelId) {
+          languageModelId.value = languageModels.value[0]?.value ?? "";
+        }
+      }
+      break;
+    case "comparison-update":
+      if (value.comparison) {
+        comparison.value = value.comparison;
+      }
+      break;
+    case "ai-send-preview":
+      if (value.aiSendPreview) {
+        aiCandidateElements.clear();
+        aiSendPreview.value = value.aiSendPreview;
+        const findingId = advanceAfterResolvedFindingId.value;
+        advanceAfterResolvedFindingId.value = undefined;
+        if (findingId) {
+          nextTick(() => aiPayloadFindingViewer.value?.focusNextAfterFinding(findingId));
+        }
+      }
+      break;
+    case "ai-send-preview-closed":
+      if (aiSendPreview.value?.requestId === value.aiSendPreviewClosedRequestId) {
+        aiSendPreview.value = undefined;
+        advanceAfterResolvedFindingId.value = undefined;
+      }
       break;
     case "stop-progress":
-      // "Run EXPLAIN ANALYZE" cancelled or failed - a successful run
-      // instead arrives as a fresh "initialize" above, which already
-      // resets this itself. The failure/cancellation reason (if any) was
-      // already shown as a native VS Code notification, extension-side.
-      isRunningActualPlan.value = false;
+      // Successful runs reset through initialize; failures are shown by the host.
+      isRunningSecondaryAction.value = false;
       break;
   }
 };
@@ -184,8 +318,66 @@ const close = (): void => {
 const analyzeWithAi = (): void => {
   vscode.postCommand({
     command: "analyzePerformanceTuningWithAi",
-    params: { languageModelId: languageModelId.value, translateResponse: translateResponse.value },
+    params: {
+      languageModelId: languageModelId.value,
+      translateResponse: translateResponse.value,
+      maskingLevel: maskingLevel.value,
+    },
   });
+};
+
+const copyPromptWithMasking = (): void => {
+  vscode.postCommand({
+    command: "copyPerformanceTuningPromptWithMasking",
+    params: { translateResponse: translateResponse.value, maskingLevel: maskingLevel.value },
+  });
+};
+
+const resolveAiFinding = (
+  findingId: string | undefined,
+  disposition: "masked" | "allowed",
+  strategy?: "partial" | "full",
+  allCandidates = false
+): void => {
+  const preview = aiSendPreview.value;
+  if (!preview) return;
+  if (findingId && !allCandidates) {
+    advanceAfterResolvedFindingId.value = findingId;
+  }
+  vscode.postCommand({
+    command: "resolvePerformanceTuningAiFinding",
+    params: {
+      requestId: preview.requestId,
+      findingId,
+      resolution: { disposition, strategy },
+      allCandidates,
+    },
+  });
+};
+
+const approveAiPayload = (): void => {
+  const preview = aiSendPreview.value;
+  if (!preview || !canApproveAiPayload.value) return;
+  vscode.postCommand({
+    command: "approvePerformanceTuningAiPayload",
+    params: { requestId: preview.requestId, payloadDigest: preview.payloadDigest },
+  });
+};
+
+const cancelAiPayload = (): void => {
+  const preview = aiSendPreview.value;
+  if (!preview) return;
+  advanceAfterResolvedFindingId.value = undefined;
+  vscode.postCommand({
+    command: "cancelPerformanceTuningAiPayload",
+    params: { requestId: preview.requestId },
+  });
+};
+
+const findingPreview = (finding: PreparedAiPayload["findings"][number]): string => {
+  const range = finding.ranges[0];
+  if (!range || !aiSendPreview.value) return finding.label;
+  return aiSendPreview.value.payload.slice(range.start, range.end);
 };
 
 const saveAiAnalysisAsNotebook = (): void => {
@@ -195,24 +387,73 @@ const saveAiAnalysisAsNotebook = (): void => {
   });
 };
 
-// "Run EXPLAIN ANALYZE" (2026-08-20 follow-up). The confirmation itself is
-// entirely host-side (a modal window.showWarningMessage - see
-// PerformanceTuningPreviewPanel.ts's runActualPlan()); this only sets the
-// optimistic "running" state so the button disables itself immediately -
-// stop-progress above resets it again if the user declines that modal or
-// the run fails.
+// Confirmation is host-side; optimistic state disables the action immediately.
 const runActualPlan = (): void => {
-  isRunningActualPlan.value = true;
+  isRunningSecondaryAction.value = true;
   vscode.postCommand({
     command: "runActualPlan",
     params: {},
   });
 };
 
-const isAnalyzing = computed(() => analysis.value.status === "running");
-const analysisJson = computed(() =>
-  analysis.value.result ? JSON.stringify(analysis.value.result, null, 2) : ""
+const runObservedRead = (): void => {
+  isRunningSecondaryAction.value = true;
+  vscode.postCommand({
+    command: "runObservedRead",
+    params: {},
+  });
+};
+
+const benchmarkItems = computed<SecondaryItem[]>(() =>
+  engine.value === "dynamodb"
+    ? [
+        { kind: "selection", label: "Page Benchmark (3 runs)", value: { runs: 3, mode: "page" } },
+        { kind: "selection", label: "Page Benchmark (5 runs)", value: { runs: 5, mode: "page" } },
+        { kind: "divider" },
+        {
+          kind: "selection",
+          label: "Complete-result Benchmark (3 runs)",
+          value: { runs: 3, mode: "completeResult" },
+        },
+        {
+          kind: "selection",
+          label: "Complete-result Benchmark (5 runs)",
+          value: { runs: 5, mode: "completeResult" },
+        },
+      ]
+    : [
+        { kind: "selection", label: "Benchmark (3 runs)", value: 3 },
+        { kind: "selection", label: "Benchmark (5 runs)", value: 5 },
+      ]
 );
+
+const runBenchmark = (selection: unknown): void => {
+  const runs =
+    typeof selection === "object" && selection !== null && "runs" in selection
+      ? (selection as { runs: unknown }).runs
+      : selection;
+  const mode =
+    typeof selection === "object" && selection !== null && "mode" in selection
+      ? (selection as { mode?: "page" | "completeResult" }).mode
+      : undefined;
+  if (runs !== 3 && runs !== 5) {
+    return;
+  }
+  isRunningSecondaryAction.value = true;
+  vscode.postCommand({
+    command: "runPerformanceTuningBenchmark",
+    params: { runs, mode },
+  });
+};
+
+// The host owns the file picker; the webview never receives a path.
+const selectBaseline = (): void => {
+  vscode.postCommand({ command: "selectPerformanceTuningBaseline", params: {} });
+};
+
+const clearBaseline = (): void => {
+  vscode.postCommand({ command: "clearPerformanceTuningBaseline", params: {} });
+};
 
 const evidenceLabel = (
   evidence:
@@ -236,6 +477,9 @@ const evidenceLabel = (
   if (evidence.diagnosticCode) {
     parts.push(`Diagnostic: ${evidence.diagnosticCode}`);
   }
+  if (evidence.contextPath) {
+    parts.push(`Context: ${evidence.contextPath}`);
+  }
   return parts.join(" / ");
 };
 
@@ -245,137 +489,284 @@ defineExpose({
 </script>
 
 <template>
-  <section class="PerformanceTuningPreviewPanel" v-if="context">
+  <section class="PerformanceTuningPreviewPanel" v-if="engine">
     <PanelActionToolbar @cancel="close" cancel-label="" cancel-title="Close">
       <template #left>
-        <!-- "Run Explain Analyze" (2026-08-20 follow-up) - listed first
-             since it's the button a user reaches for first (real execution
-             plan before asking AI to analyze it), and deliberately a
-             distinct icon/label from "Analyze with AI" below (that one only
-             sends the already-collected context to an AI model; this one
-             executes the SQL for real). Disabled, with the capability
-             message as its tooltip, when this connection's Provider does
-             not support analyze mode. Title Case to match "Analyze with AI"/
-             "Save as Notebook" below. -->
+        <!-- "Run Explain Analyze" (RDB) / "Run Observed Read" (DynamoDB) -
+             listed first since it's the button a user reaches for first
+             (real evidence before asking AI to analyze it), and
+             deliberately a distinct icon/label from "Analyze with AI" below
+             (that one only sends the already-collected context to an AI
+             model; this one executes for real). Disabled, with the
+             capability/eligibility message as its tooltip, when this
+             connection/statement does not support it. -->
         <VsCodeButton
+          v-if="engine === 'relational'"
           appearance="secondary"
-          :disabled="isRunningActualPlan || !analyzedExecutionPlan.available || !statementAllowsActualPlan"
+          :disabled="
+            isRunningSecondaryAction ||
+            !relational?.analyzedExecutionPlan.available ||
+            !statementAllowsActualPlan
+          "
           :title="actualPlanButtonTitle"
           @click="runActualPlan"
         >
-          <fa icon="circle-play" />{{ isRunningActualPlan ? "Running…" : "Run Explain Analyze" }}
+          <fa icon="circle-play" />{{
+            isRunningSecondaryAction ? "Running…" : "Run Explain Analyze"
+          }}
         </VsCodeButton>
-        <VsCodeButton :disabled="isAnalyzing" title="Analyze this context with AI" @click="analyzeWithAi">
+        <VsCodeButton
+          v-else
+          appearance="secondary"
+          :disabled="
+            isRunningSecondaryAction ||
+            !dynamodb?.observedReadCapability.available ||
+            observationEligibility?.allowed === false
+          "
+          :title="observedReadButtonTitle"
+          @click="runObservedRead"
+        >
+          <fa icon="circle-play" />{{ isRunningSecondaryAction ? "Running…" : "Run Observed Read" }}
+        </VsCodeButton>
+        <SecondarySelectionAction
+          title="Benchmark options"
+          :items="benchmarkItems"
+          :disabled="
+            isRunningSecondaryAction ||
+            (engine === 'relational'
+              ? !relational?.analyzedExecutionPlan.available || !statementAllowsActualPlan
+              : !dynamodb?.observedReadCapability.available ||
+                observationEligibility?.allowed === false)
+          "
+          @onSelect="runBenchmark"
+        />
+        <VsCodeButton
+          :disabled="isAnalyzing || isAiSendPreviewOpen || languageModels.length === 0"
+          title="Analyze this context with AI"
+          @click="analyzeWithAi"
+        >
           <fa icon="wand-magic-sparkles" />{{ isAnalyzing ? "Analyzing…" : "Analyze with AI" }}
         </VsCodeButton>
-        <!-- "Copy Prompt for Other AI" (2026-08-21 follow-up) - for a user
-             whose vscode.lm-exposed models are too limited (this extension
-             only queries `vendor: "copilot"`, so this is only ever whatever
-             models Copilot itself exposes) but who already has a ChatGPT/
-             Claude.ai/Claude Code/Codex subscription they'd rather paste
-             into directly. Copies the same domain-guided prompt as "Analyze
-             with AI", just asking for a plain-text answer instead of JSON
-             (see performanceTuningAiPrompt.ts's buildPlainTextAnalysisPrompt()) -
-             no vscode.lm call happens for this button. -->
-        <CopyToClipboardButton appearance="secondary" :content="copyPromptForOtherAi"
-          title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)">
+        <!-- Copies an equivalent plain-text prompt without invoking vscode.lm. -->
+        <VsCodeButton
+          appearance="secondary"
+          :disabled="isAiSendPreviewOpen"
+          title="Copy a prompt for pasting into another AI chat (ChatGPT, Claude.ai, Claude Code, Codex, ...)"
+          @click="copyPromptWithMasking"
+        >
           <fa icon="comment-dots" />Copy Prompt for Other AI
-        </CopyToClipboardButton>
-        <VsCodeButton appearance="secondary" :disabled="analysis.status !== 'success'" title="Save the AI analysis as a new Notebook under reports/performance-tuning/"
-          @click="saveAiAnalysisAsNotebook">
+        </VsCodeButton>
+        <!-- The host selects the engine-specific report builder. -->
+        <VsCodeButton
+          appearance="secondary"
+          :disabled="!canSaveNotebook"
+          :title="saveNotebookTitle"
+          @click="saveAiAnalysisAsNotebook"
+        >
           <fa icon="book" />Save as Notebook
         </VsCodeButton>
       </template>
     </PanelActionToolbar>
 
-    <!-- First layer of the "Run Explain Analyze" two-layer confirmation
-         (2026-08-20 follow-up) - a persistent, always-visible warning next
+    <!-- First layer of the "Run Explain Analyze"/"Run Observed Read"
+         two-layer confirmation - a persistent, always-visible warning next
          to the button, so the risk is visible *before* a user ever clicks
-         it. The second layer (a blocking modal) is host-side, on click -
-         see PerformanceTuningPreviewPanel.ts's runActualPlan(). Hidden once
-         a run has already succeeded for this context (actualPlan
-         present) - at that point the risk already materialized and is
-         redundant with the actual plan shown below. -->
-    <p v-if="!statementAllowsActualPlan" class="section-note">
-      This {{ context.statement.kind ?? "non-SELECT" }} statement uses an estimated plan only. Actual runtime metrics are not collected here.
-    </p>
-    <p v-else-if="analyzedExecutionPlan.available && !hasActualEvidence" class="section-note actual-plan-warning">
-      <fa icon="triangle-exclamation" />
-      "Run Explain Analyze" executes the SQL above for real against the database, instead of only
-      estimating its plan.
-    </p>
+         it. The second layer (a blocking modal) is host-side, on click. -->
+    <template v-if="engine === 'relational'">
+      <p v-if="!statementAllowsActualPlan" class="section-note">
+        This {{ relational?.context.statement.kind ?? "non-SELECT" }} statement uses an estimated
+        plan only. Actual runtime metrics are not collected here.
+      </p>
+      <p
+        v-else-if="relational?.analyzedExecutionPlan.available"
+        class="section-note actual-plan-warning"
+      >
+        <fa icon="triangle-exclamation" />
+        "Run Explain Analyze" executes the SQL above for real against the database, instead of only
+        estimating its plan.
+      </p>
+    </template>
+    <template v-else>
+      <p v-if="observationEligibility?.allowed === false" class="section-note">
+        Run Observed Read is not available for this statement: {{ observationEligibility.reason }}
+      </p>
+      <p
+        v-else-if="dynamodb?.observedReadCapability.available"
+        class="section-note actual-plan-warning"
+      >
+        <fa icon="triangle-exclamation" />
+        {{ observedReadNotice }}
+      </p>
+    </template>
 
-    <!-- 1. Database / Status / Payload size (§6.1) -->
     <div class="header">
-      <!-- Analyze with AI's model/translation options (2026-08-19 follow-up) -
-           always visible (not gated on analysis.status), since the choice
-           has to be made before clicking the button in the toolbar above. -->
+      <!-- Analyze with AI options remain visible before the action. The host
+           omits translateResponseLabel for English UI locales. -->
       <div class="row ai-options">
         <span class="label">AI options</span>
         <label for="languageModelId" class="label-inline">Language model</label>
-        <VsCodeDropdown id="languageModelId" :items="languageModels" v-model="languageModelId"
-          :disabled="isAnalyzing || languageModels.length === 0" style="width: 220px" />
-        <VsCodeCheckbox v-model="translateResponse" :disabled="isAnalyzing">Translate response</VsCodeCheckbox>
+        <VsCodeDropdown
+          id="languageModelId"
+          :items="languageModels"
+          v-model="languageModelId"
+          :disabled="isAnalyzing || languageModels.length === 0"
+          style="width: 220px"
+        />
+        <label for="maskingLevel" class="label-inline">AI data masking</label>
+        <VsCodeDropdown
+          id="maskingLevel"
+          :items="maskingLevelItems"
+          v-model="maskingLevel"
+          :disabled="isAnalyzing || isAiSendPreviewOpen"
+          style="width: 210px"
+        />
+        <VsCodeCheckbox
+          v-if="translateResponseLabel"
+          v-model="translateResponse"
+          :disabled="isAnalyzing"
+        >
+          {{ translateResponseLabel }}
+        </VsCodeCheckbox>
       </div>
-      <div class="row">
-        <span class="label">Database</span>
-        <span>{{ context.database.vendor }}{{ context.database.version ? ` ${context.database.version}` : "" }} ・
-          {{ context.database.databaseName }}<span v-if="context.database.schemaName">.{{ context.database.schemaName }}</span></span>
-      </div>
-      <div class="row status-summary">
-        <span class="label">Status</span>
-        <span class="badge" :class="context.collection.status">{{ context.collection.status }}</span>
-        <!-- complete badge stays green even with informational notes present
-             (§6.4) - this is a supplementary count, not a new status value. -->
-        <span v-if="context.collection.status === 'complete' && infoGroups.length > 0" class="notes-hint">
-          {{ infoGroups.length }} {{ infoGroups.length === 1 ? "note" : "notes" }}
-        </span>
-        <span class="payload-size" :class="{ exceeded: payloadExceeded }">
-          <span class="label-inline">Payload size:</span>
-          {{ payloadBytes.toLocaleString() }} / {{ maxPayloadBytes.toLocaleString() }} bytes
-          <span v-if="payloadExceeded">(exceeds limit)</span>
-        </span>
-      </div>
-
-      <!-- 2. SQL (§6.1) -->
-      <div class="row sql">
-        <span class="label">SQL</span>
-        <div class="code-panel">
-          <div class="sql-block" v-html="sqlHtml"></div>
-          <CopyToClipboardButton class="copy-btn" :content="context.statement.sql" title="Copy SQL" />
-        </div>
-      </div>
+      <RelationalPerformanceTuningView
+        v-if="engine === 'relational'"
+        :data="relational!"
+        part="header"
+      />
+      <DynamoDbPerformanceTuningView v-else :data="dynamodb!" part="header" />
     </div>
 
     <div class="scrollArea">
-      <div v-if="humanSummary" class="section performance-snapshot-section">
-        <h3 class="section-title">Performance snapshot</h3>
-        <PerformanceTuningSnapshot :summary="humanSummary" />
-        <p v-if="queryDiagramAvailable" class="section-note query-diagram-notice">
-          A query-scoped structure view (ER diagram and relevant indexes) will be included when you save this analysis as a Notebook; view it in the saved DBN or HTML report.<span v-if="queryDiagramHasWarnings"> Some relationships could not be resolved conservatively; the saved Notebook includes the details.</span>
+      <RelationalPerformanceTuningView
+        v-if="engine === 'relational'"
+        :data="relational!"
+        part="body"
+      />
+      <DynamoDbPerformanceTuningView v-else :data="dynamodb!" part="body" />
+
+      <div v-if="benchmark" class="section benchmark-section">
+        <h3 class="section-title">Benchmark</h3>
+        <div
+          v-if="engine === 'dynamodb' && benchmarkCompleteness"
+          class="completion-banner"
+          :class="benchmarkIsComplete ? 'complete' : 'incomplete'"
+        >
+          <span
+            class="codicon"
+            :class="benchmarkIsComplete ? 'codicon-pass-filled' : 'codicon-warning'"
+          ></span>
+          <strong>{{ benchmarkIsComplete ? "COMPLETE" : "INCOMPLETE" }}</strong>
+          <span>
+            {{
+              benchmarkIsComplete
+                ? "Every benchmark run reached the end of the result."
+                : benchmarkBoundDescription ??
+                  "At least one run stopped before the full result was evaluated."
+            }}
+          </span>
+        </div>
+        <p class="section-note">
+          {{ benchmark.completedRuns }} ordinary measured runs; no hidden warm-up run.
+          <span v-if="engine === 'relational'"
+            >EXPLAIN ANALYZE was collected first and is excluded from these timings.</span
+          >
+          <span v-else>
+            {{
+              "mode" in benchmark && benchmark.mode === "completeResult"
+                ? "Each sample followed continuation tokens up to the complete-result safety limits."
+                : "Each sample measured one bounded API response."
+            }}
+          </span>
+        </p>
+        <p class="section-note">
+          {{ formatUtcWithLocal(benchmark.startedAt) }} –
+          {{ formatUtcWithLocal(benchmark.completedAt) }}
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Run</th>
+              <th>Client elapsed</th>
+              <th v-if="engine === 'dynamodb'">Returned / evaluated</th>
+              <th v-if="engine === 'dynamodb'">Consumed read capacity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="sample in benchmark.samples" :key="sample.run">
+              <td>{{ sample.run }}</td>
+              <td>{{ formatMs(sample.clientElapsedTimeMs) }}</td>
+              <td v-if="engine === 'dynamodb'">
+                {{ "returnedItemCount" in sample ? sample.returnedItemCount ?? "—" : "—" }} /
+                {{ "evaluatedItemCount" in sample ? sample.evaluatedItemCount ?? "—" : "—" }}
+              </td>
+              <td v-if="engine === 'dynamodb'">
+                {{
+                  "consumedCapacity" in sample
+                    ? sample.consumedCapacity?.readCapacityUnits ??
+                      sample.consumedCapacity?.capacityUnits ??
+                      "—"
+                    : "—"
+                }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="benchmark-summary">
+          Median {{ formatMs(benchmark.medianClientElapsedTimeMs) }} ・ Average
+          {{ formatMs(benchmark.averageClientElapsedTimeMs) }} ・ Min / Max
+          {{ formatMs(benchmark.minClientElapsedTimeMs) }} /
+          {{ formatMs(benchmark.maxClientElapsedTimeMs) }}
         </p>
       </div>
 
-      <!-- AI Analysis is always rendered, even at
-           idle (2026-08-20 follow-up): a first-time user had no on-screen
-           indication of *where* the result would show up until after
-           clicking "Analyze with AI" - this idle-state hint gives that area
-           a visible home from the start, doubling as a hint for the
-           evidence-first, Analyze-with-AI-second workflow. -->
+      <!-- Always render the comparison entry point, including its idle state. -->
+      <PerformanceTuningComparisonView
+        :state="comparison"
+        @select="selectBaseline"
+        @clear="clearBaseline"
+      />
+
+      <!-- Keep the result area visible before the first AI request. -->
       <div class="section ai-analysis ai-analysis-section">
         <div class="section-title-row">
           <h3 class="section-title">AI Analysis</h3>
-          <CopyToClipboardButton v-if="analysisJson" class="copy-analysis-btn" :content="analysisJson" title="Copy AI analysis JSON" />
+          <CopyToClipboardButton
+            v-if="analysisJson"
+            class="copy-analysis-btn"
+            :content="analysisJson"
+            title="Copy AI analysis JSON"
+          />
         </div>
 
         <p v-if="analysis.status === 'idle'" class="section-note">
-          Review the SQL and details above, then click "Analyze with AI" to see the analysis results here.
+          Review the details above, then click "Analyze with AI" to see the analysis results here.
         </p>
 
-        <p v-else-if="analysis.status === 'running'" class="analysis-status">Analyzing with AI…</p>
+        <div v-else-if="analysis.status === 'running'">
+          <p class="analysis-status">Analyzing with AI…</p>
+          <p v-if="aiInputDetail" class="section-note">{{ aiInputDetail }}</p>
+          <p
+            v-if="estimatedTokenUsage"
+            class="section-note"
+            :class="{ 'token-usage-warning': tokenUsageNearLimit }"
+            :title="tokenUsageTitle"
+          >
+            Estimated AI input: {{ estimatedTokenUsage }}
+            <span v-if="tokenUsageNearLimit"> — Near this model's input limit</span>
+          </p>
+        </div>
 
         <div v-else-if="analysis.status === 'error'" class="analysis-error">
           <p>{{ analysis.errorMessage }}</p>
+          <p v-if="estimatedTokenUsage" class="section-note">
+            Smallest attempted AI input: {{ estimatedTokenUsage }}
+            <span v-if="analysis.contextDetail">
+              — Current context {{ analysis.contextDetail
+              }}<span v-if="analysis.comparisonDetail"
+                >, comparison {{ analysis.comparisonDetail }}</span
+              >
+            </span>
+          </p>
           <details v-if="analysis.rawResponseText" class="advanced-details">
             <summary>Raw AI response</summary>
             <pre class="raw-response">{{ analysis.rawResponseText }}</pre>
@@ -383,7 +774,36 @@ defineExpose({
         </div>
 
         <div v-else-if="analysis.status === 'success' && analysis.result">
-          <p class="section-note">AI input: {{ analysis.result.request?.contextDetail === "compact" ? "Compact (raw vendor artifacts omitted for model limit)" : "Full" }}</p>
+          <!-- Mark AI output stale when it predates the current baseline. -->
+          <p v-if="comparison.analysisStale" class="analysis-stale">
+            <fa icon="triangle-exclamation" />
+            Baseline changed; run Analyze with AI again. The analysis below was produced before the
+            current baseline selection and does not reflect the comparison above.
+          </p>
+          <p v-if="aiInputDetail" class="section-note">AI input: {{ aiInputDetail }}</p>
+          <p
+            v-if="estimatedTokenUsage"
+            class="section-note"
+            :class="{ 'token-usage-warning': tokenUsageNearLimit }"
+            :title="tokenUsageTitle"
+          >
+            Estimated AI input: {{ estimatedTokenUsage }}
+            <span v-if="tokenUsageNearLimit"> — Near this model's input limit</span>
+          </p>
+          <div v-if="analysis.result.qualityIssues?.length" class="analysis-quality-warning">
+            <p>
+              <fa icon="triangle-exclamation" /> Some AI recommendations failed deterministic
+              validation.
+            </p>
+            <ul>
+              <li
+                v-for="issue in analysis.result.qualityIssues"
+                :key="`${issue.code}-${issue.recommendationTitle ?? ''}`"
+              >
+                {{ issue.message }}
+              </li>
+            </ul>
+          </div>
           <p class="analysis-summary">{{ analysis.result.summary }}</p>
 
           <div v-if="analysis.result.findings.length > 0" class="analysis-subsection">
@@ -396,7 +816,9 @@ defineExpose({
             >
               <p class="ai-card-title">{{ f.title }}</p>
               <p class="ai-card-detail">{{ f.detail }}</p>
-              <p v-if="evidenceLabel(f.evidence)" class="ai-card-evidence">{{ evidenceLabel(f.evidence) }}</p>
+              <p v-if="evidenceLabel(f.evidence)" class="ai-card-evidence">
+                {{ evidenceLabel(f.evidence) }}
+              </p>
             </div>
           </div>
 
@@ -410,33 +832,43 @@ defineExpose({
             >
               <p class="ai-card-title">{{ r.title }}</p>
               <p class="ai-card-detail">{{ r.detail }}</p>
-              <p class="ai-card-rationale"><span class="label-inline">Rationale:</span> {{ r.rationale }}</p>
-              <pre v-if="r.suggestedSql" class="ai-card-sql">{{ r.suggestedSql }}</pre>
-              <!-- possibleDuplicateOfIndex (2026-08-21 follow-up) is
-                   host-computed, never AI-authored - see
-                   PerformanceTuningAiRecommendation's own doc comment. -->
+              <p class="ai-card-rationale">
+                <span class="label-inline">Rationale:</span> {{ r.rationale }}
+              </p>
+              <pre v-if="r.suggestedQuery" class="ai-card-sql">{{ r.suggestedQuery }}</pre>
+              <!-- possibleDuplicateOfIndex is host-computed, never
+                   AI-authored, and RDB-only (never set for a DynamoDB
+                   context - see PerformanceTuningPreviewPanel.ts's
+                   analyzeWithAi()). -->
               <p v-if="r.possibleDuplicateOfIndex" class="ai-card-duplicate-warning">
                 <fa icon="triangle-exclamation" />
-                Possible duplicate of existing index "{{ r.possibleDuplicateOfIndex }}" - verify before running.
+                Possible duplicate of existing index "{{ r.possibleDuplicateOfIndex }}" - verify
+                before running.
               </p>
-              <p v-if="evidenceLabel(r.evidence)" class="ai-card-evidence">{{ evidenceLabel(r.evidence) }}</p>
+              <p v-if="evidenceLabel(r.evidence)" class="ai-card-evidence">
+                {{ evidenceLabel(r.evidence) }}
+              </p>
             </div>
           </div>
 
           <p class="analysis-note">
-            Recommendations are AI-generated suggestions based on this one context snapshot. They are not applied
-            automatically - review and run them yourself.
+            Recommendations are AI-generated suggestions based on this one context snapshot. They
+            are not applied automatically - review and run them yourself.
           </p>
 
           <div class="row">
             <span class="label">Confidence</span>
-            <span class="badge" :class="`confidence-${analysis.result.confidence}`">{{ analysis.result.confidence }}</span>
+            <span class="badge" :class="`confidence-${analysis.result.confidence}`">{{
+              analysis.result.confidence
+            }}</span>
           </div>
 
           <div v-if="analysis.result.missingContext.length > 0" class="analysis-subsection">
             <h4>Missing context</h4>
             <ul>
-              <li v-for="(m, i) in analysis.result.missingContext" :key="`missing-${i}`">{{ m }}</li>
+              <li v-for="(m, i) in analysis.result.missingContext" :key="`missing-${i}`">
+                {{ m }}
+              </li>
             </ul>
           </div>
 
@@ -446,105 +878,141 @@ defineExpose({
         </div>
       </div>
 
-      <!-- 3. Collection issues: warning-severity diagnostics + unavailable
-           sections, already merged into one list extension-side (§6.1/§6.3). -->
+      <!-- Collection issues: warning-severity diagnostics + unavailable
+           sections, already merged into one list extension-side, for
+           whichever engine is active. -->
       <div v-if="issueGroups.length > 0" class="section collection-issues-section">
         <h3 class="section-title">Collection issues</h3>
         <DiagnosticGroupCard v-for="g in issueGroups" :key="g.key" :group="g" />
       </div>
 
-      <!-- 4. Information / plan notes: informational, never warning-colored
-           (§6.1/§6.2). Shared framing sentence shown once here rather than
-           repeated inside every group's own summary (2026-08-20 follow-up:
-           several PLAN_OBSERVATION groups - one per distinct plan
-           characteristic - used to each carry the identical explanatory
-           sentence, stacking into a lot of repeated vertical space when a
-           plan had several different characteristics; see
-           performanceTuningDiagnosticFormatter.ts's PLAN_OBSERVATION case for
-           the shortened per-group summary this replaces). -->
+      <!-- Information: informational, never warning-colored. Shared framing
+           sentence shown once here rather than repeated inside every
+           group's own summary. -->
       <div v-if="infoGroups.length > 0" class="section information-section">
         <h3 class="section-title">Information</h3>
         <p class="section-note">
-          The items below describe execution-plan characteristics. On their own, they don't indicate a confirmed
-          performance problem — see each item's technical details.
+          The items below describe
+          {{ engine === "relational" ? "execution-plan" : "access-pattern/collection" }}
+          characteristics. On their own, they don't indicate a confirmed performance problem — see
+          each item's technical details.
         </p>
         <DiagnosticGroupCard v-for="g in infoGroups" :key="g.key" :group="g" />
       </div>
 
-      <!-- 5. Execution plan (2026-08-19 follow-up): normalizedPlan is a
-           tree, so it's rendered as an EXPLAIN-style indented text block
-           rather than a table (a table would lose the parent-child
-           structure); planTableMappings is a genuinely flat per-table array,
-           so that one is a small table. Both come pre-formatted from
-           performanceTuningPlanFormatter.ts - this component only renders. -->
-      <div v-if="planTreeText || planTableMappingRows.length > 0" class="section execution-plan-section">
-        <h3 class="section-title">
-          Execution plan
-          <span v-if="context.executionPlan.mode === 'analyze'" class="badge analyzed-badge">analyzed</span>
-        </h3>
-        <p v-if="context.executionPlan.executionTimeMs !== undefined" class="section-note">
-          Real execution time: {{ context.executionPlan.executionTimeMs }} ms
-        </p>
-        <p v-if="context.executionPlan.actualPlan" class="section-note">
-          Runtime evidence from {{ actualEvidenceSource }} is shown first. The estimated topology is retained
-          below only for structured table/predicate metadata and comparison.
-        </p>
-        <p v-else-if="hasActualEvidence" class="section-note">
-          Runtime evidence from {{ actualEvidenceSource }} is included in the normalized execution plan below.
-        </p>
-        <p v-else class="section-note">
-          {{ isDmlEstimate ? "DML statement — estimated plan only; runtime measurements are not collected." : "Estimated plan only — the SQL has not been executed for runtime measurements." }}
-        </p>
-        <div v-if="context.executionPlan.actualPlan" class="actual-plan-text-block">
-          <h4>Actual execution plan ({{ context.executionPlan.actualPlan.source }})</h4>
-          <pre class="plan-tree">{{ actualPlanDisplayText ?? context.executionPlan.actualPlan.content }}</pre>
-        </div>
-        <details v-if="planTreeText" class="advanced-details" :open="!context.executionPlan.actualPlan">
-          <summary>{{ context.executionPlan.actualPlan ? "Estimated plan topology" : hasActualEvidence ? `Actual execution plan (${actualEvidenceSource})` : "Execution plan topology" }}</summary>
-          <pre class="plan-tree">{{ planTreeText }}</pre>
-        </details>
-        <table v-if="planTableMappingRows.length > 0" class="plan-table-mappings">
-          <caption>Table metrics</caption>
-          <thead>
-            <tr>
-              <th>Table</th>
-              <th>Index</th>
-              <th>Est. rows</th>
-              <th>Actual rows</th>
-              <th>Actual/est. ratio</th>
-              <th>Access fraction</th>
-              <th>Filter pass rate</th>
-              <th>Columns used</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, i) in planTableMappingRows" :key="`plan-table-${i}`">
-              <td>{{ row.table }}</td>
-              <td>{{ row.index ?? "-" }}</td>
-              <td>{{ row.estimatedRows ?? "-" }}</td>
-              <td>{{ formatActualRows(row.actualRows) }}</td>
-              <td>{{ formatRuntimeMetric(row.rowEstimateRatio, formatRatio) }}</td>
-              <td>{{ formatRuntimeMetric(row.tableAccessFraction, formatFractionAsPercent) }}</td>
-              <td>{{ formatRuntimeMetric(row.predicateFilterSelectivity, formatFractionAsPercent) }}</td>
-              <td>{{ row.columnsUsed ?? "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- 6. Full context JSON, as "Advanced details" - collapsed by default
-           (§6.5). -->
+      <!-- Full context JSON, as "Advanced details" - collapsed by default. -->
       <details class="section advanced-details advanced-details-section">
         <summary class="section-title">Advanced details: Full context JSON</summary>
         <p class="advanced-note">
-          This preview includes SQL, table definitions, and predicates exactly as collected. Review the content
-          before sending it to an AI service.
+          This preview includes the statement/target, table definitions, and predicates exactly as
+          collected. Review the content before sending it to an AI service.
+        </p>
+        <p v-if="active" class="advanced-note">
+          Diagnostic context size: {{ active.payloadBytes.toLocaleString() }} /
+          {{ active.maxPayloadBytes.toLocaleString() }} bytes
+          <span v-if="active.maxPayloadBytes > 0 && active.payloadBytes > active.maxPayloadBytes">
+            (exceeds collection limit)</span
+          >
         </p>
         <div class="code-panel json-panel">
-          <div class="json-block" v-html="jsonHtml"></div>
+          <div class="json-block" v-html="active?.jsonHtml"></div>
           <CopyToClipboardButton class="copy-btn" :content="contextJson" title="Copy JSON" />
         </div>
       </details>
+    </div>
+
+    <div v-if="aiSendPreview" class="ai-send-preview-backdrop">
+      <section class="ai-send-preview" role="dialog" aria-modal="true" aria-label="AI Send Preview">
+        <header>
+          <div>
+            <h2>AI Send Preview</h2>
+            <p>
+              Destination: {{ aiSendPreview.destination === "copilot" ? "Copilot" : "Clipboard" }} ·
+              Masking level: {{ aiSendPreview.level }}
+            </p>
+          </div>
+          <VsCodeButton
+            appearance="secondary"
+            title="Close preview"
+            aria-label="Close preview"
+            @click="cancelAiPayload"
+          >
+            <span class="codicon codicon-chrome-close" aria-hidden="true"></span>
+          </VsCodeButton>
+        </header>
+
+        <p class="preview-warning">
+          Review the complete payload below. Nothing is sent or copied until you approve it.
+        </p>
+        <p v-if="aiSendPreview.truncation" class="preview-warning">
+          Payload truncated: approximately
+          {{ aiSendPreview.truncation.omittedApproxBytes.toLocaleString() }} bytes omitted.
+        </p>
+
+        <div class="finding-summary">
+          <span
+            >Masked:
+            {{ aiSendPreview.findings.filter((f) => f.disposition === "masked").length }}</span
+          >
+          <span>Unreviewed: {{ unresolvedFindings.length }}</span>
+          <span>Allowed: {{ allowedFindingCount }}</span>
+          <VsCodeButton
+            v-if="unresolvedFindings.length"
+            appearance="secondary"
+            @click="resolveAiFinding(undefined, 'masked', 'full', true)"
+            >Mask all candidates</VsCodeButton
+          >
+        </div>
+
+        <div
+          v-if="unresolvedFindings.length"
+          ref="aiCandidateListElement"
+          class="candidate-list"
+        >
+          <div
+            v-for="finding in unresolvedFindings"
+            :key="finding.id"
+            :ref="(element) => setAiCandidateElement(element, finding.id)"
+            :class="['candidate-row', { selected: selectedAiFindingId === finding.id }]"
+            @click="aiPayloadFindingViewer?.focusFinding(finding.id)"
+          >
+            <code>{{ findingPreview(finding) }}</code>
+            <span>{{ finding.label }}</span>
+            <VsCodeButton
+              appearance="secondary"
+              @click.stop="resolveAiFinding(finding.id, 'masked', 'partial')"
+              >Partial</VsCodeButton
+            >
+            <VsCodeButton
+              appearance="secondary"
+              @click.stop="resolveAiFinding(finding.id, 'masked', 'full')"
+              >Full</VsCodeButton
+            >
+            <VsCodeButton appearance="secondary" @click.stop="resolveAiFinding(finding.id, 'allowed')"
+              >Keep unmasked</VsCodeButton
+            >
+          </div>
+        </div>
+
+        <AiPayloadFindingViewer
+          ref="aiPayloadFindingViewer"
+          :payload="aiSendPreview.payload"
+          :findings="aiSendPreview.findings"
+          @selection-change="selectAiFindingRow"
+        />
+
+        <footer>
+          <span v-if="allowedFindingCount" class="preview-warning">
+            {{ allowedFindingCount }} candidate(s) will be sent unmasked.
+          </span>
+          <VsCodeButton appearance="secondary" @click="cancelAiPayload">Cancel</VsCodeButton>
+          <VsCodeButton :disabled="!canApproveAiPayload" @click="approveAiPayload">
+            {{
+              aiSendPreview.destination === "clipboard" ? "Approve and Copy" : "Approve and Send"
+            }}
+          </VsCodeButton>
+        </footer>
+      </section>
     </div>
   </section>
 </template>
@@ -574,15 +1042,6 @@ defineExpose({
       align-items: baseline;
       margin-bottom: 4px;
 
-      &.sql {
-        align-items: flex-start;
-
-        .code-panel {
-          flex: 1 1 auto;
-          min-width: 0;
-        }
-      }
-
       /* `align-items: baseline` (the .row default) aligns by text baseline,
          which looks fine for plain text rows but goes ragged once the row
          mixes a <label>, a <vscode-dropdown>, and a <vscode-checkbox> - each
@@ -591,27 +1050,11 @@ defineExpose({
          instead is the standard fix for a row of mixed form controls. */
       &.ai-options {
         display: grid;
-        grid-template-columns: 110px max-content 220px max-content;
+        grid-template-columns: 110px max-content 220px max-content 210px max-content;
         align-items: center;
 
         .label {
           min-width: 0;
-        }
-      }
-
-      &.status-summary {
-        display: grid;
-        grid-template-columns: 110px max-content 220px max-content;
-        align-items: baseline;
-
-        .label {
-          min-width: 0;
-        }
-
-        // Column 4 is also where "Translate response" starts above.
-        .payload-size {
-          grid-column: 4;
-          white-space: nowrap;
         }
       }
     }
@@ -621,39 +1064,99 @@ defineExpose({
       min-width: 110px;
       flex: 0 0 auto;
     }
+  }
 
-    .sql-block {
-      max-height: 160px;
+  .ai-send-preview-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: color-mix(in srgb, var(--vscode-editor-background) 75%, transparent);
+  }
+
+  .ai-send-preview {
+    width: min(1100px, 96vw);
+    height: min(850px, 94vh);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+
+    header,
+    footer,
+    .finding-summary,
+    .candidate-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header {
+      justify-content: space-between;
+    }
+
+    h2,
+    p {
+      margin: 0;
+    }
+
+    .candidate-list {
+      // This row exists only while user decisions are required. Keep its
+      // controls readable and let the flexible payload viewer below give up
+      // the corresponding height; otherwise flexbox can shrink this list to
+      // a thin strip while preserving the payload's large intrinsic height.
+      flex: 0 0 auto;
+      max-height: min(180px, 25vh);
       overflow: auto;
-      border-radius: 3px;
+      border: 1px solid var(--vscode-panel-border);
+    }
+
+    .candidate-row {
+      box-sizing: border-box;
+      min-height: 36px;
+      padding: 6px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      cursor: pointer;
+
+      &.selected {
+        background: color-mix(in srgb, var(--vscode-focusBorder) 12%, transparent);
+        box-shadow: inset 3px 0 var(--vscode-focusBorder);
+      }
+
+      code {
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      span {
+        flex: 1;
+      }
+    }
+
+    footer {
+      justify-content: flex-end;
+    }
+
+    .preview-warning {
+      color: var(--vscode-editorWarning-foreground);
     }
   }
 
-  /* Wraps a code block + its floating copy button. `position: relative`
-     makes it the positioning root for `.copy-btn` - same pattern RDH.vue
-     already uses for its per-cell copy button (`td.vcell { position:
-     relative }` + `.cell-actions { position: absolute }`), rather than
-     putting the button as a flex sibling of the code block: a flex sibling
-     only stays visible if the code block correctly shrinks to the row's
-     available width, and an unbroken long SQL/JSON line can blow that
-     sizing up (the block ends up sized to its content instead of the
-     container, pushing the button off-screen). Taking the button out of
-     flow avoids depending on that. `min-width: 0`/`min-height: 0` on the
-     flex item itself is still needed so it can actually shrink within the
-     row/column instead of growing to fit its (potentially very wide/tall)
-     content. */
+  /* Wraps the Full Context JSON code block + its floating copy button - see
+     RelationalPerformanceTuningView.vue's own .code-panel comment (this is
+     the same pattern, just for the shell's shared JSON section instead of a
+     per-engine SQL/PartiQL row). */
   .code-panel {
     position: relative;
   }
 
-  /* createCodeHtmlString() (Prism, extension-side) renders
-     <pre class="code-highlight"><code>...</code></pre> - v-html content
-     bypasses Vue's `scoped` attribute, so these rules target it via
-     :deep(). Colors/background/padding already come from the global
-     .code-highlight rules in assets/scss/main.scss; only wrapping/sizing
-     is overridden here. The extra right padding keeps code text from
-     running under the floating copy button. */
-  .sql-block :deep(pre.code-highlight),
   .json-block :deep(pre.code-highlight) {
     margin: 0;
     white-space: pre-wrap;
@@ -676,14 +1179,6 @@ defineExpose({
     background: var(--vscode-editor-background);
     color: var(--vscode-foreground);
 
-    &.complete {
-      border-color: var(--vscode-testing-iconPassed);
-    }
-
-    &.partial {
-      border-color: var(--vscode-editorWarning-foreground);
-    }
-
     &.confidence-high {
       border-color: var(--vscode-testing-iconPassed);
     }
@@ -695,20 +1190,9 @@ defineExpose({
     &.confidence-low {
       border-color: var(--vscode-errorForeground);
     }
-
-    &.analyzed-badge {
-      border-color: var(--vscode-notificationsInfoIcon-foreground);
-      font-weight: normal;
-      margin-left: 6px;
-    }
   }
 
-  .notes-hint {
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.9em;
-  }
-
-  /* "Run EXPLAIN ANALYZE" first-layer warning (2026-08-20 follow-up) - sits
+  /* "Run Explain Analyze"/"Run Observed Read" first-layer warning - sits
      right under the toolbar, so the risk is visible before the button is
      ever clicked, not just in its tooltip. */
   .actual-plan-warning {
@@ -717,14 +1201,14 @@ defineExpose({
     margin: 2px 0 6px 0;
   }
 
-  .exceeded {
-    color: var(--vscode-errorForeground);
+  .label-inline {
     font-weight: 600;
   }
 
   /* The scrollable body between the fixed header and footer - Collection
-     issues / Information / Advanced details can all be long, so only this
-     area scrolls, keeping Database/Status/SQL always visible. */
+     issues / Information / AI Analysis / Advanced details, plus each
+     engine's own body sections, can all be long, so only this area scrolls,
+     keeping the header always visible. */
   .scrollArea {
     flex: 1 1 auto;
     min-height: 0;
@@ -733,13 +1217,23 @@ defineExpose({
     display: flex;
     flex-direction: column;
 
-    // Keep the visible reading order aligned with the saved DBN report.
-    .performance-snapshot-section { order: 1; }
-    .collection-issues-section { order: 2; }
-    .information-section { order: 3; }
-    .execution-plan-section { order: 4; }
-    .ai-analysis-section { order: 5; }
-    .advanced-details-section { order: 6; }
+    /* Keep visible section order aligned with the saved report. */
+    .collection-issues-section {
+      order: 2;
+    }
+    .information-section {
+      order: 3;
+    }
+    /* Deterministic comparison precedes the AI interpretation. */
+    .comparison-section {
+      order: 8;
+    }
+    .ai-analysis-section {
+      order: 9;
+    }
+    .advanced-details-section {
+      order: 10;
+    }
 
     .section {
       margin-bottom: 12px;
@@ -767,6 +1261,27 @@ defineExpose({
       margin: 0 0 8px 0;
     }
 
+    .completion-banner {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 9px;
+      margin: 4px 0 8px;
+      border: 1px solid;
+      border-radius: 3px;
+
+      &.complete {
+        color: var(--vscode-testing-iconPassed);
+        background: color-mix(in srgb, var(--vscode-testing-iconPassed) 10%, transparent);
+      }
+
+      &.incomplete {
+        color: var(--vscode-editorWarning-foreground);
+        background: var(--vscode-inputValidation-warningBackground);
+        border-color: var(--vscode-inputValidation-warningBorder);
+      }
+    }
+
     .json-panel {
       min-height: 200px;
       max-height: 60vh;
@@ -784,54 +1299,7 @@ defineExpose({
       }
     }
 
-    /* --- Execution plan (2026-08-19 follow-up) --- */
-
-    .plan-tree {
-      margin: 0 0 8px 0;
-      padding: 6px 8px;
-      max-height: 180px;
-      overflow: auto;
-      white-space: pre;
-      font-size: 0.85em;
-      background: var(--vscode-textCodeBlock-background);
-      border-radius: 3px;
-    }
-
-    /* Same border/padding/font-size as DiagnosticGroupCard.vue's
-       .technical-details table, for visual consistency between the two
-       "small detail table" spots this panel now has. */
-    .plan-table-mappings {
-      border-collapse: collapse;
-      width: 100%;
-      font-size: 0.85em;
-
-      caption {
-        caption-side: top;
-        margin: 0 0 4px 0;
-        text-align: left;
-        font-size: 1.1em;
-        font-weight: 600;
-      }
-
-      th,
-      td {
-        border: 1px solid var(--vscode-editorWidget-border);
-        padding: 2px 6px;
-        text-align: left;
-        vertical-align: top;
-      }
-    }
-
-    .actual-plan-text-block {
-      margin-top: 8px;
-
-      h4 {
-        margin: 0 0 4px 0;
-        font-size: 0.95em;
-      }
-    }
-
-    /* --- AI Analysis (Step 10) --- */
+    /* --- AI Analysis --- */
 
     .section-title-row {
       display: flex;
@@ -850,6 +1318,28 @@ defineExpose({
 
     .analysis-error {
       color: var(--vscode-errorForeground);
+    }
+
+    .analysis-stale {
+      color: var(--vscode-editorWarning-foreground);
+      font-size: 0.9em;
+      margin: 0 0 8px 0;
+    }
+
+    .token-usage-warning {
+      color: var(--vscode-editorWarning-foreground);
+    }
+
+    .analysis-quality-warning {
+      color: var(--vscode-editorWarning-foreground);
+      border-left: 3px solid var(--vscode-editorWarning-foreground);
+      padding: 4px 8px;
+      margin: 0 0 8px 0;
+
+      p,
+      ul {
+        margin: 2px 0;
+      }
     }
 
     .raw-response {
@@ -910,10 +1400,6 @@ defineExpose({
     .ai-card-detail,
     .ai-card-rationale {
       margin: 0 0 2px 0;
-    }
-
-    .label-inline {
-      font-weight: 600;
     }
 
     .ai-card-sql {

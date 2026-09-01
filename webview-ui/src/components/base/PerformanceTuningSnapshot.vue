@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PerformanceTuningHumanSummary } from "@/utilities/vscode";
+import ObservedSignalCard from "./ObservedSignalCard.vue";
 
 defineProps<{ summary: PerformanceTuningHumanSummary }>();
 
@@ -32,16 +33,11 @@ const isDml = (statementKind: string): boolean =>
     <h4>Observed signals</h4>
     <p class="note">Deterministic summaries of collected database facts; these are separate from the AI analysis.</p>
     <div class="signals">
-      <div v-for="(signal, index) in summary.signals" :key="`${signal.kind}-${signal.tableRef ?? index}`"
-        class="signal" :class="signal.level">
-        <div class="signal-heading">
-          <span class="level">{{ signal.level }}</span>
-          <strong>{{ signal.title }}</strong>
-          <span v-if="signal.tableRef" class="table-ref">{{ signal.tableRef }}</span>
-        </div>
-        <p>{{ signal.summary }}</p>
-        <p class="raw-path">Details: {{ signal.rawDataPath }}</p>
-      </div>
+      <ObservedSignalCard
+        v-for="(signal, index) in summary.signals"
+        :key="`${signal.kind}-${signal.tableRef ?? index}`"
+        :signal="signal"
+      />
     </div>
 
     <div v-if="summary.rowFlows.length > 0" class="row-flow">
@@ -83,25 +79,14 @@ const isDml = (statementKind: string): boolean =>
 <style lang="scss" scoped>
 .performance-snapshot {
   .profile { display: flex; flex-wrap: wrap; gap: 6px; }
-  .profile-item, .level {
+  .profile-item {
     border: 1px solid var(--vscode-panel-border);
     border-radius: 999px;
     padding: 2px 8px;
   }
   .scope-detail, .note, .raw-path { color: var(--vscode-descriptionForeground); }
   h4 { margin: 12px 0 4px; }
-  .note, .signal p { margin: 3px 0; }
-  .signals { display: grid; gap: 6px; }
-  .signal {
-    border-left: 3px solid var(--vscode-panel-border);
-    padding: 6px 8px;
-    background: var(--vscode-editor-inactiveSelectionBackground);
-    &.attention { border-left-color: var(--vscode-editorWarning-foreground); }
-    &.unknown { border-left-color: var(--vscode-descriptionForeground); }
-  }
-  .signal-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-  .level { font-size: 0.85em; text-transform: uppercase; }
-  .table-ref { color: var(--vscode-descriptionForeground); }
+  .note { margin: 3px 0; }
   .raw-path { font-size: 0.85em; }
   .row-flow { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }

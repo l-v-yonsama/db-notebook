@@ -8,15 +8,51 @@ import {
 import { ResultSetData } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import { commands, Uri, ViewColumn, WebviewPanel, window } from "vscode";
-import { OPEN_MDH_VIEWER } from "../constant";
+import {
+  commands,
+  NotebookCellData,
+  NotebookCellKind,
+  NotebookEdit,
+  Uri,
+  ViewColumn,
+  WebviewPanel,
+  window,
+  workspace,
+  WorkspaceEdit,
+} from "vscode";
+import {
+  CREATE_NEW_NOTEBOOK,
+  NOTEBOOK_TYPE,
+  OPEN_MDH_VIEWER,
+  REFRESH_QUERY_HISTORIES,
+} from "../constant";
 import { ActionCommand } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
-import { DynamoDBConditionParams, DynamoQueryFilter } from "../shared/DynamoDBConditionParams";
+import {
+  DynamoDBConditionParams,
+  DynamoQueryBuildMode,
+  DynamoQueryFilter,
+  DynamoQueryProjectionConstraintView,
+  DynamoQueryProjectionMode,
+} from "../shared/DynamoDBConditionParams";
 import { DynamoQueryPanelEventData } from "../shared/MessageEventData";
+import { CellMeta } from "../types/Notebook";
 import { MdhViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import { getDatabaseConfig } from "../utilities/configUtil";
+import {
+  buildDynamoProjectionExpression,
+  computeDynamoProjectionConstraint,
+  resolveDynamoConsistentRead,
+  resolveDynamoProjectionSelection,
+} from "../utilities/dynamoDbProjection";
+import {
+  buildDynamoQueryDisplayText,
+  buildDynamoQueryStructuralKey,
+} from "../utilities/dynamoDbQueryStructural";
+import { restoreDynamoQueryPanelState } from "../utilities/dynamoDbQueryPanelHistory";
+import { buildDynamoDbNativeQueryPreviewInput } from "../utilities/dynamoDbNativeQueryDisplay";
+import { buildDynamoPartiqlSelect } from "../utilities/dynamoDbPartiqlBuilder";
 import { log } from "../utilities/logger";
 import { StateStorage } from "../utilities/StateStorage";
 import { BasePanel } from "./BasePanel";
@@ -43,6 +79,17 @@ export class DynamoQueryPanel extends BasePanel {
   private previewInput = "";
   private sortDesc = false;
   private filters: DynamoQueryFilter[] = [];
+  private projectionMode: DynamoQueryProjectionMode = "default";
+  private projectedAttributes: string[] = [];
+  private consistentRead = false;
+  private buildMode: DynamoQueryBuildMode = "nativeQuery";
+  private projectionConstraint: DynamoQueryProjectionConstraintView = {
+    availableAttributes: [],
+    projectedAttributes: [],
+    allowAllTableAttributesOption: false,
+    restrictToProjected: false,
+    consistentReadAllowed: true,
+  };
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
     super(panel, extensionUri);
@@ -56,7 +103,11 @@ export class DynamoQueryPanel extends BasePanel {
     DynamoQueryPanel.stateStorage = storage;
   }
 
-  public static render(extensionUri: Uri, tableRes: DbDynamoTable) {
+  public static async render(
+    extensionUri: Uri,
+    tableRes: DbDynamoTable,
+    historyInput?: QueryItemsAtClientInputParams
+  ): Promise<void> {
     if (tableRes === null || tableRes === undefined) {
       throw new Error("tableRes must be defined");
     }
@@ -79,14 +130,17 @@ export class DynamoQueryPanel extends BasePanel {
       );
       DynamoQueryPanel.currentPanel = new DynamoQueryPanel(panel, extensionUri);
     }
-    DynamoQueryPanel.currentPanel.renderSub(tableRes);
+    await DynamoQueryPanel.currentPanel.renderSub(tableRes, historyInput);
   }
 
   getComponentName(): ComponentName {
     return "DynamoQueryPanel";
   }
 
-  async renderSub(tableRes: DbDynamoTable): Promise<void> {
+  async renderSub(
+    tableRes: DbDynamoTable,
+    historyInput?: QueryItemsAtClientInputParams
+  ): Promise<void> {
     const { conName } = tableRes.meta;
     const setting = await DynamoQueryPanel.stateStorage?.getConnectionSettingByName(conName);
     if (!setting) {
@@ -95,10 +149,31 @@ export class DynamoQueryPanel extends BasePanel {
     this.tableRes = tableRes;
     this.numOfRows = tableRes.attr?.ItemCount ?? 0;
     this.target = "$table";
+    this.limit = getDatabaseConfig().limitRows;
     this.pkValue = "";
     this.skValue = "";
+    this.skOpe = "";
+    this.sortDesc = false;
     this.queryInput = undefined;
     this.filters = [];
+    this.projectionMode = "default";
+    this.projectedAttributes = [];
+    this.consistentRead = false;
+    this.buildMode = "nativeQuery";
+
+    if (historyInput) {
+      const restored = restoreDynamoQueryPanelState(historyInput, tableRes);
+      this.target = restored.target;
+      this.limit = restored.limit ?? this.limit;
+      this.pkValue = restored.pkValue;
+      this.skValue = restored.skValue;
+      this.skOpe = restored.skOpe;
+      this.sortDesc = restored.sortDesc;
+      this.filters = restored.filters;
+      this.projectionMode = restored.projectionMode;
+      this.projectedAttributes = restored.projectedAttributes;
+      this.consistentRead = restored.consistentRead;
+    }
 
     this.resetByTarget();
     this.init();
@@ -131,6 +206,11 @@ export class DynamoQueryPanel extends BasePanel {
             label: `${it.name} [${it.attrType}]`,
             value: it.name,
           })),
+          projectionMode: this.projectionMode,
+          projectedAttributes: this.projectedAttributes,
+          consistentRead: this.consistentRead,
+          buildMode: this.buildMode,
+          projectionConstraint: this.projectionConstraint,
         },
       },
     };
@@ -150,8 +230,22 @@ export class DynamoQueryPanel extends BasePanel {
         return;
       case "ok":
         {
-          const { target, limit, pkValue, skValue, skOpe, preview, sortDesc, filters } =
-            params as DynamoDBConditionParams;
+          const {
+            target,
+            limit,
+            pkValue,
+            skValue,
+            skOpe,
+            preview,
+            sortDesc,
+            filters,
+            projectionMode,
+            projectedAttributes,
+            consistentRead,
+            buildMode,
+            openInNotebook,
+            inActiveNotebook,
+          } = params as DynamoDBConditionParams;
           this.limit = limit;
           this.target = target;
           this.pkValue = pkValue;
@@ -159,10 +253,39 @@ export class DynamoQueryPanel extends BasePanel {
           this.skOpe = skOpe;
           this.sortDesc = sortDesc;
           this.filters = filters;
+          // Never trusted as-is - resetByTarget() re-derives the
+          // constraint for `target` and re-resolves both against it before
+          // building queryInput (design doc §6.5).
+          this.projectionMode = projectionMode;
+          this.projectedAttributes = projectedAttributes;
+          this.consistentRead = consistentRead;
+          this.buildMode = buildMode ?? "nativeQuery";
           this.resetByTarget();
+
+          if (openInNotebook) {
+            if (this.buildMode !== "partiql") {
+              showWindowErrorMessage("Select PartiQL before opening the query in a Notebook.");
+              return;
+            }
+            if (!this.pkValue || !this.queryInput) {
+              showWindowErrorMessage("Enter a partition key value before opening the query.");
+              return;
+            }
+            if (this.projectionMode === "specific" && this.projectedAttributes.length === 0) {
+              showWindowErrorMessage("Select at least one Projection attribute.");
+              return;
+            }
+            await this.openPartiqlInNotebook(inActiveNotebook === true);
+            return;
+          }
 
           if (preview) {
             this.init();
+            return;
+          }
+
+          if (this.projectionMode === "specific" && this.projectedAttributes.length === 0) {
+            showWindowErrorMessage("Select at least one Projection attribute before executing the Query.");
             return;
           }
 
@@ -188,12 +311,102 @@ export class DynamoQueryPanel extends BasePanel {
           if (ok && result) {
             const commandParam: MdhViewParams = { title: tableRes.name, list: [result] };
             commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+            await this.saveHistory({
+              connectionName: conName,
+              queryInput,
+              result,
+              status: "success",
+            });
           } else {
             showWindowErrorMessage(message);
+            await this.saveHistory({
+              connectionName: conName,
+              queryInput,
+              status: "error",
+              errorMessage: message,
+            });
           }
         }
         return;
     }
+  }
+
+  private async openPartiqlInNotebook(inActiveNotebook: boolean): Promise<void> {
+    const { tableRes, queryInput } = this;
+    if (!tableRes || !queryInput) {
+      return;
+    }
+    let partiql: string;
+    try {
+      partiql = buildDynamoPartiqlSelect({ input: queryInput, sortKeyName: this.skName });
+    } catch (error) {
+      showWindowErrorMessage(error);
+      return;
+    }
+
+    const cell = new NotebookCellData(NotebookCellKind.Code, partiql, "sql");
+    const metadata: CellMeta = { connectionName: tableRes.meta.conName };
+    cell.metadata = metadata;
+
+    if (!inActiveNotebook) {
+      await commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
+      this.dispose();
+      return;
+    }
+
+    // Closing the webview returns focus to the previously active Notebook;
+    // mirror ViewConditionPanel's delayed insertion path.
+    this.dispose();
+    setTimeout(async () => {
+      const activeEditor = window.activeNotebookEditor;
+      if (!activeEditor || activeEditor.notebook.notebookType !== NOTEBOOK_TYPE) {
+        showWindowErrorMessage("No active notebook editor found.");
+        return;
+      }
+      const edit = new WorkspaceEdit();
+      const notebookEdit = NotebookEdit.insertCells(activeEditor.selection.end, [cell]);
+      edit.set(activeEditor.notebook.uri, [notebookEdit]);
+      await workspace.applyEdit(edit);
+    }, 100);
+  }
+
+  // Saves a Query Panel execution (success or failure) to Query History as a
+  // "dynamodbQuery"-kind entry (design doc §7.1/§7.2), and refreshes the
+  // History tree the same way every other addQueryHistory() caller does. A
+  // failed execution reuses the same structuralKey, so StateStorage's own
+  // merge logic (never this method's job) folds it into the prior success
+  // instead of overwriting it.
+  private async saveHistory(params: {
+    connectionName: string;
+    queryInput: QueryItemsAtClientInputParams;
+    result?: ResultSetData;
+    status: "success" | "error";
+    errorMessage?: string;
+  }): Promise<void> {
+    if (!DynamoQueryPanel.stateStorage) {
+      return;
+    }
+    const { connectionName, queryInput, result, status, errorMessage } = params;
+    const displayText = buildDynamoQueryDisplayText(queryInput);
+    const structuralKey = buildDynamoQueryStructuralKey(queryInput);
+
+    await DynamoQueryPanel.stateStorage.addQueryHistory({
+      connectionName,
+      sqlDoc: displayText,
+      request: {
+        kind: "dynamodbQuery",
+        origin: "dynamoQueryPanel",
+        input: queryInput,
+        structuralKey,
+        displayText,
+      },
+      meta: result?.meta,
+      summary: result?.summary,
+      executedAt: Date.now(),
+      status,
+      errorMessage,
+    });
+    commands.executeCommand(REFRESH_QUERY_HISTORIES);
   }
 
   private resetByTarget() {
@@ -239,6 +452,22 @@ export class DynamoQueryPanel extends BasePanel {
     this.skName = skCol?.name ?? "";
     this.skAttr = skCol?.attrType ?? "";
 
+    // Never trust the webview's own projectionMode/projectedAttributes/
+    // consistentRead as final - re-derive the constraint for the (possibly
+    // just-switched-to) target and re-resolve both against it, so a target
+    // switch clears an invalid selection immediately and a forged webview
+    // message can't smuggle e.g. GSI + consistentRead:true through (design
+    // doc §6.2/§6.5).
+    this.projectionConstraint = computeDynamoProjectionConstraint(this.tableRes, this.target);
+    const resolvedProjection = resolveDynamoProjectionSelection({
+      mode: this.projectionMode,
+      attributes: this.projectedAttributes,
+      constraint: this.projectionConstraint,
+    });
+    this.projectionMode = resolvedProjection.mode;
+    this.projectedAttributes = resolvedProjection.attributes;
+    this.consistentRead = resolveDynamoConsistentRead(this.consistentRead, this.projectionConstraint);
+
     this.queryInput = {
       TableName: this.tableRes.name,
       IndexName: indexName,
@@ -251,6 +480,12 @@ export class DynamoQueryPanel extends BasePanel {
     };
     if (this.sortDesc) {
       this.queryInput.ScanIndexForward = false;
+    }
+    if (this.consistentRead) {
+      // Left unset (never an explicit `false`) when off - eventual
+      // consistency is DynamoDB's own unset-Query default (design doc
+      // §6.2).
+      this.queryInput.ConsistentRead = true;
     }
     const expressionAttributeValues = this.queryInput.ExpressionAttributeValues as any;
     expressionAttributeValues[":pk"] = {};
@@ -352,6 +587,26 @@ export class DynamoQueryPanel extends BasePanel {
       }
     });
 
-    this.previewInput = JSON.stringify(this.queryInput, null, 2);
+    const projection = buildDynamoProjectionExpression(this.projectionMode, this.projectedAttributes);
+    if (projection.select) {
+      this.queryInput.Select = projection.select;
+    }
+    if (projection.projectionExpression) {
+      this.queryInput.ProjectionExpression = projection.projectionExpression;
+      Object.assign(this.queryInput.ExpressionAttributeNames!, projection.expressionAttributeNames);
+    }
+
+    if (this.buildMode === "partiql") {
+      try {
+        this.previewInput = buildDynamoPartiqlSelect({
+          input: this.queryInput,
+          sortKeyName: this.skName,
+        });
+      } catch (error) {
+        this.previewInput = `PartiQL build error: ${(error as Error).message}`;
+      }
+    } else {
+      this.previewInput = JSON.stringify(buildDynamoDbNativeQueryPreviewInput(this.queryInput), null, 2);
+    }
   }
 }

@@ -7,6 +7,7 @@ import {
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ProgressLocation, Uri, window } from "vscode";
 import { PerformanceTuningPreviewPanel } from "../panels/PerformanceTuningPreviewPanel";
+import type { AiMaskingLevel } from "../shared/AiDataMasking";
 import { validatePlanBindsInput } from "../shared/PerformanceTuningBinds";
 import { createRDSDriver, workflow } from "./driverResolver";
 
@@ -14,9 +15,14 @@ import { createRDSDriver, workflow } from "./driverResolver";
 // in analyze mode without trusting the webview to resend it.
 export type PerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
+  /** Connection-scoped default; the Preview may override it for this invocation only. */
+  initialMaskingLevel: AiMaskingLevel;
   databaseName: string;
   statement: {
     sql: string;
+    // "sqlHistory" is db-drivers' own PerformanceTuningContext union value,
+    // not this extension's naming - it stays as-is even though the view is
+    // now called Query History, so the two contracts keep lining up.
     source: "statementStatistics" | "sqlHistory" | "editor";
     statistics?: SelectedStatementStatistics;
   };
@@ -47,7 +53,7 @@ export type StartPerformanceTuningPreviewResult = {
   technicalMessage?: string;
 };
 
-// Shared by SQL History and Query Statistics so capability checks, progress,
+// Shared by Query History and Query Statistics so capability checks, progress,
 // cancellation, and error handling stay consistent.
 export async function startPerformanceTuningPreview(
   params: StartPerformanceTuningPreviewParams

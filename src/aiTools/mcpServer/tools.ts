@@ -24,7 +24,11 @@ import { StateStorage } from "../../utilities/StateStorage";
  * formatting, logging, and error handling all happen once in that shared function, so
  * neither call site (Copilot or MCP) repeats that logic.
  */
-export function registerTools(server: McpServer, stateStorage: StateStorage): void {
+export function registerTools(
+  server: McpServer,
+  stateStorage: StateStorage,
+  cancellation?: AbortSignal
+): void {
   server.registerTool(
     "listDbConnections",
     {
@@ -48,7 +52,9 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       inputSchema: {
         connectionName: z
           .string()
-          .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
+          .describe(
+            "The exact name of the connection as configured in Database Notebook's DB Explorer."
+          ),
       },
     },
     async ({ connectionName }) => {
@@ -63,43 +69,60 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     "getDbSchema",
     {
       description:
-        "Returns schema or resource information for a connection managed by Database Notebook, in a format appropriate to its type. For a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle): the CREATE TABLE DDL (columns, types, primary/foreign keys, comments) for a table, or all tables -- optionally narrow with schemaName and/or tableName. For an AWS connection: the configured resources -- S3 bucket names, SQS queue names/URLs, CloudWatch log group names, and DynamoDB table key schemas (partition/sort key, attribute types, GSI/LSI counts) -- optionally narrow with serviceType and/or resourceName. For a Redis connection: each DB index and its key count. For a Memcache connection: key counts per cache tier (hot/warm/cold) and the configured servers. For a Keycloak connection: each realm with user/group counts -- optionally narrow with realmName. For an Auth0 connection: user/organization counts, plus organization/client lists where the connection is configured to retrieve them. For an MQTT connection: the configured topic subscriptions with QoS. All filters are optional and independent; omit any of them to get every match. Use this when the user asks about table/resource structure, columns, relationships, or before writing SQL/inspecting resources against a connection you haven't inspected yet. For searching/browsing individual records or keys within a resource (not just its structure/summary), use scanDbResource instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+        "Returns schema or resource information for a connection managed by Database Notebook, in a format appropriate to its type. For a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle): the CREATE TABLE DDL (columns, types, primary/foreign keys, comments) for a table, or all tables -- optionally narrow with schemaName and/or tableName. For an AWS connection: the configured resources -- S3 bucket names, SQS queue names/URLs, CloudWatch log group names, and DynamoDB table key schemas (partition/sort key, attribute types, GSI/LSI counts) -- optionally narrow with serviceType and/or resourceName. For a Redis connection: each DB index and its key count. For a Memcache connection: key counts per cache tier (hot/warm/cold) and the configured servers. For a Keycloak connection: each realm with user/group counts -- optionally narrow with realmName. For an Auth0 connection: user/organization counts, plus organization/client lists where the connection is configured to retrieve them. For an MQTT connection: the configured topic subscriptions with QoS. All filters are optional and independent; omit any of them to get every match. Use this when the user asks about table/resource structure, columns, relationships, or before writing SQL/inspecting resources against a connection you haven't inspected yet. For searching/browsing individual records or keys within a resource (not just its structure/summary), use scanDbResource instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name. When AI data masking is enabled, comments, descriptions, and default/check literals are processed locally and require preview approval before this definition output is returned.",
       inputSchema: {
         connectionName: z
           .string()
-          .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
+          .describe(
+            "The exact name of the connection as configured in Database Notebook's DB Explorer."
+          ),
         schemaName: z
           .string()
           .optional()
-          .describe("SQL connections only. Optional: limit results to tables in a single schema/database. Omit to search every schema."),
+          .describe(
+            "SQL connections only. Optional: limit results to tables in a single schema/database. Omit to search every schema."
+          ),
         tableName: z
           .string()
           .optional()
-          .describe("SQL connections only. Optional: limit results to a single table name. Omit to get every table."),
+          .describe(
+            "SQL connections only. Optional: limit results to a single table name. Omit to get every table."
+          ),
         serviceType: z
           .enum(["S3", "SQS", "SES", "Cloudwatch", "DynamoDB"])
           .optional()
-          .describe("AWS connections only. Optional: limit results to a single AWS service. Omit to include every configured service."),
+          .describe(
+            "AWS connections only. Optional: limit results to a single AWS service. Omit to include every configured service."
+          ),
         resourceName: z
           .string()
           .optional()
-          .describe("AWS connections only. Optional: limit results to a single bucket/queue/log group/table name. Omit to get every resource."),
+          .describe(
+            "AWS connections only. Optional: limit results to a single bucket/queue/log group/table name. Omit to get every resource."
+          ),
         realmName: z
           .string()
           .optional()
-          .describe("Keycloak connections only. Optional: limit results to a single realm name. Omit to get every realm."),
+          .describe(
+            "Keycloak connections only. Optional: limit results to a single realm name. Omit to get every realm."
+          ),
       },
     },
     async ({ connectionName, schemaName, tableName, serviceType, resourceName, realmName }) => {
       const input = { connectionName, schemaName, tableName, serviceType, resourceName, realmName };
       const text = await trackInvocation("mcpServer", "getDbSchema", input, () =>
-        getSchemaText(stateStorage, connectionName, {
-          schemaName,
-          tableName,
-          serviceType,
-          resourceName,
-          realmName,
-        })
+        getSchemaText(
+          stateStorage,
+          connectionName,
+          {
+            schemaName,
+            tableName,
+            serviceType,
+            resourceName,
+            realmName,
+          },
+          { source: "mcp", cancellation }
+        )
       );
       return { content: [{ type: "text", text }] };
     }
@@ -109,20 +132,30 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     "getPerformanceTuningContext",
     {
       description:
-        "Returns a structured, vendor-neutral snapshot of everything needed to reason about why a single SQL statement (MySQL/PostgreSQL/SQL Server/Oracle only) may be slow: the estimated execution plan, the definitions/indexes/constraints of the tables it touches, optimizer statistics, physical health metrics (bloat/fragmentation/stale-statistics style signals), and structured collection diagnostics noting anything that could not be collected and why. This is read-only and observational -- it never executes the SQL (always an estimated plan, never ANALYZE) and never returns AI judgement of its own; reason about the returned JSON yourself. The SQL, table/index definitions, and predicates are included exactly as read from the database, not masked or redacted, and may contain literal values -- treat the response accordingly. Use this when the user asks why a query is slow, wants to tune performance, or asks about a query's execution plan/statistics/indexes together rather than one at a time (use getDbSchema instead for just table structure). If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
+        "Returns a structured, vendor-neutral snapshot of everything needed to reason about why a single statement may be slow or expensive: for a SQL connection (MySQL/PostgreSQL/SQL Server/Oracle), the estimated execution plan, table/index/constraint definitions, optimizer statistics, and physical health metrics; for an AWS connection configured for DynamoDB, a static access-path classification (Query vs. Scan) of a PartiQL SELECT against the table/index key schema, the table/index definitions and Capacity mode, and recent CloudWatch throughput/throttling metrics. Both include structured collection diagnostics noting anything that could not be collected and why. This is read-only and observational -- it never executes the statement or reads item/row data (SQL: always an estimated plan, never ANALYZE; DynamoDB: a static classification only, never a Query/Scan/GetItem/Run Observed Read) and never returns AI judgement of its own; reason about the returned JSON yourself. The context may contain statement literals, definitions, comments, and predicates. When AI data masking is enabled, Database Notebook processes these locally and requires preview approval before returning the context. Use this when the user asks why a query or statement is slow or expensive, wants to tune performance, or asks about its execution plan/access pattern/statistics/indexes together rather than one at a time (use getDbSchema instead for just table structure). If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name.",
       inputSchema: {
         connectionName: z
           .string()
-          .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
-        sql: z.string().describe("The SQL statement to analyze. It is never executed."),
+          .describe(
+            "The exact name of the connection as configured in Database Notebook's DB Explorer."
+          ),
+        sql: z
+          .string()
+          .describe(
+            "The SQL statement to analyze (or, for an AWS connection configured for DynamoDB, a PartiQL SELECT statement). It is never executed."
+          ),
         databaseName: z
           .string()
           .optional()
-          .describe("Optional: the database/catalog to analyze against. Omit to use the connection's configured default database."),
+          .describe(
+            "Optional: the database/catalog to analyze against. SQL connections only; ignored for a DynamoDB connection. Omit to use the connection's configured default database."
+          ),
         schemaName: z
           .string()
           .optional()
-          .describe("Optional: the schema to resolve tables in, for vendors where this differs from databaseName (e.g. PostgreSQL). Omit to let the driver resolve it."),
+          .describe(
+            "Optional: the schema to resolve tables in, for vendors where this differs from databaseName (e.g. PostgreSQL). SQL connections only; ignored for a DynamoDB connection. Omit to let the driver resolve it."
+          ),
       },
       annotations: {
         readOnlyHint: true,
@@ -131,7 +164,7 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     async ({ connectionName, sql, databaseName, schemaName }) => {
       const input = { connectionName, sql, databaseName, schemaName };
       const text = await trackInvocation("mcpServer", "getPerformanceTuningContext", input, () =>
-        getPerformanceTuningContextText(stateStorage, input)
+        getPerformanceTuningContextText(stateStorage, input, { source: "mcp", cancellation })
       );
       return { content: [{ type: "text", text }] };
     }
@@ -141,11 +174,13 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     "runDbQuery",
     {
       description:
-        "Runs a SQL statement against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) managed by Database Notebook, or a PartiQL statement against an AWS connection configured for DynamoDB, and returns the results. Prefer read-only SELECT/EXPLAIN/SHOW statements. Write/DDL statements (INSERT/UPDATE/DELETE/CREATE/ALTER/DROP/etc.) will always require the user's explicit confirmation before running, and on SQL Server or DynamoDB connections every statement requires confirmation regardless of type. Not supported for other non-SQL connections (Redis, MQTT, other AWS resources like S3/SQS/CloudWatch, etc.) -- use scanDbResource to search those instead. To run multiple statements as one atomic transaction, use runDbTransaction instead of calling this tool repeatedly (DynamoDB connections are not supported by runDbTransaction). Use getDbSchema first if you don't already know the table structure. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name. Note: when called via an MCP client (rather than GitHub Copilot Chat), write/DDL confirmation is handled by that client's own tool-approval UI, not by a Database Notebook-specific dialog -- the DB-engine-level read-only session enforcement described above still applies regardless of client.",
+        "Runs a SQL statement against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) managed by Database Notebook, or a PartiQL statement against an AWS connection configured for DynamoDB, and returns the results. Prefer read-only SELECT/EXPLAIN/SHOW statements. Write/DDL statements (INSERT/UPDATE/DELETE/CREATE/ALTER/DROP/etc.) will always require the user's explicit confirmation before running, and on SQL Server or DynamoDB connections every statement requires confirmation regardless of type. Not supported for other non-SQL connections (Redis, MQTT, other AWS resources like S3/SQS/CloudWatch, etc.) -- use scanDbResource to search those instead. To run multiple statements as one atomic transaction, use runDbTransaction instead of calling this tool repeatedly (DynamoDB connections are not supported by runDbTransaction). Use getDbSchema first if you don't already know the table structure. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name. Note: when called via an MCP client (rather than GitHub Copilot Chat), write/DDL confirmation is handled by that client's own tool-approval UI, not by a Database Notebook-specific dialog -- the DB-engine-level read-only session enforcement described above still applies regardless of client. When AI data masking is enabled, Database Notebook shows a local preview and requires approval before returning row data.",
       inputSchema: {
         connectionName: z
           .string()
-          .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
+          .describe(
+            "The exact name of the connection as configured in Database Notebook's DB Explorer."
+          ),
         sql: z.string().describe("The SQL statement to run."),
       },
       annotations: {
@@ -155,7 +190,7 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     },
     async ({ connectionName, sql }) => {
       const text = await trackInvocation("mcpServer", "runDbQuery", { connectionName, sql }, () =>
-        runQueryText(stateStorage, connectionName, sql)
+        runQueryText(stateStorage, connectionName, sql, { source: "mcp", cancellation })
       );
       return { content: [{ type: "text", text }] };
     }
@@ -165,11 +200,13 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     "scanDbResource",
     {
       description:
-        "Searches/browses data in a non-SQL connection managed by Database Notebook (Redis, Memcache, Mqtt, Keycloak, Auth0, or AWS S3/SQS/SSM/Secrets Manager/CloudWatch Logs) using resource-specific scan parameters, since these connections cannot run SQL. Not supported for SQL connections (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) or AWS DynamoDB -- use runDbQuery for SQL connections. Set connectionName and fill in exactly ONE of the nested parameter objects matching the connection's type: redis, memcache, mqtt, awsS3, awsSqs, awsSsm, awsSecretsManager, awsCloudWatchLogGroup, awsCloudWatchLogStream, keycloak, or auth0 -- each object's fields only apply to that connection type, do not mix fields from different objects. Call getDbSchema first if you don't know the connection's exact resource names (bucket/queue/log group/log stream names) or which AWS sub-resource it is, and call listDbConnections first if you don't know the exact connection name. Mqtt scanning requires the connection to already be connected and subscribed to the relevant topics via the MQTT panel -- it does not auto-connect, and returns an error telling you so if it isn't. awsSsm/awsSecretsManager never expose the actual value, only metadata -- fetching a real value is only possible via the manual \"Copy real value\" button in the Scan Panel UI, never through this tool.",
+        "Searches/browses data in a non-SQL connection managed by Database Notebook (Redis, Memcache, Mqtt, Keycloak, Auth0, or AWS S3/SQS/SSM/Secrets Manager/CloudWatch Logs) using resource-specific scan parameters, since these connections cannot run SQL. Not supported for SQL connections (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) or AWS DynamoDB -- use runDbQuery for SQL connections. Set connectionName and fill in exactly ONE of the nested parameter objects matching the connection's type: redis, memcache, mqtt, awsS3, awsSqs, awsSsm, awsSecretsManager, awsCloudWatchLogGroup, awsCloudWatchLogStream, keycloak, or auth0 -- each object's fields only apply to that connection type, do not mix fields from different objects. Call getDbSchema first if you don't know the connection's exact resource names (bucket/queue/log group/log stream names) or which AWS sub-resource it is, and call listDbConnections first if you don't know the exact connection name. Mqtt scanning requires the connection to already be connected and subscribed to the relevant topics via the MQTT panel -- it does not auto-connect, and returns an error telling you so if it isn't. awsSsm/awsSecretsManager never expose the actual value, only metadata -- fetching a real value is only possible via the manual \"Copy real value\" button in the Scan Panel UI, never through this tool. When AI data masking is enabled, Database Notebook shows a local preview and requires approval before returning row data.",
       inputSchema: {
         connectionName: z
           .string()
-          .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
+          .describe(
+            "The exact name of the connection as configured in Database Notebook's DB Explorer."
+          ),
         limit: z
           .number()
           .optional()
@@ -182,40 +219,63 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
             keyGlob: z
               .string()
               .optional()
-              .describe('SCAN MATCH glob pattern applied to key names (e.g. "session:*"). Defaults to all keys.'),
+              .describe(
+                'SCAN MATCH glob pattern applied to key names (e.g. "session:*"). Defaults to all keys.'
+              ),
             fetchValueLimitSize: z
               .number()
               .optional()
               .describe("Byte size cap for including a matched key's value in the result."),
           })
           .optional()
-          .describe("Scan a Redis connection. Use only when connectionName refers to a Redis connection."),
+          .describe(
+            "Scan a Redis connection. Use only when connectionName refers to a Redis connection."
+          ),
         memcache: z
           .object({
             key: z.string().describe("The key name."),
             matchType: z
               .enum(["exact", "partial"])
-              .describe("'exact': key must equal a key name exactly. 'partial': key is matched as a substring."),
+              .describe(
+                "'exact': key must equal a key name exactly. 'partial': key is matched as a substring."
+              ),
           })
           .optional()
-          .describe("Scan a Memcache connection. Use only when connectionName refers to a Memcache connection."),
+          .describe(
+            "Scan a Memcache connection. Use only when connectionName refers to a Memcache connection."
+          ),
         mqtt: z
           .object({
             topicFilter: z
               .string()
               .optional()
-              .describe("Subscription topic filter to scan. Empty/omitted scans across all subscribed topics."),
+              .describe(
+                "Subscription topic filter to scan. Empty/omitted scans across all subscribed topics."
+              ),
             matchType: z
               .enum(["exact", "partial"])
               .optional()
-              .describe("'exact': topicFilter must equal a subscription exactly. 'partial' (default): wildcard/substring match."),
-            payloadContains: z.string().optional().describe("Substring match against the message payload text."),
-            startTime: z.string().optional().describe("Optional ISO 8601 start of a message-timestamp range filter."),
-            endTime: z.string().optional().describe("Optional ISO 8601 end of a message-timestamp range filter."),
+              .describe(
+                "'exact': topicFilter must equal a subscription exactly. 'partial' (default): wildcard/substring match."
+              ),
+            payloadContains: z
+              .string()
+              .optional()
+              .describe("Substring match against the message payload text."),
+            startTime: z
+              .string()
+              .optional()
+              .describe("Optional ISO 8601 start of a message-timestamp range filter."),
+            endTime: z
+              .string()
+              .optional()
+              .describe("Optional ISO 8601 end of a message-timestamp range filter."),
             jsonExpansion: z
               .boolean()
               .optional()
-              .describe("Expand nested JSON payloads into individual columns. Only applied when a single topic matched."),
+              .describe(
+                "Expand nested JSON payloads into individual columns. Only applied when a single topic matched."
+              ),
             fetchValueLimitSize: z
               .number()
               .optional()
@@ -227,21 +287,36 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
           ),
         awsS3: z
           .object({
-            bucketName: z.string().describe("The S3 bucket name. Call getDbSchema first to find exact bucket names."),
+            bucketName: z
+              .string()
+              .describe("The S3 bucket name. Call getDbSchema first to find exact bucket names."),
             keyPrefix: z.string().optional().describe("Object key prefix filter."),
-            lastModifiedAfter: z.string().optional().describe("Optional ISO 8601 start of a LastModified range filter."),
-            lastModifiedBefore: z.string().optional().describe("Optional ISO 8601 end of a LastModified range filter."),
+            lastModifiedAfter: z
+              .string()
+              .optional()
+              .describe("Optional ISO 8601 start of a LastModified range filter."),
+            lastModifiedBefore: z
+              .string()
+              .optional()
+              .describe("Optional ISO 8601 end of a LastModified range filter."),
             fetchValueLimitSize: z
               .number()
               .optional()
               .describe("Byte size cap for including an object's body in the result."),
           })
           .optional()
-          .describe("Scan an AWS S3 bucket. Use only when connectionName refers to an AWS connection and the target resource is an S3 bucket."),
+          .describe(
+            "Scan an AWS S3 bucket. Use only when connectionName refers to an AWS connection and the target resource is an S3 bucket."
+          ),
         awsSqs: z
           .object({
-            queueUrl: z.string().describe("The SQS queue URL. Call getDbSchema first to find exact queue URLs."),
-            bodyOrMessageIdContains: z.string().optional().describe("Substring match against the message body or messageId."),
+            queueUrl: z
+              .string()
+              .describe("The SQS queue URL. Call getDbSchema first to find exact queue URLs."),
+            bodyOrMessageIdContains: z
+              .string()
+              .optional()
+              .describe("Substring match against the message body or messageId."),
           })
           .optional()
           .describe(
@@ -252,8 +327,13 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
             pathPrefix: z
               .string()
               .optional()
-              .describe('Path prefix under which to list parameters (e.g. "/prod/s3/"). Empty/omitted lists all parameters.'),
-            nameContains: z.string().optional().describe("Substring match against parameter names."),
+              .describe(
+                'Path prefix under which to list parameters (e.g. "/prod/s3/"). Empty/omitted lists all parameters.'
+              ),
+            nameContains: z
+              .string()
+              .optional()
+              .describe("Substring match against parameter names."),
           })
           .optional()
           .describe(
@@ -269,10 +349,23 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
           ),
         awsCloudWatchLogGroup: z
           .object({
-            logGroupName: z.string().describe("The CloudWatch log group name. Call getDbSchema first to find exact log group names."),
-            insightsQuery: z.string().optional().describe("A CloudWatch Logs Insights query string."),
-            startTime: z.string().optional().describe("Optional ISO 8601 start of the query's time range."),
-            endTime: z.string().optional().describe("Optional ISO 8601 end of the query's time range."),
+            logGroupName: z
+              .string()
+              .describe(
+                "The CloudWatch log group name. Call getDbSchema first to find exact log group names."
+              ),
+            insightsQuery: z
+              .string()
+              .optional()
+              .describe("A CloudWatch Logs Insights query string."),
+            startTime: z
+              .string()
+              .optional()
+              .describe("Optional ISO 8601 start of the query's time range."),
+            endTime: z
+              .string()
+              .optional()
+              .describe("Optional ISO 8601 end of the query's time range."),
           })
           .optional()
           .describe(
@@ -281,37 +374,72 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
         awsCloudWatchLogStream: z
           .object({
             logGroupName: z.string().describe("The parent log group's name."),
-            logStreamName: z.string().describe("The log stream name. Call getDbSchema first to find exact log stream names."),
-            startTime: z.string().optional().describe("Optional ISO 8601 start of a timestamp range filter (there is no end bound)."),
+            logStreamName: z
+              .string()
+              .describe(
+                "The log stream name. Call getDbSchema first to find exact log stream names."
+              ),
+            startTime: z
+              .string()
+              .optional()
+              .describe(
+                "Optional ISO 8601 start of a timestamp range filter (there is no end bound)."
+              ),
           })
           .optional()
-          .describe("Scan a single CloudWatch log stream. Use only when connectionName refers to an AWS connection and the target resource is a CloudWatch log stream."),
+          .describe(
+            "Scan a single CloudWatch log stream. Use only when connectionName refers to an AWS connection and the target resource is a CloudWatch log stream."
+          ),
         keycloak: z
           .object({
             resourceType: z
               .enum(["IamRealm", "IamGroup", "IamRole", "IamUser", "IamSession"])
               .describe("Which kind of Keycloak resource to list."),
-            realmName: z.string().optional().describe('Realm name. Required except for resourceType "IamRealm".'),
-            parentId: z.string().optional().describe('Client or group id to scope results to. Only used by "IamSession".'),
-            searchQuery: z.string().optional().describe("Free-text search, passed through to Keycloak's own search param."),
+            realmName: z
+              .string()
+              .optional()
+              .describe('Realm name. Required except for resourceType "IamRealm".'),
+            parentId: z
+              .string()
+              .optional()
+              .describe('Client or group id to scope results to. Only used by "IamSession".'),
+            searchQuery: z
+              .string()
+              .optional()
+              .describe("Free-text search, passed through to Keycloak's own search param."),
             jsonExpansion: z
               .boolean()
               .optional()
-              .describe('Expand the nested attributes object into individual columns. Only used by "IamUser".'),
+              .describe(
+                'Expand the nested attributes object into individual columns. Only used by "IamUser".'
+              ),
           })
           .optional()
-          .describe("Scan a Keycloak connection. Use only when connectionName refers to a Keycloak connection."),
+          .describe(
+            "Scan a Keycloak connection. Use only when connectionName refers to a Keycloak connection."
+          ),
         auth0: z
           .object({
             resourceType: z
               .enum(["IamClient", "IamUser", "IamRole", "IamOrganization"])
               .describe("Which kind of Auth0 resource to list."),
-            parentId: z.string().optional().describe('Organization id to scope results to its members. Only used by "IamUser".'),
-            searchQuery: z.string().optional().describe("Free-text search, passed through to the Auth0 Management API."),
-            jsonExpansion: z.boolean().optional().describe("Expand nested metadata objects into individual columns."),
+            parentId: z
+              .string()
+              .optional()
+              .describe('Organization id to scope results to its members. Only used by "IamUser".'),
+            searchQuery: z
+              .string()
+              .optional()
+              .describe("Free-text search, passed through to the Auth0 Management API."),
+            jsonExpansion: z
+              .boolean()
+              .optional()
+              .describe("Expand nested metadata objects into individual columns."),
           })
           .optional()
-          .describe("Scan an Auth0 connection. Use only when connectionName refers to an Auth0 connection."),
+          .describe(
+            "Scan an Auth0 connection. Use only when connectionName refers to an Auth0 connection."
+          ),
       },
       annotations: {
         readOnlyHint: true,
@@ -319,7 +447,7 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     },
     async (input) => {
       const text = await trackInvocation("mcpServer", "scanDbResource", input, () =>
-        scanResourceText(stateStorage, input)
+        scanResourceText(stateStorage, input, { source: "mcp", cancellation })
       );
       return { content: [{ type: "text", text }] };
     }
@@ -329,12 +457,16 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
     "runDbTransaction",
     {
       description:
-        "Runs multiple SQL statements against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) managed by Database Notebook as a single atomic transaction, in order, stopping at the first failure. Use this instead of calling runDbQuery repeatedly whenever the statements must all succeed or all be undone together (e.g. a sequence of INSERT/UPDATE/DELETE across related tables). For a single statement, use runDbQuery instead. Choose transactionControlType carefully: 'rollbackOnError' (default, recommended) commits only if every statement succeeds and rolls back everything on any failure; 'alwaysCommit' commits whatever ran even after a failure, keeping partial writes -- use only when partial progress is acceptable; 'alwaysRollback' always rolls back even on full success, useful for a dry run. Not supported for non-SQL connections (Redis, Memcache, MQTT, Keycloak, Auth0, AWS) -- use scanDbResource for those. If you don't already know the exact connection name, call listDbConnections first, and use getDbSchema first if you don't already know the table structure. Note: when called via an MCP client (rather than GitHub Copilot Chat), confirmation before running is handled by that client's own tool-approval UI, not by a Database Notebook-specific dialog.",
+        "Runs multiple SQL statements against a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle) managed by Database Notebook as a single atomic transaction, in order, stopping at the first failure. Use this instead of calling runDbQuery repeatedly whenever the statements must all succeed or all be undone together (e.g. a sequence of INSERT/UPDATE/DELETE across related tables). For a single statement, use runDbQuery instead. Choose transactionControlType carefully: 'rollbackOnError' (default, recommended) commits only if every statement succeeds and rolls back everything on any failure; 'alwaysCommit' commits whatever ran even after a failure, keeping partial writes -- use only when partial progress is acceptable; 'alwaysRollback' always rolls back even on full success, useful for a dry run. Not supported for non-SQL connections (Redis, Memcache, MQTT, Keycloak, Auth0, AWS) -- use scanDbResource for those. If you don't already know the exact connection name, call listDbConnections first, and use getDbSchema first if you don't already know the table structure. Note: when called via an MCP client (rather than GitHub Copilot Chat), confirmation before running is handled by that client's own tool-approval UI, not by a Database Notebook-specific dialog. When AI data masking is enabled, Database Notebook shows one local preview for the replayed SQL and row results and requires approval before returning them.",
       inputSchema: {
         connectionName: z
           .string()
-          .describe("The exact name of the connection as configured in Database Notebook's DB Explorer."),
-        statements: z.array(z.string()).describe("The SQL statements to run in order, inside one transaction."),
+          .describe(
+            "The exact name of the connection as configured in Database Notebook's DB Explorer."
+          ),
+        statements: z
+          .array(z.string())
+          .describe("The SQL statements to run in order, inside one transaction."),
         transactionControlType: z
           .enum(["rollbackOnError", "alwaysCommit", "alwaysRollback"])
           .optional()
@@ -351,7 +483,10 @@ export function registerTools(server: McpServer, stateStorage: StateStorage): vo
       const resolvedType = transactionControlType ?? "rollbackOnError";
       const input = { connectionName, statements, transactionControlType: resolvedType };
       const text = await trackInvocation("mcpServer", "runDbTransaction", input, () =>
-        runTransactionText(stateStorage, connectionName, statements, resolvedType)
+        runTransactionText(stateStorage, connectionName, statements, resolvedType, {
+          source: "mcp",
+          cancellation,
+        })
       );
       return { content: [{ type: "text", text }] };
     }

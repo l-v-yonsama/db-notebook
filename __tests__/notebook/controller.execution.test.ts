@@ -3,7 +3,7 @@ import { ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { describe, expect, it } from "vitest";
 import type { Mock } from "vitest";
 import { commands, workspace } from "vscode";
-import { OPEN_CHARTS_VIEWER, REFRESH_SQL_HISTORIES } from "../../src/constant";
+import { OPEN_CHARTS_VIEWER, REFRESH_QUERY_HISTORIES } from "../../src/constant";
 import type { RunResult } from "../../src/types/Notebook";
 import {
   lastExecution,
@@ -54,17 +54,52 @@ describe("MainController.execute -> _doExecution", () => {
       OPEN_CHARTS_VIEWER,
       expect.objectContaining({ rdh })
     );
-    expect(stateStorage.addSQLHistory).toHaveBeenCalledWith(
+    expect(stateStorage.addQueryHistory).toHaveBeenCalledWith(
       expect.objectContaining({ connectionName: "conn1" })
     );
-    expect(stateStorage.addSQLHistory).not.toHaveBeenCalledWith(
+    expect(stateStorage.addQueryHistory).not.toHaveBeenCalledWith(
       expect.objectContaining({ sqlMode: expect.anything() })
     );
-    expect(commands.executeCommand).toHaveBeenCalledWith(REFRESH_SQL_HISTORIES);
+    expect(commands.executeCommand).toHaveBeenCalledWith(REFRESH_QUERY_HISTORIES);
+  });
+
+  it("DynamoDB風のRdhSummary.infoもrdh markdown出力にそのまま表示される（db-notebookはinfoを加工しない）", async () => {
+    const { controllerObj, stateStorage } = setupController();
+    (stateStorage.getDBTypeByConnectionName as Mock).mockReturnValue(DBType.Postgres);
+
+    const rdh = ResultSetDataBuilder.createEmpty().build();
+    rdh.meta.type = "select";
+    // A DynamoDB-specific display string (design doc
+    // misc/specs/dynamodb-rdh-summary-display-improvement-plan.ja.md §8.1):
+    // db-notebook must not add DynamoDB/RDB branching of its own - whatever
+    // RdhSummary.info holds is shown verbatim, item wording and all.
+    rdh.summary = {
+      info: "38 items returned • 90 ms • Capacity not reported",
+    } as any;
+    sqlKernelRunMock.mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      skipped: false,
+      status: "executed",
+      metadata: { rdh },
+    } as RunResult);
+
+    const cell = makeCell({
+      languageId: "sql",
+      metadata: { connectionName: "conn1" },
+    });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    const execution = lastExecution(controllerObj);
+    expect(execution.outputs[0].items[0].data).toContain(
+      "38 items returned • 90 ms • Capacity not reported"
+    );
   });
 
   it.each(["Explain", "ExplainAnalyze"] as const)(
-    "%s実行はSQL Historyへ追加しない",
+    "%s実行はQuery Historyへ追加しない",
     async (sqlMode) => {
       const { controller, controllerObj, stateStorage } = setupController();
       (stateStorage.getDBTypeByConnectionName as Mock).mockReturnValue(DBType.Postgres);
@@ -89,8 +124,8 @@ describe("MainController.execute -> _doExecution", () => {
 
       await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
 
-      expect(stateStorage.addSQLHistory).not.toHaveBeenCalled();
-      expect(commands.executeCommand).not.toHaveBeenCalledWith(REFRESH_SQL_HISTORIES);
+      expect(stateStorage.addQueryHistory).not.toHaveBeenCalled();
+      expect(commands.executeCommand).not.toHaveBeenCalledWith(REFRESH_QUERY_HISTORIES);
     }
   );
 

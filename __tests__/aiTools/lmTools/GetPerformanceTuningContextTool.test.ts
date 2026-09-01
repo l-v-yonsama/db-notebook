@@ -78,4 +78,29 @@ describe("getPerformanceTuningContextText", () => {
     expect(text).toContain("no default database configured");
     expect(text).toContain("databaseName must be provided explicitly");
   });
+
+  // An "Aws" connection never needs databaseName - the RDB-only check above
+  // must not apply to it. See GetPerformanceTuningContextTool.ts's own
+  // dbType branch (fetchDynamoDbPerformanceTuningContext()). This fixture's
+  // Aws connection has no awsSetting at all, so
+  // createSQLSupportDriver()/isPartiQLType() (db-drivers'
+  // DBDriverResolver.ts/dbType.ts) correctly reject it before this tool's
+  // own DynamoDB-availability check ever runs - a real, properly-configured
+  // DynamoDB connection (awsSetting.services including 'DynamoDB') passes
+  // that gate and reaches supportsGetDynamoDbPerformanceTuningContext()
+  // instead; this test only needs to prove the RDB branch (and its
+  // databaseName requirement) was never taken for an Aws connection.
+  it("skips the RDB-only databaseName requirement for an Aws connection", async () => {
+    const stateStorage = makeStateStorage({
+      connections: { awsConn: { dbType: "Aws" } },
+    });
+    const text = await getPerformanceTuningContextText(stateStorage, {
+      connectionName: "awsConn",
+      sql: "SELECT * FROM orders WHERE pk = 'tenant#42'",
+    });
+    expect(text).toContain("❌");
+    expect(text).not.toContain("no default database configured");
+    expect(text).not.toContain("databaseName must be provided explicitly");
+    expect(text).toContain("Aws is not support sql");
+  });
 });

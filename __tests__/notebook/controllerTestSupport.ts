@@ -152,7 +152,7 @@ export const makeStateStorage = (overrides: Partial<Record<string, unknown>> = {
   ({
     getConnectionSettingList: vi.fn(async () => []),
     getDBTypeByConnectionName: vi.fn(() => undefined),
-    addSQLHistory: vi.fn(async () => true),
+    addQueryHistory: vi.fn(async () => true),
     getDefaultConnectionName: vi.fn(() => ""),
     ...overrides,
   } as unknown as StateStorage);

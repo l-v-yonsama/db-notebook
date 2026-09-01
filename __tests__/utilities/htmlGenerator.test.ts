@@ -146,6 +146,39 @@ describe("createHtmlFromHarItem", () => {
 });
 
 describe("createHtmlFromNotebook", () => {
+  it("DBN専用の目次セルをHTMLの目次と本文には重複出力しない", async () => {
+    const targetPath = tmpHtmlPath();
+    const dbnTocCell = {
+      document: {
+        languageId: "markdown",
+        getText: () => "# Performance Tuning AI Analysis\n\n## Table of contents",
+      },
+      metadata: { excludeFromHtml: true },
+      outputs: [],
+    };
+    const overviewCell = {
+      document: {
+        languageId: "markdown",
+        getText: () => "## 1. Overview",
+      },
+      metadata: {},
+      outputs: [],
+    };
+    const notebook = {
+      getCells: () => [dbnTocCell, overviewCell],
+    };
+
+    const err = await createHtmlFromNotebook(notebook as never, targetPath);
+    expect(err).toBe("");
+
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).not.toContain("Performance Tuning AI Analysis");
+    expect(html).not.toContain("Table of contents");
+    expect(html).toContain("1. Overview");
+    expect(html).toContain('var numOfContents = 1;');
+    expect(html).not.toContain('href="#cell2"');
+  });
+
   it("renders a labeled JSON cell as plain text in both the TOC and its heading", async () => {
     const targetPath = tmpHtmlPath();
     const jsonCell = {
@@ -170,5 +203,65 @@ describe("createHtmlFromNotebook", () => {
       '<span class="tag is-info is-light">json</span><span class="tag is-info is-light">Not executed</span> Full context JSON'
     );
     expect(html).not.toContain('<span class="tag is-info is-light">Full context JSON</span>');
+  });
+
+  it("shows a custom RdhSummary.info verbatim in the Query Result heading (DynamoDB-style text unmodified)", async () => {
+    // design doc misc/specs/dynamodb-rdh-summary-display-improvement-plan.ja.md
+    // §8.1: the HTML report must not add DynamoDB/RDB display branching of
+    // its own - whatever RdhSummary.info holds is escaped and shown as-is.
+    const rdh = ResultSetDataBuilder.createEmpty().build();
+    rdh.meta.type = "select";
+    rdh.summary = {
+      info: "38 items returned • 90 ms • Capacity not reported",
+    } as never;
+
+    const targetPath = tmpHtmlPath();
+    const sqlCell = {
+      document: { languageId: "sql", getText: () => "SELECT * FROM MassiveRecords" },
+      metadata: {},
+      outputs: [
+        {
+          items: [],
+          metadata: { rdh, status: "executed" },
+        },
+      ],
+    };
+    const notebook = {
+      getCells: () => [sqlCell],
+    };
+
+    const err = await createHtmlFromNotebook(notebook as never, targetPath);
+    expect(err).toBe("");
+
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).toContain("38 items returned • 90 ms • Capacity not reported");
+    expect(html).toContain('<span class="tag is-primary is-light">Query Result</span>');
+  });
+
+  it("leaves the existing RDB-generated info (e.g. rows in set) unchanged", async () => {
+    const rdh = ResultSetDataBuilder.createEmpty().build();
+    rdh.meta.type = "select";
+    rdh.summary = { info: "5 rows in set (0.01 sec)" } as never;
+
+    const targetPath = tmpHtmlPath();
+    const sqlCell = {
+      document: { languageId: "sql", getText: () => "SELECT * FROM users" },
+      metadata: {},
+      outputs: [
+        {
+          items: [],
+          metadata: { rdh, status: "executed" },
+        },
+      ],
+    };
+    const notebook = {
+      getCells: () => [sqlCell],
+    };
+
+    const err = await createHtmlFromNotebook(notebook as never, targetPath);
+    expect(err).toBe("");
+
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).toContain("5 rows in set (0.01 sec)");
   });
 });

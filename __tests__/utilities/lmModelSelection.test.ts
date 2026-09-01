@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTranslateResponseLabel,
   buildLanguageModelSelection,
   defaultTranslateResponse,
+  isResponseTranslationAvailable,
+  isModelNotSupportedError,
   LanguageModelSummary,
 } from "../../src/utilities/lmModelSelection";
 
@@ -71,15 +74,65 @@ describe("buildLanguageModelSelection", () => {
 });
 
 describe("defaultTranslateResponse", () => {
-  it("is false for an English display language", () => {
+  it("is false for English display-language variants", () => {
     expect(defaultTranslateResponse("en")).toBe(false);
+    expect(defaultTranslateResponse("en-US")).toBe(false);
+    expect(defaultTranslateResponse("en_GB")).toBe(false);
   });
 
   it("is true for a non-English display language", () => {
     expect(defaultTranslateResponse("ja")).toBe(true);
   });
 
-  it("is true when the language is unknown/undefined", () => {
-    expect(defaultTranslateResponse(undefined)).toBe(true);
+  it("is false when the language is unknown/undefined", () => {
+    expect(defaultTranslateResponse(undefined)).toBe(false);
+    expect(defaultTranslateResponse(" ")).toBe(false);
+  });
+});
+
+describe("response translation option", () => {
+  it("is unavailable and unlabeled for English UI locales", () => {
+    expect(isResponseTranslationAvailable("en-GB")).toBe(false);
+    expect(buildTranslateResponseLabel("en-GB")).toBeUndefined();
+  });
+
+  it("uses Intl.DisplayNames for a clear non-English language label", () => {
+    expect(isResponseTranslationAvailable("ja")).toBe(true);
+    expect(buildTranslateResponseLabel("ja")).toBe("Respond in Japanese");
+    expect(buildTranslateResponseLabel("pt-BR")).toBe("Respond in Brazilian Portuguese");
+  });
+
+  it("falls back to the locale code when ICU has no display name", () => {
+    expect(buildTranslateResponseLabel("xx")).toBe(
+      "Respond in the VS Code display language (xx)"
+    );
+    expect(buildTranslateResponseLabel("bad_code")).toBe(
+      "Respond in the VS Code display language (bad_code)"
+    );
+  });
+});
+
+describe("isModelNotSupportedError", () => {
+  it("recognizes the Copilot 400 response embedded in an Error message", () => {
+    expect(
+      isModelNotSupportedError(
+        new Error(
+          'Request Failed: 400 {"error":{"message":"The requested model is not supported.","code":"model_not_supported"}}'
+        )
+      )
+    ).toBe(true);
+  });
+
+  it("recognizes a provider error nested under a VS Code-style cause", () => {
+    expect(
+      isModelNotSupportedError({
+        code: "Unknown",
+        cause: { code: "model_not_supported", message: "The requested model is not supported." },
+      })
+    ).toBe(true);
+  });
+
+  it("does not quarantine models for unrelated request failures", () => {
+    expect(isModelNotSupportedError(new Error("Quota exceeded"))).toBe(false);
   });
 });

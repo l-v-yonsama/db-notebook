@@ -8,7 +8,7 @@ import type { IndexDefinition, PerformanceTuningContext } from "@l-v-yonsama/mul
 // that exact index - a live SQL error when the user ran it. The prompt now
 // also asks the model to check this itself (performanceTuningAiPrompt.ts),
 // but summary.md is explicit this should not be relied on alone - this
-// utility re-checks the model's `suggestedSql` after the fact, independent of
+// utility re-checks the model's `suggestedQuery` after the fact, independent of
 // whether the model followed that instruction.
 //
 // Deliberately narrow scope: only flags a *verbatim* column-set match
@@ -20,7 +20,7 @@ import type { IndexDefinition, PerformanceTuningContext } from "@l-v-yonsama/mul
 // attempt.
 //
 // Same "best-effort, unstructured input, nothing throws" posture as
-// db-drivers' plan parsers: `suggestedSql` is free-text the model wrote, not
+// db-drivers' plan parsers: `suggestedQuery` is free-text the model wrote, not
 // a real SQL AST - a non-`CREATE INDEX` statement, an unparseable one, or a
 // table this context doesn't know about all just return undefined rather
 // than throwing.
@@ -144,25 +144,25 @@ function isSameTable(
 }
 
 export function findPossibleDuplicateIndex(
-  suggestedSql: string | undefined,
+  suggestedQuery: string | undefined,
   context: PerformanceTuningContext,
 ): PossibleDuplicateIndexMatch | undefined {
-  if (!suggestedSql) {
+  if (!suggestedQuery) {
     return undefined;
   }
 
-  const header = CREATE_INDEX_HEADER.exec(suggestedSql);
+  const header = CREATE_INDEX_HEADER.exec(suggestedQuery);
   if (!header) {
     return undefined;
   }
 
   const openParenIndex = header.index + header[0].length;
-  const closeParenIndex = findMatchingCloseParen(suggestedSql, openParenIndex);
+  const closeParenIndex = findMatchingCloseParen(suggestedQuery, openParenIndex);
   if (closeParenIndex === undefined) {
     return undefined;
   }
 
-  const candidateColumns = splitTopLevel(suggestedSql.slice(openParenIndex, closeParenIndex)).map(
+  const candidateColumns = splitTopLevel(suggestedQuery.slice(openParenIndex, closeParenIndex)).map(
     normalizeColumnToken,
   );
   if (candidateColumns.length === 0) {

@@ -3,6 +3,7 @@ import type {
   ExtractedSqlResult,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { ResultSetData } from "@l-v-yonsama/rdh";
+import type { ExtChartData, ExtChartOptions } from "../shared/ExtChartJs";
 import type { CellMetaChart } from "./Notebook";
 
 export type MdhViewParams = {
@@ -33,6 +34,15 @@ export type ChartsViewParams = CellMetaChart & {
   pointRadius?: number;
   rdh: ResultSetData;
 };
+
+export type PreparedChartsViewParams = {
+  title: string;
+  type: "line" | "bar";
+  preparedData: ExtChartData;
+  preparedOptions: ExtChartOptions;
+};
+
+export type AnyChartsViewParams = ChartsViewParams | PreparedChartsViewParams;
 
 export type SubscriptionPayloadsViewParams = {
   conName: string;

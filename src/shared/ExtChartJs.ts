@@ -2,6 +2,10 @@ export type ExtChartOptions = {
   responsive: boolean;
   maintainAspectRatio: boolean;
   animation: boolean;
+  interaction?: {
+    mode?: "nearest" | "index" | "dataset" | "point" | "x" | "y";
+    intersect?: boolean;
+  };
   plugins?: {
     datalabels?: {
       display: boolean;
@@ -25,16 +29,33 @@ export type ExtChartOptions = {
         usePointStyle?: boolean;
       };
     };
+    tooltip?: {
+      enabled?: boolean;
+    };
   };
   scales?: {
     [key: string]: {
       axis?: string;
+      type?: "category" | "linear" | "time";
+      beginAtZero?: boolean;
       title?: {
         text?: string;
       };
       min?: number;
       max?: number;
       stacked?: boolean;
+      time?: {
+        tooltipFormat?: string;
+        displayFormats?: Record<string, string>;
+      };
+      ticks?: {
+        maxRotation?: number;
+        autoSkip?: boolean;
+        maxTicksLimit?: number;
+      };
+      grid?: {
+        color?: string;
+      };
     };
   };
 };

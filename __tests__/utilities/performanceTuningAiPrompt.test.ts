@@ -150,9 +150,9 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant).toContain("LOWER(col)");
   });
 
-  it("requires a complete replacement statement in suggestedSql for a query rewrite", () => {
+  it("requires a complete replacement statement in suggestedQuery for a query rewrite", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext());
-    expect(assistant).toContain('its "suggestedSql" is required');
+    expect(assistant).toContain('its "suggestedQuery" is required');
     expect(assistant).toContain("complete, standalone, executable replacement statement");
     expect(assistant).toContain("Never put only a predicate, a clause fragment");
   });
@@ -196,7 +196,7 @@ describe("buildAiAnalysisPrompt", () => {
     });
     expect(assistant).toContain("following language: ja");
     expect(assistant).toContain('Do not translate JSON field names, the fixed English values of "severity"');
-    expect(assistant).toContain("suggestedSql");
+    expect(assistant).toContain("suggestedQuery");
     expect(assistant).toContain("evidence identifier");
   });
 

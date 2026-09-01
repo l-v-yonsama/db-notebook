@@ -10,7 +10,7 @@ Database Notebook brings SQL, JavaScript/TypeScript, Markdown, and query results
 
 - **Investigate incidents across databases, logs, and cloud resources** — Query production and staging databases, inspect CloudWatch logs, and scan AWS resources (S3, SQS, DynamoDB, Secrets Manager, SSM) — all from the same notebook, so the whole investigation stays in one reusable file.
 - **Keep SQL, JavaScript, Markdown, and results in one reusable file** — Mix SQL, JavaScript/TypeScript, shell, and Markdown cells with variables shared between them, then export the results as HTML or Excel. See [Database Notebook file examples](/docs/examples/databaseNotebook.md).
-- **Diagnose and improve slow SQL** — Collect execution plans, table statistics, indexes, and physical-health signals together, then use the evidence to investigate bottlenecks. See the [Performance Tuning Guide](/docs/examples/performanceTuning.md).
+- **Diagnose and improve slow SQL** — Collect execution plans, table statistics, indexes, and physical-health signals together, then use the evidence to investigate bottlenecks — and compare a saved report from before your change against the current one to see exactly what moved. See the [Performance Tuning Guide](/docs/examples/performanceTuning.md).
 - **Reuse your saved connections from GitHub Copilot Chat / MCP clients** — The same connections you set up in the DB Explorer are available as AI tools in Copilot Chat (Agent mode), and via a standalone MCP server for other MCP clients (Claude Code, Claude Desktop, Cursor, ...). See [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md).
 
 ## Quickstart (3–5 min)
@@ -38,11 +38,16 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
   - See a full SQL → JavaScript → Markdown walkthrough: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
   - See Redis/Memcached command cell examples: [Database Notebook Redis/Memcached command cell examples](/docs/examples/databaseNotebookRedisAndMemcached.md)
 - Access databases through Notebooks, Sidebars, and panel UIs
+- **Dashboards (Experimental)**
+  - Inspect live database statistics for MySQL, PostgreSQL, SQL Server, SQLite, and Oracle, or CloudWatch metrics for supported AWS resources, directly from the DB Explorer.
+  - Start/stop database sampling, refresh CloudWatch metrics, switch dashboard views, and export the collected snapshot to a read-only `.dbnr` report.
+  - This feature is experimental: available panels and metrics depend on the database version, permissions, endpoint, and AWS metric configuration, and the UI/report format may change.
+  - [Dashboard Guide](/docs/examples/dashboard.md)
 - Execute SQL mode
   - Execute query (Default)
   - Execute explain plan (Generates a query plan).
   - Execute explain analyze (Displays actual execution time and statistics)
-- SQL history management
+- Query history management
 - Variable sharing between notebook cells
   - See practical SQL examples using shared variables (LIKE, IN, exact match):
     [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
@@ -209,6 +214,7 @@ The Log Parse feature analyzes application logs and extracts structured SQL exec
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
+- [Dashboard Guide (Experimental)](/docs/examples/dashboard.md)
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 - [Performance Tuning Guide](/docs/examples/performanceTuning.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)

@@ -12,7 +12,7 @@ import VsCodeButton from "./base/VsCodeButton.vue";
 
 // 2026-08-19 follow-up - see src/panels/PerformanceTuningBindParametersPanel.ts's
 // top comment for the full design rationale. This is a small, entry-point-
-// agnostic panel: both Query Statistics and SQL History open it (via
+// agnostic panel: both Query Statistics and Query History open it (via
 // openPerformanceTuningPreview()) whenever the target SQL has detected
 // placeholders, so the user only ever sees one Bind Parameters UI regardless
 // of where the preview started from.

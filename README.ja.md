@@ -38,11 +38,16 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
   - SQL → JavaScript → Markdown の一連の流れの完全な例: [Database Notebook file examples](/docs/examples/databaseNotebook.md#3-multi-language-flow-sql--javascript--markdown)
   - Redis/Memcachedコマンドセルの例: [Database Notebook Redis/Memcached command cell examples](/docs/examples/databaseNotebookRedisAndMemcached.md)
 - Notebook・サイドパネル・パネルUIからデータベースへアクセス
+- **ダッシュボード（Experimental / 実験的機能）**
+  - DB Explorerから、MySQL・PostgreSQL・SQL Server・SQLite・Oracleの稼働統計、または対応するAWSリソースのCloudWatchメトリクスを確認できます。
+  - データベース計測の開始・停止、CloudWatchメトリクスの更新、表示の切り替え、収集済みスナップショットの読み取り専用`.dbnr`レポート出力に対応します。
+  - 本機能は実験的です。表示できるパネル・メトリクスは、データベースのバージョン、権限、接続先、AWSメトリクス設定により異なり、UIやレポート形式は今後変更される可能性があります。
+  - [ダッシュボード利用ガイド](/docs/examples/dashboard.ja.md)
 - SQL実行モード
   - クエリ実行(デフォルト)
   - EXPLAINプラン実行(クエリプランを生成)
   - EXPLAIN ANALYZE実行(実際の実行時間と統計情報を表示)
-- SQL履歴管理
+- クエリ履歴管理
 - Notebookセル間の変数共有
   - 共有変数を使った実践的なSQLの例(LIKE, IN, 完全一致): [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
 - ER図を[mermaid形式](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)、または編集可能なdraw.io形式で生成
@@ -208,6 +213,7 @@ Log Parse機能は、アプリケーションログを解析し、構造化さ�
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)
+- [ダッシュボード利用ガイド（Experimental / 実験的機能）](/docs/examples/dashboard.ja.md)
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 - [Performance Tuning Guide](/docs/examples/performanceTuning.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)

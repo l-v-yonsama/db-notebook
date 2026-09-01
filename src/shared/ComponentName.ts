@@ -28,4 +28,7 @@ export type ComponentName =
   | "ToolsView"
   | "SubscriptionPayloadsView"
   | "PerformanceTuningPreviewPanel"
-  | "PerformanceTuningBindParametersPanel";
+  | "AiDataMaskingPreviewPanel"
+  | "PerformanceTuningBindParametersPanel"
+  | "CloudWatchMetricsView"
+  | "RdbDashboardView";

@@ -4,7 +4,7 @@
     "moduleResolution": "nodenext",
     "target": "es6",
     "outDir": "out",
-    "lib": ["es6", "dom"],
+    "lib": ["es6", "es2020.intl", "dom"],
     "types": ["node", "vscode"],
     "sourceMap": true,
     "rootDir": "src",

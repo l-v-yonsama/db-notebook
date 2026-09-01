@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import type { DropdownItem } from "@/types/Components";
+import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import {
   vscode,
   type DynamoDBConditionParams,
+  type DynamoQueryBuildMode,
   type DynamoQueryFilter,
   type DynamoQueryPanelEventData,
+  type DynamoQueryProjectionConstraintView,
+  type DynamoQueryProjectionMode,
   type UpdateTextDocumentActionCommand
 } from "@/utilities/vscode";
 import {
@@ -13,9 +16,11 @@ import {
 } from "@vscode/webview-ui-toolkit";
 import { computed, nextTick, onMounted, ref } from "vue";
 import PanelActionToolbar from "./base/PanelActionToolbar.vue";
+import SecondarySelectionAction from "./base/SecondarySelectionAction.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeCheckbox from "./base/VsCodeCheckbox.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
+import VsCodeRadioGroup from "./base/VsCodeRadioGroup.vue";
 import VsCodeTextField from "./base/VsCodeTextField.vue";
 
 provideVSCodeDesignSystem().register(
@@ -65,6 +70,83 @@ const targetItems = ref([] as DropdownItem[]);
 const columnItems = ref([] as DropdownItem[]);
 const filters = ref([] as DynamoQueryFilter[]);
 const target = ref("");
+const buildMode = ref<DynamoQueryBuildMode>("nativeQuery");
+
+const buildModeItems = [
+  { label: "Native Query", value: "nativeQuery" },
+  { label: "PartiQL", value: "partiql" },
+];
+
+type NotebookTarget = "new" | "active";
+const notebookItems: SecondaryItem<NotebookTarget>[] = [
+  { kind: "selection", label: "Display in new notebook", value: "new" },
+  { kind: "selection", label: "Display in active notebook", value: "active" },
+];
+
+const projectionMode = ref<DynamoQueryProjectionMode>("default");
+const projectedAttributes = ref<string[]>([]);
+const consistentRead = ref(false);
+const projectionConstraint = ref<DynamoQueryProjectionConstraintView>({
+  availableAttributes: [],
+  projectedAttributes: [],
+  allowAllTableAttributesOption: false,
+  restrictToProjected: false,
+  consistentReadAllowed: true,
+});
+
+const projectionModeItems = computed((): DropdownItem[] => {
+  const items: DropdownItem[] = [
+    { label: "Default for target", value: "default" },
+    { label: "Specific attributes", value: "specific" },
+  ];
+  if (projectionConstraint.value.allowAllTableAttributesOption) {
+    items.push({ label: "All table attributes", value: "allTableAttributes" });
+  }
+  return items;
+});
+
+// Whether `attr` is unselectable in the "Specific attributes" list - only
+// ever true for a GSI with a known KEYS_ONLY/INCLUDE Projection (design doc
+// §6.1's GSI rule: a non-projected attribute can't be fetched at all).
+const isAttributeSelectable = (attr: string): boolean => {
+  if (!projectionConstraint.value.restrictToProjected) {
+    return true;
+  }
+  return projectionConstraint.value.projectedAttributes?.includes(attr) ?? false;
+};
+
+// LSI-only advisory: true when `attr` is selectable but not part of the
+// target's own Projection, meaning DynamoDB may need an extra base-table
+// fetch (latency/Capacity) to return it (design doc §6.1/§14).
+const isAttributeNonProjected = (attr: string): boolean => {
+  const projected = projectionConstraint.value.projectedAttributes;
+  if (projected === undefined) {
+    return false;
+  }
+  return !projected.includes(attr);
+};
+
+const projectionHasNonProjectedSelection = computed(
+  () => projectionMode.value === "allTableAttributes"
+    ? projectionConstraint.value.allowAllTableAttributesOption &&
+      projectionConstraint.value.projectedAttributes !== undefined &&
+      projectionConstraint.value.projectedAttributes.length < projectionConstraint.value.availableAttributes.length
+    : projectionMode.value === "specific" && projectedAttributes.value.some(isAttributeNonProjected)
+);
+
+const projectionMetadataUnknown = computed(
+  () => projectionConstraint.value.projectedAttributes === undefined
+);
+
+const toggleProjectedAttribute = (attr: string, checked: boolean) => {
+  const idx = projectedAttributes.value.indexOf(attr);
+  if (checked && idx < 0) {
+    projectedAttributes.value.push(attr);
+  } else if (!checked && idx >= 0) {
+    projectedAttributes.value.splice(idx, 1);
+  }
+  ok(true);
+};
 
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
@@ -84,7 +166,11 @@ onMounted(() => {
   setTimeout(resetSpPaneWrapperHeight, 200);
 });
 
-const executable = computed(() => pkValue.value.length > 0);
+const projectionSelectionValid = computed(
+  () => projectionMode.value !== "specific" || projectedAttributes.value.length > 0
+);
+const executable = computed(() => pkValue.value.length > 0 && projectionSelectionValid.value);
+const notebookAvailable = computed(() => buildMode.value === "partiql" && executable.value);
 
 const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): Promise<void> => {
   if (v === undefined) {
@@ -108,6 +194,11 @@ const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): 
   previewInput.value = v.previewInput;
   targetItems.value.splice(0, targetItems.value.length);
   columnItems.value.splice(0, columnItems.value.length);
+  projectionMode.value = v.projectionMode;
+  projectedAttributes.value.splice(0, projectedAttributes.value.length, ...v.projectedAttributes);
+  consistentRead.value = v.consistentRead;
+  buildMode.value = v.buildMode ?? "nativeQuery";
+  projectionConstraint.value = v.projectionConstraint;
 
   await nextTick();
 
@@ -116,19 +207,19 @@ const initialize = async (v: DynamoQueryPanelEventData["value"]["initialize"]): 
   columnItems.value.push(...v.columnItems);
 
   targetItems.value.push({
-    label: "TABLE",
+    label: `TABLE: ${tableRes.name}`,
     value: "$table",
   });
 
-  tableRes.attr.lsi.forEach((it, idx) => {
+  tableRes.attr.lsi.forEach((it) => {
     targetItems.value.push({
-      label: `LSI(${idx + 1}):${it.IndexName} (${it.KeySchema?.map((it) => it.AttributeName).join(",")})`,
+      label: `LSI: ${it.IndexName} (${it.KeySchema?.map((key) => key.AttributeName).join(", ")})`,
       value: "$lsi:" + it.IndexName,
     });
   });
-  tableRes.attr.gsi.forEach((it, idx) => {
+  tableRes.attr.gsi.forEach((it) => {
     targetItems.value.push({
-      label: `GSI(${idx + 1}):${it.IndexName} (${it.KeySchema?.map((it) => it.AttributeName).join(",")})`,
+      label: `GSI: ${it.IndexName} (${it.KeySchema?.map((key) => key.AttributeName).join(", ")})`,
       value: "$gsi:" + it.IndexName,
     });
   });
@@ -153,7 +244,7 @@ const cancel = () => {
     params: {},
   });
 };
-const ok = (preview: boolean) => {
+const ok = (preview: boolean, openInNotebook = false, inActiveNotebook = false) => {
   const params: DynamoDBConditionParams = {
     target: target.value,
     pkValue: pkValue.value,
@@ -162,6 +253,12 @@ const ok = (preview: boolean) => {
     sortDesc: sortDesc.value,
     filters: JSON.parse(JSON.stringify(filters.value ?? [])),
     limit: limit.value === "" ? 100 : Number(limit.value),
+    projectionMode: projectionMode.value,
+    projectedAttributes: JSON.parse(JSON.stringify(projectedAttributes.value ?? [])),
+    consistentRead: consistentRead.value,
+    buildMode: buildMode.value,
+    openInNotebook,
+    inActiveNotebook,
     preview
   };
 
@@ -169,6 +266,9 @@ const ok = (preview: boolean) => {
     command: "ok",
     params,
   });
+};
+const selectedNotebookTarget = (value: NotebookTarget) => {
+  ok(true, true, value === "active");
 };
 const updateOptions = () => {
   ok(true);
@@ -210,43 +310,57 @@ defineExpose({
 
 <template>
   <section class="DynamoQueryPanel">
-    <PanelActionToolbar @cancel="cancel">
+    <PanelActionToolbar @cancel="cancel" cancel-label="" cancel-title="Close">
       <template #left>
-        <label for="tableName">Table:</label>
-        <span id="tableName">{{ tableName }}</span>
-        <label for="numOfRows">Estimated items:</label>
-        <span id="numOfRows">{{ numOfRows }}</span>
-        <label for="limit">Limit:</label>
-        <VsCodeTextField id="limit" v-model="limit" :min="0" :max="limitMax" style="width: 100px" type="number"
-          title="number of rows returned" placeholder="number of rows returned" @change="updateTextDocument()">
-        </VsCodeTextField>
-        <label for="target">Table or Index:</label>
-        <VsCodeDropdown id="target" v-model="target" :items="targetItems" style="width:200px"
+        <label for="buildMode">Build:</label>
+        <VsCodeRadioGroup id="buildMode" v-model="buildMode" :items="buildModeItems"
           @change="updateOptions()" />
+        <label for="limit">Result limit (all pages):</label>
+        <VsCodeTextField id="limit" v-model="limit" :min="0" :max="limitMax" style="width: 100px"
+          type="number"
+          title="Maximum number of matching items retained across paginated Query requests. This is not the DynamoDB API Limit."
+          placeholder="result limit" @change="updateTextDocument()">
+        </VsCodeTextField>
+        <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute as a native DynamoDB Query">
+          <fa icon="check" />Execute
+        </VsCodeButton>
       </template>
-      <VsCodeButton :disabled="!executable" @click="ok(false)" title="Execute">
-        <fa icon="check" />Execute
-      </VsCodeButton>
+      <SecondarySelectionAction label="Open in Notebook" :items="notebookItems"
+        :disabled="!notebookAvailable"
+        :title="buildMode === 'partiql' ? 'Open PartiQL in notebook' : 'Select PartiQL to open in a notebook'"
+        @onSelect="selectedNotebookTarget" />
     </PanelActionToolbar>
     <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
       <div class="settings">
+        <div class="db-resource">
+          <fieldset class="conditions">
+            <legend>DB Resource</legend>
+            <div class="resource-summary">
+              <label for="target">Target:</label>
+              <VsCodeDropdown id="target" v-model="target" :items="targetItems"
+                style="width: 360px; max-width: 100%" @change="updateOptions()" />
+              <label for="numOfRows">Estimated table items:</label>
+              <span id="numOfRows">{{ numOfRows }}</span>
+            </div>
+          </fieldset>
+        </div>
         <div class="editor">
           <fieldset class="conditions">
             <legend>
               <span style="margin-right: 30px">Key conditions</span>
             </legend>
             <div>
-              <label for="pk">Partial key ({{ pkName }} [{{ pkAttr }}] ):</label>
-              <VsCodeDropdown v-model="pkOpe" :items="ONLY_EQUAL_OPERATORS" style="width:160px" />
-              <VsCodeTextField id="pk" v-model="pkValue" style="width: 200px" @change="updateTextDocument()"
+              <label for="pk">Partition key ({{ pkName }} [{{ pkAttr }}] ):</label>
+              <VsCodeDropdown v-model="pkOpe" :items="ONLY_EQUAL_OPERATORS" style="width:130px" />
+              <VsCodeTextField id="pk" v-model="pkValue" style="width: 230px" @change="updateTextDocument()"
                 :required="true" :change-on-mouseout="true">
               </VsCodeTextField>
             </div>
             <div v-if="skName">
               <label for="sk">Sort key ({{ skName }} [{{ skAttr }}] ):</label>
-              <VsCodeDropdown v-model="skOpe" :items="OPERATORS" style="width:160px"
+              <VsCodeDropdown v-model="skOpe" :items="OPERATORS" style="width:130px"
                 @change="updateOptions()" />
-              <VsCodeTextField id="sk" v-model="skValue" style="width: 200px" @change="updateTextDocument()"
+              <VsCodeTextField id="sk" v-model="skValue" style="width: 230px" @change="updateTextDocument()"
                 :change-on-mouseout="true">
               </VsCodeTextField>
               <span v-if="skOpe === 'between'" style="font-size: small; margin-left:5px;opacity: 0.7;"> *Separate by
@@ -254,6 +368,58 @@ defineExpose({
               <VsCodeCheckbox v-model="sortDesc" @change="ok(true)"
                 style="margin-left: 8px; font-size: small; opacity: 0.7;">Sort descending order</VsCodeCheckbox>
             </div>
+            <div>
+              <label for="consistentRead">Read consistency:</label>
+              <VsCodeCheckbox id="consistentRead" v-model="consistentRead"
+                :disabled="!projectionConstraint.consistentReadAllowed" @change="ok(true)"
+                :title="projectionConstraint.consistentReadAllowed ? 'Use a strongly consistent read (table/LSI only)' : 'A GSI cannot use a strongly consistent read'">
+                Strongly consistent read
+              </VsCodeCheckbox>
+              <span v-if="buildMode === 'partiql'" class="inline-hint">
+                Read consistency is an API option and is not embedded in the PartiQL Notebook cell.
+              </span>
+            </div>
+          </fieldset>
+          <fieldset class="conditions">
+            <legend>
+              <span>Returned attributes (Projection)</span>
+            </legend>
+            <div>
+              <label for="projectionMode">Mode:</label>
+              <VsCodeDropdown id="projectionMode" v-model="projectionMode" :items="projectionModeItems"
+                style="width:220px" @change="updateOptions()" />
+            </div>
+            <div v-if="projectionMode === 'specific'" class="projection-attributes">
+              <label>Attributes:</label>
+              <span v-for="attr in projectionConstraint.availableAttributes" :key="attr" class="projection-attribute">
+                <VsCodeCheckbox :model-value="projectedAttributes.includes(attr)"
+                  :disabled="!isAttributeSelectable(attr)"
+                  :title="!isAttributeSelectable(attr) ? 'Not projected onto this GSI - cannot be returned by this Query.' : (isAttributeNonProjected(attr) ? 'Not projected onto this LSI - returning it may require an extra base-table fetch (added latency/Capacity).' : '')"
+                  @change="(checked: boolean) => toggleProjectedAttribute(attr, checked)">
+                  {{ attr }}<span v-if="isAttributeSelectable(attr) && isAttributeNonProjected(attr)"
+                    class="projection-warning-mark">*</span>
+                </VsCodeCheckbox>
+              </span>
+              <p v-if="projectionMetadataUnknown" class="hint">
+                *Projection metadata for this target is unknown (e.g. a custom endpoint) - these constraints could
+                not be verified.
+              </p>
+              <p v-else-if="projectionHasNonProjectedSelection" class="hint">
+                *Not projected onto this index - DynamoDB may need an extra base-table fetch to return it, adding
+                latency/Capacity.
+              </p>
+              <p v-if="projectedAttributes.length === 0" class="hint">
+                Select at least one attribute before previewing or executing this Query.
+              </p>
+            </div>
+            <p v-else-if="projectionMode === 'allTableAttributes' && projectionHasNonProjectedSelection" class="hint">
+              This LSI does not project every known table attribute. Returning all table attributes may require
+              extra base-table fetches, adding latency and Capacity.
+            </p>
+            <p class="hint">
+              Projection reduces the returned payload; for a table Query it does not by itself reduce Read Capacity,
+              since the same items are still read.
+            </p>
           </fieldset>
           <fieldset class="filter">
             <legend>
@@ -284,11 +450,11 @@ defineExpose({
                       @change="updateFilter(idx)" />
                   </td>
                   <td>
-                    <VsCodeDropdown v-model="filter.operator" :items="FILTER_OPERATORS" style="width:160px"
+                    <VsCodeDropdown v-model="filter.operator" :items="FILTER_OPERATORS" style="width:130px"
                       @change="updateFilter(idx)" />
                   </td>
                   <td>
-                    <VsCodeTextField v-model="filter.value" style="width: 200px" @change="updateFilter(idx)">
+                    <VsCodeTextField v-model="filter.value" style="width: 230px" @change="updateFilter(idx)">
                     </VsCodeTextField>
                     <span v-if="filter.operator === 'between'" style="font-size: small; margin-left:5px;opacity: 0.7;">
                       *Separate
@@ -301,8 +467,12 @@ defineExpose({
           </fieldset>
         </div>
         <fieldset class="conditions">
-          <legend>Preview</legend>
+          <legend>Preview ({{ buildMode === 'partiql' ? 'PartiQL' : 'Native Query' }})</legend>
           <p class="preview" v-text="previewInput"></p>
+          <p v-if="buildMode === 'nativeQuery'" class="hint">
+            Result limit (all pages): {{ limit }} — Applied by Database Notebook across paginated requests; this is
+            not the DynamoDB Query API Limit.
+          </p>
         </fieldset>
       </div>
     </div>
@@ -360,8 +530,66 @@ section.DynamoQueryPanel {
         }
       }
 
+      .resource-summary {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        label {
+          min-width: auto !important;
+          margin-left: 18px;
+        }
+
+        label:first-child {
+          margin-left: 0;
+        }
+
+        span {
+          max-width: 320px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+
       fieldset.filter {
         margin-top: 10px;
+      }
+
+      .projection-attributes {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+
+        label {
+          min-width: auto !important;
+          margin-right: 6px;
+        }
+      }
+
+      .projection-attribute {
+        margin-right: 14px;
+        margin-bottom: 4px;
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .projection-warning-mark {
+        color: var(--vscode-charts-yellow, orange);
+        margin-left: 2px;
+      }
+
+      p.hint {
+        margin: 4px 0;
+        font-size: small;
+        opacity: 0.7;
+      }
+
+      .inline-hint {
+        margin-left: 8px;
+        font-size: small;
+        opacity: 0.7;
       }
 
       p.preview {

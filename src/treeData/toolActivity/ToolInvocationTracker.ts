@@ -7,7 +7,7 @@ import { getErrorMessage } from "../../utilities/errorUtil";
  * design so it can be unit-tested without the __tests__/mocks/vscode.ts shim.
  * Deliberately not persisted to context.globalState -- this is a volatile
  * "what's happening / what just happened" activity feed, not a durable user
- * asset like SQL history.
+ * asset like query history.
  */
 
 export type ToolSource = "lmTools" | "mcpServer";

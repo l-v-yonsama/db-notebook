@@ -17,6 +17,8 @@ import { DiffTabInnerItem } from "../shared/MessageEventData";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { CellMeta } from "../types/Notebook";
 import { ChartsViewParams } from "../types/views";
+import { createReportChartViewParams } from "../observability/report/reportChartAdapter";
+import { isReportChartSpec } from "../notebook/report/reportTypes";
 import { createChartJsParams, createPairPlotChartParams } from "./chartUtil";
 import { getOutputConfig, getToStringParamByConfig } from "./configUtil";
 import { writeToResourceOnStorage } from "./fsUtil";
@@ -45,7 +47,8 @@ const HLJS_LANGUAGE_ALIASES: { [languageId: string]: string } = {
   bat: "dos",
 };
 
-const toHljsLanguage = (languageId: string): string => HLJS_LANGUAGE_ALIASES[languageId] ?? languageId;
+const toHljsLanguage = (languageId: string): string =>
+  HLJS_LANGUAGE_ALIASES[languageId] ?? languageId;
 
 export const createHtmlFromNotebook = async (
   notebook: NotebookDocument,
@@ -236,6 +239,12 @@ const createHtml = async (
   options: CreateHtmlOptionsParams
 ): Promise<string> => {
   const { isCellOrigin } = options;
+  // A generated DBN has an in-notebook TOC for easier reading. HTML already
+  // supplies its own navigation panel, so omit cells explicitly marked as
+  // DBN-only to avoid showing two TOCs.
+  const renderedCells = cells.filter(
+    (cell) => !(cell.metadata as CellMeta | undefined)?.excludeFromHtml
+  );
   let htmlContents: string[] = [];
   let errorMessage = "";
   const markdownValues: MarkdownValues = {};
@@ -253,7 +262,7 @@ const createHtml = async (
     // TOC
     if (outputCondig.html.displayToc) {
       htmlContents.push(`  <p class="panel-heading" style="padding:10px">TOC</p>`);
-      cells.forEach((cell, idx) => {
+      renderedCells.forEach((cell, idx) => {
         htmlContents.push(
           `  <a class="panel-block cellIdx${idx}" href="#cell${
             idx + 1
@@ -268,7 +277,7 @@ const createHtml = async (
 
     // CONTENTS
     htmlContents = [];
-    cells.forEach((cell, idx) => {
+    renderedCells.forEach((cell, idx) => {
       const cellMeta: CellMeta = cell.metadata;
       const cellLabel = cellMeta.cellLabel;
       const cellTitle = `${isCellOrigin ? "CELL" : "No"}${idx + 1}`;
@@ -280,14 +289,14 @@ const createHtml = async (
       if (cellMeta.publishParams?.topicName) {
         const subscriptionName = cellMeta.publishParams.topicName ?? "";
         htmlContents.push(
-          `<h4 class="title is-4" ><a name="cell${idx + 1}">${cellTitle}<span style="padding:10px; font-size:medium;">TOPIC: ${escapeHtml(
+          `<h4 class="title is-4" ><a name="cell${
+            idx + 1
+          }">${cellTitle}<span style="padding:10px; font-size:medium;">TOPIC: ${escapeHtml(
             subscriptionName
           )}</span></a></h4>`
         );
       } else {
-        htmlContents.push(
-          `<h4 class="title is-4" ><a name="cell${idx + 1}">${cellTitle}</a></h4>`
-        );
+        htmlContents.push(`<h4 class="title is-4" ><a name="cell${idx + 1}">${cellTitle}</a></h4>`);
       }
       if (cellLabel) {
         htmlContents.push(`<h5 class="subtitle is-5">${escapeHtml(cellLabel)}</h5>`);
@@ -365,9 +374,27 @@ const createHtml = async (
                 htmlContents.push(ResultSetDataBuilder.from(rdh).toHtml(toHtmlParams));
 
                 // CHART
-                if (outputCondig.html.displayGraphs && cellMeta && cellMeta.chart) {
+                const reportChart = isReportChartSpec(cellMeta.reportChart)
+                  ? cellMeta.reportChart
+                  : undefined;
+                const legacyChart = cellMeta.chart;
+                if (outputCondig.html.displayGraphs && (legacyChart || reportChart)) {
                   const chartId = `id_chart_${idx}_${idx2++}`;
-                  const params: ChartsViewParams = { ...cellMeta.chart, rdh };
+                  if (reportChart) {
+                    const prepared = createReportChartViewParams(reportChart, rdh);
+                    chartValues[chartId] = escapeHtml(
+                      JSON.stringify({
+                        type: prepared.type,
+                        data: prepared.preparedData,
+                        options: prepared.preparedOptions,
+                      })
+                    );
+                    htmlContents.push(
+                      `<div class="block chart"><canvas id="${chartId}" width="400" height="400"></canvas></div>`
+                    );
+                    return;
+                  }
+                  const params: ChartsViewParams = { ...legacyChart!, rdh };
                   let data: ExtChartData | undefined = undefined;
                   let options: ExtChartOptions | undefined = undefined;
                   let pairPlotChartParams: PairPlotChartParams | undefined = undefined;
@@ -562,7 +589,7 @@ const createHtml = async (
     htmlContents.push(`<script>
   var markdownValues = ${JSON.stringify(markdownValues)};
   var chartValues = ${JSON.stringify(chartValues)};
-  var numOfContents = ${cells.length};
+  var numOfContents = ${renderedCells.length};
   </script>`);
     reportText = reportText.replace(/<!-- __CUSTOM_SCRIPT__ -->/, htmlContents.join("\n"));
 

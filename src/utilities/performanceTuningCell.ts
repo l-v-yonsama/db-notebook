@@ -1,12 +1,12 @@
 import type { NotebookCell } from "vscode";
 import type { RunResultMetadata } from "../shared/RunResultMetadata";
 import type { CellMeta } from "../types/Notebook";
-import type { SQLHistory } from "../types/SQLHistory";
+import type { QueryHistory } from "../types/QueryHistory";
 import type { StateStorage } from "./StateStorage";
 
 /**
  * A notebook cell is eligible only after its current SQL text has successfully
- * run and produced a result. The matching SQL history check is intentionally
+ * run and produced a result. The matching query history check is intentionally
  * separate because it is asynchronous.
  */
 export function hasSuccessfulSqlCellRun(cell: NotebookCell): boolean {
@@ -21,21 +21,21 @@ export function hasSuccessfulSqlCellRun(cell: NotebookCell): boolean {
 }
 
 /**
- * Finds the SQL History entry representing the SQL currently shown in a
+ * Finds the Query History entry representing the SQL currently shown in a
  * notebook cell. A failed latest execution never qualifies, even if an older
  * successful history entry with the same text remains available.
  */
 export async function findPerformanceTuningHistoryForCell(
   stateStorage: StateStorage,
   cell: NotebookCell
-): Promise<SQLHistory | undefined> {
+): Promise<QueryHistory | undefined> {
   if (!hasSuccessfulSqlCellRun(cell)) {
     return undefined;
   }
 
   const { connectionName } = cell.metadata as CellMeta;
   const sqlDoc = cell.document.getText().trim();
-  const histories = await stateStorage.getSQLHistoryList();
+  const histories = await stateStorage.getQueryHistoryList();
   return histories.find(
     (history) =>
       history.status !== "error" &&

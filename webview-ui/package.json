@@ -29,7 +29,6 @@
   },
   "devDependencies": {
     "@l-v-yonsama/multi-platform-database-drivers": "file:../../db-drivers",
-    "@types/chart.js": "^2.9.41",
     "@types/node": "22.18.10",
     "@types/splitpanes": "^2.2.1",
     "@types/vscode-webview": "^1.57.0",

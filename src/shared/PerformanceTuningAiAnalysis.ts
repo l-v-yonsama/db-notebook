@@ -1,6 +1,8 @@
 // Structured AI output for performance tuning. Evidence references let users
 // verify findings against the collected Full Context JSON.
 
+import type { ComparisonAiInputDetail } from "./PerformanceTuningComparison";
+
 /**
  * Points a finding/recommendation back at the specific piece of
  * PerformanceTuningContext it's about, so a reader can cross-check the AI's
@@ -22,6 +24,14 @@ export type PerformanceTuningAiEvidenceRef = {
   planNodeId?: string;
   // Matches PerformanceTuningDiagnosticCode, same plain-string reasoning.
   diagnosticCode?: string;
+  // DynamoDB counterpart (design doc §12) - a JSON pointer-ish path into the
+  // DynamoDbPerformanceTuningContext this evidence is about, e.g.
+  // "/cloudWatch/series/0" or "/accessPattern". Additive and independent of
+  // the RDB-shaped fields above (which have no DynamoDB equivalent - there is
+  // no schema/table/index/plan-node identity to point at the same way), so
+  // one shared PerformanceTuningAiAnalysisResult type still fits both
+  // engines without a union.
+  contextPath?: string;
 };
 
 export type PerformanceTuningAiFindingSeverity = "info" | "warning" | "critical";
@@ -42,12 +52,12 @@ export type PerformanceTuningAiRecommendation = {
   riskLevel?: PerformanceTuningAiRiskLevel;
   // Illustrative only (e.g. a candidate CREATE INDEX statement) - never
   // executed automatically by this feature (§1 of the design doc).
-  suggestedSql?: string;
+  suggestedQuery?: string;
   evidence?: PerformanceTuningAiEvidenceRef;
   // Host-computed, NOT AI-authored (2026-08-21 follow-up,
   // performanceTuningIndexDuplication.ts's findPossibleDuplicateIndex()) -
   // set by PerformanceTuningPreviewPanel.ts after the model's response is
-  // parsed, by deterministically comparing suggestedSql's CREATE INDEX
+  // parsed, by deterministically comparing suggestedQuery's CREATE INDEX
   // column set against the target table's existing indexes. Never trust
   // this field from the model's own JSON reply; it never appears there.
   // Deliberate defense-in-depth: the prompt also asks the model to
@@ -59,11 +69,27 @@ export type PerformanceTuningAiRecommendation = {
 
 export type PerformanceTuningAiConfidence = "low" | "medium" | "high";
 
+export type PerformanceTuningAiTokenUsage = {
+  inputTokens: number;
+  maxInputTokens: number;
+  safetyMargin: number;
+};
+
+export type PerformanceTuningAiQualityIssue = {
+  code: "SUGGESTED_QUERY_MATCHES_CURRENT";
+  recommendationTitle?: string;
+  message: string;
+};
+
 export type PerformanceTuningAiAnalysisResult = {
   formatVersion: 1;
   summary: string;
   findings: PerformanceTuningAiFinding[];
   recommendations: PerformanceTuningAiRecommendation[];
+  // Host-computed quality failures. Recommendations listed here have already
+  // been removed from `recommendations`; this evidence explains why and lets
+  // both Preview and saved reports recommend trying a stronger model.
+  qualityIssues?: PerformanceTuningAiQualityIssue[];
   confidence: PerformanceTuningAiConfidence;
   missingContext: string[];
   model: {
@@ -85,6 +111,22 @@ export type PerformanceTuningAiAnalysisResult = {
     // records whether the request itself used the model-limit compact
     // projection, so the saved AI request messages remain reproducible.
     contextDetail: "full" | "compact";
+    // Model-specific preflight measurement captured immediately before the
+    // request was sent. `inputTokens` is an estimate returned by VS Code's
+    // model.countTokens(); provider-side message framing may add tokens that
+    // are not visible here, hence the separately recorded safety margin.
+    tokenUsage?: PerformanceTuningAiTokenUsage;
+    // Present only when a baseline comparison was included in the request
+    // (baseline comparison implementation plan §16 Phase 3). Records which
+    // rung of the shrink ladder the request actually used and exactly what
+    // that rung left out, so a saved report never implies the model saw more
+    // than it did (§13.1's "無言で切り捨てない").
+    comparison?: {
+      detail: ComparisonAiInputDetail;
+      omittedFields: string[];
+      baselineFileName: string;
+      baselineContextSha256: string;
+    };
   };
   generatedAt: string; // ISO8601, set by the extension host, not the model
 };

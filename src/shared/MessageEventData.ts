@@ -6,6 +6,7 @@ import type {
   DbResource,
   DbSchema,
   DbTable,
+  DynamoDbPerformanceTuningContext,
   EstimatedBindParameter,
   ExtractedSqlResult,
   LogParseParams,
@@ -33,16 +34,33 @@ import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ComponentName } from "./ComponentName";
 import type { DBDumpInputParams, DBDumpSettingsUIParams } from "./DBDumpParams";
 import type { DBRestoreInputParams, DBRestoreSettingsUIParams } from "./DBRestoreParams";
-import type { DynamoQueryFilter } from "./DynamoDBConditionParams";
+import type {
+  DynamoQueryBuildMode,
+  DynamoQueryFilter,
+  DynamoQueryProjectionConstraintView,
+  DynamoQueryProjectionMode,
+} from "./DynamoDBConditionParams";
+import type { DynamoDbPerformanceTuningHumanSummary } from "./DynamoDbPerformanceTuningHumanSummary";
 import type { LabelValueItem } from "./LabelValueItem";
 import type { ModeType } from "./ModeType";
-import type { PerformanceTuningAiAnalysisResult } from "./PerformanceTuningAiAnalysis";
+import type {
+  PerformanceTuningAiAnalysisResult,
+  PerformanceTuningAiTokenUsage,
+} from "./PerformanceTuningAiAnalysis";
+import type {
+  BaselineSourceInfo,
+  ComparisonAiInputDetail,
+  PerformanceTuningComparisonEvidence,
+} from "./PerformanceTuningComparison";
+import type { AiMaskingLevel, PreparedAiPayload } from "./AiDataMasking";
 import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSummary";
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
+import type { CloudWatchDashboardHostMessage } from "./observability";
 
 export type MessageEventData =
+  | CloudWatchDashboardHostMessage
   | ChartsViewEventData
   | CfnDiagramSettingsPanelEventData
   | CodeResolverEditorEventData
@@ -64,6 +82,7 @@ export type MessageEventData =
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | PerformanceTuningPreviewPanelEventData
+  | AiDataMaskingPreviewPanelEventData
   | PerformanceTuningBindParametersPanelEventData
   | RecordRuleEditorEventData
   | ScanPanelEventData
@@ -80,6 +99,15 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
   componentName: U;
   value: V;
 };
+
+export type AiDataMaskingPreviewPanelEventData = BaseMessageEventData<
+  "initialize" | "ai-send-preview" | "ai-send-preview-closed",
+  "AiDataMaskingPreviewPanel",
+  {
+    aiSendPreview?: PreparedAiPayload;
+    aiSendPreviewClosedRequestId?: string;
+  }
+>;
 
 export type RdhViewConfig = {
   dateFormat: ToStringParam["dateFormat"];
@@ -221,6 +249,11 @@ export type DynamoQueryPanelEventData = BaseMessageEventData<
       sortDesc: boolean;
       filters: DynamoQueryFilter[];
       columnItems: { value: string | number; label: string }[];
+      projectionMode: DynamoQueryProjectionMode;
+      projectedAttributes: string[];
+      consistentRead: boolean;
+      buildMode: DynamoQueryBuildMode;
+      projectionConstraint: DynamoQueryProjectionConstraintView;
     };
     setPreviewInput?: {
       previewInput: string;
@@ -538,11 +571,39 @@ export type PlanTableMappingRowViewModel = {
   columnsUsed?: string;
 };
 
+// Built once, extension-side, by buildDynamoDbAccessPatternViewModel()
+// (src/utilities/dynamoDbPerformanceTuningAccessPatternFormatter.ts) from
+// DynamoDbPerformanceTuningContext.accessPattern - the DynamoDB counterpart
+// of PlanTableMappingRowViewModel above (RDB has no equivalent structure to
+// share this with; DynamoDB access patterns are a genuinely different shape,
+// see that context type's own top comment). Purely presentational text -
+// every source field is already value-free, so this view model is too.
+export type DynamoDbAccessPatternViewModel = {
+  operationLabel: string;
+  accessPathLabel: string;
+  confidence: "certain" | "unknown";
+  targetRef: string;
+  partitionKeyText: string;
+  sortKeyText?: string;
+  postReadFilterText: string;
+  projectionText: string;
+  consistentReadLabel: string;
+  apiLimitText?: string;
+  resultItemLimitText?: string;
+  scanDirectionLabel?: string;
+};
+
 // A tagged status prevents independently optional AI fields from becoming
 // inconsistent. Saving does not discard a successful analysis.
 export type PerformanceTuningAiAnalysisViewState = {
   status: "idle" | "running" | "success" | "error";
   result?: PerformanceTuningAiAnalysisResult;
+  // Preflight estimate for the request being sent, or the smallest attempted
+  // request when fitting failed. A successful result persists the same data
+  // under result.request.tokenUsage for Notebook reproducibility.
+  tokenUsage?: PerformanceTuningAiTokenUsage;
+  contextDetail?: "full" | "compact";
+  comparisonDetail?: ComparisonAiInputDetail;
   errorMessage?: string;
   // Only set when status is "error" and the failure was a JSON.parse()
   // failure on the model's own reply - kept so a malformed response is never
@@ -551,82 +612,170 @@ export type PerformanceTuningAiAnalysisViewState = {
   savedNotebookRelativePath?: string;
 };
 
+/**
+ * Tagged baseline comparison state for the Preview.
+ *
+ * Every section of the comparison renders from `evidence` alone, with no AI
+ * involved - "AI 分析前から全セクションを表示可能にする" (§12).
+ */
+export type PerformanceTuningComparisonViewState = {
+  status: "idle" | "loading" | "ready" | "error";
+  // Both set together whenever status is "ready".
+  baseline?: BaselineSourceInfo;
+  evidence?: PerformanceTuningComparisonEvidence;
+  // A load/selection failure. The previous selection is deliberately kept on
+  // screen when this happens, so a mistaken pick never silently drops a
+  // working comparison (§17.5).
+  errorMessage?: string;
+  // True when an AI analysis result currently on screen was produced under a
+  // different baseline than the one now selected. The Preview must then say
+  // so rather than presenting the old text as an analysis of the new
+  // comparison (§12).
+  analysisStale?: boolean;
+};
+
+// Common to both engines' AI/full-JSON shell fields (2026-08-24 follow-up,
+// DynamoDB support) - factored out only to avoid repeating these fields' doc
+// comments twice, not exposed/used as a type on its own anywhere else.
+type PerformanceTuningPreviewShellFields = {
+  // Baseline comparison (§12). Always present, `status: "idle"` when no
+  // baseline has been selected - the section then renders as the
+  // "Compare with Baseline..." affordance alone.
+  comparison: PerformanceTuningComparisonViewState;
+  // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
+  // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
+  jsonHtml: string;
+  // Computed on the extension side (Buffer.byteLength) rather than
+  // re-serialized/measured in the webview. This is retained as diagnostic
+  // metadata under the collapsed Full context JSON details; model fit is
+  // communicated with model-specific token usage instead.
+  payloadBytes: number;
+  maxPayloadBytes: number;
+  // Analyze with AI's model/response-language options (2026-08-19 follow-up)
+  // - populated directly from
+  // lm.selectChatModels({vendor: "copilot"}) mapped 1:1, no filtering),
+  // except defaultLanguageModelId carries no gpt-4o-family preference (see
+  // lmModelSelection.ts). English UI locales omit the response-language
+  // checkbox and force translateResponse false; other locales default it on.
+  languageModels: LabelValueItem[];
+  languageModelId: string;
+  translateResponse: boolean;
+  translateResponseLabel?: string;
+  maskingLevel: AiMaskingLevel;
+};
+
+// RDB view model (2026-08-24 follow-up: split out of the formerly-flat
+// `initialize` shape so a DynamoDB sibling could be added below without
+// forcing RDB-only fields like planTreeText/queryDiagram* to become
+// meaningless-when-absent on a DynamoDB payload too). `engine` is a
+// view-model-only discriminant - PerformanceTuningContext itself has no such
+// field (see isDynamoDbPerformanceTuningContext()'s own doc comment for why).
+export type RelationalPerformanceTuningInitializeViewModel = PerformanceTuningPreviewShellFields & {
+  engine: "relational";
+  context: PerformanceTuningContext;
+  // Grouped/summarized once, extension-side, from
+  // context.collection.diagnostics + .unavailableSections - see
+  // PerformanceTuningDiagnosticGroupViewModel above. Ordered
+  // information-first, in the same provenance order collection.diagnostics
+  // itself has (plan-level, then per-table); the Vue component splits by
+  // severity for the Information vs. Collection issues sections but does
+  // not itself re-sort or re-derive anything.
+  diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
+  // Execution plan display (2026-08-19 follow-up). planTreeText is
+  // undefined when executionPlan.normalizedPlan itself is absent
+  // (e.g. a Provider that hasn't wired it, or SQLite); an empty
+  // planTableMappingRows array is normal (a plan can legitimately touch
+  // zero tables) and just means that sub-section doesn't render.
+  planTreeText?: string;
+  // XML runtime artifacts (currently SQL Server's SET STATISTICS XML)
+  // are indented extension-side for display only. The exact raw artifact
+  // remains in context.executionPlan.actualPlan / Full Context JSON.
+  actualPlanDisplayText?: string;
+  planTableMappingRows: PlanTableMappingRowViewModel[];
+  // Deterministic, human-readable facts built once by the extension host.
+  humanSummary: PerformanceTuningHumanSummary;
+  // Mermaid itself is intentionally not bundled into the Preview webview.
+  // The saved DBN/HTML report contains the query-scoped diagram instead.
+  queryDiagramAvailable: boolean;
+  queryDiagramHasWarnings: boolean;
+  sqlHtml: string;
+  // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - whether this
+  // connection's Provider can actually collect an analyze-mode plan at
+  // all (driver.checkPerformanceTuningContextAvailability(), the same
+  // static per-Provider capability check RunActualPlanActionCommand's
+  // handler itself does not need to repeat). `message` (when present)
+  // explains an unavailable capability in the button tooltip.
+  analyzedExecutionPlan: CapabilityStatus;
+};
+
+// DynamoDB counterpart (2026-08-24 follow-up, design doc §11.3). No
+// planTreeText/actualPlanDisplayText/planTableMappingRows/queryDiagram* -
+// DynamoDB has no execution plan or declared-FK diagram to show (§6.1); its
+// own structural evidence is accessPattern/humanSummary instead.
+export type DynamoDbPerformanceTuningInitializeViewModel = PerformanceTuningPreviewShellFields & {
+  engine: "dynamodb";
+  context: DynamoDbPerformanceTuningContext;
+  diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
+  accessPattern: DynamoDbAccessPatternViewModel;
+  humanSummary: DynamoDbPerformanceTuningHumanSummary;
+  // Only set when context.statement.text is present (a PartiQL statement) -
+  // a native Query/Scan statement has no SQL-like text to highlight; its
+  // value-ful, Preview-only rendering is carried separately in nativeQuery.
+  sqlHtml?: string;
+  // Ephemeral Preview-only rendering of the value-ful native Query input.
+  // It is deliberately not part of DynamoDbPerformanceTuningContext, so it
+  // never enters Full Context JSON, saved DBNs, comparisons, or AI prompts.
+  nativeQuery?: DynamoDbNativeQueryViewModel;
+  // "Run Observed Read" - the DynamoDB counterpart of RDB's
+  // analyzedExecutionPlan above, kept as its own field (not the same field
+  // reused) since the two capabilities are genuinely different checks with
+  // different messages - see DynamoDbPerformanceTuningCapabilities.observedRead's
+  // own doc comment in db-drivers for why `available` here never implies the
+  // caller's IAM policy was verified.
+  observedReadCapability: CapabilityStatus;
+};
+
+export type DynamoDbNativeQueryViewModel = {
+  target: string;
+  keyCondition: { raw: string; resolved: string };
+  filter?: { raw: string; resolved: string };
+  projection?: { raw: string; resolved: string };
+  select?: string;
+  expressionAttributeNames: Array<{ token: string; name: string }>;
+  expressionAttributeValues: Array<{ token: string; value: string }>;
+  consistentRead: "Strong" | "Eventual";
+  scanDirection: "Ascending" | "Descending";
+  limit?: number;
+};
+
 export type PerformanceTuningPreviewPanelEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand | "analysis-update",
+  | BaseMessageEventDataCommand
+  | "analysis-update"
+  | "comparison-update"
+  | "ai-send-preview"
+  | "ai-send-preview-closed",
   "PerformanceTuningPreviewPanel",
   {
-    initialize?: {
-      context: PerformanceTuningContext;
-      // Grouped/summarized once, extension-side, from
-      // context.collection.diagnostics + .unavailableSections - see
-      // PerformanceTuningDiagnosticGroupViewModel above. Ordered
-      // information-first, in the same provenance order collection.diagnostics
-      // itself has (plan-level, then per-table); the Vue component splits by
-      // severity for the Information vs. Collection issues sections but does
-      // not itself re-sort or re-derive anything.
-      diagnosticGroups: PerformanceTuningDiagnosticGroupViewModel[];
-      // Execution plan display (2026-08-19 follow-up). planTreeText is
-      // undefined when executionPlan.normalizedPlan itself is absent
-      // (e.g. a Provider that hasn't wired it, or SQLite); an empty
-      // planTableMappingRows array is normal (a plan can legitimately touch
-      // zero tables) and just means that sub-section doesn't render.
-      planTreeText?: string;
-      // XML runtime artifacts (currently SQL Server's SET STATISTICS XML)
-      // are indented extension-side for display only. The exact raw artifact
-      // remains in context.executionPlan.actualPlan / Full Context JSON.
-      actualPlanDisplayText?: string;
-      planTableMappingRows: PlanTableMappingRowViewModel[];
-      // Deterministic, human-readable facts built once by the extension host.
-      humanSummary: PerformanceTuningHumanSummary;
-      // Mermaid itself is intentionally not bundled into the Preview webview.
-      // The saved DBN/HTML report contains the query-scoped diagram instead.
-      queryDiagramAvailable: boolean;
-      queryDiagramHasWarnings: boolean;
-      // Pre-rendered by createCodeHtmlString() (Prism, extension-side) so the
-      // webview can just v-html them - mirrors HttpEventPanel's codeBlocks.
-      sqlHtml: string;
-      jsonHtml: string;
-      // "Copy Prompt for Other AI" (2026-08-21 follow-up) - a self-contained
-      // plain-text prompt (buildPlainTextAnalysisPrompt(), extension-side)
-      // for a manual paste into an external AI chat (ChatGPT/Claude.ai/
-      // Claude Code/Codex/...) the user already has a subscription for,
-      // bypassing vscode.lm/Copilot entirely. Precomputed here for the same
-      // reason sqlHtml/jsonHtml are - a pure string build, ready to copy
-      // instantly with no round-trip to the extension host.
-      plainTextPrompt: string;
-      // The same external-AI prompt with the current UI language response
-      // instruction. The webview switches between these immediately when
-      // the Translate response checkbox changes, without a host round trip.
-      translatedPlainTextPrompt: string;
-      // Computed on the extension side (Buffer.byteLength) rather than
-      // re-serialized/measured in the webview, so the displayed number
-      // always matches what RDSBaseDriver.enforcePayloadBudget() itself saw.
-      payloadBytes: number;
-      maxPayloadBytes: number;
-      // Analyze with AI's "Language model"/"Translate response" options
-      // (2026-08-19 follow-up) - populated directly from
-      // lm.selectChatModels({vendor:
-      // "copilot"}) mapped 1:1, no filtering), except defaultLanguageModelId
-      // carries no gpt-4o-family preference (see lmModelSelection.ts) and
-      // translateResponse's default is env.language !== "en", same as those
-      // two panels.
-      languageModels: LabelValueItem[];
-      languageModelId: string;
-      translateResponse: boolean;
-      // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) - whether this
-      // connection's Provider can actually collect an analyze-mode plan at
-      // all (driver.checkPerformanceTuningContextAvailability(), the same
-      // static per-Provider capability check RunActualPlanActionCommand's
-      // handler itself does not need to repeat). `message` (when present)
-      // explains an unavailable capability in the button tooltip.
-      analyzedExecutionPlan: CapabilityStatus;
-    };
+    initialize?:
+      | RelationalPerformanceTuningInitializeViewModel
+      | DynamoDbPerformanceTuningInitializeViewModel;
     analysis?: PerformanceTuningAiAnalysisViewState;
+    // Set only when Copilot advertised a model that its request endpoint then
+    // rejected as model_not_supported. The webview removes it immediately;
+    // the host also remembers it for the lifetime of this Preview panel so a
+    // later context re-render cannot add it back.
+    unavailableLanguageModelId?: string;
+    // Sent on its own by "comparison-update" whenever a baseline is selected,
+    // changed, cleared, or the Current Context was re-collected underneath an
+    // existing selection (§16 Phase 2).
+    comparison?: PerformanceTuningComparisonViewState;
+    aiSendPreview?: PreparedAiPayload;
+    aiSendPreviewClosedRequestId?: string;
   }
 >;
 
 // PerformanceTuningBindParametersPanel.vue (2026-08-19 follow-up) - the
-// shared "confirm bind values" panel both Query Statistics and SQL History
+// shared "confirm bind values" panel both Query Statistics and Query History
 // route through via openPerformanceTuningPreview() whenever the target SQL
 // has detected placeholders. See src/panels/PerformanceTuningBindParametersPanel.ts.
 export type PerformanceTuningBindParametersPanelEventData = BaseMessageEventData<
@@ -642,7 +791,7 @@ export type PerformanceTuningBindParametersPanelEventData = BaseMessageEventData
       estimatedBindParameters: EstimatedBindParameter[];
       // Real values to pre-fill each row's input with, parallel to
       // estimatedBindParameters by `position` (index position - 1) - e.g.
-      // SQL History's last-executed variables. Undefined for Query
+      // Query History's last-executed variables. Undefined for Query
       // Statistics (no such source), which keeps every row starting blank
       // exactly as before.
       presetBindValues?: unknown[];
@@ -842,7 +991,10 @@ export type DBFormEventDataValue = {
   subComponentName: "ConnectionSetting" | "ResourceProperties";
   connectionSetting?: {
     mode: ModeType;
-    setting: ConnectionSetting & { mcpEnabled?: boolean };
+    setting: ConnectionSetting & {
+      mcpEnabled?: boolean;
+      aiMaskingLevel?: AiMaskingLevel;
+    };
     prohibitedNames: string[];
   };
   resourceProperties?: {

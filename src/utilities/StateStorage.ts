@@ -29,16 +29,19 @@ import ShortUniqueId from "short-unique-id";
 import { ExtensionContext, SecretStorage } from "vscode";
 import { EXTENSION_NAME } from "../constant";
 import { showStatusMessage } from "../statusBar";
-import { SQLHistory } from "../types/SQLHistory";
+import { QueryHistory } from "../types/QueryHistory";
+import { stampDashboardConnectionName } from "../observability/dashboardLaunch";
 import { workflow } from "./driverResolver";
 import {
-  createInitialSQLHistoryPerformance,
-  isSQLHistoryTarget,
-  mergeSQLHistoryPerformance,
-  migrateStoredSQLHistory,
-  StoredSQLHistory,
-} from "./sqlHistoryUtil";
+  createInitialQueryHistoryPerformance,
+  isQueryHistoryTarget,
+  mergeQueryHistoryPerformance,
+  migrateStoredQueryHistory,
+  resetQueryHistoryPerformance,
+  StoredQueryHistory,
+} from "./queryHistoryUtil";
 import { log } from "./logger";
+import type { AiMaskingLevel } from "../shared/AiDataMasking";
 
 const uid = new ShortUniqueId();
 
@@ -46,9 +49,13 @@ const PREFIX = "[StateStorage]";
 
 export const DEFAULT_CON_NAME_KEY = `${EXTENSION_NAME}-DEFAULT-CON-NAME`;
 export const STORAGE_KEY = `${EXTENSION_NAME}-settings`;
-export const SQL_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
+// The stored value keeps its original `-sql-history` suffix even though the
+// view is now called Query History: renaming the globalState key itself would
+// orphan every existing user's saved history for no functional gain.
+export const QUERY_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
 export const PREV_SAVE_FOLDER = `${EXTENSION_NAME}-previous-save-folder`;
 export const MCP_ENABLED_CONNECTIONS_KEY = `${EXTENSION_NAME}-mcp-enabled-connections`;
+export const AI_MASKING_LEVEL_BY_CONNECTION_KEY = `${EXTENSION_NAME}-ai-masking-level-by-connection`;
 
 type DbResInfo = {
   isInProgress: boolean;
@@ -94,9 +101,9 @@ export class StateStorage {
     connectionName: string,
     reload: boolean,
     wait = false
-  ): Promise<GeneralResult<{ db: DbDatabase[]; dbType: DBType; }>> {
+  ): Promise<GeneralResult<{ db: DbDatabase[]; dbType: DBType }>> {
     // log(`${PREFIX} loadResource(${connectionName}, reload:${reload}, wait:${wait})`);
-    const ret: GeneralResult<{ db: DbDatabase[]; dbType: DBType; }> = {
+    const ret: GeneralResult<{ db: DbDatabase[]; dbType: DBType }> = {
       ok: false,
       message: "",
     };
@@ -196,11 +203,13 @@ export class StateStorage {
         // ResourceTreeProvider), but still needs conName stamped so the
         // "Create CloudFormation diagram" command can resolve a connection
         // setting from the tree item alone.
-        dbRes.findChildren<DbCfnStack>({ resourceType: ResourceType.CfnStack }).forEach((stackRes) => {
-          stackRes.meta = {
-            conName: conRes.name,
-          };
-        });
+        dbRes
+          .findChildren<DbCfnStack>({ resourceType: ResourceType.CfnStack })
+          .forEach((stackRes) => {
+            stackRes.meta = {
+              conName: conRes.name,
+            };
+          });
         // for ssm
         {
           const params = dbRes.findChildren<DbSsmParameter>({
@@ -321,6 +330,7 @@ export class StateStorage {
               conName: conRes.name,
             };
           });
+        stampDashboardConnectionName(dbRes, conRes.name);
       }
       this.resMap.set(connectionName, { isInProgress: false, res: result });
       ret.result = { db: result, dbType };
@@ -329,7 +339,7 @@ export class StateStorage {
       log(`${PREFIX} loadResource Error:${message}`);
       this.resMap.set(connectionName, { isInProgress: false, res: undefined });
       ret.message = message;
-      showStatusMessage(message, 'warning');
+      showStatusMessage(message, "warning");
     }
     return ret;
   }
@@ -355,45 +365,82 @@ export class StateStorage {
     this.context.globalState.update(PREV_SAVE_FOLDER, folderPath);
   }
 
-  async getSQLHistoryList(): Promise<SQLHistory[]> {
-    const storedList = this.context.globalState.get<StoredSQLHistory[]>(
-      SQL_HISTORY_STORAGE_KEY,
+  async getQueryHistoryList(): Promise<QueryHistory[]> {
+    const storedList = this.context.globalState.get<StoredQueryHistory[]>(
+      QUERY_HISTORY_STORAGE_KEY,
       []
     );
     const list = storedList.flatMap((stored) => {
-      const migrated = migrateStoredSQLHistory(stored);
+      const migrated = migrateStoredQueryHistory(stored);
       return migrated ? [migrated] : [];
     });
 
     // 読み込み時に旧sqlModeを除去し、performanceを補完する。Explain系の
     // 旧エントリもここで除外するため、再実行を待たず一度だけ移行できる。
     if (JSON.stringify(storedList) !== JSON.stringify(list)) {
-      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+      await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
     }
     return list;
   }
 
-  async addSQLHistory(
-    history: Omit<SQLHistory, "id" | "performance" | "lastErrorMessage" | "lastErrorAt">
+  async addQueryHistory(
+    history: Omit<QueryHistory, "id" | "performance" | "lastErrorMessage" | "lastErrorAt">
   ): Promise<boolean> {
     // 呼び出し元の実行モードだけに依存せず、保存境界でもraw EXPLAINを拒否する。
-    if (!isSQLHistoryTarget(history)) {
+    if (!isQueryHistoryTarget(history)) {
       return false;
     }
-    const list = await this.getSQLHistoryList();
+    const list = await this.getQueryHistoryList();
 
-    const newTrimedSql = history.sqlDoc.trim();
-    const sameHistoryIndex = list.findIndex(
-      (it) => it.sqlDoc.trim() === newTrimedSql && it.connectionName === history.connectionName
-    );
+    // Identity: a native Query history entry is identified by its
+    // structural key (design doc §4.2), never by sqlDoc - sqlDoc is only a
+    // value-free description text for this kind, and a real native Query
+    // request has no equivalent of "trimmed SQL text" to compare. Every
+    // other kind (including entries with no `request` at all, which predate
+    // this field) keeps the existing sqlDoc+connectionName identity
+    // unchanged.
+    const dynamoRequest = history.request?.kind === "dynamodbQuery" ? history.request : undefined;
+    const sameHistoryIndex = dynamoRequest
+      ? list.findIndex(
+          (it) =>
+            it.request?.kind === "dynamodbQuery" &&
+            it.request.structuralKey === dynamoRequest.structuralKey &&
+            it.connectionName === history.connectionName
+        )
+      : (() => {
+          const newTrimedSql = history.sqlDoc.trim();
+          return list.findIndex(
+            (it) =>
+              it.request?.kind !== "dynamodbQuery" &&
+              it.sqlDoc.trim() === newTrimedSql &&
+              it.connectionName === history.connectionName
+          );
+        })();
 
     // Re-running the same SQL+connection moves it to the front (LRU), so a
     // frequently re-measured query survives the cap below instead of being
     // evicted by unrelated one-off queries while sitting at its old position.
     const isNew = sameHistoryIndex < 0;
+    // DynamoDB API telemetry is namespaced under summary.dynamoDb and that
+    // object is its sole source of truth. Do not silently fall back to the
+    // generic display-oriented capacityUnits when a DynamoDB summary exists;
+    // a disagreement would otherwise corrupt the history aggregate. The
+    // generic field remains available for non-DynamoDB producers.
+    const capacityUnits = history.summary?.dynamoDb
+      ? history.summary.dynamoDb.consumedCapacity?.totalCapacityUnits
+      : history.summary?.capacityUnits;
     const performance = isNew
-      ? createInitialSQLHistoryPerformance(history.summary?.elapsedTimeMilli)
-      : mergeSQLHistoryPerformance(list[sameHistoryIndex], history.summary?.elapsedTimeMilli);
+      ? createInitialQueryHistoryPerformance(
+          history.summary?.elapsedTimeMilli,
+          capacityUnits,
+          history.summary?.dynamoDb
+        )
+      : mergeQueryHistoryPerformance(
+          list[sameHistoryIndex],
+          history.summary?.elapsedTimeMilli,
+          capacityUnits,
+          history.summary?.dynamoDb
+        );
     const previous = isNew ? undefined : list[sameHistoryIndex];
     if (previous) {
       list.splice(sameHistoryIndex, 1);
@@ -419,23 +466,40 @@ export class StateStorage {
     if (list.length > maxHistory) {
       list.splice(maxHistory, list.length - maxHistory);
     }
-    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+    await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
     return isNew;
   }
 
-  async deleteSQLHistoryByID(id: string): Promise<boolean> {
-    const list = await this.getSQLHistoryList();
+  async deleteQueryHistoryByID(id: string): Promise<boolean> {
+    const list = await this.getQueryHistoryList();
     const idx = list.findIndex((it) => it.id === id);
     if (idx >= 0) {
       list.splice(idx, 1);
-      await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, list);
+      await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
       return true;
     }
     return false;
   }
 
-  async deleteAllSQLHistories(): Promise<boolean> {
-    await this.context.globalState.update(SQL_HISTORY_STORAGE_KEY, []);
+  async resetQueryHistoryPerformanceByID(id: string, resetAt = Date.now()): Promise<boolean> {
+    const list = await this.getQueryHistoryList();
+    const idx = list.findIndex((it) => it.id === id);
+    if (idx < 0) {
+      return false;
+    }
+    const history = list[idx];
+    const includeDynamoDbAggregate =
+      history.performance?.dynamoDb !== undefined || history.summary?.dynamoDb !== undefined;
+    list[idx] = {
+      ...history,
+      performance: resetQueryHistoryPerformance(resetAt, includeDynamoDbAggregate),
+    };
+    await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, list);
+    return true;
+  }
+
+  async deleteAllQueryHistories(): Promise<boolean> {
+    await this.context.globalState.update(QUERY_HISTORY_STORAGE_KEY, []);
     return true;
   }
 
@@ -509,6 +573,33 @@ export class StateStorage {
       return;
     }
     await this.context.globalState.update(MCP_ENABLED_CONNECTIONS_KEY, list);
+  }
+
+  getAiMaskingLevelForConnection(name: string): AiMaskingLevel {
+    const levels = this.context.globalState.get<Record<string, AiMaskingLevel>>(
+      AI_MASKING_LEVEL_BY_CONNECTION_KEY,
+      {}
+    );
+    const value = levels[name];
+    return value === 0 || value === 1 || value === 2 ? value : 0;
+  }
+
+  async setAiMaskingLevelForConnection(
+    name: string,
+    level: AiMaskingLevel | undefined
+  ): Promise<void> {
+    const levels = {
+      ...this.context.globalState.get<Record<string, AiMaskingLevel>>(
+        AI_MASKING_LEVEL_BY_CONNECTION_KEY,
+        {}
+      ),
+    };
+    if (level === undefined) {
+      delete levels[name];
+    } else {
+      levels[name] = level;
+    }
+    await this.context.globalState.update(AI_MASKING_LEVEL_BY_CONNECTION_KEY, levels);
   }
 
   getDBTypeByConnectionName(name: string): DBType | undefined {
@@ -587,6 +678,7 @@ export class StateStorage {
     await this.context.globalState.update(STORAGE_KEY, list);
     this.resMap.delete(name);
     await this.setMcpEnabledForConnection(name, false);
+    await this.setAiMaskingLevelForConnection(name, undefined);
     return true;
   }
 

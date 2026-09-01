@@ -11,6 +11,7 @@ import type { CodeResolverParams } from "./CodeResolverParams";
 import type { ModeType } from "./ModeType";
 import type { QueryStatisticsSearchParams } from "./QueryStatisticsParams";
 import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
+import type { AiMaskingLevel, AiPayloadFindingResolution } from "./AiDataMasking";
 
 export type TabIdParam = {
   tabId: string;
@@ -97,8 +98,19 @@ export type ActionCommand =
   | PreviewPerformanceTuningActionCommand
   | SubmitPerformanceTuningBindParametersActionCommand
   | AnalyzePerformanceTuningWithAiActionCommand
+  | CopyPerformanceTuningPromptWithMaskingActionCommand
+  | ResolvePerformanceTuningAiFindingActionCommand
+  | ApprovePerformanceTuningAiPayloadActionCommand
+  | CancelPerformanceTuningAiPayloadActionCommand
+  | ResolveAiPayloadFindingActionCommand
+  | ApproveAiPayloadActionCommand
+  | CancelAiPayloadActionCommand
   | SaveAiAnalysisAsNotebookActionCommand
-  | RunActualPlanActionCommand;
+  | RunActualPlanActionCommand
+  | RunObservedDynamoDbReadActionCommand
+  | RunPerformanceTuningBenchmarkActionCommand
+  | SelectPerformanceTuningBaselineActionCommand
+  | ClearPerformanceTuningBaselineActionCommand;
 
 export type NameWithComment = {
   name: string;
@@ -150,7 +162,52 @@ export type SubmitPerformanceTuningBindParametersActionCommand = BaseActionComma
 // current model and translation selections.
 export type AnalyzePerformanceTuningWithAiActionCommand = BaseActionCommand<
   "analyzePerformanceTuningWithAi",
-  { languageModelId: string; translateResponse: boolean }
+  { languageModelId: string; translateResponse: boolean; maskingLevel?: AiMaskingLevel }
+>;
+
+export type CopyPerformanceTuningPromptWithMaskingActionCommand = BaseActionCommand<
+  "copyPerformanceTuningPromptWithMasking",
+  { translateResponse: boolean; maskingLevel: AiMaskingLevel }
+>;
+
+export type ResolvePerformanceTuningAiFindingActionCommand = BaseActionCommand<
+  "resolvePerformanceTuningAiFinding",
+  {
+    requestId: string;
+    findingId?: string;
+    resolution: AiPayloadFindingResolution;
+    allCandidates?: boolean;
+  }
+>;
+
+export type ApprovePerformanceTuningAiPayloadActionCommand = BaseActionCommand<
+  "approvePerformanceTuningAiPayload",
+  { requestId: string; payloadDigest: string }
+>;
+
+export type CancelPerformanceTuningAiPayloadActionCommand = BaseActionCommand<
+  "cancelPerformanceTuningAiPayload",
+  { requestId: string }
+>;
+
+export type ResolveAiPayloadFindingActionCommand = BaseActionCommand<
+  "resolveAiPayloadFinding",
+  {
+    requestId: string;
+    findingId?: string;
+    resolution: AiPayloadFindingResolution;
+    allCandidates?: boolean;
+  }
+>;
+
+export type ApproveAiPayloadActionCommand = BaseActionCommand<
+  "approveAiPayload",
+  { requestId: string; payloadDigest: string }
+>;
+
+export type CancelAiPayloadActionCommand = BaseActionCommand<
+  "cancelAiPayload",
+  { requestId: string }
 >;
 
 // Saves the most recent successful AI analysis (held as Panel instance
@@ -166,6 +223,29 @@ export type SaveAiAnalysisAsNotebookActionCommand = BaseActionCommand<"saveAiAna
 // are needed here either. The confirmation gate itself is host-side (window.showWarningMessage,
 // modal) - see PerformanceTuningPreviewPanel.ts's runActualPlan().
 export type RunActualPlanActionCommand = BaseActionCommand<"runActualPlan">;
+
+// "Run Observed Read" - DynamoDB's counterpart to RunActualPlanActionCommand
+// above (same rationale: PerformanceTuningPreviewPanel holds the original
+// DynamoDB request - connectionSetting/statement - as instance state the
+// same way it already holds the RDB request, so no params are needed here
+// either). The confirmation gate is host-side (window.showWarningMessage,
+// modal) - see PerformanceTuningPreviewPanel.ts's runObservedRead().
+export type RunObservedDynamoDbReadActionCommand = BaseActionCommand<"runObservedRead">;
+
+export type RunPerformanceTuningBenchmarkActionCommand = BaseActionCommand<
+  "runPerformanceTuningBenchmark",
+  { runs: 3 | 5; mode?: "page" | "completeResult" }
+>;
+
+// The host owns baseline paths and the current Context, so the webview sends no parameters.
+export type SelectPerformanceTuningBaselineActionCommand =
+  BaseActionCommand<"selectPerformanceTuningBaseline">;
+
+// "Clear Baseline" (§6.1). Drops the selection and the comparison built from
+// it; the Current Context and its own AI analysis state are untouched apart
+// from the staleness flag the host recomputes (§12).
+export type ClearPerformanceTuningBaselineActionCommand =
+  BaseActionCommand<"clearPerformanceTuningBaseline">;
 
 export type ConnectActionCommand = BaseActionCommand<"connect", { conName: string }>;
 export type DisconnectActionCommand = BaseActionCommand<"disconnect", { conName: string }>;
@@ -221,7 +301,10 @@ export type TestConnectionSettingActionCommand = {
 export type SaveConnectionSettingActionCommand = {
   command: "saveConnectionSetting";
   mode: ModeType;
-  params: ConnectionSetting & { mcpEnabled?: boolean };
+  params: ConnectionSetting & {
+    mcpEnabled?: boolean;
+    aiMaskingLevel?: AiMaskingLevel | "0" | "1" | "2";
+  };
 };
 
 export type CancelActionCommand = BaseActionCommand<"cancel">;

@@ -1,5 +1,6 @@
 import {
   AwsDatabase,
+  AwsDriver,
   AwsServiceType,
   BaseSQLSupportDriver,
   DbCfnStack,
@@ -65,7 +66,11 @@ import {
   REFRESH_RESOURCES,
   REMOVE_SUBSCRIPTION,
   RESTORE_DATABASE,
+  SCAN_ITEMS,
   SHOW_CONNECTION_SETTING,
+  SHOW_CLOUDWATCH_METRICS,
+  SHOW_CLOUDWATCH_METRICS_OVERVIEW,
+  SHOW_RDB_DASHBOARD,
   SHOW_DYNAMO_QUERY_PANEL,
   SHOW_PUBLISH_EDITOR_PANEL,
   SHOW_QUERY_STATISTICS,
@@ -82,6 +87,8 @@ import {
 import { SQLConfigurationViewProvider } from "../../form";
 import { MqttDriverManager } from "../../mqtt/MqttDriverManager";
 import { CfnDiagramSettingsPanel } from "../../panels/CfnDiagramSettingsPanel";
+import { CloudWatchMetricsPanel } from "../../panels/CloudWatchMetricsPanel";
+import { RdbDashboardPanel } from "../../panels/RdbDashboardPanel";
 import { CreateInsertScriptSettingsPanel } from "../../panels/CreateInsertScriptSettingsPanel";
 import { DBDumpSettingsPanel } from "../../panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "../../panels/DBRestoreSettingsPanel";
@@ -215,6 +222,24 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
     } catch (e) {
       showWindowErrorMessage(e);
     }
+  });
+  commands.registerCommand(SHOW_CLOUDWATCH_METRICS, async (res: DbResource) => {
+    if (!res) {
+      return;
+    }
+    CloudWatchMetricsPanel.render(context.extensionUri, res);
+  });
+  commands.registerCommand(SHOW_CLOUDWATCH_METRICS_OVERVIEW, async (res: DbResource) => {
+    if (!res) {
+      return;
+    }
+    CloudWatchMetricsPanel.renderOverview(context.extensionUri, res);
+  });
+  commands.registerCommand(SHOW_RDB_DASHBOARD, async (res: DbResource) => {
+    if (!res) {
+      return;
+    }
+    RdbDashboardPanel.render(context.extensionUri, res);
   });
 
   commands.registerCommand(COPY_COLUMN_NAMES, async (tableRes: DbTable) => {
@@ -512,6 +537,12 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   );
 
   context.subscriptions.push(
+    commands.registerCommand(SCAN_ITEMS, async (tableRes: DbDynamoTable) => {
+      await scanItems(stateStorage, tableRes);
+    })
+  );
+
+  context.subscriptions.push(
     commands.registerCommand(FLUSH_DB, async (conRes: DbConnection) => {
       await workflow<RedisDriver>(conRes, async (driver) => {
         const answer = await window.showInformationMessage(
@@ -752,6 +783,38 @@ async function viewRows(stateStorage: StateStorage, tableRes: DbTable, limitMode
         limitMode,
         limit: 100,
         limitLastColumn,
+      });
+    },
+    true
+  );
+
+  if (ok && result !== undefined) {
+    const commandParam: MdhViewParams = {
+      title: tableRes.name,
+      list: [result],
+    };
+    commands.executeCommand(OPEN_MDH_VIEWER, commandParam);
+  } else {
+    showWindowErrorMessage(message);
+  }
+}
+
+async function scanItems(stateStorage: StateStorage, tableRes: DbDynamoTable) {
+  const { conName } = tableRes.meta;
+  const setting = await stateStorage.getConnectionSettingByName(conName);
+  if (!setting) {
+    return;
+  }
+
+  const { ok, message, result } = await workflow<AwsDriver>(
+    setting,
+    async (driver) => {
+      if (!driver.dynamoClient) {
+        throw new Error("DynamoDB is not configured for this connection.");
+      }
+      return await driver.dynamoClient.scanItemsAtClient({
+        TableName: tableRes.name,
+        Limit: 100,
       });
     },
     true

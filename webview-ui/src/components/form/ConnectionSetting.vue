@@ -162,9 +162,17 @@ const CA_FILE_FILTERS: { [name: string]: string[] } = {
 
 type Props = {
   mode: ModeType;
-  item: ConnectionSetting & { mcpEnabled?: boolean };
+  item: ConnectionSetting & {
+    mcpEnabled?: boolean;
+    aiMaskingLevel?: 0 | 1 | 2;
+  };
   prohibitedNames: string[];
 };
+
+const aiMaskingLevelLabel = computed(():string =>{
+  const item = aiMaskingLevelItems.find(it => it.value === aiMaskingLevel.value);
+  return item?.label ?? '';
+});
 
 const acceptValues = computed((): boolean => {
   const item = createItem();
@@ -368,6 +376,12 @@ const mqttRejectUnauthorized = ref(props.item.mqttSetting?.rejectUnauthorized ??
 const mqttClean = ref(props.item.mqttSetting?.clean ?? true);
 
 const mcpEnabled = ref(props.item.mcpEnabled ?? false);
+const aiMaskingLevel = ref<0 | 1 | 2>(props.item.aiMaskingLevel ?? 0);
+const aiMaskingLevelItems = [
+  { label: "Lv0 - No masking", value: 0 },
+  { label: "Lv1 - Sensitive data", value: 1 },
+  { label: "Lv2 - All non-empty cells", value: 2 },
+];
 let mqttSubscriptionList = props.item.mqttSetting?.subscriptionList ?? [];
 
 
@@ -524,7 +538,11 @@ function save() {
   vscode.postCommand({
     command: "saveConnectionSetting",
     mode: props.mode,
-    params: { ...createItem(), mcpEnabled: mcpEnabled.value },
+    params: {
+      ...createItem(),
+      mcpEnabled: mcpEnabled.value,
+      aiMaskingLevel: aiMaskingLevel.value,
+    },
   });
 }
 
@@ -650,6 +668,11 @@ defineExpose({
       <VsCodeCheckbox id="mcpEnabled" v-if="!isShowMode" v-model="mcpEnabled"
         style="margin-right: auto">Allow AI tools (e.g. Copilot
         Chat)<br> to check and query this connection</VsCodeCheckbox>
+
+      <label for="aiMaskingLevel">AI masking level</label>
+      <p v-if="isShowMode" id="aiMaskingLevel">{{ aiMaskingLevelLabel }}</p>
+      <VsCodeDropdown v-else id="aiMaskingLevel" v-model="aiMaskingLevel"
+        :items="aiMaskingLevelItems" :width="220"></VsCodeDropdown>
 
       <!-- SQL Server -->
       <label v-if="elmSettings.getSqlServerAuthenticationType().visible" for="authenticationType">Authentication</label>

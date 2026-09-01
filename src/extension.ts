@@ -43,10 +43,13 @@ import { HelpProvider } from "./treeData/help/HelpProvider";
 import { registerHistoryTreeCommand } from "./treeData/history/HistoryTreeCommand";
 import { activateLmTools } from "./aiTools/lmTools/activator";
 import { activateMcpServer } from "./aiTools/mcpServer/activator";
+import { configureAiDataMaskingPreview } from "./panels/AiDataMaskingPreviewPanel";
 import { onDidChangeRunningState } from "./aiTools/mcpServer/server";
 import { MqttDriverManager } from "./mqtt/MqttDriverManager";
 import { activateNotebook } from "./notebook/activator";
 import { CfnDiagramSettingsPanel } from "./panels/CfnDiagramSettingsPanel";
+import { CloudWatchMetricsPanel } from "./panels/CloudWatchMetricsPanel";
+import { RdbDashboardPanel } from "./panels/RdbDashboardPanel";
 import { CsvParseSettingPanel } from "./panels/CsvParseSettingPanel";
 import { DBDumpSettingsPanel } from "./panels/DBDumpSettingsPanel";
 import { DBRestoreSettingsPanel } from "./panels/DBRestoreSettingsPanel";
@@ -64,7 +67,7 @@ import { registerToolActivityTreeCommand } from "./treeData/toolActivity/ToolAct
 import { ToolActivityTreeProvider } from "./treeData/toolActivity/ToolActivityTreeProvider";
 import { onDidChangeActivity } from "./treeData/toolActivity/ToolInvocationTracker";
 import {
-  ChartsViewParams,
+  AnyChartsViewParams,
   DiffMdhViewTabParam,
   LogParseResultViewParams,
   MdhViewParams,
@@ -126,7 +129,10 @@ export async function activate(context: ExtensionContext) {
   DBDumpSettingsPanel.setStateStorage(stateStorage);
   DBRestoreSettingsPanel.setStateStorage(stateStorage);
   CfnDiagramSettingsPanel.setStateStorage(stateStorage);
+  CloudWatchMetricsPanel.setStateStorage(stateStorage);
+  RdbDashboardPanel.setStateStorage(stateStorage);
 
+  configureAiDataMaskingPreview(context.extensionUri);
   activateLmTools(context, stateStorage);
   activateMcpServer(context, stateStorage);
 
@@ -140,10 +146,10 @@ export async function activate(context: ExtensionContext) {
   historyTreeProvider.onDidChangeTreeData(() => {
     const filter = historyTreeProvider.getConnectionFilter();
     historyTreeView.description = filter ? `Filtered by: ${filter}` : undefined;
-    commands.executeCommand("setContext", "databaseNotebook.sqlHistoryFiltered", !!filter);
+    commands.executeCommand("setContext", "databaseNotebook.queryHistoryFiltered", !!filter);
     commands.executeCommand(
       "setContext",
-      "databaseNotebook.sqlHistorySortByDuration",
+      "databaseNotebook.queryHistorySortByDuration",
       historyTreeProvider.getSortOrder() === "duration"
     );
   });
@@ -267,8 +273,8 @@ export async function activate(context: ExtensionContext) {
     context.subscriptions.push(
       window.registerWebviewViewProvider(chartsViewProvider.viewId, chartsViewProvider)
     );
-    commands.registerCommand(OPEN_CHARTS_VIEWER, (params: ChartsViewParams) => {
-      chartsViewProvider.render(params);
+    commands.registerCommand(OPEN_CHARTS_VIEWER, (params: AnyChartsViewParams) => {
+      return chartsViewProvider.render(params);
     });
 
     // Count records View
@@ -349,9 +355,12 @@ export async function activate(context: ExtensionContext) {
       )
     );
 
-    registerDisposableCommand(OPEN_LOG_PARSE_RESULT_VIEWER, async (params: LogParseResultViewParams) => {
-      logParseResultViewProvider.render(params);
-    });
+    registerDisposableCommand(
+      OPEN_LOG_PARSE_RESULT_VIEWER,
+      async (params: LogParseResultViewParams) => {
+        logParseResultViewProvider.render(params);
+      }
+    );
   }
 
   log(`${PREFIX} end activation.`);

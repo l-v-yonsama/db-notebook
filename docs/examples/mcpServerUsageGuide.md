@@ -53,7 +53,7 @@ another machine) and requires a bearer token on every request, including the ini
 | Run Database Query | `runDbQuery` | Runs one SQL statement (or one PartiQL statement against DynamoDB) |
 | Run Database Transaction | `runDbTransaction` | Runs several SQL statements as one all-or-nothing transaction |
 | Scan Database Resource | `scanDbResource` | Searches a non-SQL resource (Redis, Memcache, MQTT, Keycloak, Auth0, AWS S3/SQS/CloudWatch) |
-| Get Performance Tuning Context | `getPerformanceTuningContext` | Returns a read-only execution-plan, schema, statistics, and physical-health snapshot for one SQL statement |
+| Get Performance Tuning Context | `getPerformanceTuningContext` | Returns a read-only execution-plan (SQL) or static access-path/Capacity (DynamoDB PartiQL) snapshot, with schema, statistics, and physical-health/CloudWatch facts, for one statement |
 
 `createDbNotebook`/`editDbNotebook` (creating/editing `.dbn` files) are **not** exposed here — see
 the table above for why — use Copilot Chat in VS Code for those.
@@ -82,7 +82,7 @@ to check.
 ## 3. Starting the server
 
 The server never starts on its own. In the sidebar's **MCP Server** section (a sibling of DB
-Explorer/SQL histories/Help, not inside DB Explorer itself), click the broadcast icon
+Explorer/Query histories/Help, not inside DB Explorer itself), click the broadcast icon
 (**Start Database Notebook MCP Server**), or run it from the Command Palette as
 **Database Notebook: Start Database Notebook MCP Server**. A notification shows the server's URL
 and offers three actions (kept to three so VS Code doesn't shrink every label into an unreadable
@@ -362,11 +362,14 @@ examples here, see
 its MCP tool name (e.g. `#getDbSchema` → `getDbSchema`).
 
 For performance investigation, use `getPerformanceTuningContext`. It supports MySQL, PostgreSQL,
-SQL Server, and Oracle, and returns the estimated execution plan together with relevant table
-definitions, indexes, optimizer statistics, physical-health signals, and collection diagnostics.
-It **never executes the supplied SQL**: this tool always requests an estimated plan, not `ANALYZE`.
-The result can contain SQL literals and DDL exactly as collected, so handle it as database-sensitive
-information. For example:
+SQL Server, and Oracle, and — for an AWS connection configured for DynamoDB — a PartiQL `SELECT`
+statement too, returning the estimated execution plan (SQL) or a static access-path classification
+(DynamoDB, `Query` vs. a full `Scan`) together with relevant table/index definitions,
+statistics/Capacity mode, physical-health signals or recent CloudWatch metrics, and collection
+diagnostics. It **never executes the supplied statement**: this tool always requests an estimated
+plan or a static classification, never `ANALYZE`, a real DynamoDB `Query`/`Scan`, or any item read.
+The result can contain SQL/PartiQL literals and DDL/table definitions exactly as collected, so
+handle it as database-sensitive information. For example:
 
 > Why is this query likely slow on localMysql? Use the performance tuning context and give only
 > evidence-based recommendations.

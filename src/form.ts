@@ -57,7 +57,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
     this.webviewView = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
-      enableForms: true,      
+      enableForms: true,
       localResourceRoots: [this.context.extensionUri],
     };
 
@@ -117,7 +117,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           break;
         case "saveConnectionSetting":
           const mode = message.mode;
-          const { mcpEnabled, ...setting } = params;
+          const { mcpEnabled, aiMaskingLevel, ...setting } = params;
           if (mode === "create" || mode === "duplicate") {
             if (mode === "duplicate") {
               setting.id = undefined;
@@ -127,6 +127,16 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
             await this.stateStorage.editConnectionSetting(setting);
           }
           await this.stateStorage.setMcpEnabledForConnection(setting.name, mcpEnabled === true);
+          await this.stateStorage.setAiMaskingLevelForConnection(
+            setting.name,
+            aiMaskingLevel === 0 || aiMaskingLevel === "0"
+              ? 0
+              : aiMaskingLevel === 1 || aiMaskingLevel === "1"
+              ? 1
+              : aiMaskingLevel === 2 || aiMaskingLevel === "2"
+              ? 2
+              : 0
+          );
           await vscode.commands.executeCommand(REFRESH_RESOURCES);
           // addConnectionSetting/editConnectionSetting strip secrets (password, clientSecret,
           // sessionToken) from `setting` in place and move them to SecretStorage, so re-fetch
@@ -174,6 +184,7 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
             setting: {
               ...(res as DbConnection),
               mcpEnabled: this.stateStorage.isMcpEnabledForConnection(res?.name ?? ""),
+              aiMaskingLevel: this.stateStorage.getAiMaskingLevelForConnection(res?.name ?? ""),
             },
             prohibitedNames,
           },
