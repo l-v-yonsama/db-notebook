@@ -89,7 +89,7 @@ const writtenNotebook = (): { cells: Array<{ value: string; metadata?: { cellLab
 
 describe("buildAiAnalysisNotebookFilename", () => {
   it("sanitizes non-alphanumeric characters in the database name and embeds a timestamp", () => {
-    const now = new Date(2026, 7, 18, 9, 5, 3); // 2026-08-18 09:05:03 local
+    const now = new Date(2026, 7, 18, 9, 5, 3); // local time
     const filename = buildAiAnalysisNotebookFilename("my app!/db", now);
     expect(filename).toBe("perf-tuning-analysis-my_app_db-20260818-090503.dbn");
   });
@@ -290,9 +290,7 @@ describe("buildAiAnalysisNotebookCells", () => {
     );
   });
 
-  // 2026-08-21 follow-up (summary.md's Full Context improvement item 4) -
-  // possibleDuplicateOfIndex is host-computed upstream (PerformanceTuningPreviewPanel.ts),
-  // already a plain string on the recommendation by the time this renders.
+  // The renderer receives the host-computed duplicate-index match as a plain string.
   it("renders possibleDuplicateOfIndex in its own recommendations-table column when set, and '-' when absent", () => {
     const withDuplicate = buildAiAnalysisNotebookCells(
       buildContext(),

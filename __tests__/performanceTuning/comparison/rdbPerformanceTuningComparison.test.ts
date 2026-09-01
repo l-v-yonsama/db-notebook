@@ -431,7 +431,7 @@ describe("buildRdbComparison - metric decisions", () => {
   });
 });
 
-// --- Code review 2026-08-27 regressions -----------------------------------
+// --- Blocking-comparability regressions ------------------------------------
 
 describe("buildRdbComparison - a blocking reason suppresses every improvement", () => {
   it("marks all metrics not comparable when the two sides are different databases", () => {

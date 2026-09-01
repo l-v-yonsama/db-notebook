@@ -10,10 +10,7 @@ import type {
 } from "../../shared/PerformanceTuningComparison";
 import { formatUtcWithLocal } from "../../shared/dateTimeDisplay";
 
-// Deliberately a local copy of performanceTuningAiNotebook.ts's escapeMdCell()
-// rather than an import of it: that module imports this one (it owns the
-// report's cell list), and a two-line defensive escape is not worth a runtime
-// circular import to share.
+// Local copy avoids a circular import with the notebook builder.
 function escapeMdCell(value: string): string {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br/>");
 }
@@ -24,13 +21,7 @@ export type ComparisonSectionNumbering = {
   section: string;
 };
 
-/**
- * What a report needs in order to carry a comparison. The Baseline Context is
- * passed alongside the evidence rather than embedded in it: the evidence is
- * also what the Preview renders and what the AI projection is built from, and
- * neither of those needs a second whole Context. The saved report does - §14
- * requires it to stay readable with the original baseline `.dbn` gone.
- */
+/** Report data, including the baseline context needed for a self-contained saved report. */
 export type PerformanceTuningComparisonReportInput = {
   evidence: PerformanceTuningComparisonEvidence;
   baselineContext: AnyTuningContext;

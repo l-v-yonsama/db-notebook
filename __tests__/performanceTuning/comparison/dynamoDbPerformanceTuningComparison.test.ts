@@ -697,7 +697,7 @@ describe("buildDynamoDbComparison - workload", () => {
   });
 });
 
-// --- Code review 2026-08-27 regressions -----------------------------------
+// --- Blocking-comparability regressions ------------------------------------
 
 describe("buildDynamoDbComparison - a blocking reason suppresses every improvement", () => {
   it("marks all metrics not comparable when the two sides are different tables", () => {

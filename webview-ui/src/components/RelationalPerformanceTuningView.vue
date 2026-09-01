@@ -1,22 +1,6 @@
 <script setup lang="ts">
-// RDB body content extracted from the formerly-monolithic
-// PerformanceTuningPreviewPanel.vue (2026-08-24 follow-up, DynamoDB support,
-// design doc §11.3's 3-component split). Toolbar/AI options/persistent
-// warning note/AI Analysis/Collection issues/Information/Full context JSON
-// stay in the shell (shared with DynamoDbPerformanceTuningView.vue); this
-// component renders only what's genuinely RDB-specific: the header
-// (Database/Status/SQL) and Performance snapshot/Execution plan.
-//
-// The shell mounts this component *twice* - once with part="header" inside
-// its non-scrolling .header, once with part="body" inside its scrolling
-// .scrollArea - rather than once with a single multi-root template: a Vue
-// component's root nodes can only land at the one place it's invoked, so a
-// single mount could never split its own output across two different parent
-// containers the way the fixed-header/scrolling-body layout (unchanged from
-// before this split) needs. See the `order` values in this file's own
-// <style> for how the documented visual order within .scrollArea is
-// preserved even though this component only contributes some of its
-// siblings there.
+// RDB-specific preview content; the shell owns shared controls and sections.
+// Mounted separately for the fixed header and scrolling body.
 import type { RelationalPerformanceTuningInitializeViewModel } from "@/utilities/vscode";
 import { actualExecutionEvidenceSource, hasActualExecutionEvidence } from "@/utilities/vscode";
 import { computed } from "vue";

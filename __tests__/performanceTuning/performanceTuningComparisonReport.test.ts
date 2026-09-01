@@ -271,7 +271,7 @@ describe("DynamoDB comparison report", () => {
   });
 });
 
-// --- Code review 2026-08-27 regression ------------------------------------
+// --- Saved AI-request regression --------------------------------------------
 
 describe("AI request messages reproduce the request that was actually sent", () => {
   const baselineContext = rdbContext();

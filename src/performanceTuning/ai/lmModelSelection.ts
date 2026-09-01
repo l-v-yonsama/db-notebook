@@ -1,15 +1,7 @@
 import type { LabelValueItem } from "../../shared/LabelValueItem";
 
-// Backs the "Language model" picker in PerformanceTuningPreviewPanel.ts.
-// It was extracted from that panel's AI-analysis design work on 2026-08-19
-// so the model-list/default-selection policy remains isolated from the panel
-// UI and cannot drift as the feature evolves.
-//
-// Deliberately takes a plain summary shape rather than importing
-// vscode.LanguageModelChat as a value, so this stays a pure function with no
-// `vscode` import - the caller (extension host only; `vscode.lm` doesn't
-// exist in the webview) does the actual `lm.selectChatModels()` call and
-// passes the result in.
+// Pure model-selection policy for the preview's language-model picker.
+// The extension host supplies summaries because `vscode.lm` is unavailable in the webview.
 export type LanguageModelSummary = {
   id: string;
   name?: string;
@@ -62,14 +54,7 @@ export function isModelNotSupportedError(error: unknown): boolean {
   return false;
 }
 
-// `LanguageModelChat.name` is a "human-readable name", not a unique key -
-// Copilot can (and, per user report 2026-08-19, does) return more than one
-// model entry with the identical `.name` (e.g. a directly-pinned model and
-// a separately-listed "Auto"-routed variant) while `.id`/`.family`/
-// `.version` differ. Left alone, that produces indistinguishable duplicate
-// rows in the dropdown. Disambiguate only the colliding entries - by
-// appending `.family`, and if that still collides, `.id` - so the common
-// case (no collision) keeps the plain name unchanged.
+// Model names are not unique. Add family, then id, only for duplicate labels.
 function disambiguateLabels(models: LanguageModelSummary[], rawLabels: string[]): string[] {
   const countOf = (labels: string[]) => {
     const counts = new Map<string, number>();

@@ -1,13 +1,7 @@
 import type { DynamoDbAccessPattern } from "@l-v-yonsama/multi-platform-database-drivers";
 import type { DynamoDbAccessPatternViewModel } from "../../shared/MessageEventData";
 
-// Builds DynamoDbPerformanceTuningView.vue's "Access pattern" section
-// (design doc §11.3 item 5) from the already-safe, values-free
-// DynamoDbAccessPattern structure - purely presentational (label/text
-// formatting), unlike dynamoDbPerformanceTuningHumanSummary.ts which draws
-// conclusions. Never leaks a literal: every field on DynamoDbAccessPattern is
-// already just attribute names/operators/booleans, so this file only ever
-// formats structure, never a value.
+// Formats the values-free access-pattern data for display without drawing conclusions.
 
 function operationLabel(operation: DynamoDbAccessPattern["operation"]): string {
   switch (operation) {
@@ -73,8 +67,7 @@ function postReadFilterText(filter: DynamoDbAccessPattern["postReadFilter"]): st
 }
 
 function projectionText(projection: DynamoDbAccessPattern["projection"]): string {
-  // allAttributes fallback keeps previously saved preview notebooks (created
-  // before projection.mode existed) readable.
+  // Preserve the legacy all-attributes representation in saved previews.
   if (projection.mode === "allAttributes" || projection.allAttributes) {
     return "All table attributes";
   }

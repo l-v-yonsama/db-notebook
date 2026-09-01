@@ -335,17 +335,7 @@ export class ToolsViewProvider extends BaseViewProvider {
     await this.searchAndRefresh();
   }
 
-  // Re-resolves rowIndex against the RdsDatabase resource / RDH this
-  // Provider still holds and picks the plan SQL + its Bind Parameters
-  // estimate for it (selectPlanSql(), §7.1/§7.2) - the resolved SQL, its
-  // Bind Parameters estimate, targetTables/tableAliasMap (§6.5/§6.6/§7.7),
-  // and statistics are exactly what previewPerformanceTuning below needs to
-  // hand off to openPerformanceTuningPreview(). Pure/cheap (no DB call), so
-  // this is only ever called right when a preview is actually requested -
-  // there's no separate "resolve on row click, cache for later" step
-  // (2026-08-19: that step, and the estimatedBindParameters display it fed,
-  // were removed along with ToolsView.vue's inline Bind Parameters editor -
-  // see PerformanceTuningBindParametersPanel.ts).
+  // Resolves a Query Statistics row into the request needed to open a preview.
   private resolveQueryStatisticsPlanForRow(
     rowIndex: number
   ):
@@ -378,14 +368,7 @@ export class ToolsViewProvider extends BaseViewProvider {
     return { sql, estimatedBindParameters, targetTables, tableAliasMap, statistics: mapped.statistics };
   }
 
-  // 2026-08-19 follow-up: no more `values`/`markers` from the webview - Bind
-  // Parameters, if the resolved SQL has any, are now collected by
-  // PerformanceTuningBindParametersPanel instead (openPerformanceTuningPreview()
-  // decides whether that's needed at all). This method's own previewStatus
-  // "collecting" therefore only ever covers the *immediate* (no confirmation
-  // needed) path now; the "deferred" case below resets it right back to
-  // "idle" since the new panel owns showing its own progress/error state
-  // from here on.
+  // The bind-value panel owns its deferred collection state.
   private async previewPerformanceTuning(
     params: PreviewPerformanceTuningActionCommand["params"]
   ) {

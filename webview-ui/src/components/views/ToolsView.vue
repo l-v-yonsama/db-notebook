@@ -39,13 +39,8 @@ const search = ref<QueryStatisticsSearchParams>({
   minimumAverageElapsedTimeMs: 0,
 });
 
-// Separate from `search` above (the last *applied*/server-confirmed
-// conditions) - these are the raw form fields the user is currently
-// editing. Changing them alone never triggers a search; only Search/Refresh
-// or Enter does (§10 Phase 5 "入力変更だけでは検索せず...明示実行する").
-// minimumAverageElapsedTimeMs has no UI control - always sent as 0 (per user
-// feedback: the field added noise nobody used; the backend still accepts and
-// stores it, so a future UI can reintroduce a control without a schema change).
+// Raw form values; a search runs only on Search, Refresh, or Enter.
+// The hidden minimum-average threshold remains 0.
 const sortByInput = ref<string>(StatementStatisticsSortKey.TotalElapsedTime);
 const limitInput = ref<string>("100");
 
@@ -92,14 +87,7 @@ const refresh = async (v: ToolsViewEventData["value"]["refresh"]) => {
     database.value = v.database;
     search.value = v.search;
 
-    // A new resultVersion means this is a fresh search cycle (its very
-    // first "loading" post already carries the bumped version) - reset the
-    // row selection exactly then, never on a preview-status-only update
-    // that leaves resultVersion unchanged (§10 Phase 5 "refresh / mode変更
-    // 時はclickedCellParamsを必ずclearする"). Bind Parameters input itself
-    // no longer lives in this component at all (2026-08-19 follow-up) -
-    // PerformanceTuningBindParametersPanel owns that now, opened only when
-    // the target SQL actually has placeholders.
+    // A new result version starts a search cycle, so reset the selected row.
     if (v.resultVersion !== resultVersion.value) {
       resultVersion.value = v.resultVersion;
       clearSelection();
@@ -226,9 +214,7 @@ const canPreview = (): boolean =>
   clickedCellParams.value !== undefined &&
   previewStatus.value !== "collecting";
 
-// No bind values sent here (2026-08-19 follow-up) - ToolsViewProvider
-// re-resolves the row's SQL and its Bind Parameters estimate itself, and
-// hands off to PerformanceTuningBindParametersPanel when any are found.
+// The provider resolves SQL and opens the bind-value panel when needed.
 const previewPerformanceTuning = (): void => {
   if (!canPreview() || clickedCellParams.value === undefined) {
     return;

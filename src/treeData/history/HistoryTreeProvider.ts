@@ -118,9 +118,7 @@ export class QueryHistoryItem extends vscode.TreeItem {
     if (resource.status === "error") {
       descriptionParts.push("Error");
     } else if (isDynamoQuery) {
-      // native Query results are "items", never "rows" (design doc §8.1) -
-      // DynamoDB's own vocabulary, and distinct from the generic RDH row
-      // count SQL/PartiQL history already shows above.
+      // Native DynamoDB Query results are items, not rows.
       const returnedItemCount =
         resource.summary?.dynamoDb?.returnedItemCount ?? resource.summary?.selectedRows;
       if (returnedItemCount !== undefined) {
@@ -168,11 +166,7 @@ export class QueryHistoryItem extends vscode.TreeItem {
       this.iconPath = new vscode.ThemeIcon("pass");
     }
 
-    // native Query history's sqlDoc is a value-free description text, not
-    // SQL - an ```sql fence would mislabel it (design doc §8.1). Its
-    // structural (values-free) query shape is shown as JSON underneath
-    // instead of the raw request, which would leak ExpressionAttributeValues
-    // into the tooltip (design doc §4.2).
+    // Native Query history uses a value-free description and safe structural JSON.
     const tooltip = new vscode.MarkdownString("", true);
     tooltip.appendCodeblock(resource.sqlDoc, isDynamoQuery ? "text" : "sql");
     if (isDynamoQuery && resource.request?.kind === "dynamodbQuery") {

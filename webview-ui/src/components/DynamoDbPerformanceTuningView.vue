@@ -1,11 +1,5 @@
 <script setup lang="ts">
-// DynamoDB body content (design doc §11.3's 3-component split - see
-// RelationalPerformanceTuningView.vue's own top comment for the shared
-// architecture, including why the shell mounts this component *twice*
-// (part="header"/"body") instead of once). Renders items 1/2/3/5/6/7/8 of
-// §11.3's documented display order; items 4/9/10/11 (Collection issues/
-// Information/AI Analysis/Full context JSON) are shell-owned and shared
-// with the RDB view - see PerformanceTuningPreviewPanel.vue.
+// DynamoDB-specific preview content; the shell owns shared controls and sections.
 import type { DynamoDbCapacityBreakdown } from "@l-v-yonsama/multi-platform-database-drivers";
 import type {
   DynamoDbPerformanceTuningHumanProfile,

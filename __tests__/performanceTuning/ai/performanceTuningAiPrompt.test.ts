@@ -141,9 +141,7 @@ describe("buildAiAnalysisPrompt", () => {
     expect(assistant).toContain("planNodeId");
   });
 
-  // 2026-08-21 follow-up (scripts/performance-lab/aiResults/summary.md's
-  // re-examined improvement proposals, db-drivers repo) - one assertion per
-  // added instruction.
+  // One assertion per required analysis instruction.
   it("instructs the model to prefer a sargable SQL rewrite over indexing a function-wrapped predicate column", () => {
     const { assistant } = buildAiAnalysisPrompt(buildContext());
     expect(assistant.toLowerCase()).toContain("sargable");
@@ -226,11 +224,7 @@ describe("buildPlainTextAnalysisPrompt", () => {
   });
 });
 
-// 2026-08-21 follow-up: "Copy Prompt for Other AI" - a manual-paste fallback
-// for a user whose vscode.lm-exposed models are too limited (vendor:
-// "copilot" only today), reusing the same domain guidance as
-// buildAiAnalysisPrompt() but with plain-text, not JSON, response
-// instructions, folded into one combined string.
+// Manual-copy prompt uses the same domain guidance with plain-text output instructions.
 describe("buildPlainTextAnalysisPrompt", () => {
   it("returns a single string, not an {assistant, user} pair", () => {
     const prompt = buildPlainTextAnalysisPrompt(buildContext());

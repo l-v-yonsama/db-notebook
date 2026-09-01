@@ -35,14 +35,7 @@ function toPerformanceCapacityAmountMap(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-// Maps rdh's explicitly-named RdhDynamoDbConsumedCapacity (totalCapacityUnits/
-// totalReadCapacityUnits/totalWriteCapacityUnits) onto the existing
-// DynamoDB Performance Tuning Context's DynamoDbCapacityBreakdown
-// (capacityUnits/readCapacityUnits/writeCapacityUnits) - the two types are
-// deliberately named differently (rdh's fields are prefixed "total" to make
-// clear they are already summed across every paginated response) even
-// though they describe the same thing, so this mapping is never a plain
-// cast (design doc §9.1).
+// Maps RDH's paginated consumed-capacity totals to the tuning-context shape.
 export function toPerformanceCapacityBreakdown(
   consumedCapacity: RdhDynamoDbConsumedCapacity | undefined
 ): DynamoDbCapacityBreakdown | undefined {
@@ -69,13 +62,7 @@ export function toPerformanceCapacityBreakdown(
   return breakdown;
 }
 
-// Builds a DynamoDbReadObservation from a Query History entry's most recent
-// execution (design doc §9.1) - the single source of truth is
-// summary.dynamoDb; undefined when it is absent (an older/dev-era history
-// entry saved before summary.dynamoDb existed, or a non-AWS connection) so
-// that case is never fabricated into a "complete" observation (design doc
-// §7.4/§9.1's "古い履歴でtoken状態が不明な場合は完全観測と断定しない", applied
-// one step earlier: no dynamoDb evidence at all means no Observation).
+// Builds an observation from values-free DynamoDB history evidence when available.
 export function buildObservationFromHistory(
   history: QueryHistory
 ): DynamoDbReadObservation | undefined {

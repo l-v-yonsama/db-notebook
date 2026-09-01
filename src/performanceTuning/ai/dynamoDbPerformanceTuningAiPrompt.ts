@@ -5,15 +5,7 @@ import {
   type ComparisonAiInput,
 } from "./performanceTuningComparisonAiInput";
 
-// DynamoDB counterpart of performanceTuningAiPrompt.ts. Deliberately its own
-// prompt text, not a reuse of the RDB one with a few words swapped - DynamoDB
-// has none of RDB's core vocabulary (optimizer, execution plan, index scan,
-// VACUUM/ANALYZE, sargability) and instead needs its own guardrails against
-// exactly the mistakes an RDB-trained model tends to make when handed
-// DynamoDB facts (design doc §12's 11 required instructions, folded into the
-// paragraphs below). The *response shape* is still the shared
-// PerformanceTuningAiAnalysisResult type (§12: "AI evidence ref には
-// backward-compatible に JSON path を追加する") - only the prompt differs.
+// DynamoDB requires engine-specific analysis guidance while sharing the RDB response shape.
 
 const ASSISTANT_ANALYSIS_PROMPT = `You are a DynamoDB performance tuning expert.
 Your job is to analyze the structured performance tuning context supplied by the user - a static access-path classification, the table/index key schema and Capacity mode, optional Consumed Capacity workload/observation evidence, and optional CloudWatch metrics - and explain why the target statement may be expensive or slow, then suggest safe, verifiable improvements.

@@ -20,9 +20,7 @@ export type PerformanceTuningPreviewRequest = {
   databaseName: string;
   statement: {
     sql: string;
-    // "sqlHistory" is db-drivers' own PerformanceTuningContext union value,
-    // not this extension's naming - it stays as-is even though the view is
-    // now called Query History, so the two contracts keep lining up.
+    // `sqlHistory` is the driver contract's existing source value.
     source: "statementStatistics" | "sqlHistory" | "editor";
     statistics?: SelectedStatementStatistics;
   };
@@ -46,10 +44,7 @@ export type StartPerformanceTuningPreviewResult = {
   status: "opened" | "cancelled" | "failed";
   // Beginner-facing; never contains a raw DB exception, stack, or bind value.
   message?: string;
-  // The same boundary getPerformanceTuningContext() itself already promises
-  // for GeneralResult.message (fixed text or a driver-classified, non-secret
-  // detail) - shown as an optional, collapsible "technical details", never
-  // substituted for `message` (§10 Phase 5 "Preview接続の共通化と競合防止").
+  // Optional non-secret detail shown separately from the user-facing message.
   technicalMessage?: string;
 };
 
@@ -61,11 +56,7 @@ export async function startPerformanceTuningPreview(
   const { extensionUri, ...request } = params;
   const { connectionSetting, databaseName, statement, plan, targetTables, tableAliasMap } = request;
 
-  // Defense in depth: the webview and ToolsViewProvider already validate
-  // Query Statistics' representative bind values before reaching here, and
-  // History never passes any - but this is the one place both paths funnel
-  // through, so it's also the one place that can guarantee the invariant
-  // regardless of which caller (mis)behaves.
+  // Validate binds at the shared entry point.
   if (plan.binds !== undefined) {
     const validated = validatePlanBindsInput(plan.binds);
     if (!validated.ok) {
@@ -104,13 +95,7 @@ export async function startPerformanceTuningPreview(
               { databaseName, statement, plan: { ...plan, mode: "estimate" }, targetTables, tableAliasMap },
               { signal: controller.signal }
             ),
-            // "Run EXPLAIN ANALYZE" (2026-08-20 follow-up) needs to know up
-            // front whether this Provider can do it at all, to enable/
-            // disable+tooltip the button - this is a static per-Provider
-            // capability report (no EXPLAIN, no catalog query - see
-            // checkCapabilities()'s own doc comment in db-drivers), so
-            // fetching it alongside the real collection costs nothing extra
-            // worth gating behind a second round trip.
+            // Load static capabilities with the context so the preview can configure its actions.
             driver.checkPerformanceTuningContextAvailability(
               { databaseName },
               { signal: controller.signal }
@@ -119,9 +104,7 @@ export async function startPerformanceTuningPreview(
           if (!contextResult.ok || !contextResult.result) {
             throw new Error(contextResult.message);
           }
-          // A capabilities failure is not fatal to opening the preview - it
-          // just means the button falls back to "not available" (disabled)
-          // rather than blocking the whole panel on a secondary check.
+          // A capability lookup failure disables affected actions without blocking the preview.
           const capabilities: PerformanceTuningCapabilities = capabilitiesResult.ok && capabilitiesResult.result
             ? capabilitiesResult.result
             : {

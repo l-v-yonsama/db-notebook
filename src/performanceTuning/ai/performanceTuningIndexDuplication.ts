@@ -1,29 +1,8 @@
 import type { IndexDefinition, PerformanceTuningContext } from "@l-v-yonsama/multi-platform-database-drivers";
 
-// Deterministic backstop for the AI's own duplicate-index self-check (2026-08-21
-// follow-up, scripts/performance-lab/aiResults/summary.md's Full Context
-// improvement item 4). Round 1 testing found a real case (PostgreSQL slow-03)
-// where the AI suggested `CREATE INDEX idx_products_category ON ... (category)`
-// even though Full Context's own `tables[].definition.indexes` already listed
-// that exact index - a live SQL error when the user ran it. The prompt now
-// also asks the model to check this itself (performanceTuningAiPrompt.ts),
-// but summary.md is explicit this should not be relied on alone - this
-// utility re-checks the model's `suggestedQuery` after the fact, independent of
-// whether the model followed that instruction.
-//
-// Deliberately narrow scope: only flags a *verbatim* column-set match
-// (same columns, same order) against an existing index - matching the actual
-// failure mode observed, not a general redundant-index analyzer. A candidate
-// that is a subset/superset/reordering of an existing index is NOT flagged -
-// that is a fuzzier judgment call (a narrower single-column index can still
-// be useful even with a wider composite index present) this utility does not
-// attempt.
-//
-// Same "best-effort, unstructured input, nothing throws" posture as
-// db-drivers' plan parsers: `suggestedQuery` is free-text the model wrote, not
-// a real SQL AST - a non-`CREATE INDEX` statement, an unparseable one, or a
-// table this context doesn't know about all just return undefined rather
-// than throwing.
+// Deterministic guard for AI-suggested indexes that exactly duplicate an existing index.
+// It compares only identical ordered column sets; it is not a general redundant-index analyzer.
+// Unparseable or unsupported AI output returns undefined rather than throwing.
 
 export type PossibleDuplicateIndexMatch = {
   schemaName?: string;

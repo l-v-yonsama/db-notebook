@@ -13,47 +13,22 @@ import type { AiMaskingLevel } from "../../shared/AiDataMasking";
 import { createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
 import { toDynamoDbQueryAnalysisInput } from "./dynamoDbQueryAnalysisInput";
 
-// DynamoDB counterpart of performanceTuningPreview.ts's
-// startPerformanceTuningPreview(). Request state retained by the host panel
-// so it can rerun the same statement in "Run Observed Read" mode without
-// trusting the webview to resend it - same rationale as
-// PerformanceTuningPreviewRequest.
+// Host-owned request state for static analysis and Run Observed Read.
 export type DynamoDbPerformanceTuningPreviewRequest = {
   connectionSetting: ConnectionSetting;
   /** Connection-scoped default; the Preview may override it for this invocation only. */
   initialMaskingLevel: AiMaskingLevel;
   statement: {
-    // db-drivers' union value - see PerformanceTuningPreviewRequest.
+    // Existing driver-contract source value.
     source: "sqlHistory" | "editor";
     request:
       | { kind: "partiql"; text: string }
-      // A native Query selected from Query History retains the *real*,
-      // value-ful query input (QueryItemsAtClientInputParams *is* the AWS
-      // SDK's QueryCommandInput, a bare type alias in db-drivers - see
-      // AwsDynamoServiceClient.ts). Kept real (not
-      // pre-stripped) here, call-scoped only and never persisted/logged,
-      // mirroring RDB's own PerformanceTuningPreviewRequest.plan.binds - see
-      // startDynamoDbPerformanceTuningPreview() below for where the
-      // values-free mirror the static collection path needs is derived from
-      // it, and PerformanceTuningPreviewPanel.ts's runObservedRead() for
-      // where the real object is used directly (Run Observed Read genuinely
-      // needs real ExpressionAttributeValues to execute).
+      // Retain the native request only for this preview; it is never persisted or logged.
       | { kind: "query"; input: QueryItemsAtClientInputParams };
-    // The most recent execution's read evidence for this exact statement
-    // (design doc §8.4/§9.1) - e.g. dynamoDbHistoryObservation.ts's
-    // buildObservationFromHistory(), built from Query History's
-    // summary.dynamoDb, values-free by construction (it never derives from
-    // ExpressionAttributeValues). Optional, since an editor/Notebook-cell
-    // preview may have no matching prior execution. Passed straight through to the driver's own
-    // statement.previousObservation, which folds it into
-    // DynamoDbPerformanceTuningContext.observation unless a fresh Run
-    // Observed Read (executeOnce mode) replaces it.
+    // Optional values-free evidence from the most recent matching history entry.
     previousObservation?: DynamoDbReadObservation;
   };
-  // Query History's rolling Capacity/timing aggregate for this exact statement
-  // (queryHistoryUtil.ts's mergeQueryHistoryPerformance/averageCapacityUnits) -
-  // optional, since an editor/Notebook-cell preview may have no prior
-  // history to aggregate.
+  // Optional Capacity and timing aggregate from matching Query History entries.
   workload?: DynamoDbWorkloadContext;
 };
 
@@ -76,9 +51,7 @@ const UNAVAILABLE_DYNAMODB_CAPABILITIES: DynamoDbPerformanceTuningCapabilities =
   observedRead: { available: false },
 };
 
-// Shared by Query History and the executed-Notebook-cell entry point,
-// mirroring startPerformanceTuningPreview()'s own
-// role for RDB.
+// Shared by Query History and executed notebook cells.
 export async function startDynamoDbPerformanceTuningPreview(
   params: StartDynamoDbPerformanceTuningPreviewParams
 ): Promise<StartDynamoDbPerformanceTuningPreviewResult> {
