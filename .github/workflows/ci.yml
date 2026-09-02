@@ -18,6 +18,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Install webview dependencies
+        working-directory: webview-ui
+        run: npm ci
+
       - name: Compile (tsc)
         run: npm run compile
 
