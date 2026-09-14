@@ -20,8 +20,8 @@ No external database needed — this uses a small local SQLite file.
 1. Install the extension.
 2. Open the Command Palette and run **`Database Notebook: Create SQLite Demo`**. This creates a small local SQLite database, a connection pointing at it, and a ready-to-run `.dbn` notebook.
 3. Run the notebook with **Run All**.
-4. Check the query result and the chart it generates.
-5. Save the result as an HTML or Excel file from the result panel's toolbar.
+4. The generated chart opens automatically in the bottom panel. To view the result tables, click **Open ResultSets** (table icon) in the notebook's top toolbar.
+5. Save the result as an HTML or Excel file from the **ResultSets** panel's toolbar.
 6. When you're ready, create your own connection from the DB Explorer side panel and point your notebooks at it.
 
 ## Supported databases & resources

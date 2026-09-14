@@ -20,8 +20,8 @@ Database Notebook は、SQL・JavaScript/TypeScript・Markdown・実行結果を
 1. 拡張機能をインストールします。
 2. コマンドパレットから **`Database Notebook: Create SQLite Demo`** を実行します。小さなローカルSQLiteデータベース、それを指す接続設定、そしてすぐ実行できる `.dbn` Notebookが一括で作成されます。
 3. Notebookを **Run All** で実行します。
-4. クエリ結果と、生成されたグラフを確認します。
-5. 結果パネルのツールバーから、結果をHTMLまたはExcelファイルとして保存します。
+4. 生成されたグラフが下部パネルに自動で開きます。結果テーブルを確認するには、Notebook上部のツールバーで **Open ResultSets**（表アイコン）をクリックします。
+5. **ResultSets** パネルのツールバーから、結果をHTMLまたはExcelファイルとして保存します。
 6. 準備ができたら、DB Explorerサイドパネルから自分の接続を作成し、Notebookをそちらに向けます。
 
 ## 対応データベース・リソース
