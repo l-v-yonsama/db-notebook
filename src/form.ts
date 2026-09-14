@@ -98,21 +98,26 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
         case "testConnectionSetting":
           {
             log(`${PREFIX} Test connection ${params.dbType}`);
-            const driver = await createDriver(params, true);
-            const message = await driver.test(true);
-            if (message) {
-              showWindowErrorMessage(message);
-            } else {
-              vscode.window.showInformationMessage("OK");
+            try {
+              const driver = await createDriver(params, true);
+              const message = await driver.test(true);
+              if (message) {
+                showWindowErrorMessage(message);
+              } else {
+                vscode.window.showInformationMessage("OK");
+              }
+            } catch (e) {
+              showWindowErrorMessage(e);
+            } finally {
+              const msg: DBFormEventData = {
+                command: "stop-progress",
+                componentName: "DBFormView",
+                value: {
+                  subComponentName: "ConnectionSetting",
+                },
+              };
+              this.webviewView?.webview.postMessage(msg);
             }
-            let msg: DBFormEventData = {
-              command: "stop-progress",
-              componentName: "DBFormView",
-              value: {
-                subComponentName: "ConnectionSetting",
-              },
-            };
-            this.webviewView?.webview.postMessage(msg);
           }
           break;
         case "saveConnectionSetting":
