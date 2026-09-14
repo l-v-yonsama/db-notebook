@@ -43,7 +43,8 @@ export class SqlKernel {
     } else {
       return {
         stdout,
-        stderr: "Specify the connection name to be used.",
+        stderr:
+          'Specify the connection name to be used.\nClick "Specify connection" below this cell to select a saved connection. If none are available, create one in DB Explorer first.',
         skipped: false,
         status: "error",
         metadata,
@@ -52,7 +53,8 @@ export class SqlKernel {
     if (!connectionSetting) {
       return {
         stdout,
-        stderr: "Missing connection " + connectionName,
+        stderr:
+          `Missing connection ${connectionName}.\nClick the "Missing connection" indicator below this cell to select an existing connection. If needed, create a connection in DB Explorer first.`,
         skipped: false,
         status: "error",
         metadata,
