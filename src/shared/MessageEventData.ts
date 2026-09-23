@@ -1,3 +1,4 @@
+import type { LogParseWorkflowState } from "./LogParseWorkflow";
 import type {
   CapabilityStatus,
   ConnectionSetting,
@@ -488,7 +489,7 @@ export type LogParseSettingPanelEventData = BaseMessageEventData<
   | "reset-config"
   | "set-parsed-result"
   | "set-config-editor-visibility"
-  | "set-sql-parse-preset-visibility"
+  | "operation-completed"
   | "reset-config-file-and-items",
   "LogParseSettingPanel",
   {
@@ -499,7 +500,7 @@ export type LogParseSettingPanelEventData = BaseMessageEventData<
       formatterSqlLanguageItems: LabelValueItem[];
       linesToParse: number;
       totalLogLines: number;
-      errorMessage: string;
+      workflow: LogParseWorkflowState;
       configSummary: LogParseSettingPanelEventDataConfigSummary;
       preset: LogParseSettingPanelEventDataPreset;
     };
@@ -509,12 +510,12 @@ export type LogParseSettingPanelEventData = BaseMessageEventData<
     };
     "reset-config"?: {
       configSummary: LogParseSettingPanelEventDataConfigSummary;
-      canSplitLog: boolean;
-      errorMessage: string;
+      logParserConfigFile: string;
+      workflow: LogParseWorkflowState;
       preset: LogParseSettingPanelEventDataPreset;
     };
     "set-config-editor-visibility"?: boolean;
-    "set-sql-parse-preset-visibility"?: boolean;
+    "operation-completed"?: { operationId: number; error?: string };
   }
 >;
 

@@ -26,67 +26,95 @@ split → (expand message) → classify → extract → build-sql
 
 ## Usage Flow
 
-### 1. Parse Log File from Context Menu
+### 1. Open the Log Parse Settings Panel
 
 ![Step1](../images/logs/01_context_menu_parse_log_file.png)
 
-- Open a log file in the editor
-- Right-click → **Parse Log file**
+- Open the folder containing your logs and config files in VS Code.
+- Open a log file in the editor, then right-click → **Parse Log file**.
+- The **LogParseSetting** panel opens with guidance, a **Config file** selector, and **a) RAW LOG**.
 
----
+### 2. Select or Create a Config
 
-### 2. Open Log Parse Setting Panel
+For a known log format, select its `*.log-parser.config.json` file from **Config file**. Previews run automatically using the available settings. You do not need to apply presets again or repeat setup steps.
 
-![Step2](../images/logs/02_log_parse_setting_panel.png)
+For a new log format, click **Create new config** in the top-right toolbar and save a file ending in `.log-parser.config.json` in your workspace. The empty config is selected automatically; continue with the presets in step 4.
 
-- The **Log Parse Setting Panel** is displayed
-- This panel controls all parsing behavior
-- Select or Create Config File
-  - Select an existing config file or create a new one
+To adapt an existing config while preserving the original, select it and click **Copy config and adjust** below the selector. Choose a different file name; subsequent changes apply to the copy.
 
----
+### 3. Choose the Preview Sample
 
-### 3. Choose Log Split Preset
+In **a) RAW LOG**, the row above the table shows the total number of lines and the **Test sample** dropdown.
 
-![Step3](../images/logs/03_config_create_or_select.png)
+- Logs with **500 lines or fewer** start with **All**.
+- Larger logs start with **First 500 lines**.
+- Change the sample to inspect more or fewer lines. All preview stages use this sample, and update automatically.
 
-- Select a Log split preset
-- Review:
-  - Target log examples
-  - Event split pattern
-  - Field extraction pattern
+Preview tables scroll and are not limited to 10 rows. Sampling affects previews only; **Parse all log** always processes the entire log.
 
----
+### 4. Configure Splitting and SQL Extraction
 
-### 4. Execute "Test split log" (Important)
+**b) SPLIT & CLASSIFIED LOG** appears when a config is selected, including a newly created empty config.
 
-![Step4](../images/logs/04_log_split_preset_details.png)
+1. Choose a **Log split preset** and click its **Apply** button. Review the automatically generated log events, especially event boundaries and multiline messages.
+2. Once the split settings are valid, choose a **SQL output preset (classify & extract)** and click **Apply**. Review the classified events and the SQL preview in **c)**.
 
-- Click **Test split log**
+The split preset and its current split/field patterns appear on the left; the SQL output preset and current classification rules appear on the right. On narrow panels, these columns stack vertically. **Selected preset details** lets you inspect a preset before applying it.
 
-This step is mandatory:
-- Enables classification & extraction presets
-- Generates structured log events
+**Likely**, **Detected**, and **Recommended** are detection hints, not automatically applied settings. SQL preset detection uses the split events and updates after the preview runs.
 
----
+Applying a split preset replaces the config's `split` settings. Applying a SQL output preset replaces `classify` and `extractors`. Copy the config first if you want to preserve custom rules.
 
-### 5. Select 'Classify & Extract' Preset
+There are no separate test buttons or confirmation steps. The config determines how far the automatic preview can run:
 
-![Step5](../images/logs/05_test_split_log_required.png)
+| Valid settings | Automatic preview | Parse all log |
+| --- | --- | --- |
+| No config or empty split settings | Raw log only; an empty config also shows the controls in b) | Hidden |
+| Split | Split events in b) | Hidden |
+| Split and classification | Classified events in b) | Hidden |
+| Split, classification, and extraction | Classified events in b) and SQL in c) | Shown |
 
-- Select classification & extraction preset
+### 5. Review and Fine-Tune the Config
 
----
+**c) EXTRACT & FORMAT SQL** appears when the config is valid for SQL extraction. It shows the optional **SQL formatter language**, the current **SQL extraction settings**, and extracted SQL. Choosing a formatter is not required for parsing.
 
-### 6. Parse Log
+Use **Edit JSON** in the top-right toolbar to open the config beside the panel. This is useful for rules that presets cannot express, fine-tuning patterns, or combining rules from other configs. Previews use the current editor contents, including unsaved changes.
 
-![Step6](../images/logs/06_classify_extract_presets_enabled.png)
+| Action | Preview behavior |
+| --- | --- |
+| Select a config or create/copy one | Runs automatically up to the highest valid stage |
+| Apply either preset | Updates automatically |
+| Change Test sample or SQL formatter language | Updates automatically without changing the config rules |
+| Edit the selected config JSON | Updates about one second after the last edit |
+| Save config | Saves changes; does not run a full-log parse |
 
-- Click **Parse log**
+During updates, a spinner and status message indicate that previous results may still be displayed. Check the guidance for invalid settings or errors. If field extraction fails for some events, expand the diagnostic message to see their start lines.
 
----
+If no SQL is found, increase **Test sample** or select **All** before changing rules: the sample may simply contain no SQL. A zero-result preview does not hide **Parse all log** when the config is valid.
 
-### 7. Generate report in Excel and DBN file.
+The source log is read when the panel opens. If the log file changes, close and reopen the panel to load it again.
+
+### 6. Save the Config and Parse the Entire Log
+
+The top-right toolbar contains:
+
+| Button | When shown | Action |
+| --- | --- | --- |
+| Create new config | No config selected | Creates and selects an empty config |
+| Edit JSON | Config selected | Opens the config in an adjacent editor |
+| Save config | Config has unsaved changes | Saves the config without parsing the entire log |
+| Parse all log | Config is valid for SQL extraction | Parses all log lines using the current settings, including unsaved edits |
+| × | Always | Closes the panel |
+
+**Parse all log does not save the config.** Use **Save config** or the editor's save command to keep your changes. VS Code Auto Save also applies to config edits.
+
+After parsing, open the **Log Parse Result** view → the **tab named after your log file** → the **table selector at the top right**, and choose the entry containing **SQL-EXECUTION**. The completion message also gives this location. The view's position depends on your VS Code layout.
+
+Automatic previews stay inside the settings panel. Only **Parse all log** sends results to the **Log Parse Result** view. Each of the a), b), and c) sections can be collapsed independently.
+
+### 7. Export Results
+
+In **Log Parse Result**, use **Output as Excel** to create a report or **Open in NoteBook** to open the SQL in a database notebook. Hover over the toolbar icons to see these names.
 
 ![Step7](../images/logs/07_generate_report.png)
 

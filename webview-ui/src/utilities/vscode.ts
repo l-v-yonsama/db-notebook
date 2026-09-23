@@ -14,6 +14,7 @@ export * from "../../../src/shared/DynamoDbPerformanceTuningHumanSummary";
 export * from "../../../src/shared/ExtChartJs";
 export * from "../../../src/shared/LabelValueItem";
 export * from "../../../src/shared/MessageEventData";
+export * from "../../../src/shared/LogParseWorkflow";
 export * from "../../../src/shared/ModeType";
 export * from "../../../src/shared/observability";
 export * from "../../../src/shared/PerformanceTuningAiAnalysis";

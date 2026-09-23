@@ -1,25 +1,25 @@
 import {
   createLogEventPatternText,
+  createLogResultBuilder,
+  createSqlResultBuilder,
   detectLogSplitPreset,
-  detectSqlParsePresetByText,
+  detectSqlParsePreset,
   ExtractedSqlResult,
   formatLogDetectionMessage,
   FORMATTER_SQL_LANGUAGES,
   LOG_EVENT_SPLIT_PRESETS,
   LogEventSplitConfig,
   LogEventSplitPresetName,
-  LogFormatDetectionResult,
   LogParseConfig,
   LogParseParams,
   LogParser,
-  LogParseStage,
   SQL_LOG_PARSE_PRESETS,
   SqlLogParsePresetName,
   summarizeClassifyRules,
   summarizeExtractors,
-  validateConfig,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { createRdhKey, GeneralColumnType, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
+import stringify from "fast-json-stable-stringify";
 import { applyEdits, modify } from "jsonc-parser";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -30,9 +30,14 @@ import { ComponentName } from "../shared/ComponentName";
 import { LabelValueItem } from "../shared/LabelValueItem";
 import {
   LogParseSettingPanelEventData,
-  LogParseSettingPanelEventDataConfigSummary,
   LogParseSettingPanelEventDataPreset,
 } from "../shared/MessageEventData";
+import type {
+  LogParseRunState,
+  LogParseWorkflowState,
+  LogParseSampleState,
+} from "../shared/LogParseWorkflow";
+import { readLogParseConfiguration } from "../utilities/logParseConfiguration";
 import { LogParseResultViewParams } from "../types/views";
 import { showWindowErrorMessage } from "../utilities/alertUtil";
 import {
@@ -43,7 +48,7 @@ import {
 } from "../utilities/fsUtil";
 import { BasePanel } from "./BasePanel";
 
-const PREFIX = "[LogParseSettingPanel]";
+const DEFAULT_SAMPLE_LINES = 500;
 
 export class LogParseSettingPanel extends BasePanel {
   public static currentPanel: LogParseSettingPanel | undefined;
@@ -53,7 +58,29 @@ export class LogParseSettingPanel extends BasePanel {
   private rawText: string = "";
   private formatterSqlLanguage: LogParseParams["language"];
   private totalLogLines = 0;
-  private linesToParse = 100;
+  private linesToParse = DEFAULT_SAMPLE_LINES;
+  private configurationRevision = 0;
+  private logVersion = 0;
+  private initializationId = 0;
+  private activeOperationId?: number;
+  private lastResult?: LogParseRunState;
+  private lastResultKey?: string;
+  private splitTestKey?: string;
+  private sampleLinesToParse = DEFAULT_SAMPLE_LINES;
+  private splitSample?: LogParseSampleState;
+  private sqlSample?: LogParseSampleState;
+  private previewTimer?: ReturnType<typeof setTimeout>;
+  private previewTask?: Promise<void>;
+  private previewPending = false;
+  private previewVersion = 0;
+  private previewKey?: string;
+  private previewStatus: LogParseWorkflowState["previewStatus"] = "idle";
+  private previewError?: string;
+  private disposed = false;
+  private lastResultIsSample = false;
+  private splitEvents?: ExtractedSqlResult["logEvents"];
+  private appliedSplitPreset?: { name: string; value: string };
+  private appliedSqlPreset?: { name: string; value: string };
   private disposableSubscriptions: vscode.Disposable[] = [];
 
   private constructor(panel: WebviewPanel, extensionUri: Uri) {
@@ -65,13 +92,19 @@ export class LogParseSettingPanel extends BasePanel {
           this.logParserConfigFileUri &&
           e.document.uri.toString() === this.logParserConfigFileUri.toString()
         ) {
-          this.resetConfig(true);
+          this.requestPreview(1000);
         }
       })
     );
     this.disposableSubscriptions.push(
-      window.onDidChangeVisibleTextEditors((editors) => {
-        const uris = editors.map((e) => e.document.uri.toString());
+      workspace.onDidSaveTextDocument((document) => {
+        if (document === this.logParserConfigDoc) {
+          void this.resetConfig(true);
+        }
+      })
+    );
+    this.disposableSubscriptions.push(
+      window.onDidChangeVisibleTextEditors(() => {
         this.setConfigEditorVisibility();
       })
     );
@@ -113,6 +146,17 @@ export class LogParseSettingPanel extends BasePanel {
   }
 
   async initialize() {
+    const initializationId = ++this.initializationId;
+    this.logVersion++;
+    this.cancelPreview();
+    this.previewError = undefined;
+    this.previewKey = undefined;
+    this.previewStatus = "idle";
+    this.lastResult = undefined;
+    this.splitTestKey = undefined;
+    this.splitEvents = undefined;
+    this.splitSample = undefined;
+    this.sqlSample = undefined;
     const { logFileUri, formatterSqlLanguage } = this;
     if (!logFileUri) {
       return;
@@ -127,28 +171,33 @@ export class LogParseSettingPanel extends BasePanel {
       "**/*.log-parser.config.json",
       "**/{node_modules,dist,build,out,coverage,.git,.next,.nuxt,classes}/**"
     );
+    if (initializationId !== this.initializationId) {
+      return;
+    }
     const logParserConfigItems: LabelValueItem[] = (logParserConfigUris ?? []).map((it) => ({
       label: path.relative(rootPath, it.fsPath),
       value: path.relative(rootPath, it.fsPath),
     }));
 
     this.totalLogLines = 0;
-    this.linesToParse = 100;
+    this.linesToParse = DEFAULT_SAMPLE_LINES;
     try {
-      this.rawText = await readResource(this.logFileUri!);
-      this.totalLogLines = this.countLines(this.rawText);
-      if (this.totalLogLines > 100) {
-        this.linesToParse = 100;
-      } else {
-        this.linesToParse = -1;
+      const rawText = await readResource(logFileUri);
+      if (initializationId !== this.initializationId) {
+        return;
       }
-      await this.showLogParseResultView();
+      this.rawText = rawText;
+      this.totalLogLines = this.countLines(this.rawText);
+      this.linesToParse = this.totalLogLines > DEFAULT_SAMPLE_LINES ? DEFAULT_SAMPLE_LINES : -1;
     } catch (e) {
+      this.rawText = "";
       showWindowErrorMessage(e);
     }
-    await this.resetConfig();
-    const { configSummary, errorMessage } = this.createConfigSummary();
-    const preset = await this.createPreset();
+    if (initializationId !== this.initializationId) {
+      return;
+    }
+    this.sampleLinesToParse = this.linesToParse;
+    const configurationPayload = this.createConfigurationPayload();
     const msg: LogParseSettingPanelEventData = {
       command: "initialize",
       componentName: "LogParseSettingPanel",
@@ -159,154 +208,200 @@ export class LogParseSettingPanel extends BasePanel {
             label: toDisplayName(it),
             value: it,
           })),
-          logParserConfigFile: this.logParserConfigFileUri
-            ? path.relative(rootPath, this.logParserConfigFileUri.fsPath)
-            : "",
           logParserConfigItems,
           linesToParse: this.linesToParse,
           totalLogLines: this.totalLogLines,
-          configSummary,
-          preset,
-          errorMessage,
+          ...configurationPayload,
         },
       },
     };
     this.panel.webview.postMessage(msg);
+    this.requestPreview();
   }
 
   public preDispose(): void {
+    this.initializationId++;
+    this.disposed = true;
+    this.cancelPreview();
     LogParseSettingPanel.currentPanel = undefined;
     this.disposableSubscriptions.forEach((it) => it.dispose());
     this.disposableSubscriptions = [];
   }
 
   protected async recieveMessageFromWebview(message: ActionCommand): Promise<void> {
-    const { command, params } = message;
-    switch (command) {
-      case "cancel":
-        this.dispose();
-        return;
-      case "ok":
-        {
-          if (!LogParseSettingPanel.currentPanel) {
-            return;
-          }
-          const { action, linesToParse, presetName, logParserConfigFile, sqlLanguage } =
-            params as SaveLogOptionParams;
-
-          switch (action) {
-            case "create-new-config":
-              const newPath = await this.createLogParserConfigFile();
-              await this.resetConfigFile(newPath);
-              break;
-            case "open-as-json":
-              this.openJsonEditor(true);
-              break;
-            case "reset-lines":
-              if (linesToParse !== undefined) {
-                this.linesToParse = linesToParse;
-              }
-              this.showLogParseResultView();
-              break;
-            case "reset-formatter-sql-language":
-              this.formatterSqlLanguage = sqlLanguage;
-              break;
-            case "apply-log-event-split-preset":
-              if (presetName) {
-                await this.applyLogEventSplitPreset(presetName as LogEventSplitPresetName);
-                await this.resetConfig(true);
-              }
-              break;
-            case "apply-parser-sql-preset":
-              if (presetName) {
-                await this.applySqlParsePreset(presetName as SqlLogParsePresetName);
-                await this.resetConfig(true);
-              }
-              break;
-            case "parse":
-              await this.parseLog();
-              break;
-            case "test-split":
-              await this.parseLog("split");
-              break;
-            case "set-config-file":
-              await this.resetConfigFile(logParserConfigFile);
-              break;
-          }
-        }
-
-        return;
+    if (message.command === "cancel") {
+      this.dispose();
+      return;
     }
+    if (message.command !== "ok") {
+      return;
+    }
+    const params = message.params as SaveLogOptionParams;
+    const operationId = params.operationId ?? Date.now();
+    if (this.activeOperationId !== undefined) {
+      this.completeOperation(operationId, "Another operation is still running.");
+      return;
+    }
+    this.activeOperationId = operationId;
+    let operationError: string | undefined;
+    try {
+      const { action, linesToParse, presetName, logParserConfigFile, sqlLanguage } = params;
+      this.refreshSampleState();
+      switch (action) {
+        case "reset-sample-lines":
+          if (linesToParse !== undefined) {
+            this.sampleLinesToParse = linesToParse;
+          }
+          this.requestPreview();
+          break;
+        case "save-config":
+          await this.saveConfig();
+          break;
+        case "copy-config":
+        case "create-new-config": {
+          if (action === "copy-config" && !this.logParserConfigDoc) {
+            throw new Error("Select a config file to copy.");
+          }
+          const newPath = await this.createLogParserConfigFile(action === "copy-config");
+          if (newPath) {
+            await this.resetConfigFile(newPath);
+            this.requestPreview();
+          }
+          break;
+        }
+        case "open-as-json":
+          await this.openJsonEditor(true);
+          break;
+        case "reset-lines":
+          if (linesToParse !== undefined) {
+            this.linesToParse = linesToParse;
+          }
+          break;
+        case "reset-formatter-sql-language":
+          this.formatterSqlLanguage = sqlLanguage;
+          this.requestPreview();
+          break;
+        case "apply-log-event-split-preset":
+          if (presetName) {
+            await this.applyLogEventSplitPreset(presetName as LogEventSplitPresetName);
+            this.requestPreview();
+          }
+          break;
+        case "apply-parser-sql-preset":
+          if (presetName) {
+            await this.applySqlParsePreset(presetName as SqlLogParsePresetName);
+            this.requestPreview();
+          }
+          break;
+        case "parse":
+          this.cancelPreview();
+          await this.previewTask;
+          if (linesToParse !== undefined) {
+            this.linesToParse = linesToParse;
+          }
+          await this.parseLog("sqlExecution");
+          break;
+        case "set-config-file":
+          await this.resetConfigFile(logParserConfigFile);
+          this.requestPreview();
+          break;
+      }
+    } catch (error) {
+      operationError = error instanceof Error ? error.message : String(error);
+    } finally {
+      this.activeOperationId = undefined;
+      try {
+        await this.resetConfig(true);
+      } finally {
+        this.completeOperation(operationId, operationError);
+        if (this.previewPending && !this.previewTimer) {
+          this.startPreview();
+        }
+      }
+    }
+  }
+
+  private completeOperation(operationId: number, error?: string): void {
+    this.panel.webview.postMessage({
+      command: "operation-completed",
+      componentName: "LogParseSettingPanel",
+      value: { "operation-completed": { operationId, error } },
+    } satisfies LogParseSettingPanelEventData);
   }
 
   async resetConfigFile(logParserConfigFile: string | undefined) {
     if (logParserConfigFile) {
       if (!(await existsFileOnWorkspace(logParserConfigFile!))) {
-        showWindowErrorMessage("File is not exists on workspace." + logParserConfigFile);
-        return;
+        throw new Error(`Config file does not exist: ${logParserConfigFile}`);
       }
       const wsfolder = workspace.workspaceFolders?.[0].uri;
       if (!wsfolder) {
         return;
       }
-      this.logParserConfigFileUri = Uri.joinPath(wsfolder, logParserConfigFile);
-      await this.openJsonEditor(false);
+      const configUri = Uri.joinPath(wsfolder, logParserConfigFile);
+      const document = await workspace.openTextDocument(configUri);
+      if (this.logParserConfigFileUri?.toString() !== configUri.toString()) {
+        this.clearPreview();
+      }
+      this.logParserConfigFileUri = configUri;
+      this.logParserConfigDoc = document;
     } else {
+      this.clearPreview();
       this.logParserConfigFileUri = null;
+      this.logParserConfigDoc = null;
     }
     await this.resetConfig(true);
     this.setConfigEditorVisibility();
   }
 
-  async createLogParserConfigFile(): Promise<string | undefined> {
-    const fileFilters = {
-      logParserConfigJSON: ["log-parser.config.json"],
-    };
-    let wsfolder = workspace.workspaceFolders?.[0].uri?.fsPath ?? "";
-
-    // TODO: 対象のログファイル(this.logFileUri)の名称から命名したい(考慮不足な単純な例：`${this.logFileUri}.log-parser.config.json`)
-    let uri = await window.showSaveDialog({
-      defaultUri: Uri.file(path.join(wsfolder, "untitled.log-parser.config.json")),
-      filters: fileFilters,
-      title: "Save Log parser config JSON file(*.log-parser.config.json)",
-    });
-
-    if (!uri) {
-      return;
-    }
-    if (!uri.fsPath.endsWith(".log-parser.config.json")) {
+  async createLogParserConfigFile(copy = false): Promise<string | undefined> {
+    const sourceDocument = copy ? this.logParserConfigDoc : undefined;
+    const sourceUri = this.logParserConfigFileUri;
+    const wsfolder = workspace.workspaceFolders?.[0].uri?.fsPath ?? "";
+    const name =
+      copy && sourceUri
+        ? path.basename(sourceUri.fsPath).replace(/\.log-parser\.config\.json$/, "-copy")
+        : path.parse(this.logFileUri?.fsPath ?? "untitled").name;
+    let uri: Uri | undefined;
+    while (true) {
+      uri = await window.showSaveDialog({
+        defaultUri: Uri.file(path.join(wsfolder, `${name}.log-parser.config.json`)),
+        filters: { logParserConfigJSON: ["log-parser.config.json"] },
+        title: copy ? "Copy config and adjust" : "Create log parser config",
+      });
+      if (!uri) {
+        return;
+      }
+      if (uri.fsPath.endsWith(".log-parser.config.json")) {
+        break;
+      }
       const retry = await window.showWarningMessage(
         "File name must end with '.log-parser.config.json'. Retry?",
         "Yes",
         "Cancel"
       );
-
-      if (retry === "Yes") {
-        uri = await window.showSaveDialog({
-          defaultUri: Uri.file(path.join(wsfolder, "untitled.log-parser.config.json")),
-          filters: fileFilters,
-          title: "Save Log parser config JSON file(*.log-parser.config.json)",
-        });
+      if (retry !== "Yes") {
+        return;
       }
     }
-    if (!uri) {
-      return;
+    if (
+      uri.toString() === sourceUri?.toString() ||
+      workspace.textDocuments.some((doc) => doc.uri.toString() === uri!.toString() && doc.isDirty)
+    ) {
+      throw new Error("Choose another file to preserve the current edits.");
     }
-
-    const obj: LogParseConfig = {
-      split: {
-        fields: [],
-      },
-      classify: [],
-      extractors: [],
-    };
-    await writeToResource(uri, JSON.stringify(obj, null, 2));
+    const emptyConfig: LogParseConfig = { split: { fields: [] }, classify: [], extractors: [] };
+    await writeToResource(uri, sourceDocument?.getText() ?? JSON.stringify(emptyConfig, null, 2));
 
     const logParserConfigUris = await workspace.findFiles(
       "**/*.log-parser.config.json",
       "**/{node_modules,dist,build,out,coverage,.git,.next,.nuxt,classes}/**"
     );
-    const logParserConfigItems: LabelValueItem[] = (logParserConfigUris ?? []).map((it) => ({
+    const configUris = [...(logParserConfigUris ?? [])];
+    if (!configUris.some((item) => item.toString() === uri.toString())) {
+      configUris.push(uri);
+    }
+    const logParserConfigItems: LabelValueItem[] = configUris.map((it) => ({
       label: path.relative(wsfolder, it.fsPath),
       value: path.relative(wsfolder, it.fsPath),
     }));
@@ -353,8 +448,11 @@ export class LogParseSettingPanel extends BasePanel {
   }
 
   private getLogEventSplitConfigByPreset(presetName: LogEventSplitPresetName): LogEventSplitConfig {
-    const { logExample, split } = LOG_EVENT_SPLIT_PRESETS[presetName];
-    return split;
+    const preset = LOG_EVENT_SPLIT_PRESETS[presetName];
+    if (!preset) {
+      throw new Error("Select a log split preset.");
+    }
+    return preset.split;
   }
 
   private countLines(text: string): number {
@@ -381,158 +479,157 @@ export class LogParseSettingPanel extends BasePanel {
     return count;
   }
 
-  private async resetConfig(postMessage = false): Promise<void> {
-    const preset = await this.createPreset();
-    const { configSummary, errorMessage, canSplitLog } = this.createConfigSummary();
+  private getInputKey(linesToParse = this.linesToParse): string {
+    return JSON.stringify([
+      this.logVersion,
+      this.logFileUri?.toString(),
+      this.logParserConfigFileUri?.toString(),
+      this.getConfigKey(),
+      linesToParse,
+      this.formatterSqlLanguage,
+    ]);
+  }
 
-    if (postMessage) {
-      const msg: LogParseSettingPanelEventData = {
-        command: "reset-config",
-        componentName: "LogParseSettingPanel",
-        value: {
-          "reset-config": {
-            configSummary,
-            canSplitLog,
-            errorMessage,
-            preset,
-          },
-        },
-      };
-      this.panel.webview.postMessage(msg);
+  private getConfigKey(): string | undefined {
+    const text = this.logParserConfigDoc?.getText();
+    try {
+      return text === undefined ? undefined : stringify(JSON.parse(text));
+    } catch {
+      return text;
     }
   }
 
-  private createConfigSummary(): {
-    canSplitLog: boolean;
-    errorMessage: string;
-    configSummary: LogParseSettingPanelEventDataConfigSummary;
-  } {
-    let logEventSplitPattern = "";
-    let logEventFieldsPattern = "";
-    let classificationSummary = "";
-    let extractionSummary = "";
-    let errorMessage = "";
-    let canSplitLog = false;
+  private getSplitInputKey(config?: LogParseConfig): string {
+    return JSON.stringify([
+      this.logVersion,
+      this.logFileUri?.toString(),
+      this.logParserConfigFileUri?.toString(),
+      config?.split,
+      config?.classify?.filter((rule) => rule?.expandMessage),
+      this.sampleLinesToParse,
+    ]);
+  }
 
-    if (this.logParserConfigDoc) {
-      let logParseConfig: LogParseConfig | null = null;
-      try {
-        logParseConfig = JSON.parse(this.logParserConfigDoc.getText()) as LogParseConfig;
-      } catch (e) {
-        errorMessage = `JSON.parse error.${(e as Error).message}`;
-      }
-      if (!errorMessage) {
-        if (logParseConfig && logParseConfig.split && logParseConfig.split.fields?.length > 0) {
-          logEventSplitPattern = createLogEventPatternText({
-            ...logParseConfig.split,
-            targetForHuman: true,
-            onlyStartMarker: true,
-          });
-          logEventFieldsPattern = createLogEventPatternText({
-            ...logParseConfig.split,
-            targetForHuman: true,
-          });
-
-          const validateResult = validateConfig(logParseConfig);
-          if (validateResult.ok && logParseConfig) {
-            classificationSummary = summarizeClassifyRules(logParseConfig.classify);
-            extractionSummary = summarizeExtractors(logParseConfig.extractors);
-          } else if (validateResult.errorMessage) {
-            errorMessage = validateResult.errorMessage;
-          }
-          canSplitLog = validateResult.availableStage !== undefined;
-        } else {
-          errorMessage = "Select 'Log split preset' and Apply";
-        }
-      }
-    } else {
-      errorMessage = "Select or Create log parser config file.";
+  private refreshSampleState(): void {
+    const { configuration } = readLogParseConfiguration(this.logParserConfigDoc?.getText());
+    if (!configuration.canSplit) {
+      this.splitSample = undefined;
+      this.previewKey = undefined;
     }
+    if (configuration.availableStage === "split" && this.splitSample?.result.stage === "classify") {
+      this.splitSample = undefined;
+      this.previewKey = undefined;
+    }
+    if (!configuration.canParse && this.sqlSample) {
+      this.sqlSample = undefined;
+      this.previewKey = undefined;
+    }
+  }
 
-    return {
-      errorMessage,
-      canSplitLog,
-      configSummary: {
-        logEventSplitPattern,
-        logEventFieldsPattern,
-        classificationSummary,
-        extractionSummary,
+  private async saveConfig(): Promise<void> {
+    if (!this.logParserConfigDoc || !(await this.logParserConfigDoc.save())) {
+      throw new Error("Could not save the config.");
+    }
+  }
+
+  private createConfigurationPayload() {
+    const { config, configuration, configSummary } = readLogParseConfiguration(
+      this.logParserConfigDoc?.getText()
+    );
+    this.refreshSampleState();
+    if (
+      this.lastResultKey !==
+      this.getInputKey(this.lastResultIsSample ? this.sampleLinesToParse : this.linesToParse)
+    ) {
+      this.lastResult = undefined;
+    }
+    const splitTested =
+      configuration.canSplit && this.splitTestKey === this.getSplitInputKey(config);
+    if (!splitTested) {
+      this.splitEvents = undefined;
+    }
+    if (this.appliedSplitPreset?.value !== JSON.stringify(config?.split)) {
+      this.appliedSplitPreset = undefined;
+    }
+    if (this.appliedSqlPreset?.value !== JSON.stringify([config?.classify, config?.extractors])) {
+      this.appliedSqlPreset = undefined;
+    }
+    const workflow: LogParseWorkflowState = {
+      revision: ++this.configurationRevision,
+      rawPreview: this.createRawLogResult(this.sampleLinesToParse),
+      configuration,
+      previewStatus: this.previewStatus,
+      previewError: this.previewError,
+      configDirty: this.logParserConfigDoc?.isDirty ?? false,
+      linesToParse: this.linesToParse,
+      setup: {
+        sampleLinesToParse: this.sampleLinesToParse,
+        split: this.splitSample,
+        sql: this.sqlSample,
       },
+      result: this.lastResult,
+      appliedSplitPreset: this.appliedSplitPreset?.name,
+      appliedSqlPreset: this.appliedSqlPreset?.name,
+    };
+    return {
+      configSummary,
+      workflow,
+      preset: this.createPreset(),
+      logParserConfigFile: this.logParserConfigFileUri
+        ? path.relative(
+            workspace.workspaceFolders?.[0].uri.fsPath ?? "",
+            this.logParserConfigFileUri.fsPath
+          )
+        : "",
     };
   }
 
-  private getCurrentConfig(): LogParseConfig | null {
-    const { logParserConfigDoc } = this;
-    if (!logParserConfigDoc) {
-      return null;
+  private async resetConfig(postMessage = false): Promise<void> {
+    const payload = this.createConfigurationPayload();
+    if (postMessage) {
+      await this.panel.webview.postMessage({
+        command: "reset-config",
+        componentName: "LogParseSettingPanel",
+        value: { "reset-config": payload },
+      } satisfies LogParseSettingPanelEventData);
     }
-    return JSON.parse(logParserConfigDoc.getText()) as LogParseConfig;
   }
 
-  private async createPreset(): Promise<LogParseSettingPanelEventDataPreset> {
-    const { rawText } = this;
-    const logParseConfig = this.getCurrentConfig();
-    let sqlParseDetectionMessage = "";
-    const logEventSplitPresets: LogParseSettingPanelEventDataPreset["logEventSplitPresets"] = [];
-    const sqlParsePresets: LogParseSettingPanelEventDataPreset["sqlParsePresets"] = [];
-
+  private createPreset(): LogParseSettingPanelEventDataPreset {
     const splitConfidence = detectLogSplitPreset(this.rawText, LOG_EVENT_SPLIT_PRESETS);
-    for (const [key, value] of Object.entries(LOG_EVENT_SPLIT_PRESETS)) {
-      const recommended =
-        splitConfidence.confidence >= 0.3 && splitConfidence.presetNames.includes(key);
-      logEventSplitPresets.push({
-        name: key,
-        label: `${key}${recommended ? " (Recommended)" : ""}`,
-        logExample: value.logExample,
-        logFieldsPattern: createLogEventPatternText({
-          ...value.split,
-          targetForHuman: true,
-        }),
+    const sqlConfidence = this.splitEvents
+      ? detectSqlParsePreset(this.splitEvents, SQL_LOG_PARSE_PRESETS)
+      : undefined;
+    return {
+      logSplitDetectionMessage: formatLogDetectionMessage(splitConfidence),
+      logEventSplitPresets: Object.entries(LOG_EVENT_SPLIT_PRESETS).map(([name, preset]) => ({
+        name,
+        label: `${name}${
+          splitConfidence.confidence >= 0.3 && splitConfidence.presetNames.includes(name)
+            ? " (Recommended)"
+            : ""
+        }`,
+        logExample: preset.logExample,
+        logFieldsPattern: createLogEventPatternText({ ...preset.split, targetForHuman: true }),
         logEventSplitPattern: createLogEventPatternText({
-          ...value.split,
+          ...preset.split,
           onlyStartMarker: true,
           targetForHuman: true,
         }),
-      });
-    }
-    const logDetectionMessage = formatLogDetectionMessage(splitConfidence);
-
-    if (rawText && logParseConfig) {
-      let sqlParseConfidence: LogFormatDetectionResult | null = null;
-      let errorMessage = "";
-      try {
-        sqlParseConfidence = await detectSqlParsePresetByText(
-          rawText,
-          logParseConfig,
-          SQL_LOG_PARSE_PRESETS
-        );
-      } catch (e) {
-        errorMessage = e instanceof Error ? e.message : "" + e;
-      }
-      for (const [key, value] of Object.entries(SQL_LOG_PARSE_PRESETS)) {
-        const recommended =
-          sqlParseConfidence &&
-          sqlParseConfidence.confidence >= 0.3 &&
-          sqlParseConfidence.presetNames.includes(key);
-        sqlParsePresets.push({
-          name: key,
-          label: `${key}${recommended ? " (Recommended)" : ""}`,
-          classificationSummary: summarizeClassifyRules(value.classify),
-          extractionSummary: summarizeExtractors(value.extractors),
-        });
-      }
-      if (sqlParseConfidence) {
-        sqlParseDetectionMessage = formatLogDetectionMessage(sqlParseConfidence);
-      } else {
-        sqlParseDetectionMessage = errorMessage;
-      }
-    }
-
-    return {
-      logSplitDetectionMessage: logDetectionMessage,
-      logEventSplitPresets,
-      sqlParseDetectionMessage,
-      sqlParsePresets,
+      })),
+      sqlParseDetectionMessage: sqlConfidence ? formatLogDetectionMessage(sqlConfidence) : "",
+      sqlParsePresets: Object.entries(SQL_LOG_PARSE_PRESETS).map(([name, preset]) => ({
+        name,
+        label: `${name}${
+          sqlConfidence &&
+          sqlConfidence.confidence >= 0.3 &&
+          sqlConfidence.presetNames.includes(name)
+            ? " (Recommended)"
+            : ""
+        }`,
+        classificationSummary: summarizeClassifyRules(preset.classify),
+        extractionSummary: summarizeExtractors(preset.extractors),
+      })),
     };
   }
 
@@ -556,7 +653,10 @@ export class LogParseSettingPanel extends BasePanel {
     const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(text.length));
     edit.replace(document.uri, fullRange, newText);
 
-    await vscode.workspace.applyEdit(edit);
+    if (!(await vscode.workspace.applyEdit(edit))) {
+      throw new Error("Could not apply the split preset.");
+    }
+    this.appliedSplitPreset = { name: logEventSplitPresetName, value: JSON.stringify(splitConfig) };
   }
 
   private async applySqlParsePreset(presetName: SqlLogParsePresetName) {
@@ -566,6 +666,9 @@ export class LogParseSettingPanel extends BasePanel {
     }
 
     const preset = SQL_LOG_PARSE_PRESETS[presetName];
+    if (!preset) {
+      throw new Error("Select a SQL preset.");
+    }
     const keys: (keyof Pick<LogParseConfig, "classify" | "extractors">)[] = [
       "classify",
       "extractors",
@@ -591,23 +694,24 @@ export class LogParseSettingPanel extends BasePanel {
     const edit = new vscode.WorkspaceEdit();
     edit.replace(document.uri, fullRange, text);
 
-    await vscode.workspace.applyEdit(edit);
+    if (!(await vscode.workspace.applyEdit(edit))) {
+      throw new Error("Could not apply the SQL preset.");
+    }
+    this.appliedSqlPreset = {
+      name: presetName,
+      value: JSON.stringify([preset.classify, preset.extractors]),
+    };
   }
 
-  private showLogParseResultView(extractedSqlResult?: ExtractedSqlResult) {
-    const { logFileUri, linesToParse } = this;
-    if (!logFileUri) {
-      return;
-    }
+  private createRawLogResult(linesToParse: number) {
     const rdb = new ResultSetDataBuilder([
       createRdhKey({ name: "lineNo", type: GeneralColumnType.INTEGER, width: 80 }),
       createRdhKey({ name: "content", type: GeneralColumnType.TEXT, width: 1000 }),
     ]);
     const start = new Date().getTime();
-    let rawLines = this.rawText.split(/\r?\n|\r/);
-    if (linesToParse && linesToParse >= 0) {
-      rawLines = rawLines.slice(0, linesToParse);
-    }
+    const rawLines = this.rawText
+      ? this.rawText.split(/\r?\n|\r/, linesToParse >= 0 ? linesToParse : undefined)
+      : [];
     rawLines.forEach((text, index) => {
       rdb.addRow({ lineNo: index + 1, content: text });
     });
@@ -620,56 +724,243 @@ export class LogParseSettingPanel extends BasePanel {
       selectedRows: rdb.rs.rows.length,
     });
 
-    const title = path.basename(logFileUri.fsPath);
-    rdb.setSqlStatement(logFileUri.fsPath);
-    const commandParams: LogParseResultViewParams = {
-      title,
-      rawLogs: rdb.build(),
-      totalLogLines: this.totalLogLines,
-      linesToParse: this.linesToParse,
-      extractedSqlResult,
-    };
-    commands.executeCommand(OPEN_LOG_PARSE_RESULT_VIEWER, commandParams);
+    rdb.setSqlStatement(this.logFileUri?.fsPath ?? "");
+    return rdb.build();
   }
 
-  private async parseLog(stage?: LogParseStage): Promise<void> {
-    const logParseConfig = this.getCurrentConfig();
-    let sqlParsePresetVisibility = false;
-    const { rawText, linesToParse } = this;
-    if (!rawText || !logParseConfig) {
+  private showLogParseResultView(
+    extractedSqlResult?: ExtractedSqlResult,
+    linesToParse = this.linesToParse
+  ) {
+    const { logFileUri } = this;
+    if (!logFileUri) {
       return;
     }
+    const commandParams: LogParseResultViewParams = {
+      title: path.basename(logFileUri.fsPath),
+      rawLogs: this.createRawLogResult(linesToParse),
+      totalLogLines: this.totalLogLines,
+      linesToParse,
+      extractedSqlResult,
+    };
+    return commands.executeCommand(OPEN_LOG_PARSE_RESULT_VIEWER, commandParams);
+  }
+
+  private cancelPreview(): void {
+    clearTimeout(this.previewTimer);
+    this.previewTimer = undefined;
+    this.previewPending = false;
+    this.previewVersion++;
+    this.previewStatus =
+      this.sqlSample || this.splitSample
+        ? this.previewKey === this.getPreviewInput().key
+          ? "ready"
+          : "stale"
+        : "idle";
+  }
+
+  private clearPreview(): void {
+    this.cancelPreview();
+    this.previewKey = undefined;
+    this.previewError = undefined;
+    this.splitSample = undefined;
+    this.sqlSample = undefined;
+    this.splitEvents = undefined;
+    this.splitTestKey = undefined;
+    this.previewStatus = "idle";
+  }
+
+  private getPreviewInput() {
+    const { config, configuration } = readLogParseConfiguration(this.logParserConfigDoc?.getText());
+    const stage = configuration.availableStage;
+    const runConfig =
+      config && stage
+        ? {
+            ...config,
+            classify: stage === "split" ? [] : config.classify,
+            extractors: stage === "sqlExecution" ? config.extractors : [],
+          }
+        : undefined;
+    const key = stringify([
+      this.logVersion,
+      this.logFileUri?.toString(),
+      this.logParserConfigFileUri?.toString(),
+      runConfig,
+      stage,
+      this.sampleLinesToParse,
+      stage === "sqlExecution" ? this.formatterSqlLanguage : undefined,
+    ]);
+    return { config: runConfig, stage, key };
+  }
+
+  private requestPreview(delay = 0): void {
+    if (this.disposed) {
+      return;
+    }
+    clearTimeout(this.previewTimer);
+    this.previewTimer = undefined;
+    const { stage, key } = this.getPreviewInput();
+    if (!stage) {
+      this.cancelPreview();
+      this.previewStatus = "idle";
+      this.previewError = undefined;
+    } else if (key === this.previewKey && !this.previewTask) {
+      this.previewPending = false;
+      this.previewStatus = this.previewError ? "failed" : "ready";
+    } else {
+      this.previewVersion++;
+      this.previewError = undefined;
+      this.previewPending = true;
+      this.previewStatus = "waiting";
+      if (delay) {
+        this.previewTimer = setTimeout(() => {
+          this.previewTimer = undefined;
+          this.startPreview();
+        }, delay);
+      } else {
+        this.startPreview();
+      }
+    }
+    void this.resetConfig(true);
+  }
+
+  private startPreview(): void {
+    if (this.disposed || this.previewTask || this.activeOperationId !== undefined) {
+      return;
+    }
+    this.previewPending = false;
+    this.previewTask = this.updatePreview().finally(() => {
+      this.previewTask = undefined;
+      if (this.previewPending && !this.previewTimer) {
+        this.startPreview();
+      }
+    });
+  }
+
+  private async updatePreview(): Promise<void> {
+    const { stage, key } = this.getPreviewInput();
+    if (!stage) {
+      return;
+    }
+    if (key === this.previewKey) {
+      this.previewStatus = this.previewError ? "failed" : "ready";
+      await this.resetConfig(true);
+      return;
+    }
+    const version = this.previewVersion;
+    this.previewStatus = "running";
+    await this.resetConfig(true);
     try {
-      let targtStage = stage ?? "sqlExecution";
-      const parser = new LogParser(logParseConfig);
-      const extractedResult = await parser.parse({
-        logText: rawText,
-        stage: targtStage,
+      if (version !== this.previewVersion) {
+        return;
+      }
+      await this.parseLog(stage, true, version);
+      if (version === this.previewVersion) {
+        this.previewStatus = "ready";
+      }
+    } catch (error) {
+      if (version === this.previewVersion) {
+        this.previewStatus = "failed";
+        this.previewError = error instanceof Error ? error.message : String(error);
+      }
+    } finally {
+      if (version === this.previewVersion) {
+        this.previewKey = key;
+        await this.resetConfig(true);
+      }
+    }
+  }
+
+  private async parseLog(
+    stage: LogParseRunState["stage"],
+    sample = false,
+    version = this.previewVersion
+  ): Promise<void> {
+    const linesToParse = sample ? this.sampleLinesToParse : this.linesToParse;
+    const currentInputKey = () =>
+      this.getInputKey(sample ? this.sampleLinesToParse : this.linesToParse);
+    const inputKey = currentInputKey();
+    const run: LogParseRunState = {
+      status: "failed",
+      sample,
+      stage,
+      logName: path.basename(this.logFileUri?.fsPath ?? ""),
+      linesToParse,
+      eventCount: 0,
+      sqlCount: 0,
+    };
+    try {
+      const { config, configuration } = readLogParseConfiguration(
+        this.logParserConfigDoc?.getText()
+      );
+      if (!config) {
+        throw new Error(configuration.splitError || "Select a config file.");
+      }
+      if (!(sample ? configuration.availableStage : configuration.canParse)) {
+        throw new Error(
+          (stage === "split" ? configuration.splitError : configuration.parseError) ||
+            "Configure the log split fields."
+        );
+      }
+      const runConfig = sample ? this.getPreviewInput().config! : config;
+      const result = await new LogParser(runConfig).parse({
+        logText: this.rawText,
+        stage,
         language: this.formatterSqlLanguage,
         linesToParse,
       });
-      if (extractedResult.ok) {
-        sqlParsePresetVisibility = !!extractedResult.logEvents;
+      if (sample && (version !== this.previewVersion || inputKey !== currentInputKey())) {
+        return;
       }
-      this.showLogParseResultView(extractedResult);
-      await this.setParsePresetVisibility(sqlParsePresetVisibility);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      showWindowErrorMessage(message);
-
-      throw e;
+      if (!sample && inputKey !== currentInputKey()) {
+        throw new Error("Settings changed. Parse the log again.");
+      }
+      if (!result.ok) {
+        throw new Error(result.error || "Log parsing failed.");
+      }
+      if (!sample) {
+        await this.showLogParseResultView(result, linesToParse);
+      }
+      if (sample && (version !== this.previewVersion || inputKey !== currentInputKey())) {
+        return;
+      }
+      if (!sample && inputKey !== currentInputKey()) {
+        throw new Error("Settings changed. Parse the log again.");
+      }
+      run.status = "success";
+      run.eventCount = result.logEvents.length;
+      run.sqlCount = result.sqlExecutions.length;
+      run.diagnostics = result.diagnostics;
+      if (sample) {
+        const preview =
+          stage !== "sqlExecution"
+            ? createLogResultBuilder(result.logEvents, stage).build()
+            : createSqlResultBuilder(result.sqlExecutions).build();
+        const classifiedPreview =
+          stage !== "split" ? createLogResultBuilder(result.logEvents, stage).build() : undefined;
+        const sampleState = {
+          result: run,
+          preview,
+          classifiedPreview,
+        };
+        if (stage !== "sqlExecution") {
+          this.splitSample = sampleState;
+        } else {
+          this.sqlSample = sampleState;
+        }
+        this.splitTestKey = result.logEvents.length ? this.getSplitInputKey(config) : undefined;
+        this.splitEvents = result.logEvents;
+      }
+    } catch (error) {
+      run.error = error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      if (inputKey === currentInputKey() && (!sample || version === this.previewVersion)) {
+        this.lastResultIsSample = sample;
+        this.lastResultKey = inputKey;
+        this.lastResult = run;
+      }
     }
-  }
-
-  private async setParsePresetVisibility(visibility: boolean) {
-    const msg: LogParseSettingPanelEventData = {
-      command: "set-sql-parse-preset-visibility",
-      componentName: "LogParseSettingPanel",
-      value: {
-        "set-sql-parse-preset-visibility": visibility,
-      },
-    };
-    this.panel.webview.postMessage(msg);
   }
 }
 

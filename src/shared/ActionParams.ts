@@ -30,15 +30,18 @@ export type SaveCsvOptionParams = CsvParseOptions & {
 };
 
 export type SaveLogOptionParams = {
+  operationId?: number;
   action:
     | "create-new-config"
+    | "copy-config"
+    | "reset-sample-lines"
+    | "save-config"
     | "reset-lines"
     | "reset-formatter-sql-language"
     | "apply-log-event-split-preset"
     | "apply-parser-sql-preset"
     | "open-as-json"
     | "parse"
-    | "test-split"
     | "set-config-file";
   linesToParse?: number;
   presetName?: string;

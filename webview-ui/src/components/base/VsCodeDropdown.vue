@@ -2,7 +2,7 @@
   <!-- <vscode-radio-group :value="modelValue || value" @change="handleOnChange">
     <slot></slot>
   </vscode-radio-group> -->
-  <vscode-dropdown :value="selectedValue" :class="{ transparent, verr: isError }" :disabled="disabled"
+  <vscode-dropdown :id="id" :value="selectedValue" :class="{ transparent, verr: isError }" :disabled="disabled"
     @change="handleOnChange" @focus="handleOnFocus" @blur="handleOnBlur" :style="dropdownStyle">
     <!-- <vscode-option value="" aria-disabled="true" style="display: none">-- Select --</vscode-option> -->
     <vscode-option v-for="(item, index) in items" :key="index" :value="String(item.value)">

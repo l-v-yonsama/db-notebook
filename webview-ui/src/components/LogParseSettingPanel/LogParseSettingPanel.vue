@@ -1,659 +1,814 @@
 <script setup lang="ts">
 import type { DropdownItem } from "@/types/Components";
-import type { LogParseSettingPanelEventData, SaveLogOptionParams } from "@/utilities/vscode";
-import { vscode } from "@/utilities/vscode";
-import { computed, nextTick, onMounted, ref } from "vue";
-import PanelActionToolbar from "../base/PanelActionToolbar.vue";
+import type {
+  LogParseSettingPanelEventData,
+  LogParseWorkflowState,
+  SaveLogOptionParams,
+} from "@/utilities/vscode";
+import { formatLogParseDiagnostics, getLogParseNextAction, vscode } from "@/utilities/vscode";
+import { computed, ref } from "vue";
+import LogParsePreview from "./LogParsePreview.vue";
 import VsCodeButton from "../base/VsCodeButton.vue";
 import VsCodeDropdown from "../base/VsCodeDropdown.vue";
+import type {
+  InitializePayload,
+  ResetConfigFileAndItemsPayload,
+  ResetConfigPayload,
+} from "./LogParseSettingPanel.types";
 
-import {
-  provideVSCodeDesignSystem, vsCodePanels,
-  vsCodePanelTab,
-  vsCodePanelView,
-} from "@vscode/webview-ui-toolkit";
-
-import type { InitializePayload, ResetConfigFileAndItemsPayload, ResetConfigPayload } from "./LogParseSettingPanel.types";
-
-provideVSCodeDesignSystem().register(vsCodePanels(), vsCodePanelView(), vsCodePanelTab());
-
-/* state */
-
-const sectionHeight = ref(300);
-const sectionWidth = ref(300);
-
-const configEditorVisible = ref(false);
-const sqlParsePresetVisible = ref(false);
-const configFile = ref('');
-const linesToParse = ref('-1');
-const configFileItems = ref([] as DropdownItem[]);
-const lineItems = ref([] as DropdownItem[]);
-
-const formatterSqlLanguage = ref(
-  '' as (Exclude<InitializePayload["formatterSqlLanguage"], undefined> | '')
-);
-const formatterSqlLanguageItems = ref([] as DropdownItem[]);
-
-const initilizing = ref(true);
-const editingLogFieldsPattern = ref(false);
-const editingEventClassification = ref(false);
-const sqlExtractionFlowEditable = ref(false);
-const processing = ref(false);
-
-const errorMessage = ref('');
+const sampleLinesToParse = ref("-1");
+const configFile = ref("");
+let lastConfigFile = "";
+const configFileItems = ref<DropdownItem[]>([]);
+const lineItems = ref<DropdownItem[]>([]);
+const formatterSqlLanguage = ref<
+  Exclude<InitializePayload["formatterSqlLanguage"], undefined> | ""
+>("");
+const formatterSqlLanguageItems = ref<DropdownItem[]>([]);
+const initializing = ref(true);
 const totalLogLines = ref(0);
-const canSplitLog = ref(false);
+const pendingOperationId = ref<number>();
+const pendingAction = ref<SaveLogOptionParams["action"]>();
+let nextOperationId = 0;
+const operationError = ref("");
+const processing = computed(() => pendingOperationId.value !== undefined);
+const workflow = ref<LogParseWorkflowState>({
+  revision: -1,
+  configuration: {
+    hasConfig: false,
+    hasSplitFields: false,
+    canSplit: false,
+    canParse: false,
+    splitError: "",
+    parseError: "",
+  },
+});
+const configSummary = ref<InitializePayload["configSummary"]>({
+  logEventSplitPattern: "",
+  logEventFieldsPattern: "",
+  classificationSummary: "",
+  extractionSummary: "",
+});
+const logSplitDetectionMessage = ref("");
+const splitPresetItems = ref<DropdownItem[]>([]);
+const splitPresetName = ref("");
+const sqlParseDetectionMessage = ref("");
+const sqlParsePresetItems = ref<DropdownItem[]>([]);
+const sqlParsePresetName = ref("");
 
-const currentLogEventSplitPattern = ref('');
-const currentLogFieldsPattern = ref('');
-const currentEventClassification = ref('');
-const currentSqlExtractionFlow = ref('');
-
-// Preset
-const logSplitDetectionMessage = ref('');
-const splitPresetItems = ref([] as DropdownItem[]);
-const splitPresetName = ref('');
-
-const sqlParseDetectionMessage = ref('');
-const sqlParsePresetItems = ref([] as DropdownItem[]);
-const sqlParsePresetName = ref('');
-
-/* lifecycle */
-
-window.addEventListener("resize", () => resetSectionHeight());
-
-const resetSectionHeight = () => {
-  const sectionWrapper = window.document.querySelector(".log-conditional-root");
-  if (sectionWrapper?.clientHeight) {
-    sectionHeight.value = Math.max(sectionWrapper?.clientHeight - 50, 100);
+const setup = computed(() => workflow.value.setup);
+const displayedResult = computed(() => workflow.value.result);
+const logSample = computed(() => setup.value?.sql ?? setup.value?.split);
+const logPreview = computed(() => logSample.value?.classifiedPreview ?? logSample.value?.preview);
+const sqlSample = computed(() => setup.value?.sql);
+const currentLogEventSplitPattern = computed(() => configSummary.value.logEventSplitPattern);
+const currentLogFieldsPattern = computed(() => configSummary.value.logEventFieldsPattern);
+const currentEventClassification = computed(() => configSummary.value.classificationSummary);
+const currentSqlExtractionFlow = computed(() => configSummary.value.extractionSummary);
+const canSplitLog = computed(() => workflow.value.configuration.canSplit);
+const canParseLog = computed(() => workflow.value.configuration.canParse);
+const isConfigFileSelected = computed(() => workflow.value.configuration.hasConfig);
+const nextAction = computed(() => getLogParseNextAction(workflow.value));
+const primaryAction = computed(() => {
+  if (processing.value) {
+    return "";
   }
-  if (sectionWrapper?.clientWidth) {
-    sectionWidth.value = sectionWrapper.clientWidth - 50;
-  }
-};
-
-onMounted(() => {
-  nextTick(resetSectionHeight);
-});
-
-/* computed */
-const isSummaryVisible = computed((): boolean => {
-  return currentLogFieldsPattern.value.length > 1 || !!currentEventClassification.value || !!currentSqlExtractionFlow.value;
-});
-const isConfigFileSelected = computed((): boolean => {
-  return !!configFile.value;
-});
-
-const computedPresetInfo = computed((): {
-  logExample: string;
-  logFieldsPattern: string;
-  logEventSplitPattern: string;
-  classificationSummary: string;
-  extractionSummary: string;
-} => {
-  const ret = {
-    logExample: '',
-    logFieldsPattern: '',
-    logEventSplitPattern: '',
-    classificationSummary: '',
-    extractionSummary: ''
-  };
   if (splitPresetName.value) {
-    const item = splitPresetItems.value.find(it => it.value === splitPresetName.value);
-    if (item) {
-      ret.logExample = item.meta?.logExample ?? '';
-      ret.logFieldsPattern = item.meta?.logFieldsPattern ?? '';
-      ret.logEventSplitPattern = item.meta?.logEventSplitPattern ?? '';
-    }
+    return "apply-split";
   }
   if (sqlParsePresetName.value) {
-    const item = sqlParsePresetItems.value.find(it => it.value === sqlParsePresetName.value);
-    if (item) {
-      ret.classificationSummary = item.meta?.classificationSummary ?? '';
-      ret.extractionSummary = item.meta?.extractionSummary ?? '';
-    }
+    return "apply-sql";
   }
-
-  return ret;
+  return nextAction.value;
+});
+const errorMessage = computed(
+  () =>
+    operationError.value ||
+    workflow.value.previewError ||
+    displayedResult.value?.error ||
+    (!canSplitLog.value
+      ? workflow.value.configuration.splitError
+      : workflow.value.configuration.parseError)
+);
+const diagnostics = computed(() =>
+  displayedResult.value?.status === "success"
+    ? displayedResult.value.diagnostics
+    : setup.value?.split?.result.diagnostics
+);
+const diagnosticMessage = computed(() =>
+  displayedResult.value?.status === "success" || diagnostics.value
+    ? formatLogParseDiagnostics(diagnostics.value)
+    : ""
+);
+const resultLocation = computed(() => {
+  const result = displayedResult.value;
+  if (result?.status !== "success" || result.sample) {
+    return "";
+  }
+  const table = result.stage === "split" ? "SPLIT-LOG-EVENT" : "SQL-EXECUTION";
+  return `"Log Parse Result" view → "${result.logName}" tab → table selector at the top right: "${table}".`;
+});
+const previewMessage = computed(() => {
+  switch (workflow.value.previewStatus) {
+    case "waiting":
+      return "Preview update pending · Previous results may be shown.";
+    case "running":
+      return "Updating preview… Previous results may be shown.";
+    case "failed":
+      return "Preview failed. Any table below shows the previous result.";
+    case "stale":
+      return "Previous result · Preview has not been updated for these settings.";
+    default:
+      return "";
+  }
+});
+const previewBusy = computed(() =>
+  ["waiting", "running"].includes(workflow.value.previewStatus ?? "")
+);
+const guidance = computed(() => {
+  if (processing.value) {
+    return "Working…";
+  }
+  if (errorMessage.value) {
+    return errorMessage.value;
+  }
+  if (previewBusy.value) {
+    return "Preview updates automatically when the settings change.";
+  }
+  if (!isConfigFileSelected.value) {
+    return "Select a config file, or create one for a new log format.";
+  }
+  if (resultLocation.value) {
+    return "Parsing complete. Review the SQL results in the Log Parse Result view.";
+  }
+  if (!canSplitLog.value) {
+    return "Choose a log split preset in b), or edit the config.";
+  }
+  if (!canParseLog.value) {
+    return "Review b). Complete the classify and extractor settings, or apply a SQL output preset.";
+  }
+  if (sqlSample.value?.result.sqlCount === 0) {
+    return "No SQL was found in this sample. Adjust the settings or select Parse all log to check the entire log.";
+  }
+  return "Preview updates automatically. Review b) and c), then select Parse all log.";
 });
 
-const initialize = async (v: InitializePayload) => {
-  initilizing.value = true;
-  editingLogFieldsPattern.value = false;
-  editingEventClassification.value = false;
-  sqlExtractionFlowEditable.value = false;
-  configFileItems.value.splice(0, configFileItems.value.length);
-  lineItems.value.splice(0, lineItems.value.length);
-  totalLogLines.value = v.totalLogLines;
-  configFile.value = '';
-  sqlParsePresetVisible.value = false;
-  errorMessage.value = v.errorMessage;
+const computedPresetInfo = computed(() => {
+  const split = splitPresetItems.value.find((item) => item.value === splitPresetName.value)?.meta;
+  const sql = sqlParsePresetItems.value.find(
+    (item) => item.value === sqlParsePresetName.value
+  )?.meta;
+  return {
+    logExample: split?.logExample ?? "",
+    logFieldsPattern: split?.logFieldsPattern ?? "",
+    logEventSplitPattern: split?.logEventSplitPattern ?? "",
+    classificationSummary: sql?.classificationSummary ?? "",
+    extractionSummary: sql?.extractionSummary ?? "",
+  };
+});
 
-  if (v.totalLogLines < 50) {
-    lineItems.value.push({ label: `${v.totalLogLines}`, value: `${v.totalLogLines}` });
-  } else {
-    for (const i of [50, 100, 200, 500, 1000]) {
-      if (i <= v.totalLogLines) {
-        lineItems.value.push({ label: `${i}`, value: `${i}` });
-      }
-    }
+const resetConfig = (payload: ResetConfigPayload) => {
+  if (payload.workflow.revision < workflow.value.revision) {
+    return;
   }
-  lineItems.value.push({ label: 'All', value: '-1' });
-
-  formatterSqlLanguageItems.value.splice(0, formatterSqlLanguageItems.value.length);
-
-  // preset
-  splitPresetItems.value.splice(0, splitPresetItems.value.length);
-  sqlParsePresetItems.value.splice(0, sqlParsePresetItems.value.length);
-
-  await nextTick();
-
-  linesToParse.value = v.linesToParse.toString();
-
-  formatterSqlLanguageItems.value.push({ label: '-- Select --', value: '' });
-  v.formatterSqlLanguageItems.forEach(it => {
-    formatterSqlLanguageItems.value.push(it);
-  });
-  formatterSqlLanguage.value = v.formatterSqlLanguage ?? '';
-
-  // preset
-  logSplitDetectionMessage.value = v.preset.logSplitDetectionMessage;
-  splitPresetItems.value.push({ label: '-- Select --', value: '' });
-  v.preset.logEventSplitPresets.forEach(it => {
-    splitPresetItems.value.push({
-      label: it.label, value: it.name, meta: {
-        logExample: it.logExample,
-        logFieldsPattern: it.logFieldsPattern,
-        logEventSplitPattern: it.logEventSplitPattern,
-      }
-    });
-  });
-  sqlParseDetectionMessage.value = v.preset.sqlParseDetectionMessage;
-  sqlParsePresetItems.value.push({ label: '-- Select --', value: '' });
-  v.preset.sqlParsePresets.forEach(it => {
-    sqlParsePresetItems.value.push({
-      label: it.label, value: it.name, meta: {
-        classificationSummary: it.classificationSummary,
-        extractionSummary: it.extractionSummary,
-      }
-    });
-  });
-
-  // config
-  configFileItems.value.push({ label: '-- Select --', value: '' });
-  v.logParserConfigItems.forEach(it => configFileItems.value.push(it));
-  configFile.value = v.logParserConfigFile;
-
-  currentLogEventSplitPattern.value = v.configSummary.logEventSplitPattern;
-  currentLogFieldsPattern.value = v.configSummary.logEventFieldsPattern;
-  currentEventClassification.value = v.configSummary.classificationSummary;
-  currentSqlExtractionFlow.value = v.configSummary.extractionSummary;
-  initilizing.value = false;
+  operationError.value = "";
+  if (lastConfigFile !== payload.logParserConfigFile) {
+    splitPresetName.value = "";
+    sqlParsePresetName.value = "";
+  }
+  workflow.value = payload.workflow;
+  sampleLinesToParse.value = String(
+    payload.workflow.setup?.sampleLinesToParse ?? sampleLinesToParse.value
+  );
+  configSummary.value = payload.configSummary;
+  configFile.value = payload.logParserConfigFile;
+  lastConfigFile = payload.logParserConfigFile;
+  logSplitDetectionMessage.value = payload.preset.logSplitDetectionMessage;
+  sqlParseDetectionMessage.value = payload.preset.sqlParseDetectionMessage;
+  splitPresetItems.value = [
+    { label: "-- Select --", value: "" },
+    ...payload.preset.logEventSplitPresets.map((item) => ({
+      label: item.label,
+      value: item.name,
+      meta: item,
+    })),
+  ];
+  sqlParsePresetItems.value = [
+    { label: "-- Select --", value: "" },
+    ...payload.preset.sqlParsePresets.map((item) => ({
+      label: item.label,
+      value: item.name,
+      meta: item,
+    })),
+  ];
 };
 
-/* handlers */
-
-const resetConfig = async (v: ResetConfigPayload) => {
-  currentLogEventSplitPattern.value = v.configSummary.logEventSplitPattern;
-  currentLogFieldsPattern.value = v.configSummary.logEventFieldsPattern;
-  currentEventClassification.value = v.configSummary.classificationSummary;
-  currentSqlExtractionFlow.value = v.configSummary.extractionSummary;
-  canSplitLog.value = v.canSplitLog;
-  errorMessage.value = v.errorMessage;
-  // preset
-  splitPresetItems.value.splice(0, splitPresetItems.value.length);
-  sqlParsePresetItems.value.splice(0, sqlParsePresetItems.value.length);
-  await nextTick();
-
-  // preset
-  logSplitDetectionMessage.value = v.preset.logSplitDetectionMessage;
-  splitPresetItems.value.push({ label: '-- Select --', value: '' });
-  v.preset.logEventSplitPresets.forEach(it => {
-    splitPresetItems.value.push({
-      label: it.label, value: it.name, meta: {
-        logExample: it.logExample,
-        logFieldsPattern: it.logFieldsPattern,
-        logEventSplitPattern: it.logEventSplitPattern
-      }
-    });
-  });
-  sqlParseDetectionMessage.value = v.preset.sqlParseDetectionMessage;
-  sqlParsePresetItems.value.push({ label: '-- Select --', value: '' });
-  v.preset.sqlParsePresets.forEach(it => {
-    sqlParsePresetItems.value.push({
-      label: it.label, value: it.name, meta: {
-        classificationSummary: it.classificationSummary,
-        extractionSummary: it.extractionSummary,
-      }
-    });
-  });
+const initialize = (payload: InitializePayload) => {
+  totalLogLines.value = payload.totalLogLines;
+  const limits =
+    payload.totalLogLines < 50
+      ? [payload.totalLogLines]
+      : [50, 100, 200, 500, 1000].filter((n) => n <= payload.totalLogLines);
+  lineItems.value = [
+    ...limits.filter((n) => n > 0).map((n) => ({ label: `First ${n} lines`, value: String(n) })),
+    { label: "All", value: "-1" },
+  ];
+  sampleLinesToParse.value = String(payload.linesToParse);
+  formatterSqlLanguageItems.value = [
+    { label: "-- Select --", value: "" },
+    ...payload.formatterSqlLanguageItems,
+  ];
+  formatterSqlLanguage.value = payload.formatterSqlLanguage ?? "";
+  configFileItems.value = [{ label: "-- Select --", value: "" }, ...payload.logParserConfigItems];
+  pendingOperationId.value = undefined;
+  operationError.value = "";
+  splitPresetName.value = "";
+  sqlParsePresetName.value = "";
+  resetConfig(payload);
+  initializing.value = false;
 };
 
-const resetConfigFileAndItems = async (v: ResetConfigFileAndItemsPayload) => {
-  initilizing.value = true;
-  configFileItems.value.splice(0, configFileItems.value.length);
-  configFile.value = '';
-
-  await nextTick();
-
-  // config
-  configFileItems.value.push({ label: '-- Select --', value: '' });
-  v.logParserConfigItems.forEach(it => configFileItems.value.push(it));
-  configFile.value = v.logParserConfigFile;
-  initilizing.value = false;
+const resetConfigFileAndItems = (payload: ResetConfigFileAndItemsPayload) => {
+  configFileItems.value = [{ label: "-- Select --", value: "" }, ...payload.logParserConfigItems];
+  configFile.value = payload.logParserConfigFile;
 };
 
-const setConfigEditorVisibility = async (v: boolean) => {
-  configEditorVisible.value = v;
-};
-
-const setSqlParsePresetVisibility = async (v: boolean) => {
-  sqlParsePresetVisible.value = v;
-};
-
-const cancel = () => {
+const postOk = (options: Omit<SaveLogOptionParams, "operationId" | "logParserConfigFile">) => {
+  if (processing.value) {
+    return;
+  }
+  operationError.value = "";
+  pendingOperationId.value = ++nextOperationId;
+  pendingAction.value = options.action;
   vscode.postCommand({
-    command: "cancel",
-    params: {},
+    command: "ok",
+    params: {
+      ...options,
+      operationId: pendingOperationId.value,
+      logParserConfigFile: configFile.value,
+    },
   });
 };
+const cancel = () => vscode.postCommand({ command: "cancel", params: {} });
+const resetSampleLines = () =>
+  postOk({ action: "reset-sample-lines", linesToParse: Number(sampleLinesToParse.value) });
+const resetSqlLanguage = () =>
+  postOk({
+    action: "reset-formatter-sql-language",
+    sqlLanguage: formatterSqlLanguage.value || undefined,
+  });
+const applyLogEventSplitPreset = () =>
+  postOk({ action: "apply-log-event-split-preset", presetName: splitPresetName.value });
+const applySqlParsePreset = () =>
+  postOk({ action: "apply-parser-sql-preset", presetName: sqlParsePresetName.value });
+const openAsJSON = () => postOk({ action: "open-as-json" });
 
-const resetLines = () => {
-  postOk({ action: 'reset-lines', linesToParse: Number(linesToParse.value) });
-  splitPresetName.value = '';
-};
-
-const resetSqlLanguage = () => {
-  const sqlLanguage = formatterSqlLanguage.value === '' ? undefined : formatterSqlLanguage.value;
-  postOk({ action: 'reset-formatter-sql-language', sqlLanguage });
-  splitPresetName.value = '';
-};
-
-const applyLogEventSplitPreset = () => {
-  postOk({ action: 'apply-log-event-split-preset', presetName: splitPresetName.value });
-  splitPresetName.value = '';
-};
-
-const applySqlParsePreset = () => {
-  postOk({ action: 'apply-parser-sql-preset', presetName: sqlParsePresetName.value });
-  sqlParsePresetName.value = '';
-};
-
-const openAsJSON = () => {
-  postOk({ action: 'open-as-json', presetName: splitPresetName.value });
-  splitPresetName.value = '';
-};
-
-const postOk = async ({ action, presetName, linesToParse, sqlLanguage }: {
-  action: SaveLogOptionParams['action'],
-  presetName?: string;
-  linesToParse?: number;
-  sqlLanguage?: InitializePayload["formatterSqlLanguage"];
-}) => {
-  processing.value = true;
-  const params: SaveLogOptionParams = {
-    action,
-    presetName,
-    linesToParse,
-    sqlLanguage,
-    logParserConfigFile: configFile.value
-  }
-
-  vscode.postCommand({ command: "ok", params });
-
-};
-
-
-const recieveMessage = (data: LogParseSettingPanelEventData) => {
-  processing.value = false;
-  const { command, value } = data;
+const recieveMessage = ({ command, value }: LogParseSettingPanelEventData) => {
   switch (command) {
     case "initialize":
-      if (value.initialize === undefined) {
-        return;
+      if (value.initialize) {
+        initialize(value.initialize);
       }
-      initialize(value.initialize);
       break;
     case "reset-config":
-      if (value['reset-config'] === undefined) {
-        return;
+      if (value["reset-config"]) {
+        resetConfig(value["reset-config"]);
       }
-      resetConfig(value['reset-config']);
       break;
     case "reset-config-file-and-items":
-      if (value['reset-config-file-and-items'] === undefined) {
+      if (value["reset-config-file-and-items"]) {
+        resetConfigFileAndItems(value["reset-config-file-and-items"]);
+      }
+      break;
+    case "operation-completed": {
+      const result = value["operation-completed"];
+      if (!result || result.operationId !== pendingOperationId.value) {
         return;
       }
-      resetConfigFileAndItems(value['reset-config-file-and-items']);
-      break;
-    case "set-config-editor-visibility":
-      if (value['set-config-editor-visibility'] === undefined) {
-        return;
+      operationError.value = result.error ?? "";
+      if (!result.error) {
+        if (pendingAction.value === "apply-log-event-split-preset") {
+          splitPresetName.value = "";
+        }
+        if (pendingAction.value === "apply-parser-sql-preset") {
+          sqlParsePresetName.value = "";
+        }
       }
-      setConfigEditorVisibility(value['set-config-editor-visibility']);
+      pendingOperationId.value = undefined;
+      pendingAction.value = undefined;
       break;
-    case "set-sql-parse-preset-visibility":
-      if (value['set-sql-parse-preset-visibility'] === undefined) {
-        return;
-      }
-      setSqlParsePresetVisibility(value['set-sql-parse-preset-visibility']);
-      break;
+    }
   }
 };
-
-defineExpose({
-  recieveMessage,
-});
+defineExpose({ recieveMessage });
 </script>
 
 <template>
-  <section class="log-conditional-root">
-    <PanelActionToolbar @cancel="cancel">
-      <template #left>
-        <span v-if="errorMessage" class="disabled-reason">⚠️ {{ errorMessage }}</span>
-      </template>
-      <VsCodeButton @click="postOk({ 'action': 'create-new-config' })" title="Create new config"
-        :appearance="isConfigFileSelected ? 'secondary' : ''">
-        <fa icon="plus" />{{ configEditorVisible ? 'Create config' : 'Create new config' }}
-      </VsCodeButton>
-      <VsCodeButton @click="openAsJSON" title="Create new config" :disabled="configEditorVisible || configFile === ''"
-        :appearance="isConfigFileSelected ? '' : 'secondary'">
-        <fa icon="pencil" />Edit config
-      </VsCodeButton>
-      <VsCodeButton @click="postOk({ 'action': 'test-split' })" title="Test split log" appearance="secondary"
-        :disabled="!canSplitLog">
-        <fa icon="check" />Test split log
-      </VsCodeButton>
-      <VsCodeButton @click="postOk({ 'action': 'parse' })" title="Parse log" :disabled="!!errorMessage">
-        <fa icon="check" />Parse log
-      </VsCodeButton>
-    </PanelActionToolbar>
-    <div class="scroll-wrapper" :style="{ height: `${sectionHeight}px` }">
-      <div class="editor">
-        <fieldset class="conditions">
-          <legend>
-            <span style="margin-right: 30px">Log parser conditions</span>
-          </legend>
+  <section class="log-conditional-root" :aria-busy="processing">
+    <div class="panel-header">
+      <span class="panel-title">Log parse settings</span>
+      <div class="panel-actions">
+        <VsCodeButton
+          v-if="!isConfigFileSelected"
+          appearance="primary"
+          :disabled="processing"
+          @click="postOk({ action: 'create-new-config' })"
+          ><fa icon="plus" />Create new config</VsCodeButton
+        >
+        <VsCodeButton
+          v-if="isConfigFileSelected"
+          class="panel-edit"
+          title="Open the config JSON beside this panel to fine-tune rules or combine settings from other configs."
+          :appearance="primaryAction === 'edit-config' ? 'primary' : 'secondary'"
+          :disabled="processing"
+          @click="openAsJSON"
+          ><fa icon="pencil" />Edit JSON</VsCodeButton
+        >
 
-          <div v-if="!initilizing" class="area">
-            <section class="condition-grid">
-              <div class="flex-line">
-                <label for="splitPreset" class="condition-label">Lines to parse:&nbsp;</label>
-                <div>
-                  <VsCodeDropdown id="splitPreset" v-model="linesToParse" :items="lineItems" @change="resetLines" />
-                  <p class="total-log-lines hint" style="margin-left: 2px;">(Total log lines: {{ totalLogLines }} )</p>
-                </div>
-              </div>
-              <div class="flex-line">
-                <label for="configFile" class="condition-label">Config file:&nbsp;</label>
-                <VsCodeDropdown id="configFile" v-model="configFile" :items="configFileItems" style=" width: 300px;"
-                  @change="postOk({ 'action': 'set-config-file' })" />
-              </div>
-              <div class="flex-line">
-                <label for="formatterSqlLanguage" class="condition-label">Formatter SQL language:&nbsp;</label>
-                <div>
-                  <VsCodeDropdown id="formatterSqlLanguage" v-model="formatterSqlLanguage"
-                    :items="formatterSqlLanguageItems" @change="resetSqlLanguage" />
-                  <p class="log-detection-message hint" style="margin-left: 2px;">( optional )</p>
-                </div>
-              </div>
-              <div class="flex-line">&nbsp;</div>
-
-              <template v-if="isConfigFileSelected">
-                <div>
-                  <div class="flex-line">
-                    <label for="splitPreset" class="condition-label">Log split preset:&nbsp;</label>
-                    <VsCodeDropdown id="splitPreset" v-model="splitPresetName" :items="splitPresetItems"
-                      style="width: 200px;" />
-                    <VsCodeButton @click="applyLogEventSplitPreset" :disabled="splitPresetName === ''"
-                      title="Apply selected preset" appearance="secondary">
-                      <fa icon="check" />Apply
-                    </VsCodeButton>
-                  </div>
-                  <p v-if="logSplitDetectionMessage" class="log-detection-message hint">( {{
-                    logSplitDetectionMessage }} )</p>
-                </div>
-                <div>
-                  <div class="flex-line">
-                    <label for="sqlParsePreset" class="condition-label">Classify & Extract preset:&nbsp;</label>
-                    <template v-if="sqlParsePresetVisible">
-                      <VsCodeDropdown id="sqlParsePreset" v-model="sqlParsePresetName" :items="sqlParsePresetItems"
-                        style="width: 200px;" />
-                      <VsCodeButton @click="applySqlParsePreset" :disabled="sqlParsePresetName === ''"
-                        title="Apply selected preset" appearance="secondary">
-                        <fa icon="check" />Apply
-                      </VsCodeButton>
-                    </template>
-                    <p v-else style="margin:0"><span class="disabled-reason">⚠️ Log must be split before using this
-                        feature.</span></p>
-                  </div>
-                  <p v-if="sqlParsePresetVisible && sqlParseDetectionMessage" class="log-detection-message hint">( {{
-                    sqlParseDetectionMessage }} )</p>
-                </div>
-              </template>
-            </section>
-            <template v-if="isConfigFileSelected">
-
-              <fieldset v-if="splitPresetName" class="preset-details">
-                <legend class="legend-bar">
-                  <span>Log split preset details <VsCodeButton @click="splitPresetName = ''" appearance="secondary"
-                      style="margin-left:10px;">
-                      Close</VsCodeButton></span>
-                </legend>
-                <fieldset v-if="computedPresetInfo.logExample" class="example-logs">
-                  <legend>
-                    <span>Target log examples</span>
-                  </legend>
-                  <div class="log-examples" v-text="computedPresetInfo.logExample"></div>
-                </fieldset>
-                <fieldset v-if="computedPresetInfo.logEventSplitPattern" class="log-fields-pattern">
-                  <legend>
-                    <span>Log event split pattern</span>
-                  </legend>
-                  <div class="log-fields-pattern" v-text="computedPresetInfo.logEventSplitPattern"></div>
-                </fieldset>
-                <fieldset v-if="computedPresetInfo.logFieldsPattern" class="log-fields-pattern">
-                  <legend>
-                    <span>Log event fields pattern</span>
-                  </legend>
-                  <div class="log-fields-pattern" v-text="computedPresetInfo.logFieldsPattern"></div>
-                </fieldset>
-              </fieldset>
-              <fieldset v-if="sqlParsePresetName" class="preset-details">
-                <legend class="legend-bar">
-                  <span>SQL parse preset details <VsCodeButton @click="sqlParsePresetName = ''" appearance="secondary"
-                      style="margin-left:10px;">
-                      Close</VsCodeButton></span>
-                </legend>
-
-                <fieldset v-if="computedPresetInfo.classificationSummary" class="log-fields-pattern summary">
-                  <legend>
-                    <span>Event classification</span>
-                  </legend>
-                  <div class="log-fields-pattern" v-text="computedPresetInfo.classificationSummary"></div>
-                </fieldset>
-                <fieldset v-if="computedPresetInfo.extractionSummary" class="log-fields-pattern summary">
-                  <legend>
-                    <span>SQL extraction flow</span>
-                  </legend>
-                  <div class="log-fields-pattern" v-text="computedPresetInfo.extractionSummary"></div>
-                </fieldset>
-              </fieldset>
-
-              <fieldset v-if="isSummaryVisible" class="summary">
-                <legend><span>Summary</span></legend>
-
-                <label for="currentLogFieldPattern" class="condition-label">Log event split pattern</label>
-                <div id="currentLogFieldPattern" class="log-fields-pattern" v-text="currentLogEventSplitPattern"></div>
-
-                <label for="currentLogFieldPattern" class="condition-label">Log event fields pattern</label>
-                <div id="currentLogFieldPattern" class="log-fields-pattern" v-text="currentLogFieldsPattern"></div>
-
-                <template v-if="currentEventClassification">
-                  <label for="currentEventClassification" class="condition-label">Event classification</label>
-                  <div id="currentEventClassification" class="event-classification" v-text="currentEventClassification">
-                  </div>
-                </template>
-
-                <template v-if="currentSqlExtractionFlow">
-                  <label for="currentSqlExtractionFlow" class="condition-label">SQL extraction flow</label>
-                  <div id="currentSqlExtractionFlow" class="sql-extraction-flow" v-text="currentSqlExtractionFlow">
-                  </div>
-                </template>
-              </fieldset>
-            </template>
-          </div>
-        </fieldset>
+        <VsCodeButton
+          v-if="workflow.configDirty"
+          appearance="secondary"
+          :disabled="processing"
+          @click="postOk({ action: 'save-config' })"
+          >Save config</VsCodeButton
+        >
+        <VsCodeButton
+          v-if="canParseLog"
+          appearance="primary"
+          :disabled="processing"
+          @click="
+            postOk({
+              action: 'parse',
+              linesToParse: -1,
+            })
+          "
+          >Parse all log</VsCodeButton
+        >
+        <VsCodeButton class="panel-close" appearance="icon" title="Close" @click="cancel">
+          <fa icon="times" />
+        </VsCodeButton>
       </div>
+    </div>
+    <div
+      class="workflow-guidance"
+      :class="{ 'has-error': errorMessage }"
+      role="status"
+      aria-live="polite"
+    >
+      <p>{{ guidance }}</p>
+      <p v-if="resultLocation && !errorMessage && !processing">
+        {{ resultLocation }}
+      </p>
+      <details v-if="diagnosticMessage && !errorMessage && !processing" class="diagnostic">
+        <summary>
+          {{
+            diagnostics?.unmatchedEventCount
+              ? `${diagnostics.unmatchedEventCount} log events did not match the field pattern.`
+              : "Field extraction diagnostics are unavailable."
+          }}
+        </summary>
+        <p>{{ diagnosticMessage }}</p>
+      </details>
+    </div>
+    <div v-if="!initializing" class="scroll-wrapper">
+      <section class="config-file-section">
+        <div
+          class="config-selector"
+          :class="{ 'next-action-field': primaryAction === 'select-config' }"
+        >
+          <label for="logConfigFile">Config file</label>
+          <span v-if="primaryAction === 'select-config'" class="next-label"
+            >Next: Select a config file</span
+          >
+          <VsCodeDropdown
+            id="logConfigFile"
+            aria-label="Config file"
+            :disabled="processing"
+            v-model="configFile"
+            :items="configFileItems"
+            @change="postOk({ action: 'set-config-file' })"
+          />
+          <span v-if="configFile" class="config-path"
+            >{{ configFile }} · {{ workflow.configDirty ? "Unsaved changes" : "Saved" }}</span
+          >
+          <div v-if="isConfigFileSelected" class="config-actions">
+            <VsCodeButton
+              appearance="secondary"
+              :disabled="processing"
+              @click="postOk({ action: 'copy-config' })"
+              >Copy config and adjust</VsCodeButton
+            >
+            <span class="hint">
+              For custom rules, use <strong>Edit JSON</strong> to open the config beside this panel.
+              To keep the original, choose <strong>Copy config and adjust</strong> first.
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <template v-if="!initializing">
+        <details open class="log-section">
+          <summary>a) RAW LOG</summary>
+          <div class="raw-sample-controls">
+            <span>Total: {{ totalLogLines.toLocaleString() }} lines</span>
+            <label for="logSampleLines">· Test sample:</label>
+            <VsCodeDropdown
+              id="logSampleLines"
+              aria-label="Sample lines"
+              :disabled="processing"
+              v-model="sampleLinesToParse"
+              :items="lineItems"
+              @change="resetSampleLines"
+            />
+          </div>
+          <LogParsePreview
+            v-if="workflow.rawPreview"
+            :rdh="workflow.rawPreview"
+            :total="totalLogLines"
+            :show-count="false"
+          />
+        </details>
+        <details v-if="isConfigFileSelected" open class="log-section">
+          <summary>b) SPLIT &amp; CLASSIFIED LOG</summary>
+          <div
+            class="preset-grid settings-block"
+            role="group"
+            aria-label="Split & classification settings"
+          >
+            <div
+              class="preset-field"
+              :class="{ 'next-action-field': primaryAction === 'select-split' }"
+            >
+              <div class="preset-heading">
+                <label for="logSplitPreset">Log split preset</label>
+                <span v-if="logSplitDetectionMessage" class="hint">{{
+                  logSplitDetectionMessage
+                }}</span>
+              </div>
+              <div class="preset-controls">
+                <VsCodeDropdown
+                  id="logSplitPreset"
+                  aria-label="Log split preset"
+                  :disabled="processing"
+                  v-model="splitPresetName"
+                  :items="splitPresetItems"
+                />
+                <VsCodeButton
+                  :disabled="processing || !splitPresetName"
+                  :appearance="primaryAction === 'apply-split' ? 'primary' : 'secondary'"
+                  @click="applyLogEventSplitPreset"
+                  >Apply</VsCodeButton
+                >
+              </div>
+              <p v-if="workflow.appliedSplitPreset" class="hint">
+                Applied: {{ workflow.appliedSplitPreset }}
+              </p>
+              <details v-if="splitPresetName" class="preset-details">
+                <summary>Selected preset details</summary>
+                <div class="detail-content">
+                  <strong>Example log</strong>
+                  <pre>{{ computedPresetInfo.logExample }}</pre>
+                  <strong>Log event split pattern</strong>
+                  <pre>{{ computedPresetInfo.logEventSplitPattern }}</pre>
+                  <strong>Log event fields pattern</strong>
+                  <pre>{{ computedPresetInfo.logFieldsPattern }}</pre>
+                </div>
+              </details>
+              <div class="settings-summary">
+                <strong>Log event split pattern</strong>
+                <pre>{{ currentLogEventSplitPattern || "Not configured" }}</pre>
+                <strong>Log event fields pattern</strong>
+                <pre>{{ currentLogFieldsPattern || "Not configured" }}</pre>
+              </div>
+            </div>
+            <div
+              class="preset-field"
+              :class="{ 'next-action-field': primaryAction === 'select-sql' }"
+            >
+              <div class="preset-heading">
+                <label for="logSqlPreset">SQL output preset (classify &amp; extract)</label>
+                <span v-if="sqlParseDetectionMessage" class="hint">{{
+                  sqlParseDetectionMessage
+                }}</span>
+              </div>
+              <div class="preset-controls">
+                <VsCodeDropdown
+                  id="logSqlPreset"
+                  aria-label="SQL output preset"
+                  :disabled="processing"
+                  v-model="sqlParsePresetName"
+                  :items="sqlParsePresetItems"
+                />
+                <VsCodeButton
+                  :disabled="processing || !canSplitLog || !sqlParsePresetName"
+                  :appearance="primaryAction === 'apply-sql' ? 'primary' : 'secondary'"
+                  @click="applySqlParsePreset"
+                  >Apply</VsCodeButton
+                >
+              </div>
+              <p v-if="workflow.appliedSqlPreset" class="hint">
+                Applied: {{ workflow.appliedSqlPreset }}
+              </p>
+              <details v-if="sqlParsePresetName" class="preset-details">
+                <summary>Selected preset details</summary>
+                <div class="detail-content">
+                  <strong>Event classification</strong>
+                  <pre>{{ computedPresetInfo.classificationSummary }}</pre>
+                  <strong>SQL extraction flow</strong>
+                  <pre>{{ computedPresetInfo.extractionSummary }}</pre>
+                </div>
+              </details>
+              <div class="settings-summary">
+                <strong>Event classification</strong>
+                <pre>{{ currentEventClassification || "Not configured" }}</pre>
+              </div>
+            </div>
+          </div>
+          <p v-if="previewMessage" class="hint" role="status" :aria-busy="previewBusy">
+            <span v-if="previewBusy" class="preview-spinner" aria-hidden="true" />{{
+              previewMessage
+            }}
+          </p>
+          <LogParsePreview
+            v-if="logPreview && logSample"
+            :rdh="logPreview"
+            :total="logSample.result.eventCount"
+            :label="logSample.classifiedPreview ? 'Classified log' : 'Split log'"
+          />
+          <p v-else class="hint">
+            {{
+              canSplitLog
+                ? "Log preview will appear automatically."
+                : "Configure split rules to preview log events automatically."
+            }}
+          </p>
+        </details>
+        <details v-if="canParseLog" open class="log-section">
+          <summary>c) EXTRACT &amp; FORMAT SQL</summary>
+          <div class="options-grid settings-block">
+            <div class="preset-field">
+              <div class="field">
+                <label for="logSqlLanguage">SQL formatter language (optional)</label>
+                <VsCodeDropdown
+                  id="logSqlLanguage"
+                  aria-label="SQL formatter language"
+                  :disabled="processing"
+                  v-model="formatterSqlLanguage"
+                  :items="formatterSqlLanguageItems"
+                  @change="resetSqlLanguage"
+                />
+              </div>
+            </div>
+            <div class="preset-field">
+              <strong>SQL extraction settings</strong>
+              <pre>{{ currentSqlExtractionFlow || "Not configured" }}</pre>
+            </div>
+          </div>
+          <p v-if="previewMessage" class="hint" role="status" :aria-busy="previewBusy">
+            <span v-if="previewBusy" class="preview-spinner" aria-hidden="true" />{{
+              previewMessage
+            }}
+          </p>
+          <LogParsePreview
+            v-if="sqlSample?.preview"
+            :rdh="sqlSample.preview"
+            :total="sqlSample.result.sqlCount"
+          />
+          <p v-else class="hint">SQL preview will appear automatically.</p>
+        </details>
+      </template>
     </div>
   </section>
 </template>
 
 <style lang="scss" scoped>
-/* ===============================
-   Root Layout
-================================ */
-
+.log-section {
+  margin: 10px 0;
+  padding: 8px;
+  border: 1px solid var(--vscode-panel-border);
+  min-width: 0;
+}
+.log-section > summary {
+  font-weight: 600;
+  margin: -8px;
+  padding: 8px;
+  background-color: var(
+    --vscode-sideBarSectionHeader-background,
+    var(--vscode-toolbar-hoverBackground)
+  );
+  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-panel-border));
+}
+.log-section[open] > summary {
+  margin-bottom: 8px;
+}
+.preview-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border: 2px solid var(--vscode-panel-border);
+  border-top-color: var(--vscode-progressBar-background);
+  border-radius: 50%;
+  animation: preview-spin 1s linear infinite;
+}
+@keyframes preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-spinner {
+    animation: none;
+  }
+}
+.raw-sample-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.raw-sample-controls :deep(vscode-dropdown) {
+  width: 180px;
+  max-width: 100%;
+}
 .log-conditional-root {
   width: 100%;
   height: 100%;
-
+  min-height: 0;
   display: flex;
   flex-direction: column;
-
-  >div {
-    margin: 5px;
+  gap: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  max-width: 100%;
+}
+.panel-edit {
+  flex-shrink: 0;
+}
+.panel-close {
+  flex-shrink: 0;
+}
+.config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.panel-title {
+  font-weight: 600;
+  align-self: center;
+}
+.workflow-guidance {
+  padding: 4px 10px;
+  border-left: 3px solid var(--vscode-focusBorder);
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
+  p {
+    margin: 3px 0;
+  }
+  &.has-error {
+    border-color: var(--vscode-errorForeground);
+  }
+  .diagnostic {
+    color: var(--vscode-editorWarning-foreground);
   }
 }
-
-fieldset {
-  margin-top: 8px;
+:deep(.toolbar) {
+  flex-wrap: wrap;
+  height: auto;
+  gap: 6px;
+  flex-shrink: 0;
 }
-
-/* ===============================
-   Toolbar
-================================ */
-
-.toolbar {
-  margin-bottom: 0 !important;
-
-  .tool-left {
-
-    label {
-      margin-left: 25px;
-      margin-right: 5px;
-    }
-
-    span {
-      max-width: 280px;
-
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
+:deep(.tool-right) {
+  flex-wrap: wrap;
+  gap: 6px;
 }
-
-/* ===============================
-   Scroll Area
-================================ */
-
+:deep(vscode-button[appearance="primary"]:hover) {
+  background-color: var(--vscode-button-hoverBackground);
+}
 .scroll-wrapper {
+  min-height: 0;
   overflow: auto;
+  flex: 1;
 }
-
-.condition-grid {
+.config-selector,
+.preset-field {
+  border: 2px solid transparent;
+  padding: 8px;
+  min-width: 0;
+}
+.config-selector {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.next-action-field {
+  border-color: var(--vscode-focusBorder);
+  border-radius: 3px;
+}
+.next-label {
+  color: var(--vscode-textLink-foreground);
+}
+.config-file-section {
+  overflow-wrap: anywhere;
+}
+.config-path {
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.preset-grid,
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 8px;
+}
+.settings-block {
+  border: 1px solid var(--vscode-panel-border);
+  margin: 8px 0;
+  align-items: start;
+}
+.preset-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 4px 12px;
-
-  div.flex-line {
-    display: flex;
-    column-gap: 3px;
-  }
 }
-
-/* ===============================
-   Conditions Panel
-================================ */
-
-.conditions {
-
-  margin-top: 0;
-
-  legend span {
-    margin-left: 8px;
-    margin-right: 30px;
-  }
-
-  label,
-  span {
-    display: inline-block;
-    margin-top: 5px;
-  }
-
-  label.condition-label {
-    min-width: 156px;
-  }
+.preset-heading .hint {
+  margin: 0 0 0 auto;
+  text-align: right;
 }
-
-/* ===============================
-   Preset Details
-================================ */
-
-.preset-details {
-
-  margin-bottom: 15px;
-
-  .log-fields-pattern,
-  .event-classification,
-  .sql-extraction-flow {
-    opacity: 0.7;
-  }
+.settings-summary {
+  margin-top: 12px;
 }
-
-
-
-/* ===============================
-   Log Examples
-================================ */
-
-.log-examples {
-  max-height: 85px;
-
-  overflow: auto;
-  white-space: pre;
+.settings-block pre:last-child {
+  margin-bottom: 0;
 }
-
-/* ===============================
-   Pattern Display
-================================ */
-
-fieldset.summary {
-  div {
-    white-space: pre-wrap;
-    margin-left: 1em;
-    opacity: 0.7;
-    max-height: 4.5em;
-    overflow-y: auto;
-  }
+.preset-controls {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
 }
-
-/* ===============================
-   Utility
-================================ */
-
+.preset-controls :deep(vscode-dropdown) {
+  flex: 1;
+  min-width: 0;
+}
+.field {
+  display: grid;
+  gap: 6px;
+}
+.config-selector :deep(vscode-dropdown),
+.field :deep(vscode-dropdown) {
+  width: 100%;
+  min-width: 0;
+}
 .hint {
-  opacity: 0.7;
-  margin: 1px 0 6px 158px;
-  font-size: x-small;
+  opacity: 0.8;
+  margin: 6px 0;
 }
-
-/* ===============================
-   Preview
-================================ */
-
-.preview {
-  margin-top: 15px;
+.parse-options,
+.config-summary {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--vscode-panel-border);
+}
+.config-summary p {
+  margin: 3px 0 6px;
+}
+summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+summary:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+.detail-content {
+  max-height: min(220px, 35vh);
+  overflow: auto;
+  padding: 8px;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  user-select: text;
+  margin: 6px 0 14px;
 }
 </style>
