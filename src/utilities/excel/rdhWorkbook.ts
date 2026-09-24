@@ -6,11 +6,11 @@ import {
   BookCreateOption,
   createCommonHeader,
   createQueryResultSheet,
-  FONT_NAME_COMIC_SANS_MS,
   TocRecords,
   writeTocRecords,
 } from "./common";
 import { createRecordRulesSheet } from "./recordRuleSheet";
+import { applyExcelTheme } from "./excelTheme";
 
 function stripSheetName(s: string): string {
   return s.replace(/['*\/:\?\[\\\]’＇*／：？［＼］￥]+/g, "");
@@ -108,6 +108,7 @@ export async function createBookFromRdh(rdh: ResultSetData, targetExcelPath: str
     pageSetup: { paperSize: 9, orientation: "portrait" },
   });
   createQueryResultSheet(workbook, sheet, rdh, 1, getResultsetConfig());
+  applyExcelTheme(workbook, getOutputConfig().excel.theme);
 
   return new Promise<string>((resolve, reject) => {
     try {
@@ -156,15 +157,15 @@ export async function createBookFromList(
       tocSheet.getColumn("B").width = 2;
       tocSheet.getColumn("C").width = 4;
       tocSheet.getColumn("D").width = 20;
-      tocSheet.getColumn("E").width = 16;
+      tocSheet.getColumn("E").width = 26;
     }
 
-    let tocRowNo = 3;
+    let tocRowNo = 4;
     let cell: Excel.Cell;
     if (outputCondig.excel.displayToc) {
       cell = tocSheet!.getCell(`C${tocRowNo}`);
       cell.value = "Table of contents.";
-      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 24 };
+      cell.font = { size: 24 };
     }
 
     tocRowNo += 4;
@@ -205,6 +206,8 @@ export async function createBookFromList(
     console.error(e);
   }
 
+  applyExcelTheme(workbook, outputCondig.excel.theme);
+
   return new Promise<string>((resolve, reject) => {
     try {
       workbook.xlsx.writeFile(targetExcelPath).then(function () {
@@ -219,4 +222,3 @@ export async function createBookFromList(
     }
   });
 }
-

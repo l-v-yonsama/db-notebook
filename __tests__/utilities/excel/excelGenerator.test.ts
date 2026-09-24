@@ -10,7 +10,8 @@ import * as Excel from "exceljs";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { workspace } from "vscode";
 import {
   BookCreateOption,
   createBookFromDiffList,
@@ -201,10 +202,178 @@ describe("createQueryResultSheetの戻り値(plusNo)の伝播 (via createBookFro
 
     const workbook = await readWorkbook(targetPath);
     const sheet = workbook.getWorksheet("RESULT_SETS")!;
+    const toc = workbook.getWorksheet("TOC")!;
 
     // rdh1: baseRowNo=3, title(1) + header(2) + rows(2) = plusNo 5 -> next base = 3 + 5 + 2 = 10
     expect(sheet.getCell(3, 2).value).toBe("■ first");
     expect(sheet.getCell(10, 2).value).toBe("■ second");
+    expect(toc.getCell("C3").value).toBeNull();
+    expect(toc.getCell("C4").value).toBe("Table of contents.");
+    expect(toc.getCell("C4").font.name).toBeUndefined();
+    for (const row of [1, 2]) {
+      expect(toc.getCell(row, 10).fill?.fgColor?.argb).toBe("FFF3F3F3");
+      expect(toc.getCell(row, 11).fill?.fgColor?.argb).toBeUndefined();
+      expect(toc.getCell(row, 10).isMerged).toBe(true);
+    }
+    for (const col of ["F", "G", "J"]) {
+      expect(toc.getColumn(col).width).toBe(11);
+    }
+    expect(toc.getColumn("E").width).toBe(26);
+    expect(sheet.getCell("B4").fill).toMatchObject({ fgColor: { argb: "FF444444" } });
+  });
+});
+
+describe("Excel theme setting", () => {
+  it("通常の結果表でもSQL行を表見出しと同じ幅で塗る", async () => {
+    const getConfiguration = vi.mocked(workspace.getConfiguration);
+    const original = getConfiguration.getMockImplementation()!;
+    getConfiguration.mockImplementation((section?: string) => ({
+      get: (key: string, defaultValue?: unknown) =>
+        section === "output" && key === "Excel: Theme" ? "roastery" : defaultValue,
+    }) as never);
+
+    try {
+      const rdh = makeRdh({
+        tableName: "users",
+        keys: [{ name: "id", type: GeneralColumnType.INTEGER }],
+        rows: [{ id: 1 }],
+        sqlStatement: "SELECT id\nFROM users",
+      });
+      const targetPath = tmpXlsxPath();
+      expect(await createBookFromRdh(rdh, targetPath)).toBe("");
+      const sheet = (await readWorkbook(targetPath)).worksheets[0];
+      expect(sheet.getCell("C3").value).toBe("SELECT id");
+      expect(sheet.getCell("C4").value).toBe("FROM users");
+      let lastHeadingCol = 2;
+      while (sheet.getCell(1, lastHeadingCol + 1).fill?.fgColor?.argb === "FF6B4A35") {
+        lastHeadingCol++;
+      }
+      for (const row of [3, 4]) {
+        expect(sheet.getCell(row, lastHeadingCol).fill?.fgColor?.argb).toBe("FF231813");
+        expect(sheet.getCell(row, lastHeadingCol + 1).fill?.fgColor?.argb).toBeUndefined();
+      }
+    } finally {
+      getConfiguration.mockImplementation(original);
+    }
+  });
+
+  it("Midnight指定時はTOCと結果表にテーマ配色とフォントを適用する", async () => {
+    const getConfiguration = vi.mocked(workspace.getConfiguration);
+    const original = getConfiguration.getMockImplementation()!;
+    getConfiguration.mockImplementation((section?: string) => ({
+      get: (key: string, defaultValue?: unknown) =>
+        section === "output" && key === "Excel: Theme" ? "midnight" : defaultValue,
+    }) as never);
+
+    try {
+      const rdh = makeRdh({
+        tableName: "users",
+        keys: [{ name: "id", type: GeneralColumnType.INTEGER }],
+        rows: [{ id: 1 }],
+      });
+      const targetPath = tmpXlsxPath();
+      const err = await createBookFromList([rdh], targetPath, {
+        rdh: { outputAllOnOneSheet: true },
+      });
+      expect(err).toBe("");
+
+      const workbook = await readWorkbook(targetPath);
+      const toc = workbook.getWorksheet("TOC")!;
+      const result = workbook.getWorksheet("RESULT_SETS")!;
+      expect(toc.getCell("C4").font.name).toBe("PT Mono");
+      expect(toc.getCell("C4").font.color?.argb).toBe("FFE9EDF2");
+      expect(toc.getCell("C4").border.left?.style).toBe("medium");
+      expect(toc.getCell("D4").fill).toMatchObject({ fgColor: { argb: "FF3B4B5B" } });
+      expect(toc.getCell("D4").border.bottom?.style).toBe("thin");
+      expect(toc.getCell("C9").fill).toMatchObject({ fgColor: { argb: "FF3B4B5B" } });
+      expect(toc.getCell("J1").fill?.fgColor?.argb).toBe("FF151B23");
+      expect(toc.getCell("J2").fill?.fgColor?.argb).toBe("FF151B23");
+      expect(result.getCell("B4").font.color?.argb).toBe("FFE9EDF2");
+      expect(result.getCell("B6").fill).toMatchObject({ fgColor: { argb: "FF151B23" } });
+      expect(result.getCell("B6").font.name).toBe("PT Mono");
+      expect(result.properties.tabColor?.argb).toBe("FF7BB9D3");
+    } finally {
+      getConfiguration.mockImplementation(original);
+    }
+  });
+
+  it("差分表のNULLセルにもRoasteryの背景色を適用する", async () => {
+    const getConfiguration = vi.mocked(workspace.getConfiguration);
+    const original = getConfiguration.getMockImplementation()!;
+    getConfiguration.mockImplementation((section?: string) => ({
+      get: (key: string, defaultValue?: unknown) =>
+        section === "output" && key === "Excel: Theme" ? "roastery" : defaultValue,
+    }) as never);
+
+    try {
+      const rdh = makeRdh({
+        tableName: "users",
+        sqlStatement: "SELECT id, note\nFROM users",
+        keys: [
+          { name: "id", type: GeneralColumnType.INTEGER },
+          { name: "note", type: GeneralColumnType.VARCHAR },
+        ],
+        rows: [{ id: 42, note: null }],
+      });
+      const targetPath = tmpXlsxPath();
+      await createBookFromDiffList(
+        [
+          {
+            title: "users diff",
+            rdh1: rdh,
+            rdh2: rdh,
+            undoChangeStatements: ["UPDATE users SET note = NULL WHERE id = 42"],
+            diffResult: {
+              ok: true,
+              message: "",
+              inserted: 0,
+              deleted: 0,
+              updated: 0,
+              updatedColumns: 0,
+            },
+          },
+        ],
+        targetPath,
+        { rdh: { outputAllOnOneSheet: false }, diff: { displayOnlyChanged: false } }
+      );
+
+      const sheet = (await readWorkbook(targetPath)).getWorksheet("before")!;
+      let nullColumn: number | undefined;
+      let dataRow: number | undefined;
+      sheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          if (cell.value === 42) {
+            nullColumn = cell.fullAddress.col + 1;
+            dataRow = row.number;
+          }
+        });
+      });
+      expect(dataRow).toBeDefined();
+      expect(sheet.getCell(dataRow!, nullColumn!).value).toBeNull();
+      expect(sheet.getCell(dataRow!, nullColumn!).fill).toMatchObject({
+        fgColor: { argb: "FF231813" },
+      });
+      expect(sheet.getCell(dataRow!, nullColumn! + 1).fill?.fgColor?.argb).toBeUndefined();
+      expect(sheet.getCell("B3").value).toBe("SELECT id, note");
+      expect(sheet.getCell("B4").value).toBe("FROM users");
+      let lastHeadingCol = 1;
+      while (sheet.getCell(1, lastHeadingCol + 1).fill?.fgColor?.argb === "FF6B4A35") {
+        lastHeadingCol++;
+      }
+      for (const row of [3, 4]) {
+        expect(sheet.getCell(row, lastHeadingCol).fill?.fgColor?.argb).toBe("FF231813");
+        expect(sheet.getCell(row, lastHeadingCol + 1).fill?.fgColor?.argb).toBeUndefined();
+      }
+      const undo = (await readWorkbook(targetPath)).getWorksheet("UNDO_CHANGES")!;
+      expect(undo.getCell("B4").value).toBe("UPDATE users SET note = NULL WHERE id = 42;");
+      for (let col = 2; col <= 11; col++) {
+        expect(undo.getCell(4, col).fill?.fgColor?.argb).toBe("FF231813");
+      }
+      expect(undo.getCell("L4").fill?.fgColor?.argb).toBeUndefined();
+      expect(undo.getCell("K5").fill?.fgColor?.argb).toBeUndefined();
+    } finally {
+      getConfiguration.mockImplementation(original);
+    }
   });
 });
 
@@ -275,6 +444,17 @@ describe("createBookFromDiffList", () => {
     expect(sheetNames).toEqual(
       expect.arrayContaining(["TOC", "before", "after", "UNDO_CHANGES"])
     );
+
+    const toc = workbook.getWorksheet("TOC")!;
+    expect(toc.getCell("C3").value).toBeNull();
+    expect(toc.getCell("C4").value).toBe("Table of contents.");
+    expect(toc.getCell("H5").value).toBe("Before time:");
+    expect(toc.getCell("H6").value).toBe("After  time:");
+    expect(toc.getCell("J2").fill?.fgColor?.argb).toBe("FFF3F3F3");
+    for (const col of ["F", "G", "J"]) {
+      expect(toc.getColumn(col).width).toBe(11);
+    }
+    expect(toc.getColumn("E").width).toBe(26);
 
     const before = workbook.getWorksheet("before")!;
     expect(before.getCell("A1").value).toBe("■ users diff (user table)");

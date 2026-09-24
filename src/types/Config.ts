@@ -144,6 +144,17 @@ export type McpServerConfigType = {
  * Corresponds to: output.*
  * These settings DO NOT affect the VS Code preview.
  * ========================================================= */
+export type ExcelTheme =
+  | "unspecified"
+  | "light"
+  | "warm"
+  | "slate"
+  | "sage"
+  | "midnight"
+  | "chalkboard"
+  | "patisserie"
+  | "roastery";
+
 export type OutputConfigType = {
   /** Maximum number of rows written to output files */
   maxRows: number;
@@ -152,6 +163,9 @@ export type OutputConfigType = {
   maxCharactersInCell: number;
 
   excel: {
+    /** Color theme for Excel output; unspecified preserves the existing styles */
+    theme: ExcelTheme;
+
     /** Create a table of contents sheet in Excel output */
     displayToc: boolean;
 

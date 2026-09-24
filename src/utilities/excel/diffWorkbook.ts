@@ -15,8 +15,13 @@ import { EnumValues } from "enum-values";
 import * as Excel from "exceljs";
 import { getOutputConfig, getResultsetConfig } from "../configUtil";
 import { fillCell, getCellFormat, setAnyValueByIndex, setTableHeaderCell, toRuleMarker } from "./cellStyle";
-import { BookCreateOption, createCommonHeader, FONT_NAME_COMIC_SANS_MS, writeTocRecords } from "./common";
+import { BookCreateOption, createCommonHeader, writeTocRecords } from "./common";
 import { createRecordRulesSheet, createUndoChangeSheet } from "./recordRuleSheet";
+import {
+  applyExcelTheme,
+  registerExcelThemeDataRange,
+  registerExcelThemeSqlBlock,
+} from "./excelTheme";
 
 function rowCellStringLabel(row: number, col?: number): string {
   let s = `${row} row${row === 1 ? "" : "s"}`;
@@ -66,16 +71,16 @@ export async function createBookFromDiffList(
       tocSheet.getColumn("B").width = 2;
       tocSheet.getColumn("C").width = 4;
       tocSheet.getColumn("D").width = 20;
-      tocSheet.getColumn("E").width = 16;
+      tocSheet.getColumn("E").width = 26;
       tocSheet.getColumn("H").width = 16;
     }
 
-    let tocRowNo = 3;
+    let tocRowNo = 4;
     let cell: Excel.Cell;
     if (outputCondig.excel.displayToc) {
       cell = tocSheet!.getCell(`C${tocRowNo}`);
       cell.value = "Table of contents.";
-      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 24 };
+      cell.font = { size: 24 };
     }
 
     tocRowNo += 4;
@@ -103,18 +108,18 @@ export async function createBookFromDiffList(
     const afterDate = diffList.map((it) => it.rdh2.created).find((it) => it !== undefined);
 
     if (outputCondig.excel.displayToc) {
-      tocSheet!.getCell("H4").value = "Before time:";
-      tocSheet!.getCell("H4").alignment = {
-        horizontal: "right",
-      };
-      tocSheet!.mergeCells("H4:I4");
-      tocSheet!.getCell("H5").value = "After  time:";
+      tocSheet!.getCell("H5").value = "Before time:";
       tocSheet!.getCell("H5").alignment = {
         horizontal: "right",
       };
       tocSheet!.mergeCells("H5:I5");
-      tocSheet!.getCell("J4").value = `${dayjs(beforeDate).format("HH:mm:ss")}`;
-      tocSheet!.getCell("J5").value = `${dayjs(afterDate).format("HH:mm:ss")}`;
+      tocSheet!.getCell("H6").value = "After  time:";
+      tocSheet!.getCell("H6").alignment = {
+        horizontal: "right",
+      };
+      tocSheet!.mergeCells("H6:I6");
+      tocSheet!.getCell("J5").value = `${dayjs(beforeDate).format("HH:mm:ss")}`;
+      tocSheet!.getCell("J6").value = `${dayjs(afterDate).format("HH:mm:ss")}`;
 
       // RESULTSETS
       cell = tocSheet!.getCell(`C${tocRowNo}`);
@@ -165,6 +170,12 @@ export async function createBookFromDiffList(
           text: "After" + no,
           hyperlink: `#after!A${pairList[1].rowNo}`,
         };
+        registerExcelThemeDataRange(tocSheet!, {
+          firstRow: tocRowNo,
+          lastRow: tocRowNo,
+          firstCol: 3,
+          lastCol: 10,
+        });
         tocRowNo += 1;
       }
 
@@ -179,6 +190,7 @@ export async function createBookFromDiffList(
         cur.tableRowNoList.push(cur.rowNo);
         if (outputCondig.excel.displayTableNameAndStatement) {
           // table name
+          const headingRow = cur.rowNo;
           const cellTitle = sheet.getCell(cur.rowNo, 1);
           let titleValue = title;
           if (comment) {
@@ -194,6 +206,7 @@ export async function createBookFromDiffList(
           if (rdh.sqlStatement) {
             cur.rowNo++;
             const lines = rdh.sqlStatement.trim().replace(/\r\n/g, "\n").split("\n");
+            const firstSqlRow = cur.rowNo;
             cell = sheet.getCell(cur.rowNo, 1);
             cell.value = "SQL";
             setTableHeaderCell(cell);
@@ -202,6 +215,12 @@ export async function createBookFromDiffList(
               cell = sheet.getCell(cur.rowNo, 2);
               cell.value = line;
               cur.rowNo++;
+            });
+            registerExcelThemeSqlBlock(sheet, {
+              headingRow,
+              firstRow: firstSqlRow,
+              lastRow: cur.rowNo - 1,
+              firstCol: 1,
             });
             if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
               cell = sheet.getCell(cur.rowNo, 1);
@@ -293,6 +312,7 @@ export async function createBookFromDiffList(
           }
         }
 
+        const firstDataRow = cur.rowNo;
         rdh.rows
           .filter(
             (row) => !displayOnlyChanged || RowHelper.hasAnyAnnotation(row, ["Add", "Upd", "Del"])
@@ -381,6 +401,12 @@ export async function createBookFromDiffList(
             });
             cur.rowNo++;
           });
+        registerExcelThemeDataRange(sheet, {
+          firstRow: firstDataRow,
+          lastRow: cur.rowNo - 1,
+          firstCol: 1,
+          lastCol: rdh.keys.length + (displayRowno ? 1 : 0),
+        });
 
         cur.rowNo += 2;
       }
@@ -448,6 +474,7 @@ export async function createBookFromDiffList(
       }
     }
 
+    applyExcelTheme(workbook, outputCondig.excel.theme);
     await workbook.xlsx.writeFile(targetExcelPath);
   } catch (e) {
     if (e instanceof Error) {
@@ -458,4 +485,3 @@ export async function createBookFromDiffList(
   }
   return errorMessage;
 }
-

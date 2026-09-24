@@ -3,6 +3,7 @@ import { workspace } from "vscode";
 import { RdhViewConfig } from "../shared/MessageEventData";
 import {
   DatabaseConfigType,
+  ExcelTheme,
   McpServerConfigType,
   NodeConfigType,
   OutputConfigType,
@@ -20,6 +21,21 @@ const RESOURCE_TREE_AUTO_EXPAND_TO_VALUES: ResourceTreeAutoExpandTo[] = [
 ];
 
 const DEFAULT_RESOURCE_TREE_AUTO_EXPAND_TO: ResourceTreeAutoExpandTo = "schema";
+
+const EXCEL_THEME_VALUES: ExcelTheme[] = [
+  "unspecified",
+  "light",
+  "warm",
+  "slate",
+  "sage",
+  "midnight",
+  "chalkboard",
+  "patisserie",
+  "roastery",
+];
+
+const normalizeExcelTheme = (value: unknown): ExcelTheme =>
+  EXCEL_THEME_VALUES.includes(value as ExcelTheme) ? (value as ExcelTheme) : "unspecified";
 
 const normalizeResourceTreeAutoExpandTo = (value: unknown): ResourceTreeAutoExpandTo => {
   if (RESOURCE_TREE_AUTO_EXPAND_TO_VALUES.includes(value as ResourceTreeAutoExpandTo)) {
@@ -119,6 +135,7 @@ export const getOutputConfig = (): OutputConfigType => {
     maxRows: settings.get("Max rows in output file", 10000),
     maxCharactersInCell: settings.get("Max characters in cell in output file", 10000),
     excel: {
+      theme: normalizeExcelTheme(settings.get("Excel: Theme", "unspecified")),
       displayToc: settings.get("Excel: Create Table of Contents", true),
       displayTableNameAndStatement: settings.get("Excel: Show Query and Table Info", true),
       enableCrossPairLinks: settings.get("Excel: enable cross-pair links", true),

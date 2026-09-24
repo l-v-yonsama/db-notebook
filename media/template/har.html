@@ -1,11 +1,60 @@
 <!DOCTYPE html>
-<html>
+<html data-theme="light" data-report-theme="light">
   <head>
     <meta charset="utf-8" />
     <title>Database Notebook Har viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Restore before styles load to avoid flashing the default palette.
+      (function () {
+        const storageKey = "db-notebook.report.theme";
+        const themes = ["light", "warm", "slate", "sage", "midnight", "chalkboard", "patisserie", "roastery"];
+        const root = document.documentElement;
+        const applyTheme = (theme) => {
+          root.dataset.reportTheme = themes.includes(theme) ? theme : "light";
+          root.dataset.theme = ["midnight", "chalkboard", "roastery"].includes(root.dataset.reportTheme)
+            ? "dark"
+            : "light";
+        };
+        try {
+          applyTheme(localStorage.getItem(storageKey));
+        } catch (e) {
+          // Local files and browsers that block storage can still switch themes.
+        }
+        document.addEventListener("DOMContentLoaded", function () {
+          const select = document.getElementById("report-theme");
+          const logo = document.getElementById("report-theme-logo");
+          const updateLogo = () => {
+            logo.onerror = () => {
+              logo.onerror = null;
+              logo.src = "https://l-v-yonsama.github.io/db-notebook/media/logo128.png";
+            };
+            logo.src = `https://l-v-yonsama.github.io/db-notebook/media/theme-logos/logo-${root.dataset.reportTheme}.png`;
+          };
+          select.value = root.dataset.reportTheme;
+          updateLogo();
+          select.addEventListener("change", function () {
+            applyTheme(select.value);
+            updateLogo();
+            document.dispatchEvent(new Event("report-theme-change"));
+            try {
+              localStorage.setItem(storageKey, root.dataset.reportTheme);
+            } catch (e) {
+              // Remembering the choice is optional; applying it is not.
+            }
+          });
+        });
+      })();
+    </script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css" />
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.10.0/css/all.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- These six Google Fonts families are licensed under the SIL Open Font License. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&amp;family=Bebas+Neue&amp;family=Caveat:wght@400;700&amp;family=DM+Serif+Display&amp;family=Nunito+Sans:wght@400;600;700&amp;family=Space+Mono:wght@400;700&amp;display=swap"
+    />
     <script src="https://code.jquery.com/jquery-1.9.1.js"></script>
     <link
       rel="stylesheet"
@@ -17,6 +66,375 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <style>
+      /* Keep the Bulma stylesheet and customize its theme/component variables. */
+      html[data-report-theme="warm"] {
+        --bulma-scheme-h: 34;
+        --bulma-scheme-s: 45%;
+        --bulma-scheme-main-l: 96%;
+        --bulma-scheme-main-bis-l: 94%;
+        --bulma-scheme-main-ter-l: 92%;
+        --bulma-scheme-main: #faf6ef;
+        --bulma-background-l: 91%;
+        --bulma-background: #f3eadf;
+        --bulma-border-l: 83%;
+        --bulma-border-weak-l: 88%;
+        --bulma-border: #e2d5c7;
+        --bulma-text-h: 24deg;
+        --bulma-text-s: 29%;
+        --bulma-text-l: 17%;
+        --bulma-text-strong-l: 14%;
+        --bulma-text-weak-l: 42%;
+        --bulma-text: #38291f;
+        --bulma-text-weak: #79685b;
+        --bulma-link-h: 12deg;
+        --bulma-link-s: 57%;
+        --bulma-link-l: 43%;
+        --bulma-link-on-scheme-l: 43%;
+        --bulma-link: #aa482f;
+        --bulma-link-text: #aa482f;
+        --bulma-shadow-h: 24deg;
+        --bulma-shadow-s: 29%;
+        --bulma-code: var(--bulma-link-text);
+        --bulma-family-secondary: "Iowan Old Style", "Hiragino Mincho ProN", "Yu Mincho", Georgia, serif;
+        --report-code-keyword: #aa482f;
+        --report-code-string: #526137;
+        --report-code-number: #88552b;
+        --report-code-title: #7d4d62;
+      }
+
+      html[data-report-theme="slate"] {
+        --bulma-scheme-h: 206;
+        --bulma-scheme-s: 41%;
+        --bulma-scheme-main-l: 97%;
+        --bulma-scheme-main-bis-l: 95%;
+        --bulma-scheme-main-ter-l: 93%;
+        --bulma-scheme-main: #f3f7fa;
+        --bulma-background-l: 94%;
+        --bulma-background: #e8eff5;
+        --bulma-border-l: 84%;
+        --bulma-border-weak-l: 89%;
+        --bulma-border: #cad8e4;
+        --bulma-text-h: 212deg;
+        --bulma-text-s: 35%;
+        --bulma-text-l: 22%;
+        --bulma-text-strong-l: 17%;
+        --bulma-text-weak-l: 43%;
+        --bulma-text: #24364a;
+        --bulma-text-weak: #5f7286;
+        --bulma-link-h: 205deg;
+        --bulma-link-s: 46%;
+        --bulma-link-l: 39%;
+        --bulma-link-on-scheme-l: 39%;
+        --bulma-link: #356b91;
+        --bulma-link-text: #356b91;
+        --bulma-shadow-h: 212deg;
+        --bulma-shadow-s: 35%;
+        --bulma-code: var(--bulma-link-text);
+        --bulma-family-secondary: "Avenir Next", "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+        --report-code-keyword: #356b91;
+        --report-code-string: #2f7166;
+        --report-code-number: #865538;
+        --report-code-title: #79527c;
+      }
+
+      html[data-report-theme="sage"] {
+        --bulma-scheme-h: 100;
+        --bulma-scheme-s: 27%;
+        --bulma-scheme-main-l: 96%;
+        --bulma-scheme-main-bis-l: 94%;
+        --bulma-scheme-main-ter-l: 92%;
+        --bulma-scheme-main: #f4f7f1;
+        --bulma-background-l: 92%;
+        --bulma-background: #e8f0e5;
+        --bulma-border-l: 82%;
+        --bulma-border-weak-l: 87%;
+        --bulma-border: #c9d9cd;
+        --bulma-text-h: 150deg;
+        --bulma-text-s: 21%;
+        --bulma-text-l: 19%;
+        --bulma-text-strong-l: 15%;
+        --bulma-text-weak-l: 42%;
+        --bulma-text: #263a30;
+        --bulma-text-weak: #65796b;
+        --bulma-link-h: 154deg;
+        --bulma-link-s: 35%;
+        --bulma-link-l: 32%;
+        --bulma-link-on-scheme-l: 32%;
+        --bulma-link: #356d55;
+        --bulma-link-text: #356d55;
+        --bulma-shadow-h: 150deg;
+        --bulma-shadow-s: 21%;
+        --bulma-code: var(--bulma-link-text);
+        --bulma-family-secondary: Optima, "Avenir Next", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+        --report-code-keyword: #356d55;
+        --report-code-string: #647029;
+        --report-code-number: #8a552e;
+        --report-code-title: #6d537a;
+      }
+
+      html[data-report-theme="midnight"] {
+        --bulma-scheme-h: 214;
+        --bulma-scheme-s: 25%;
+        --bulma-scheme-main-l: 11%;
+        --bulma-scheme-main-bis-l: 13%;
+        --bulma-scheme-main-ter-l: 17%;
+        --bulma-scheme-main: #151b23;
+        --bulma-background-l: 17%;
+        --bulma-background: #202a35;
+        --bulma-border-l: 29%;
+        --bulma-border-weak-l: 23%;
+        --bulma-border: #3b4b5b;
+        --bulma-text-h: 213deg;
+        --bulma-text-s: 26%;
+        --bulma-text-l: 93%;
+        --bulma-text-strong-l: 96%;
+        --bulma-text-title-l: 96%;
+        --bulma-text-weak-l: 72%;
+        --bulma-text: #e9edf2;
+        --bulma-text-weak: #a7b7c8;
+        --bulma-link-h: 198deg;
+        --bulma-link-s: 50%;
+        --bulma-link-l: 65%;
+        --bulma-link-on-scheme-l: 65%;
+        --bulma-link: #7bb9d3;
+        --bulma-link-text: #7bb9d3;
+        --bulma-shadow-h: 214deg;
+        --bulma-shadow-s: 25%;
+        --bulma-code: var(--bulma-link-text);
+        --bulma-family-secondary: "SFMono-Regular", Consolas, "Liberation Mono", "Hiragino Kaku Gothic ProN", "Yu Gothic", monospace;
+        --report-code-keyword: #7bb9d3;
+        --report-code-string: #a3d79b;
+        --report-code-number: #e6bd87;
+        --report-code-title: #c7aae8;
+      }
+
+      /* Cafe menu-board themes. The Latin faces are OFL fonts; Japanese falls back locally. */
+      html[data-report-theme="chalkboard"] {
+        --bulma-scheme-h: 150;
+        --bulma-scheme-s: 17%;
+        --bulma-scheme-main-l: 15%;
+        --bulma-scheme-main-bis-l: 18%;
+        --bulma-scheme-main-ter-l: 23%;
+        --bulma-scheme-main: #1f2a26;
+        --bulma-background-l: 22%;
+        --bulma-background: #2d3933;
+        --bulma-border-l: 38%;
+        --bulma-border-weak-l: 30%;
+        --bulma-border: #596b5d;
+        --bulma-text-h: 48deg;
+        --bulma-text-s: 41%;
+        --bulma-text-l: 90%;
+        --bulma-text-strong-l: 94%;
+        --bulma-text-title-l: 94%;
+        --bulma-text-weak-l: 71%;
+        --bulma-text: #f3eed9;
+        --bulma-text-weak: #bdcbbd;
+        --bulma-link-h: 39deg;
+        --bulma-link-s: 53%;
+        --bulma-link-l: 66%;
+        --bulma-link-on-scheme-l: 66%;
+        --bulma-link: #d4b776;
+        --bulma-link-text: #d4b776;
+        --bulma-shadow-h: 150deg;
+        --bulma-shadow-s: 17%;
+        --bulma-code: var(--bulma-link-text);
+        --bulma-family-primary: "Barlow Condensed", sans-serif;
+        --bulma-family-secondary: "Caveat", cursive;
+        --report-code-family: "Caveat", "Barlow Condensed", cursive;
+        --report-code-size: 1.25rem;
+        --bulma-body-family: var(--bulma-family-primary);
+        --bulma-control-family: var(--bulma-family-primary);
+        --report-code-keyword: #d4b776;
+        --report-code-string: #a8d8ad;
+        --report-code-number: #e8aa8d;
+        --report-code-title: #c8b1d5;
+      }
+
+      html[data-report-theme="patisserie"] {
+        --bulma-scheme-h: 36;
+        --bulma-scheme-s: 67%;
+        --bulma-scheme-main-l: 97%;
+        --bulma-scheme-main-bis-l: 95%;
+        --bulma-scheme-main-ter-l: 91%;
+        --bulma-scheme-main: #fff8ef;
+        --bulma-background-l: 92%;
+        --bulma-background: #f7e9de;
+        --bulma-border-l: 83%;
+        --bulma-border-weak-l: 88%;
+        --bulma-border: #e2cfc3;
+        --bulma-text-h: 339deg;
+        --bulma-text-s: 32%;
+        --bulma-text-l: 23%;
+        --bulma-text-strong-l: 18%;
+        --bulma-text-weak-l: 45%;
+        --bulma-text: #4c2735;
+        --bulma-text-weak: #826574;
+        --bulma-link-h: 347deg;
+        --bulma-link-s: 36%;
+        --bulma-link-l: 49%;
+        --bulma-link-on-scheme-l: 49%;
+        --bulma-link: #aa5264;
+        --bulma-link-text: #aa5264;
+        --bulma-shadow-h: 339deg;
+        --bulma-shadow-s: 32%;
+        --bulma-code: var(--bulma-link-text);
+        --bulma-family-primary: "Nunito Sans", sans-serif;
+        --bulma-family-secondary: "DM Serif Display", serif;
+        --report-code-family: "DM Serif Display", "Nunito Sans", serif;
+        --report-code-size: 1.05rem;
+        --bulma-body-family: var(--bulma-family-primary);
+        --bulma-control-family: var(--bulma-family-primary);
+        --report-code-keyword: #aa5264;
+        --report-code-string: #5a7460;
+        --report-code-number: #9b6449;
+        --report-code-title: #784e78;
+      }
+
+      html[data-report-theme="roastery"] {
+        --bulma-scheme-h: 21;
+        --bulma-scheme-s: 28%;
+        --bulma-scheme-main-l: 11%;
+        --bulma-scheme-main-bis-l: 15%;
+        --bulma-scheme-main-ter-l: 20%;
+        --bulma-scheme-main: #231813;
+        --bulma-background-l: 18%;
+        --bulma-background: #34231c;
+        --bulma-border-l: 32%;
+        --bulma-border-weak-l: 25%;
+        --bulma-border: #6b4a35;
+        --bulma-text-h: 36deg;
+        --bulma-text-s: 72%;
+        --bulma-text-l: 88%;
+        --bulma-text-strong-l: 94%;
+        --bulma-text-title-l: 94%;
+        --bulma-text-weak-l: 69%;
+        --bulma-text: #f6e5ca;
+        --bulma-text-weak: #c9ac91;
+        --bulma-link-h: 27deg;
+        --bulma-link-s: 70%;
+        --bulma-link-l: 67%;
+        --bulma-link-on-scheme-l: 67%;
+        --bulma-link: #e5aa70;
+        --bulma-link-text: #e5aa70;
+        --bulma-shadow-h: 21deg;
+        --bulma-shadow-s: 28%;
+        --bulma-code: var(--bulma-link-text);
+        --bulma-family-primary: "Space Mono", monospace;
+        --bulma-family-secondary: "Bebas Neue", sans-serif;
+        --report-code-family: "Space Mono", monospace;
+        --report-code-size: 0.95rem;
+        --bulma-body-family: var(--bulma-family-primary);
+        --bulma-control-family: var(--bulma-family-primary);
+        --report-code-keyword: #e5aa70;
+        --report-code-string: #b5ca8c;
+        --report-code-number: #f0c791;
+        --report-code-title: #d5a0aa;
+      }
+
+      html[data-report-theme]:not([data-report-theme="light"]) .notification.is-primary {
+        --bulma-notification-h: var(--bulma-link-h);
+        --bulma-notification-s: var(--bulma-link-s);
+      }
+      html[data-report-theme]:not([data-report-theme="light"]) .tag.is-primary {
+        --bulma-tag-h: var(--bulma-link-h);
+        --bulma-tag-s: var(--bulma-link-s);
+      }
+
+      /* Bulma's secondary family needs to be applied explicitly to headings. */
+      .title,
+      .subtitle {
+        font-family: var(--bulma-family-secondary);
+      }
+
+      /* Carry the cafe menu typography into fenced and inline code. */
+      html[data-report-theme="chalkboard"] :is(pre, code),
+      html[data-report-theme="patisserie"] :is(pre, code),
+      html[data-report-theme="roastery"] :is(pre, code) {
+        font-family: var(--report-code-family);
+      }
+      html[data-report-theme="chalkboard"] pre,
+      html[data-report-theme="patisserie"] pre,
+      html[data-report-theme="roastery"] pre {
+        font-size: var(--report-code-size);
+        line-height: 1.35;
+      }
+
+      html[data-report-theme="chalkboard"] .container > .subtitle.is-2 {
+        text-align: center;
+        font-size: 3.25rem;
+        border-block: 2px dashed var(--bulma-border);
+        padding-block: 0.35rem;
+      }
+      html[data-report-theme="patisserie"] .container > .subtitle.is-2 {
+        text-align: center;
+        font-style: italic;
+        border-bottom: 1px solid var(--bulma-border);
+        padding-bottom: 0.65rem;
+      }
+      html[data-report-theme="patisserie"] .panel {
+        --bulma-panel-h: 339;
+      }
+      html[data-report-theme="roastery"] .container > .subtitle.is-2 {
+        font-size: 3rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        border-bottom: 4px solid var(--bulma-link);
+        padding-bottom: 0.35rem;
+      }
+
+      /* highlight.js uses a separate color palette. */
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-keyword,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-selector-tag,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-deletion {
+        color: var(--report-code-keyword);
+      }
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-string,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-regexp,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-addition {
+        color: var(--report-code-string);
+      }
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-number,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-literal,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-built_in,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-attr {
+        color: var(--report-code-number);
+      }
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-title {
+        color: var(--report-code-title);
+      }
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-comment,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-quote,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-operator,
+      html[data-report-theme]:not([data-report-theme="light"]) .hljs-punctuation {
+        color: var(--bulma-text-weak);
+      }
+
+      html[data-theme="dark"] .panel {
+        --bulma-panel-heading-background-l: 23%;
+        --bulma-panel-heading-color-l: 93%;
+      }
+      html[data-theme="dark"] span.tag.is-light {
+        color: var(--bulma-scheme-main);
+      }
+
+      .report-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1rem;
+        margin-bottom: 1rem;
+      }
+      .report-toolbar .report-search {
+        flex: 1 1 28rem;
+        min-width: 0;
+        margin-bottom: 0;
+      }
+      .report-theme-control {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
       .ellipsis {
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -36,8 +454,8 @@
       }
 
       div.chart {
-        color: gray;
-        background-color: white;
+        color: var(--bulma-text-weak);
+        background-color: var(--bulma-scheme-main);
       }
 
       div.block {
@@ -51,7 +469,7 @@
       }
 
       span.tag.is-light {
-        color: gray;
+        color: var(--bulma-text-weak);
       }
       
       .pagetop {
@@ -60,8 +478,8 @@
         position: fixed;
         right: 30px;
         bottom: 30px;
-        background: #fff;
-        border: solid 2px #000;
+        background: var(--bulma-scheme-main);
+        border: solid 2px var(--bulma-text-strong);
         border-radius: 50%;
         display: none;
         justify-content: center;
@@ -73,8 +491,8 @@
         display: block;
         height: 10px;
         width: 10px;
-        border-top: 3px solid #000;
-        border-right: 3px solid #000;
+        border-top: 3px solid var(--bulma-text-strong);
+        border-right: 3px solid var(--bulma-text-strong);
         transform: translateY(20%) rotate(-45deg);
       }
       .delete_icon {
@@ -370,43 +788,62 @@
       <div class="container">
         <h2 class="subtitle is-2">Database Notebook Har viewer.</h2>
 
-        <div class="field has-addons">
-          <p class="control">
-            <span class="select">
-              <select class="status"></select>
-            </span>
-          </p>
-          <p class="control">
-            <span class="select">
-              <select class="method"></select>
-            </span>
-          </p>
-          <p class="control">
-            <span class="select">
-              <select class="content"></select>
-            </span>
-          </p>
-          <p class="control">
-            <span class="select">
-              <select class="mode">
-                <option title="Case-insensitive" selected value="">-</option>
-                <option title="Case-sensitive" value="Aa">Aa</option>
-                <option title="Use regular expressions" value=".*">.*</option>
+        <div class="report-toolbar">
+          <div class="field has-addons report-search">
+            <p class="control">
+              <span class="select">
+                <select class="status"></select>
+              </span>
+            </p>
+            <p class="control">
+              <span class="select">
+                <select class="method"></select>
+              </span>
+            </p>
+            <p class="control">
+              <span class="select">
+                <select class="content"></select>
+              </span>
+            </p>
+            <p class="control">
+              <span class="select">
+                <select class="mode">
+                  <option title="Case-insensitive" selected value="">-</option>
+                  <option title="Case-sensitive" value="Aa">Aa</option>
+                  <option title="Use regular expressions" value=".*">.*</option>
+                </select>
+              </span>
+            </p>
+            <p class="control has-icons-left has-icons-right is-expanded">
+              <span class="icon is-small is-left">
+                <i class="fas fa-search"></i>
+              </span>
+              <input class="input keyword" type="text" placeholder="Please enter keywords" />
+              <span class="icon is-small is-right delete_icon">
+                <i class="fas fa-times"></i>
+              </span>
+            </p>
+            <p class="control">
+              <button class="button search">Search</button>
+            </p>
+          </div>
+          <div class="control report-theme-control">
+            <label for="report-theme">Theme</label>
+            <div class="select">
+              <select id="report-theme">
+                <option value="light">Light</option>
+                <option value="warm">Warm</option>
+                <option value="slate">Slate</option>
+                <option value="sage">Sage</option>
+                <option value="midnight">Midnight</option>
+                <optgroup label="Cafe menu boards">
+                  <option value="chalkboard">Chalkboard</option>
+                  <option value="patisserie">Patisserie</option>
+                  <option value="roastery">Roastery</option>
+                </optgroup>
               </select>
-            </span>
-          </p>
-          <p class="control has-icons-left has-icons-right is-expanded">
-            <span class="icon is-small is-left">
-              <i class="fas fa-search"></i>
-            </span>
-            <input class="input keyword" type="text" placeholder="Please enter keywords" />
-            <span class="icon is-small is-right delete_icon">
-              <i class="fas fa-times"></i>
-            </span>
-          </p>
-          <p class="control">
-            <button class="button search">Search</button>
-          </p>
+            </div>
+          </div>
         </div>
         <!-- __TOC__ -->
 
@@ -418,7 +855,7 @@
           <article class="media">
             <figure class="media-left">
               <p class="image is-64x64">
-                <img src="https://l-v-yonsama.github.io/db-notebook/media/logo128.png" />
+                <img id="report-theme-logo" src="https://l-v-yonsama.github.io/db-notebook/media/logo128.png" alt="Database Notebook mascot" />
               </p>
             </figure>
             <div class="media-content">

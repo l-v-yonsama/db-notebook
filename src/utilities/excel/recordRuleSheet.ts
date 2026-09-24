@@ -3,6 +3,7 @@ import * as Excel from "exceljs";
 import { getOutputConfig } from "../configUtil";
 import { setAnyValueByIndex, setTableHeaderCell } from "./cellStyle";
 import { TocRecords } from "./common";
+import { registerExcelThemeDataRange } from "./excelTheme";
 
 const RECORD_RULE_SHEET_NAME = "RECORD_RULES";
 
@@ -101,11 +102,18 @@ export function createRecordRulesSheet(
       cell.value = "Condition values";
       setTableHeaderCell(cell);
       rowNo++;
+      const firstErrorRow = rowNo;
       detail.errorRows.forEach((errorRow, idx) => {
         cell = sheet.getCell(`C${rowNo}`).value = idx + 1;
         cell = sheet.getCell(`D${rowNo}`).value = errorRow.rowNo;
         cell = sheet.getCell(`E${rowNo}`).value = JSON.stringify(errorRow.conditionValues);
         rowNo++;
+      });
+      registerExcelThemeDataRange(sheet, {
+        firstRow: firstErrorRow,
+        lastRow: rowNo - 1,
+        firstCol: 3,
+        lastCol: 5,
       });
       rowNo += 2;
     });
@@ -167,14 +175,20 @@ export function createUndoChangeSheet(
 
     rowNo++;
 
+    const firstStatementRow = rowNo;
     undoChangeStatements.forEach((statement) => {
       // Rule name
       cell = sheet.getCell(`B${rowNo}`);
       cell.value = `${statement};`;
       rowNo++;
     });
+    registerExcelThemeDataRange(sheet, {
+      firstRow: firstStatementRow,
+      lastRow: rowNo - 1,
+      firstCol: 2,
+      lastCol: 11,
+    });
     rowNo += 2;
   });
   return tocRecords;
 }
-

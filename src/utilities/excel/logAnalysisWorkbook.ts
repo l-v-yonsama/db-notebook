@@ -3,7 +3,8 @@ import { ResultSetData } from "@l-v-yonsama/rdh";
 import * as Excel from "exceljs";
 import { getOutputConfig, getResultsetConfig } from "../configUtil";
 import { setAnyValueByIndex, setTableHeaderCell } from "./cellStyle";
-import { BookCreateOption, createCommonHeader, createQueryResultSheet, FONT_NAME_COMIC_SANS_MS } from "./common";
+import { BookCreateOption, createCommonHeader, createQueryResultSheet } from "./common";
+import { applyExcelTheme } from "./excelTheme";
 
 export type LogAnalysisWorkbookParams = {
   totalLogLines: number;
@@ -73,7 +74,7 @@ export async function createLogAnalysisWorkbook(params: LogAnalysisWorkbookParam
       // [Title]
       cell = tocSheet.getCell(`C${tocRowNo++}`);
       cell.value = "Log Analysis Report";
-      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 24 };
+      cell.font = { size: 24 };
 
       tocRowNo += 2;
 
@@ -83,7 +84,7 @@ export async function createLogAnalysisWorkbook(params: LogAnalysisWorkbookParam
         outputSummary;
       cell = tocSheet.getCell(`C${tocRowNo++}`);
       cell.value = "[Summary]";
-      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+      cell.font = { size: 18 };
       writeLabelAndValue(tocRowNo++, "Total Log Lines", totalLogLines);
       writeLabelAndValue(tocRowNo++, "Lines to parse", linesToParse < 0 ? "All" : linesToParse);
       writeLabelAndValue(tocRowNo++, "Parsed Events", totalEvents);
@@ -105,7 +106,7 @@ export async function createLogAnalysisWorkbook(params: LogAnalysisWorkbookParam
         // [Classified Log Events]
         cell = tocSheet.getCell(`C${tocRowNo++}`);
         cell.value = "[Classified Log Events]";
-        cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+        cell.font = { size: 18 };
         for (const [key, value] of Object.entries(eventTypeCounts)) {
           writeLabelAndValue(tocRowNo++, key, value ?? 0);
         }
@@ -116,7 +117,7 @@ export async function createLogAnalysisWorkbook(params: LogAnalysisWorkbookParam
         // [Extracted SQL Summary]
         cell = tocSheet.getCell(`C${tocRowNo++}`);
         cell.value = "[Extracted SQL Summary]";
-        cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+        cell.font = { size: 18 };
         for (const [key, value] of Object.entries(sqlExecutionTypeCounts)) {
           writeLabelAndValue(tocRowNo++, key, value ?? 0);
         }
@@ -128,7 +129,7 @@ export async function createLogAnalysisWorkbook(params: LogAnalysisWorkbookParam
       // [Navigation]
       cell = tocSheet.getCell(`C${tocRowNo++}`);
       cell.value = "[Navigation]";
-      cell.font = { name: FONT_NAME_COMIC_SANS_MS, size: 18 };
+      cell.font = { size: 18 };
       writeLabelAndValue(tocRowNo++, "Raw Logs", "Link to Raw Logs", "#RawLogs!A1");
       if (elapsedTimeMilli.classification !== undefined) {
         writeLabelAndValue(
@@ -152,6 +153,8 @@ export async function createLogAnalysisWorkbook(params: LogAnalysisWorkbookParam
   } catch (e) {
     console.error(e);
   }
+
+  applyExcelTheme(workbook, outputCondig.excel.theme);
 
   return new Promise<string>((resolve, reject) => {
     try {
@@ -298,4 +301,3 @@ function createLogAnalysisWorksheets(
     });
   }
 }
-

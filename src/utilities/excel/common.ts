@@ -25,9 +25,7 @@ import {
   setTableHeaderCell,
   toRuleMarker,
 } from "./cellStyle";
-
-// const FONT_NAME_Arial ='Arial';
-export const FONT_NAME_COMIC_SANS_MS = "Comic Sans MS";
+import { registerExcelThemeDataRange, registerExcelThemeSqlBlock } from "./excelTheme";
 
 // Shared workbook-level plumbing (TOC record building, the common header block,
 // and the single-result-set "table writer" pipeline) reused by both
@@ -72,6 +70,22 @@ export function columnToLetter(column: number) {
 export function createCommonHeader(sheet: Excel.Worksheet) {
   sheet.getCell("A1").value = `Created: ${dayjs().format("YYYY-MM-DD(ddd) HH:mm")}`;
   sheet.getCell("A2").value = `Creator: ${os.userInfo().username}`;
+  sheet.mergeCells("A1:J1");
+  sheet.mergeCells("A2:J2");
+  const headerFill: Excel.Fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFF3F3F3" },
+  };
+  for (let row = 1; row <= 2; row++) {
+    for (let col = 1; col <= 10; col++) {
+      sheet.getCell(row, col).fill = headerFill;
+    }
+  }
+  registerExcelThemeDataRange(sheet, { firstRow: 1, lastRow: 2, firstCol: 1, lastCol: 10 });
+  for (const col of ["F", "G", "J"]) {
+    sheet.getColumn(col).width = 11;
+  }
 }
 
 export function writeTocRecords(tocSheet: Excel.Worksheet, tocRecords: TocRecords, rowNo: number): number {
@@ -89,6 +103,13 @@ export function writeTocRecords(tocSheet: Excel.Worksheet, tocRecords: TocRecord
       cell.value = record[header.key];
     });
     plusNo++;
+  });
+
+  registerExcelThemeDataRange(tocSheet, {
+    firstRow: rowNo + 1,
+    lastRow: rowNo + tocRecords.records.length,
+    firstCol: 3,
+    lastCol: 2 + tocRecords.headers.length,
   });
 
   return plusNo;
@@ -158,6 +179,7 @@ function writeTitleAndSqlStatementSection(
       .trim()
       .replace(/\r\n|\r/g, "\n")
       .split("\n");
+    const firstSqlRow = baseRowNo + plusNo;
     cell = sheet.getCell(baseRowNo + plusNo, 2);
     cell.value = options?.sqlStatementLabel ? options.sqlStatementLabel : "SQL";
     setTableHeaderCell(cell);
@@ -166,6 +188,12 @@ function writeTitleAndSqlStatementSection(
       cell = sheet.getCell(baseRowNo + plusNo, 3);
       cell.value = line;
       plusNo++;
+    });
+    registerExcelThemeSqlBlock(sheet, {
+      headingRow: baseRowNo,
+      firstRow: firstSqlRow,
+      lastRow: baseRowNo + plusNo - 1,
+      firstCol: 2,
     });
     if (rdh.queryConditions?.binds && rdh.queryConditions?.binds.length > 0) {
       cell = sheet.getCell(baseRowNo + plusNo, 2);
@@ -293,6 +321,12 @@ function writeDataRowsSection(
   const { ruleViolationSummary } = rdh.meta;
 
   if (rdh.rows.length > 0) {
+    registerExcelThemeDataRange(sheet, {
+      firstRow: baseRowNo,
+      lastRow: baseRowNo + rdh.rows.length - 1,
+      firstCol: 2,
+      lastCol: (displayRowno ? 2 : 1) + rdh.keys.length,
+    });
     rdh.rows.forEach((rdhRow, ri: number) => {
       const values = rdhRow.values;
       if (displayRowno) {
@@ -431,4 +465,3 @@ async function createFileSheet(workbook: Excel.Workbook, sheetName: string, file
 function convertNotNaN(v: number) {
   return isNaN(v) ? "-" : v;
 }
-
