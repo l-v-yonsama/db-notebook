@@ -177,6 +177,83 @@ const columns = ref(
     return key;
   })
 );
+
+const minColumnWidth = 50;
+const fixedColumnLayout = ref<{ prefixWidths: number[]; tableWidth: number } | null>(null);
+let resizingColumn: {
+  key: ColKey;
+  pointerId: number;
+  startX: number;
+  startWidth: number;
+} | null = null;
+
+const setColumnWidth = (key: ColKey, width: number): void => {
+  const nextWidth = Math.max(minColumnWidth, Math.round(width));
+  if (fixedColumnLayout.value) {
+    fixedColumnLayout.value.tableWidth += nextWidth - key.width;
+  }
+  key.width = nextWidth;
+  key.inputSize = Math.ceil(key.width / 8);
+};
+
+const freezeColumnLayout = (target: HTMLElement): boolean => {
+  const headers = target.closest("table")?.querySelectorAll("thead tr:first-child th");
+  const prefixCount = Number(editable) + Number(showRowColumn);
+  if (!headers || headers.length !== columns.value.length + prefixCount) {
+    return false;
+  }
+  // Auto table layout distributes spare space. Freeze the rendered widths so the
+  // boundary follows the pointer instead of redistributing the other columns.
+  const widths = Array.from(headers, (cell) => Math.round(cell.getBoundingClientRect().width));
+  columns.value.forEach((column, index) => {
+    column.width = widths[index + prefixCount];
+    column.inputSize = Math.ceil(column.width / 8);
+  });
+  fixedColumnLayout.value = {
+    prefixWidths: widths.slice(0, prefixCount),
+    tableWidth: widths.reduce((sum, width) => sum + width, 0),
+  };
+  return true;
+};
+
+const startColumnResize = (event: PointerEvent, key: ColKey): void => {
+  if (resizingColumn || !event.isPrimary || event.button !== 0) {
+    return;
+  }
+  const handle = event.currentTarget as HTMLElement;
+  if (!freezeColumnLayout(handle)) {
+    return;
+  }
+  resizingColumn = {
+    key,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startWidth: key.width,
+  };
+  handle.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  event.stopPropagation();
+};
+
+const moveColumnResize = (event: PointerEvent): void => {
+  if (resizingColumn?.pointerId !== event.pointerId) {
+    return;
+  }
+  setColumnWidth(resizingColumn.key, resizingColumn.startWidth + event.clientX - resizingColumn.startX);
+  event.preventDefault();
+};
+
+const endColumnResize = (event: PointerEvent): void => {
+  if (resizingColumn?.pointerId !== event.pointerId) {
+    return;
+  }
+  resizingColumn = null;
+  const handle = event.currentTarget as HTMLElement;
+  if (handle.hasPointerCapture(event.pointerId)) {
+    handle.releasePointerCapture(event.pointerId);
+  }
+};
+
 const list = ref(
   props.rdh.rows
     .filter(
@@ -548,16 +625,26 @@ defineExpose({
 <template>
   <section>
     <section class="table" :class="{ readonly: !editable }">
-      <VirtualList v-if="visible" :items="list" :table="true" class="list-table" :style="{ height: `${height}px` }">
+      <VirtualList v-if="visible" :items="list" :table="true" class="list-table"
+        :class="{ 'fixed-columns': fixedColumnLayout !== null }"
+        :style="{ height: `${height}px`, '--rdh-table-width': fixedColumnLayout ? `${fixedColumnLayout.tableWidth}px` : undefined }">
         <template #prepend>
+          <colgroup v-if="fixedColumnLayout">
+            <col v-for="(columnWidth, idx) of fixedColumnLayout.prefixWidths" :key="`prefix-${idx}`"
+              :style="{ width: `${columnWidth}px` }" />
+            <col v-for="(key, idx) of columns" :key="idx" :style="{ width: `${key.width}px` }" />
+          </colgroup>
           <thead>
             <tr>
               <th v-if="editable" class="ctrl">CONTROL</th>
               <th v-if="showRowColumn" class="row">ROW</th>
               <th v-for="(key, idx) of columns" :key="idx" :title="key.name" :style="{ width: `${key.width}px` }">
-                <span class="codicon" :class="key.typeClass"></span><span class="label"
-                  :style="{ 'width': `${key.width - 18}px`, 'max-width': `${key.width - 18}px` }">{{ key.name }}</span>
-                <a class="widen" @click="key.width += 100"><span class="codicon codicon-arrow-both"></span></a>
+                <div class="column-heading">
+                  <span class="codicon" :class="key.typeClass"></span><span class="label">{{ key.name }}</span>
+                </div>
+                <span class="column-resize-handle" aria-hidden="true" @pointerdown="startColumnResize($event, key)"
+                  @pointermove="moveColumnResize" @pointerup="endColumnResize" @pointercancel="endColumnResize"
+                  @lostpointercapture="endColumnResize" @click.stop></span>
               </th>
             </tr>
             <tr v-if="showCommentRow">
@@ -663,6 +750,11 @@ defineExpose({
 .list-table table {
   border-collapse: collapse;
   width: 100%;
+}
+
+.list-table.fixed-columns table {
+  table-layout: fixed;
+  width: var(--rdh-table-width);
 }
 </style>
 
@@ -828,15 +920,29 @@ th {
   overflow: hidden;
   white-space: nowrap;
 
-  >a.widen {
-    display: none;
-    position: absolute;
-    right: 2px;
-    top: 2px;
+  >.column-heading {
+    display: flex;
+    align-items: center;
+    padding-right: 8px;
+
+    >.codicon {
+      flex: none;
+    }
   }
 
-  &:hover>a.widen {
-    display: inline-block;
+  >.column-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+    z-index: 1;
+
+    &:hover {
+      background: var(--vscode-focusBorder);
+    }
   }
 }
 
@@ -850,8 +956,9 @@ span.codicon {
 }
 
 span.label {
-  display: inline-block;
-  vertical-align: middle;
+  display: block;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
