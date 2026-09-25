@@ -30,7 +30,7 @@ import {
   isUUIDType,
 } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, toDisplayString } from "vue";
 import CopyToClipboardButton from "./base/CopyToClipboardButton.vue";
 import FileAnnotationView from "./base/FileAnnotationView.vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
@@ -321,6 +321,118 @@ const list = ref(
       return item;
     })
 );
+
+const columnFilters = ref<Record<string, string>>({});
+const cellText = (value: unknown): string => toDisplayString(value);
+const activeFilters = computed(() =>
+  Object.entries(columnFilters.value)
+    .filter(([, term]) => term.length > 0)
+    .map(([name, term]) => [name, term.toLowerCase()] as const)
+);
+const filteredList = computed(() => {
+  if (activeFilters.value.length === 0) {
+    return list.value;
+  }
+  // Keep unsaved editors visible while their values are being changed.
+  return list.value.filter((row) =>
+    row.editType === "ins" || row.editType === "upd" ||
+    activeFilters.value.every(([name, term]) => cellText(row[name]).toLowerCase().includes(term))
+  );
+});
+const sourceIndexes = computed(() => new Map(list.value.map((row, index) => [row, index])));
+const sourceIndex = (row: RowValues): number => sourceIndexes.value.get(row) ?? -1;
+
+const highlightedParts = (value: unknown, name: string): { text: string; match: boolean }[] => {
+  const content = cellText(value);
+  const term = columnFilters.value[name]?.toLowerCase();
+  if (!term) {
+    return [{ text: content, match: false }];
+  }
+  const lowerContent = content.toLowerCase();
+  const parts: { text: string; match: boolean }[] = [];
+  let from = 0;
+  let matchAt = lowerContent.indexOf(term);
+  while (matchAt >= 0) {
+    if (matchAt > from) {
+      parts.push({ text: content.slice(from, matchAt), match: false });
+    }
+    parts.push({ text: content.slice(matchAt, matchAt + term.length), match: true });
+    from = matchAt + term.length;
+    matchAt = lowerContent.indexOf(term, from);
+  }
+  if (from < content.length) {
+    parts.push({ text: content.slice(from), match: false });
+  }
+  return parts;
+};
+
+const filterPopup = ref<{ name: string; top: number; left: number } | null>(null);
+const filterPopupElement = ref<HTMLElement | null>(null);
+const filterInput = ref<HTMLInputElement | null>(null);
+const draftFilter = ref("");
+let filterTrigger: HTMLElement | null = null;
+
+const closeFilterPopup = (): void => {
+  filterPopup.value = null;
+  filterTrigger = null;
+  window.removeEventListener("pointerdown", onFilterPointerDown, true);
+  window.removeEventListener("scroll", closeFilterPopup, true);
+  window.removeEventListener("resize", closeFilterPopup);
+};
+
+function onFilterPointerDown(event: PointerEvent): void {
+  const target = event.target as Node;
+  if (!filterPopupElement.value?.contains(target) && !filterTrigger?.contains(target)) {
+    closeFilterPopup();
+  }
+}
+
+const openFilterPopup = (event: MouseEvent, name: string): void => {
+  const trigger = event.currentTarget as HTMLElement;
+  if (filterPopup.value?.name === name) {
+    closeFilterPopup();
+    return;
+  }
+  closeFilterPopup();
+  const rect = trigger.getBoundingClientRect();
+  const popupWidth = Math.min(260, Math.max(0, window.innerWidth - 16));
+  const popupHeight = 150;
+  filterPopup.value = {
+    name,
+    left: Math.max(8, Math.min(rect.left, window.innerWidth - popupWidth - 8)),
+    top: rect.bottom + popupHeight <= window.innerHeight
+      ? rect.bottom + 4
+      : Math.max(8, rect.top - popupHeight - 4),
+  };
+  draftFilter.value = columnFilters.value[name] ?? "";
+  filterTrigger = trigger;
+  window.addEventListener("pointerdown", onFilterPointerDown, true);
+  window.addEventListener("scroll", closeFilterPopup, true);
+  window.addEventListener("resize", closeFilterPopup);
+  nextTick(() => filterInput.value?.focus());
+};
+
+const applyFilter = (): void => {
+  if (!filterPopup.value) {
+    return;
+  }
+  const next = { ...columnFilters.value };
+  const term = draftFilter.value.trim();
+  if (term) {
+    next[filterPopup.value.name] = term;
+  } else {
+    delete next[filterPopup.value.name];
+  }
+  columnFilters.value = next;
+  closeFilterPopup();
+};
+
+const clearFilter = (): void => {
+  draftFilter.value = "";
+  applyFilter();
+};
+
+onBeforeUnmount(closeFilterPopup);
 
 const addRow = (): void => {
   const empty: RowValues = {
@@ -625,7 +737,7 @@ defineExpose({
 <template>
   <section>
     <section class="table" :class="{ readonly: !editable }">
-      <VirtualList v-if="visible" :items="list" :table="true" class="list-table"
+      <VirtualList v-if="visible" :items="filteredList" :table="true" class="list-table"
         :class="{ 'fixed-columns': fixedColumnLayout !== null }"
         :style="{ height: `${height}px`, '--rdh-table-width': fixedColumnLayout ? `${fixedColumnLayout.tableWidth}px` : undefined }">
         <template #prepend>
@@ -638,9 +750,17 @@ defineExpose({
             <tr>
               <th v-if="editable" class="ctrl">CONTROL</th>
               <th v-if="showRowColumn" class="row">ROW</th>
-              <th v-for="(key, idx) of columns" :key="idx" :title="key.name" :style="{ width: `${key.width}px` }">
+              <th v-for="(key, idx) of columns" :key="idx" :title="key.name"
+                :class="{ 'has-filter': !!columnFilters[key.name] }" :style="{ width: `${key.width}px` }">
                 <div class="column-heading">
                   <span class="codicon" :class="key.typeClass"></span><span class="label">{{ key.name }}</span>
+                  <button type="button" class="column-filter-button" :class="{ active: !!columnFilters[key.name] }"
+                    :title="columnFilters[key.name] ? `Filter ${key.name}: ${columnFilters[key.name]}` : `Filter ${key.name}`"
+                    :aria-label="columnFilters[key.name] ? `Filter ${key.name}, active: ${columnFilters[key.name]}` : `Filter ${key.name}`"
+                    aria-haspopup="dialog" :aria-expanded="filterPopup?.name === key.name"
+                    @click.stop="openFilterPopup($event, key.name)">
+                    <span class="codicon codicon-filter"></span>
+                  </button>
                 </div>
                 <span class="column-resize-handle" aria-hidden="true" @pointerdown="startColumnResize($event, key)"
                   @pointermove="moveColumnResize" @pointerup="endColumnResize" @pointercancel="endColumnResize"
@@ -677,18 +797,18 @@ defineExpose({
           <tr :style="rowStyle(item, index)" :class="{ selectedRow: item === selectedRow }">
             <td v-if="editable" class="ctrl">
               <div>
-                <VsCodeButton v-if="editable" :disabled="item.editType === 'ins'" @click="editRow(index)"
+                <VsCodeButton v-if="editable" :disabled="item.editType === 'ins'" @click="editRow(sourceIndex(item))"
                   title="Update row" appearance="secondary">
                   <fa icon="pencil" />
                 </VsCodeButton>
-                <VsCodeButton v-if="editable" @click="deleteRow(index)" title="Delete row" appearance="secondary">
+                <VsCodeButton v-if="editable" @click="deleteRow(sourceIndex(item))" title="Delete row" appearance="secondary">
                   <fa icon="trash" />
                 </VsCodeButton>
               </div>
             </td>
-            <td v-if="showRowColumn" class="row" @click="onClickCell({ rowPos: index, colPos: -1, key: '', rowValues: item })">
+            <td v-if="showRowColumn" class="row" @click="onClickCell({ rowPos: sourceIndex(item), colPos: -1, key: '', rowValues: item })">
               {{ toEditTypeMark(item.editType) }}
-              {{ index + 1 }}
+              {{ sourceIndex(item) + 1 }}
               <div class="cell-actions" v-if="!editable">
                 <VsCodeButton @click.stop="showDetailAll(item)" appearance="secondary" class="show-detail"
                   title="View details">
@@ -697,7 +817,7 @@ defineExpose({
               </div>
             </td>
             <td class="vcell" v-for="(key, idx) of columns" :key="idx" :style="cellStyle(item, key)"
-              @click="onClickCell({ rowPos: index, colPos: idx, key: key.name, rowValues: item })">
+              @click="onClickCell({ rowPos: sourceIndex(item), colPos: idx, key: key.name, rowValues: item })">
               <VsCodeTextField v-if="item.editType === 'ins' || item.editType === 'upd'" v-model="item[key.name]"
                 :readonly="false" :required="key.required" :transparent="true" :maxlength="1000" :size="key.inputSize"
                 style="width: 99%"></VsCodeTextField>
@@ -713,7 +833,15 @@ defineExpose({
                     <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
                       item.$ruleViolationMarks[key.name]
                       }}</span>
-                    <span class="val">{{ item[key.name] }}</span>
+                    <span class="val">
+                      <template v-if="columnFilters[key.name]">
+                        <template v-for="(part, partIndex) of highlightedParts(item[key.name], key.name)" :key="partIndex">
+                          <mark v-if="part.match" class="filter-match">{{ part.text }}</mark>
+                          <template v-else>{{ part.text }}</template>
+                        </template>
+                      </template>
+                      <template v-else>{{ item[key.name] }}</template>
+                    </span>
                   </p>
                   <span v-if="item.$resolvedLabels[key.name]" class="marker-box code-label" :class="{
                     'marker-info': item.$resolvedLabels[key.name]?.isUndefined === false,
@@ -742,6 +870,22 @@ defineExpose({
         </template>
       </VirtualList>
     </section>
+    <Teleport to="body">
+      <div v-if="filterPopup" ref="filterPopupElement" class="rdh-filter-popup" role="dialog"
+        :aria-label="`Filter ${filterPopup.name}`" :style="{ top: `${filterPopup.top}px`, left: `${filterPopup.left}px` }"
+        @keydown.esc.stop.prevent="closeFilterPopup">
+        <form @submit.prevent="applyFilter">
+          <label>Filter {{ filterPopup.name }}
+            <input ref="filterInput" v-model="draftFilter" type="text" placeholder="Contains text" />
+          </label>
+          <div class="filter-actions">
+            <button type="button" @click="clearFilter">Clear</button>
+            <button type="button" @click="closeFilterPopup">Cancel</button>
+            <button type="submit" class="apply-filter">Apply</button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
     <p v-if="legend.length" class="rule-violation-legend" v-text="legend"></p>
   </section>
 </template>
@@ -920,6 +1064,16 @@ th {
   overflow: hidden;
   white-space: nowrap;
 
+  &:hover > .column-heading,
+  &.has-filter > .column-heading {
+    padding-right: 28px;
+  }
+
+  &:hover > .column-heading > .column-filter-button,
+  &.has-filter > .column-heading > .column-filter-button {
+    visibility: visible;
+  }
+
   >.column-heading {
     display: flex;
     align-items: center;
@@ -927,6 +1081,39 @@ th {
 
     >.codicon {
       flex: none;
+    }
+
+    >.column-filter-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: 0;
+      border-radius: 2px;
+      color: var(--vscode-foreground);
+      background: transparent;
+      cursor: pointer;
+      visibility: hidden;
+
+      >.codicon {
+        margin-right: 0;
+      }
+
+      &:hover,
+      &.active {
+        color: var(--vscode-button-foreground);
+        background: var(--vscode-button-background);
+      }
+
+      &:focus-visible {
+        outline: 1px solid var(--vscode-focusBorder);
+      }
     }
   }
 
@@ -962,6 +1149,64 @@ span.label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+mark.filter-match {
+  color: inherit;
+  background: var(--vscode-editor-findMatchHighlightBackground, rgba(255, 190, 0, 0.45));
+  border-radius: 2px;
+}
+
+.rdh-filter-popup {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  width: min(260px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--vscode-panel-border, var(--vscode-focusBorder));
+  border-radius: 4px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 6px;
+    border: 1px solid var(--vscode-input-border, var(--vscode-focusBorder));
+    color: var(--vscode-input-foreground, var(--vscode-foreground));
+    background: var(--vscode-input-background, var(--vscode-editor-background));
+    font: inherit;
+  }
+
+  .filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 10px;
+
+    button {
+      padding: 4px 8px;
+      border: 0;
+      border-radius: 2px;
+      color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+      background: var(--vscode-button-secondaryBackground, var(--vscode-toolbar-hoverBackground));
+      cursor: pointer;
+    }
+
+    .apply-filter {
+      color: var(--vscode-button-foreground);
+      background: var(--vscode-button-background);
+    }
+  }
 }
 
 p.rule-violation-legend {
