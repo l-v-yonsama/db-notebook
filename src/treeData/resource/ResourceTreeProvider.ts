@@ -42,7 +42,7 @@ import {
 } from "../../utilities/connectionEnvironmentDisplay";
 import { getIconPath } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
-import { StateStorage } from "../../utilities/StateStorage";
+import { ResourceFavorite, StateStorage } from "../../utilities/StateStorage";
 import { appendDashboardContextValues } from "../../observability/dashboardLaunch";
 import { getDynamoDbIndexKeyRoles } from "./dynamoDbKeyRoles";
 
@@ -85,6 +85,32 @@ const DB_TYPE_DISPLAY_NAMES: Record<DBType, string> = {
 };
 
 const toDbTypeDisplayName = (dbType: DBType): string => DB_TYPE_DISPLAY_NAMES[dbType] ?? dbType;
+
+const SEARCHABLE_RESOURCE_TYPES = new Set<ResourceType>([
+  ResourceType.Table,
+  ResourceType.DynamoTable,
+  ResourceType.LogGroup,
+  ResourceType.Bucket,
+  ResourceType.Queue,
+  ResourceType.Identity,
+  ResourceType.SsmParameter,
+  ResourceType.SecretsManagerSecret,
+  ResourceType.CfnStack,
+]);
+
+export type LoadedResourceMatch = {
+  resource: DbResource;
+  connection: DbConnection;
+  path: string[];
+  resourcePath: ResourceFavorite["path"];
+};
+
+const activeResourceFilters = (conRes: DbConnection) =>
+  ([
+    ["Resource name", conRes.resourceFilter?.resourceName],
+    ["Schema", conRes.resourceFilter?.schema],
+    ["Table", conRes.resourceFilter?.table],
+  ] as const).filter(([, detail]) => detail?.value?.trim());
 
 // Vendor logos for the DBTypes where a safely-licensed brand mark is available.
 // Oracle/SQL Server/AWS/Memcached deliberately stay on generic codicons for now.
@@ -212,7 +238,14 @@ export class ResourceTreeProvider
     if (element.hasChildren()) {
       state = vscode.TreeItemCollapsibleState.Collapsed;
     }
-    return new DBDatabaseItem(element, state, this.stateStorage, this.parentMap.get(element.id));
+    const favorite = this.getFavoriteForResource(element);
+    return new DBDatabaseItem(
+      element,
+      state,
+      this.stateStorage,
+      this.parentMap.get(element.id),
+      favorite ? this.stateStorage.isResourceFavorite(favorite) : false
+    );
   }
 
   getChildren(element?: DbResource): vscode.ProviderResult<DbResource[]> {
@@ -238,6 +271,55 @@ export class ResourceTreeProvider
 
   getParent(element: DbResource): vscode.ProviderResult<DbResource> {
     return this.parentMap.get(element.id);
+  }
+
+  getLoadedResourceMatches(connection?: DbConnection): LoadedResourceMatch[] {
+    const matches: LoadedResourceMatch[] = [];
+    const connections = connection ? this.conResList.filter((it) => it === connection) : this.conResList;
+    for (const conRes of connections) {
+      const visit = (
+        resource: DbResource,
+        parent: DbResource,
+        path: string[],
+        resourcePath: ResourceFavorite["path"]
+      ) => {
+        this.parentMap.set(resource.id, parent);
+        const currentPath = [...path, resource.name];
+        const currentResourcePath = resource.resourceType === ResourceType.Group
+          ? resourcePath
+          : [...resourcePath, { type: resource.resourceType, name: resource.name }];
+        if (SEARCHABLE_RESOURCE_TYPES.has(resource.resourceType)) {
+          matches.push({ resource, connection: conRes, path: currentPath, resourcePath: currentResourcePath });
+        }
+        // Columns are not Quick Open targets; avoid walking large column lists.
+        if (resource.resourceType !== ResourceType.Table && resource.resourceType !== ResourceType.DynamoTable) {
+          resource.children.forEach((child) => visit(child, resource, currentPath, currentResourcePath));
+        }
+      };
+      (this.stateStorage.getResourceByName(conRes.name) ?? []).forEach((db) =>
+        visit(db, conRes, [conRes.name], [])
+      );
+    }
+    return matches;
+  }
+
+  getFavoriteForResource(resource: DbResource): ResourceFavorite | undefined {
+    if (!SEARCHABLE_RESOURCE_TYPES.has(resource.resourceType)) {
+      return undefined;
+    }
+    const path: ResourceFavorite["path"] = [];
+    let current: DbResource | undefined = resource;
+    while (current && !(current instanceof DbConnection)) {
+      if (current.resourceType !== ResourceType.Group) {
+        path.unshift({ type: current.resourceType, name: current.name });
+      }
+      current = this.parentMap.get(current.id);
+    }
+    if (!(current instanceof DbConnection)) {
+      return undefined;
+    }
+    const setting = this.stateStorage.getPasswordlessConnectionSettingByName(current.name);
+    return setting?.id ? { connectionId: setting.id, connectionName: current.name, path } : undefined;
   }
 
   // Drop stale parent links for a subtree that's about to be replaced (e.g. on schema reload),
@@ -282,6 +364,10 @@ export class ConnectionListItem extends vscode.TreeItem {
     if (isDefault) {
       this.description += " (default)";
     }
+    const filters = activeResourceFilters(conRes);
+    if (filters.length) {
+      this.description += " · filtered";
+    }
     const support = DBType.Mqtt !== conRes.dbType;
     this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},CD:${clearableDefault},connected:${conRes.isConnected},support:${support},${conRes.isInProgress}`;
     this.contextValue += ",tag:dbResource";
@@ -313,6 +399,16 @@ export class ConnectionListItem extends vscode.TreeItem {
     if (isDefault) {
       tooltip.appendMarkdown("\\\nDefault connection for new SQL cells");
     }
+    const filterTypes = { prefix: "starts with", suffix: "ends with", include: "contains", regex: "regex" };
+    for (const [label, detail] of filters) {
+      if (detail) {
+        tooltip.appendMarkdown(`\\\n${label} filter (${filterTypes[detail.type]}): `);
+        tooltip.appendText(detail.value);
+      }
+    }
+    if (conRes.readOnly === true) {
+      tooltip.appendMarkdown("\\\nRead-only setting: enabled (behavior depends on the database)");
+    }
     this.tooltip = tooltip;
   }
 }
@@ -322,7 +418,8 @@ export class DBDatabaseItem extends vscode.TreeItem {
     public readonly resource: DbResource,
     state: vscode.TreeItemCollapsibleState,
     private stateStorage: StateStorage,
-    private readonly parentResource?: DbResource
+    private readonly parentResource?: DbResource,
+    private readonly isFavorite = false
   ) {
     super(resource.name, state);
 
@@ -708,6 +805,9 @@ export class DBDatabaseItem extends vscode.TreeItem {
       contextValue += ",canViewLastRows";
     }
     contextValue = appendDashboardContextValues(contextValue, resource);
+    if (SEARCHABLE_RESOURCE_TYPES.has(resource.resourceType)) {
+      contextValue += `,favorite:${this.isFavorite}`;
+    }
     contextValue += ",tag:dbResource";
 
     if (tooltip) {

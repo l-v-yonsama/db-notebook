@@ -28,6 +28,10 @@ export const REMOVE_SUBSCRIPTION = `${EXTENSION_NAME}.remove-subscription`;
 
 export const REFRESH_RESOURCES = `${EXTENSION_NAME}.refresh-resources`;
 export const LOAD_DB_SCHEMA = `${EXTENSION_NAME}.load-database-schema`;
+export const QUICK_OPEN_RESOURCE = `${EXTENSION_NAME}.quick-open-resource`;
+export const SHOW_RESOURCE_FAVORITES = `${EXTENSION_NAME}.show-resource-favorites`;
+export const ADD_RESOURCE_FAVORITE = `${EXTENSION_NAME}.add-resource-favorite`;
+export const REMOVE_RESOURCE_FAVORITE = `${EXTENSION_NAME}.remove-resource-favorite`;
 export const OPEN_DB_NOTEBOOK = `${EXTENSION_NAME}.open-db-notebook`;
 export const SPECIFY_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.specify-default-connection-for-sql-cell`;
 export const CLEAR_DEFAULT_CON_FOR_SQL_CELL = `${EXTENSION_NAME}.clear-default-connection-for-sql-cell`;
@@ -65,6 +69,8 @@ export const CREATE_CFN_DIAGRAM = `${EXTENSION_NAME}.create-cfn-diagram`;
 export const CREATE_INSERT_SCRIPT_WITH_SETTINGS = `${EXTENSION_NAME}.create-insert-script-with-settings`;
 
 export const COPY_RESOURCE_NAME = `${EXTENSION_NAME}.copy-resource-name`;
+export const COPY_QUALIFIED_TABLE_NAME = `${EXTENSION_NAME}.copy-qualified-table-name`;
+export const OPEN_TABLE_SELECT_NOTEBOOK = `${EXTENSION_NAME}.open-table-select-notebook`;
 export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 
 //---------------------------------------------------

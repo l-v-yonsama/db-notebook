@@ -13,6 +13,7 @@ import {
   DbSsmParameter,
   DbSubscription,
   DbTable,
+  isRDSType,
   MqttDatabase,
   RDSBaseDriver,
   RdsDatabase,
@@ -38,9 +39,11 @@ import {
   ADD_SUBSCRIPTION,
   CLEAR_DEFAULT_CON_FOR_SQL_CELL,
   CONNECT,
+  COPY_QUALIFIED_TABLE_NAME,
   COPY_AWS_SECRET_VALUE,
   COPY_COLUMN_NAMES,
   COPY_RESOURCE_NAME,
+  ADD_RESOURCE_FAVORITE,
   CONNECTION_SETTING_FORM_VIEWID,
   COUNT_FOR_ALL_TABLES,
   CREATE_CFN_DIAGRAM,
@@ -61,9 +64,12 @@ import {
   LOAD_DB_SCHEMA,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DB_NOTEBOOK,
+  OPEN_TABLE_SELECT_NOTEBOOK,
   OPEN_MDH_VIEWER,
   OPEN_TOOLS_VIEWER,
+  QUICK_OPEN_RESOURCE,
   REFRESH_RESOURCES,
+  REMOVE_RESOURCE_FAVORITE,
   REMOVE_SUBSCRIPTION,
   RESTORE_DATABASE,
   SCAN_ITEMS,
@@ -75,6 +81,7 @@ import {
   SHOW_PUBLISH_EDITOR_PANEL,
   SHOW_QUERY_STATISTICS,
   SHOW_RESOURCE_PROPERTIES,
+  SHOW_RESOURCE_FAVORITES,
   SHOW_SCAN_PANEL,
   SPECIFY_DEFAULT_CON_FOR_SQL_CELL,
   SUBSCRIBE,
@@ -107,9 +114,10 @@ import { copyToClipboard } from "../../utilities/clipboardUtil";
 import { getDatabaseConfig } from "../../utilities/configUtil";
 import { workflow } from "../../utilities/driverResolver";
 import { log } from "../../utilities/logger";
-import { StateStorage } from "../../utilities/StateStorage";
+import { ResourceFavorite, sameResourceFavorite, StateStorage } from "../../utilities/StateStorage";
 import { ToolsViewParams } from "../../views/ToolsViewProvider";
-import { ResourceTreeProvider } from "./ResourceTreeProvider";
+import { LoadedResourceMatch, ResourceTreeProvider } from "./ResourceTreeProvider";
+import { createTableSqlShortcut } from "./tableSqlShortcut";
 
 type ResourceTreeParams = {
   context: ExtensionContext;
@@ -203,6 +211,100 @@ const registerConnectionSettingCommand = (params: ResourceTreeParams) => {
 const registerDbResourceCommand = (params: ResourceTreeParams) => {
   const { context, stateStorage, dbResourceTree, dbResourceTreeView } = params;
 
+  const favoriteFromMatch = (match: LoadedResourceMatch, connectionId: string): ResourceFavorite => ({
+    connectionId,
+    connectionName: match.connection.name,
+    path: match.resourcePath,
+  });
+
+  const toggleFavorite = async (resource: DbResource, enabled: boolean): Promise<void> => {
+    const match = dbResourceTree.getLoadedResourceMatches().find((it) => it.resource === resource);
+    if (!match) {
+      await window.showInformationMessage("This object is no longer loaded. Search or reload it first.");
+      return;
+    }
+    const connectionId = await stateStorage.getOrCreateConnectionSettingId(match.connection.name);
+    if (!connectionId) {
+      await window.showInformationMessage("The connection setting could not be found.");
+      return;
+    }
+    await stateStorage.setResourceFavorite(favoriteFromMatch(match, connectionId), enabled);
+    dbResourceTree.changeDbResourceTreeData(resource);
+  };
+
+  commands.registerCommand(ADD_RESOURCE_FAVORITE, async (resource: DbResource) => {
+    try {
+      await toggleFavorite(resource, true);
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
+  commands.registerCommand(REMOVE_RESOURCE_FAVORITE, async (resource: DbResource) => {
+    try {
+      await toggleFavorite(resource, false);
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
+  commands.registerCommand(SHOW_RESOURCE_FAVORITES, async () => {
+    const favorites = stateStorage.getResourceFavorites();
+    if (!favorites.length) {
+      await window.showInformationMessage("No favorite objects yet. Add one from an object's context menu.");
+      return;
+    }
+    const settings = stateStorage.getPasswordlessConnectionSettingList();
+    const loaded = dbResourceTree.getLoadedResourceMatches();
+    const items = favorites.map((favorite) => {
+      const setting = settings.find((it) => it.id === favorite.connectionId);
+      const match = setting && loaded.find((it) =>
+        it.connection.name === setting.name &&
+        sameResourceFavorite(favoriteFromMatch(it, setting.id!), favorite)
+      );
+      const status = !setting
+        ? "Connection setting is missing"
+        : stateStorage.getResourceByName(setting.name) === undefined
+          ? "Schema is not loaded"
+          : !match
+            ? "Object is unavailable (filtered, removed, or load failed)"
+            : match.resource.comment;
+      return {
+        label: favorite.path[favorite.path.length - 1].name,
+        description: `${favorite.path[favorite.path.length - 1].type} · ${setting?.name ?? favorite.connectionName} / ${favorite.path.map((part) => part.name).join(" / ")}`,
+        detail: status,
+        favorite,
+      };
+    });
+    const selected = await window.showQuickPick(items, {
+      title: "Favorite Database Objects",
+      placeHolder: "Choose a saved object (loaded objects can be revealed)",
+      matchOnDescription: true,
+      matchOnDetail: true,
+    });
+    if (!selected) {
+      return;
+    }
+    const setting = stateStorage.getPasswordlessConnectionSettingList().find(
+      (it) => it.id === selected.favorite.connectionId
+    );
+    if (!setting) {
+      await window.showInformationMessage("This favorite's connection setting is missing.");
+      return;
+    }
+    const match = dbResourceTree.getLoadedResourceMatches().find((it) =>
+      it.connection.name === setting.name &&
+      sameResourceFavorite(favoriteFromMatch(it, setting.id!), selected.favorite)
+    );
+    if (!match) {
+      await window.showInformationMessage("This object is not available in the loaded schema. Reload its connection if needed.");
+      return;
+    }
+    try {
+      await dbResourceTreeView.reveal(match.resource, { select: true, focus: true });
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
+
   commands.registerCommand(COPY_RESOURCE_NAME, async (res: DbResource | DbConnection) => {
     try {
       let target = res;
@@ -219,6 +321,36 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
 
       const text = target.name;
       await copyToClipboard(text);
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
+  const getTableShortcut = async (table: DbTable) => {
+    if (!(table instanceof DbTable)) {
+      throw new Error("Select a relational table.");
+    }
+    const conName = table.meta?.conName;
+    const setting = conName ? await stateStorage.getConnectionSettingByName(conName) : undefined;
+    if (!setting || !isRDSType(setting.dbType)) {
+      throw new Error("The relational connection setting could not be found.");
+    }
+    return { conName, ...createTableSqlShortcut(setting, table, getDatabaseConfig().limitRows) };
+  };
+  commands.registerCommand(COPY_QUALIFIED_TABLE_NAME, async (table: DbTable) => {
+    try {
+      const { qualifiedName } = await getTableShortcut(table);
+      await copyToClipboard(qualifiedName);
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
+  });
+  commands.registerCommand(OPEN_TABLE_SELECT_NOTEBOOK, async (table: DbTable) => {
+    try {
+      const { conName, selectSql } = await getTableShortcut(table);
+      const cell = new NotebookCellData(NotebookCellKind.Code, selectSql, "sql");
+      const metadata: CellMeta = { connectionName: conName };
+      cell.metadata = metadata;
+      await commands.executeCommand(CREATE_NEW_NOTEBOOK, [cell]);
     } catch (e) {
       showWindowErrorMessage(e);
     }
@@ -265,6 +397,45 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
 
   commands.registerCommand(REFRESH_RESOURCES, () => {
     dbResourceTree.refresh(true);
+  });
+
+  commands.registerCommand(QUICK_OPEN_RESOURCE, async (connection?: DbConnection) => {
+    const scope = connection instanceof DbConnection ? connection : undefined;
+    const matches = dbResourceTree.getLoadedResourceMatches(scope);
+    if (!matches.length) {
+      await window.showInformationMessage(
+        "No loaded objects to search. Use 'Load or Reload Database Schema' on a connection first."
+      );
+      return;
+    }
+    const items = matches.map((match) => ({
+      label: match.resource.name,
+      description: `${match.resource.resourceType} · ${match.path.join(" / ")}`,
+      detail: match.resource.comment,
+      match,
+    }));
+    const selected = await window.showQuickPick(items, {
+      title: "Quick Open Database Object",
+      placeHolder: "Search loaded object names, comments, and paths",
+      matchOnDescription: true,
+      matchOnDetail: true,
+    });
+    if (!selected) {
+      return;
+    }
+    // A connection may have been refreshed while Quick Pick was open.
+    const current = dbResourceTree.getLoadedResourceMatches(scope).some(
+      (it) => it.connection === selected.match.connection && it.resource === selected.match.resource
+    );
+    if (!current) {
+      await window.showInformationMessage("The selected object was reloaded. Search again to locate it.");
+      return;
+    }
+    try {
+      await dbResourceTreeView.reveal(selected.match.resource, { select: true, focus: true });
+    } catch (e) {
+      showWindowErrorMessage(e);
+    }
   });
 
   commands.registerCommand(OPEN_DB_NOTEBOOK, async (conRes: DbConnection) => {

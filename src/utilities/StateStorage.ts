@@ -56,6 +56,18 @@ export const QUERY_HISTORY_STORAGE_KEY = `${EXTENSION_NAME}-sql-history`;
 export const PREV_SAVE_FOLDER = `${EXTENSION_NAME}-previous-save-folder`;
 export const MCP_ENABLED_CONNECTIONS_KEY = `${EXTENSION_NAME}-mcp-enabled-connections`;
 export const AI_MASKING_LEVEL_BY_CONNECTION_KEY = `${EXTENSION_NAME}-ai-masking-level-by-connection`;
+export const RESOURCE_FAVORITES_KEY = `${EXTENSION_NAME}-resource-favorites`;
+
+export type ResourceFavorite = {
+  connectionId: string;
+  connectionName: string;
+  path: { type: ResourceType; name: string }[];
+};
+
+export const sameResourceFavorite = (a: ResourceFavorite, b: ResourceFavorite): boolean =>
+  a.connectionId === b.connectionId &&
+  a.path.length === b.path.length &&
+  a.path.every((part, index) => part.type === b.path[index].type && part.name === b.path[index].name);
 
 type DbResInfo = {
   isInProgress: boolean;
@@ -526,6 +538,47 @@ export class StateStorage {
 
   getPasswordlessConnectionSettingByName(name: string): ConnectionSetting | undefined {
     return this.getPasswordlessConnectionSettingList().find((it) => it.name === name);
+  }
+
+  async getOrCreateConnectionSettingId(name: string): Promise<string | undefined> {
+    const setting = await this.getConnectionSettingByName(name);
+    if (!setting) {
+      return undefined;
+    }
+    if (setting.id) {
+      return setting.id;
+    }
+    // Older saved connections may not have an id. Persist one through the
+    // normal edit path so favorites never depend on a recyclable name.
+    const migrated = { ...setting };
+    return (await this.editConnectionSetting(migrated)) ? migrated.id : undefined;
+  }
+
+  getResourceFavorites(): ResourceFavorite[] {
+    const entries = this.context.globalState.get<ResourceFavorite[]>(RESOURCE_FAVORITES_KEY, []);
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+    return entries.filter(
+      (entry) =>
+        typeof entry?.connectionId === "string" &&
+        typeof entry.connectionName === "string" &&
+        Array.isArray(entry.path) &&
+        entry.path.length > 0 &&
+        entry.path.every((part) => typeof part?.type === "string" && typeof part.name === "string")
+    );
+  }
+
+  isResourceFavorite(favorite: ResourceFavorite): boolean {
+    return this.getResourceFavorites().some((item) => sameResourceFavorite(item, favorite));
+  }
+
+  async setResourceFavorite(favorite: ResourceFavorite, enabled: boolean): Promise<void> {
+    const others = this.getResourceFavorites().filter((item) => !sameResourceFavorite(item, favorite));
+    await this.context.globalState.update(
+      RESOURCE_FAVORITES_KEY,
+      enabled ? [...others, favorite] : others
+    );
   }
 
   async getConnectionSettingByName(name: string): Promise<ConnectionSetting | undefined> {

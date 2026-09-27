@@ -72,6 +72,10 @@ export class Uri {
     return new Uri(value);
   }
 
+  static from(parts: { scheme: string; path: string }): Uri {
+    return new Uri(`${parts.scheme}:${parts.path}`);
+  }
+
   toString(): string {
     return `file://${this.fsPath}`;
   }
@@ -194,6 +198,11 @@ export class MarkdownString {
 
   appendMarkdown(value: string): MarkdownString {
     this.value += value;
+    return this;
+  }
+
+  appendText(value: string): MarkdownString {
+    this.value += value.replace(/[\\`*_{}\[\]()#+.!|>\-]/g, "\\$&");
     return this;
   }
 
