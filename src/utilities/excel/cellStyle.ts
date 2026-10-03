@@ -2,8 +2,6 @@ import {
   AnnotationType,
   GeneralColumnType,
   isDateTimeOrDate,
-  RdhMeta,
-  RuleAnnotation,
   toDate,
 } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
@@ -28,7 +26,6 @@ interface IHyperLink {
 
 export type CellStyleOptionsParams = {
   annotationMessage?: any;
-  ruleMarker?: string;
   resolvedLabel?: string;
   isHyperText?: boolean;
   hyperLinkAddr?: string;
@@ -79,10 +76,6 @@ export function fillCell(cell: Excel.Cell, type: AnnotationType) {
     case "Del":
       // GitHub diff: red
       fgColor = "FFF2DEDE";
-      break;
-    case "Rul":
-      // warning / rule
-      fgColor = "FFFCF8E3";
       break;
     case "Err":
       fgColor = "FFFF8E8E";
@@ -135,7 +128,6 @@ export function setAnyValueByIndex(cell: Excel.Cell, text: any, options?: CellSt
     let useFormat = !!options.format;
     if (
       options.annotationMessage !== undefined ||
-      options.ruleMarker !== undefined ||
       options.resolvedLabel !== undefined
     ) {
       cellValue = {
@@ -143,7 +135,6 @@ export function setAnyValueByIndex(cell: Excel.Cell, text: any, options?: CellSt
       };
       let me = text ?? "";
       let you = options.annotationMessage ?? "";
-      let ruleMarker = options.ruleMarker ?? "";
       // 比較対象も横並びにする場合は標準型のまま
       if (options.format) {
         if (options.format === CellFormat.date || options.format === CellFormat.dateTime) {
@@ -152,17 +143,6 @@ export function setAnyValueByIndex(cell: Excel.Cell, text: any, options?: CellSt
             you = toDateString(you, options.format);
           }
         }
-      }
-      if (options.ruleMarker) {
-        cellValue.richText.push({
-          text: `${ruleMarker} `,
-          font: {
-            color: {
-              argb: "33663366",
-            },
-            size: 8,
-          },
-        });
       }
       cellValue.richText.push({
         text: me,
@@ -243,23 +223,6 @@ function nvl(s: string | undefined, rep: string) {
     return rep;
   }
   return s;
-}
-
-export function toRuleMarker(
-  ruleViolationSummary: RdhMeta["ruleViolationSummary"],
-  rules: RuleAnnotation[]
-): string | undefined {
-  if (ruleViolationSummary === undefined) {
-    return undefined;
-  }
-  const marks: number[] = [];
-  const names = Object.keys(ruleViolationSummary);
-  names.forEach((it, idx) => {
-    if (rules.some((rule) => rule.values?.name === it)) {
-      marks.push(idx + 1);
-    }
-  });
-  return marks.length > 0 ? `*${marks.join(",")}` : undefined;
 }
 
 function convertToLocalTimezoneDate(e: Date | undefined | null): Date | undefined | null {

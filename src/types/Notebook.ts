@@ -45,7 +45,6 @@ export type CellMeta = {
   // language-restricted at the type level, but only offered for JSON cells
   // today (CellLabelProvider in statusBarProviders.ts).
   cellLabel?: string;
-  ruleFile?: string;
   codeResolverFile?: string;
   sharedVariableName?: string;
   useDatabaseName?: string;

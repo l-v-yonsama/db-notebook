@@ -1,4 +1,4 @@
-import { DBType, runRuleEngine } from "@l-v-yonsama/multi-platform-database-drivers";
+import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { resolveCodeLabel, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import {
   CancellationTokenSource,
@@ -48,7 +48,6 @@ import {
   isShellCell,
   isSqlCell,
   readCodeResolverFile,
-  readRuleFile,
 } from "../utilities/notebookUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { AwsKernel } from "./awsKernel";
@@ -457,7 +456,6 @@ export class MainController {
       maxPrintLines: getResultsetConfig().maxRowsInPreview,
       maxCellValueLength: getResultsetConfig().maxCharactersInCell,
       withCodeLabel: (cellMeta?.codeResolverFile ?? "").length > 0,
-      withRuleViolation: (cellMeta?.ruleFile ?? "").length > 0,
     });
     const title = rdh.meta.command ? "Command Result" : "Query Result";
     return new NotebookCellOutput(
@@ -624,23 +622,6 @@ export class MainController {
       const metadata: CellMeta = cell.metadata;
       if (r.metadata?.rdh?.meta?.type === "select") {
         const { rdh } = r.metadata;
-        if (metadata.ruleFile && (await existsFileOnWorkspace(metadata.ruleFile))) {
-          const rrule = await readRuleFile(metadata, rdh);
-          if (rrule) {
-            rdh.meta.tableRule = rrule.tableRule;
-            // log(`${PREFIX} rrule.tableRule:${JSON.stringify(rrule.tableRule, null, 1)}`);
-            try {
-              const runRuleEngineResult = await runRuleEngine(rdh);
-              // log(`${PREFIX} runRuleEngineResult:${runRuleEngineResult}`);
-            } catch (e) {
-              throw new Error(
-                `RuleEngineError:${(e as Error).message}. Unuse or review the following file. ${
-                  metadata.ruleFile
-                }`
-              );
-            }
-          }
-        }
         if (metadata.codeResolverFile && (await existsFileOnWorkspace(metadata.codeResolverFile))) {
           const codeResolver = await readCodeResolverFile(metadata);
           if (codeResolver) {
@@ -664,7 +645,6 @@ export class MainController {
           meta: resultRdhForHistory?.meta,
           summary: resultRdhForHistory?.summary,
           codeResolverFile: metadata.codeResolverFile,
-          ruleFile: metadata.ruleFile,
           executedAt: Date.now(),
           status: r.status === "error" ? "error" : "success",
           errorMessage: r.status === "error" ? r.stderr : undefined,

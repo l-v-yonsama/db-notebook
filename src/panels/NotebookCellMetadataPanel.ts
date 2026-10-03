@@ -109,17 +109,6 @@ export class NotebookCellMetadataPanel {
       value: "",
     });
 
-    const ruleFiles = await workspace.findFiles("**/*.rrule", "**/node_modules/**");
-    const ruleFileItems = ruleFiles.map((it) => ({
-      label: path.relative(rootPath, it.fsPath),
-      value: path.relative(rootPath, it.fsPath),
-    }));
-
-    ruleFileItems.unshift({
-      label: NO_USE,
-      value: "",
-    });
-
     const { outputs } = this.cell;
     const columnItems: RdhKey[] = [];
     const output = outputs.find((it) => it.metadata && it.metadata.rdh);
@@ -142,7 +131,6 @@ export class NotebookCellMetadataPanel {
           preparationVisible,
           connectionSettingNames: ["", ...connectionSettingNames],
           codeFileItems,
-          ruleFileItems,
           columnItems,
         },
       },
@@ -183,9 +171,6 @@ export class NotebookCellMetadataPanel {
 
               if (newMetadata.codeResolverFile === "") {
                 delete newMetadata.codeResolverFile;
-              }
-              if (newMetadata.ruleFile === "") {
-                delete newMetadata.ruleFile;
               }
               if (newMetadata.showComment === false) {
                 delete newMetadata.showComment;

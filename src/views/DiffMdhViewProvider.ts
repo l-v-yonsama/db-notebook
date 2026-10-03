@@ -2,7 +2,6 @@ import {
   createUndoChangeSQL,
   DBType,
   RDSBaseDriver,
-  runRuleEngine,
   SQLLang,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
@@ -168,13 +167,8 @@ export class DiffMdhViewProvider extends BaseViewProvider {
       }
       subTitle = `${before} ⇔ ${after}`;
     }
-    // asyncDiff自体は非破壊化されており、Upd/Del/Addの重複はresolveDiffContext側で
-    // 型スコープクリアされる。一方runRuleEngine/resolveCodeLabelはRul/Codを常に
-    // 追記するだけなので、再チェック(compare)を繰り返すとここが重複蓄積する。
-    // そのため対象をRul/Codに絞ってクリアし、Fil/Cinなど無関係な既存アノテーション
-    // は保持する。
-    list1.forEach((it) => RdhHelper.clearAnnotationsByType(it, ["Rul", "Cod"]));
-    list2.forEach((it) => RdhHelper.clearAnnotationsByType(it, ["Rul", "Cod"]));
+    list1.forEach((it) => RdhHelper.clearAnnotationsByType(it, "Cod"));
+    list2.forEach((it) => RdhHelper.clearAnnotationsByType(it, "Cod"));
 
     const createTabId = () => createHash("md5").update(title).digest("hex");
     const tabId = createTabId();
@@ -223,12 +217,6 @@ export class DiffMdhViewProvider extends BaseViewProvider {
           rdh1 = diffResult.rdh1!;
           rdh2 = diffResult.rdh2!;
 
-          if (rdh1.meta.tableRule) {
-            await runRuleEngine(rdh1);
-          }
-          if (rdh2.meta.tableRule) {
-            await runRuleEngine(rdh2);
-          }
           if (rdh1.meta.codeItems) {
             await resolveCodeLabel(rdh1);
           }
@@ -491,9 +479,6 @@ export class DiffMdhViewProvider extends BaseViewProvider {
             diff: {
               displayOnlyChanged: data.displayOnlyChanged ?? false,
             },
-            rule: {
-              withRecordRule: true,
-            },
           })
         : await createHtmlFromDiffList(tabItem.list, uri.fsPath);
     if (message) {
@@ -554,9 +539,6 @@ export class DiffMdhViewProvider extends BaseViewProvider {
                     ? { useDatabaseName: rdh.meta.useDatabase }
                     : undefined,
                 });
-                if (rdh.meta.tableRule) {
-                  afterRdh.meta.tableRule = rdh.meta.tableRule;
-                }
                 if (rdh.meta.codeItems) {
                   afterRdh.meta.codeItems = rdh.meta.codeItems;
                 }

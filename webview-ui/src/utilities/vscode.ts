@@ -24,7 +24,7 @@ export * from "../../../src/shared/PerformanceTuningComparison";
 export * from "../../../src/shared/PerformanceTuningHumanSummary";
 export * from "../../../src/shared/PublishEditorParams";
 export * from "../../../src/shared/QueryStatisticsParams";
-export * from "../../../src/shared/RecordRule";
+export * from "../../../src/shared/ViewCondition";
 export * from "../../../src/shared/RunResultMetadata";
 export * from "../../../src/shared/SaveValuesInRdhParams";
 export * from "../../../src/shared/ViewConditionParams";

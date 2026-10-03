@@ -17,7 +17,6 @@ import {
   type RdhKey,
   type RdhRow,
   type ResultSetData,
-  type RuleAnnotation,
   isArray,
   isBinaryLike,
   isBooleanLike,
@@ -53,9 +52,6 @@ type RowValues = {
   $meta: RdhRow["meta"];
   [key: string]: any;
 
-  $ruleViolationMarks: {
-    [key: string]: string | undefined;
-  };
   $resolvedLabels: {
     [key: string]: CodeResolvedAnnotation["values"];
   };
@@ -110,16 +106,6 @@ if (props.rdh.meta?.compareKeys?.length) {
     compareKey = props.rdh.meta.compareKeys[0];
   }
 }
-
-const { ruleViolationSummary } = props.rdh.meta;
-
-const legend = ruleViolationSummary
-  ? Object.keys(ruleViolationSummary)
-    .map((k, idx) => `*${idx + 1}: ${k}: ${ruleViolationSummary[k]}`)
-    .join(" , ")
-  : "";
-
-const height = computed(() => (legend.length > 0 ? Math.max(props.height - 16, 0) : props.height));
 
 const columns = ref(
   props.rdh.keys.map((k) => {
@@ -267,7 +253,6 @@ const list = ref(
         $meta: row.meta,
         $resolvedLabels: {},
         $changeInNumbers: {},
-        $ruleViolationMarks: {},
         $fileValues: {},
       };
       if (editable && compareKey) {
@@ -287,22 +272,6 @@ const list = ref(
           const meta = row.meta;
           const code = meta[k.name]?.find((it) => it.type === "Cod") as CodeResolvedAnnotation;
           item.$resolvedLabels[k.name] = code?.values;
-        }
-        if (ruleViolationSummary) {
-          const rules = meta[k.name]?.filter((it) => it.type === "Rul") as RuleAnnotation[];
-          if (rules && rules.length) {
-            const marks: number[] = [];
-            const names = Object.keys(ruleViolationSummary);
-            names.forEach((it, idx) => {
-              if (rules.some((rule) => rule.values?.name === it)) {
-                marks.push(idx + 1);
-              }
-            });
-            let legend = marks.length > 0 ? `*${marks.join(",")}` : undefined;
-            if (legend) {
-              item.$ruleViolationMarks[k.name] = legend;
-            }
-          }
         }
         // change in numbers
         const cinAnnonation = meta[k.name]?.find(
@@ -440,7 +409,6 @@ const addRow = (): void => {
     $meta: {},
     $resolvedLabels: {},
     $changeInNumbers: {},
-    $ruleViolationMarks: {},
     $fileValues: {},
   };
   props.rdh.keys.map((k) => {
@@ -572,9 +540,6 @@ const cellStyle = (p: any, keyInfo: ColKey): any => {
   if (hasAnnotationsOf(meta, "Upd", keyInfo.name)) {
     styles["background-color"] = "rgba(112, 83, 255, 0.32) !important";
   }
-  if (hasAnnotationsOf(meta, "Rul", keyInfo.name)) {
-    styles["background-color"] = "rgba(232, 232, 83, 0.21) !important";
-  }
   if (hasAnnotationsOf(meta, "Err", keyInfo.name)) {
     styles["background-color"] = "rgba(200, 33, 33, 0.32) !important";
   }
@@ -589,8 +554,6 @@ const rowStyle = (p: any, rowIndex: number): any => {
     return { "background-color": "rgba(255, 83, 112, 0.25) !important" };
   } else if (hasAnnotationsOf(meta, "Upd")) {
     return { "background-color": "rgba(112, 83, 255, 0.17) !important" };
-    // } else if (hasAnnotationsOf(meta, "Rul")) {
-    // return { "background-color": "rgba(232, 232, 83, 0.09) !important" };
   }
   if (p === selectedRow.value) {
     return { "background-color": "rgba(232, 232, 232, 0.09) !important" };
@@ -630,7 +593,6 @@ const showDetailAll = (item: RowValues) => {
   delete o.$meta;
   delete o.$resolvedLabels;
   delete o.$changeInNumbers;
-  delete o.$ruleViolationMarks;
   delete o.$fileValues;
   delete o.$changeInNumbers;
   delete o.$beforeKeyValues;
@@ -830,9 +792,6 @@ defineExpose({
                     'code-value': item.$resolvedLabels[key.name],
                     'is-null': item[key.name] == null,
                   }" :title="item[key.name]">
-                    <span v-if="item.$ruleViolationMarks[key.name]" class="violation-mark">{{
-                      item.$ruleViolationMarks[key.name]
-                      }}</span>
                     <span class="val">
                       <template v-if="columnFilters[key.name]">
                         <template v-for="(part, partIndex) of highlightedParts(item[key.name], key.name)" :key="partIndex">
@@ -886,7 +845,6 @@ defineExpose({
         </form>
       </div>
     </Teleport>
-    <p v-if="legend.length" class="rule-violation-legend" v-text="legend"></p>
   </section>
 </template>
 
@@ -1033,12 +991,6 @@ td.vcell {
     white-space: nowrap;
     width: 100%;
   }
-
-  span.violation-mark {
-    font-size: x-small;
-    font-weight: bold;
-    margin-right: 4px;
-  }
 }
 
 /* =========================
@@ -1064,11 +1016,6 @@ th {
   overflow: hidden;
   white-space: nowrap;
 
-  &:hover > .column-heading,
-  &.has-filter > .column-heading {
-    padding-right: 28px;
-  }
-
   &:hover > .column-heading > .column-filter-button,
   &.has-filter > .column-heading > .column-filter-button {
     visibility: visible;
@@ -1077,7 +1024,7 @@ th {
   >.column-heading {
     display: flex;
     align-items: center;
-    padding-right: 8px;
+    padding-right: 28px;
 
     >.codicon {
       flex: none;
@@ -1207,10 +1154,6 @@ mark.filter-match {
       background: var(--vscode-button-background);
     }
   }
-}
-
-p.rule-violation-legend {
-  margin: 0 5px;
 }
 
 p.code-value {

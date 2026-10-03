@@ -41,7 +41,7 @@ const contentHeight = computed(() => {
     div += TR_HEIGHT;
   }
 
-  return Math.max(props.height - div, 50)
+  return Math.max(props.height - div, 50);
 });
 
 const emit = defineEmits<{
@@ -73,7 +73,6 @@ function onShowRecordAtDetailPane(params: ShowRecordParams) {
   detailText.value = JSON.stringify(value, null, 2);
   showDetailPane.value = true;
 }
-
 
 const save = (): any => {
   return rdhRef.value?.save();

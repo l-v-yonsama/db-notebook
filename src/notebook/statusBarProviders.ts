@@ -55,7 +55,6 @@ export class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
     }
 
     const {
-      ruleFile,
       codeResolverFile,
       savingSharedVariables,
       sharedVariableName,
@@ -75,18 +74,6 @@ export class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
         tooltip += " $(replace) Use " + abbr(displayFileName, 18);
       } else {
         tooltip += " $(warning) Missing Code resolver " + abbr(displayFileName, 18);
-      }
-    }
-
-    if (ruleFile) {
-      let displayFileName = ruleFile;
-      if (displayFileName.endsWith(".rrule")) {
-        displayFileName = displayFileName.substring(0, displayFileName.length - 6);
-      }
-      if (await existsFileOnWorkspace(ruleFile)) {
-        tooltip += " $(checklist) Use " + abbr(displayFileName, 18);
-      } else {
-        tooltip += " $(warning) Missing Rule " + abbr(displayFileName, 18);
       }
     }
 

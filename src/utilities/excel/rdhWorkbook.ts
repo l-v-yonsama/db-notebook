@@ -1,5 +1,4 @@
-import { getRecordRuleResults } from "@l-v-yonsama/multi-platform-database-drivers";
-import { RecordRuleValidationResult, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
+import { ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import * as Excel from "exceljs";
 import { getOutputConfig, getResultsetConfig } from "../configUtil";
 import {
@@ -9,7 +8,6 @@ import {
   TocRecords,
   writeTocRecords,
 } from "./common";
-import { createRecordRulesSheet } from "./recordRuleSheet";
 import { applyExcelTheme } from "./excelTheme";
 
 function stripSheetName(s: string): string {
@@ -184,24 +182,6 @@ export async function createBookFromList(
       tocRowNo += writeTocRecords(tocSheet!, tocRecords, tocRowNo);
     }
 
-    tocRowNo += 2;
-
-    // RECORD RULES
-    const ruleResultList = generalList
-      .map((rdh) => getRecordRuleResults(rdh))
-      .filter((it) => it !== undefined) as RecordRuleValidationResult[];
-    if (ruleResultList.length) {
-      if (outputCondig.excel.displayToc) {
-        cell = tocSheet!.getCell(`C${tocRowNo}`);
-        cell.value = "■ Record Rules";
-      }
-      tocRowNo++;
-      // create a sheet.
-      const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
-      if (outputCondig.excel.displayToc) {
-        tocRowNo += writeTocRecords(tocSheet!, tocRecords, tocRowNo);
-      }
-    }
   } catch (e) {
     console.error(e);
   }

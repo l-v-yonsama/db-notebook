@@ -15,7 +15,6 @@ import VsCodeTextField from "./base/VsCodeTextField.vue";
 window.addEventListener("resize", () => resetSpPaneWrapperHeight());
 
 const codeFileItems: DropdownItem[] = [];
-const ruleFileItems: DropdownItem[] = [];
 const chartTypeItems: DropdownItem[] = [
   { label: "Unused", value: "Unused" },
   { label: "Bar Chart", value: "bar" },
@@ -32,7 +31,6 @@ const chartDataItems: DropdownItem[] = [];
 const preparationVisible = ref(false);
 const showComment = ref(false);
 const codeResolverFile = ref("");
-const ruleFile = ref("");
 const chartMultipleDataset = ref(false);
 const chartShowDataLabels = ref(false);
 const chartShowTitle = ref(false);
@@ -72,13 +70,9 @@ const initialize = async (v: NotebookCellMetadataPanelEventData["value"]["initia
   showComment.value = v.metadata.showComment === true;
 
   codeResolverFile.value = v.metadata.codeResolverFile ?? "";
-  ruleFile.value = v.metadata.ruleFile ?? "";
 
   v.codeFileItems.map((it) => {
     codeFileItems.push({ label: it.label, value: it.value });
-  });
-  v.ruleFileItems.map((it) => {
-    ruleFileItems.push({ label: it.label, value: it.value });
   });
 
   chartLabelItems.push({ label: " -- ", value: "" });
@@ -130,7 +124,6 @@ const save = () => {
       metadata: {
         showComment: showComment.value,
         codeResolverFile: codeResolverFile.value,
-        ruleFile: ruleFile.value,
         savingSharedVariables: savingSharedVariables.value,
         sharedVariableName: sharedVariableName.value,
         useDatabaseName: preparationVisible.value ? useDatabaseName.value : undefined,
@@ -215,14 +208,7 @@ defineExpose({
         <legend>Resultset decoration</legend>
         <div>
           <p>Resolve code values to labels and display them in the resultset</p>
-          <VsCodeDropdown id="codeFileItems" v-model="codeResolverFile" :items="codeFileItems" />
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Resultset validation</legend>
-        <div>
-          <p>Verify each records by the record rule file</p>
-          <VsCodeDropdown id="ruleFileItems" v-model="ruleFile" :items="ruleFileItems" />
+          <VsCodeDropdown id="codeFileItems" v-model="codeResolverFile" :items="codeFileItems" :width="180" />
         </div>
       </fieldset>
       <fieldset>

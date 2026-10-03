@@ -1,7 +1,4 @@
-import {
-  RDSBaseDriver,
-  runRuleEngine,
-} from "@l-v-yonsama/multi-platform-database-drivers";
+import { RDSBaseDriver } from "@l-v-yonsama/multi-platform-database-drivers";
 import { resolveCodeLabel, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import { createHash } from "crypto";
 import dayjs from "dayjs";
@@ -287,9 +284,6 @@ export class MdhViewProvider extends BaseViewProvider {
             rdh: {
               outputAllOnOneSheet: true,
             },
-            rule: {
-              withRecordRule: true,
-            },
           })
         : await createHtmlFromRdhList(tabItem.list, uri.fsPath);
     if (message) {
@@ -356,9 +350,6 @@ export class MdhViewProvider extends BaseViewProvider {
                     ? { useDatabaseName: rdh.meta.useDatabase }
                     : undefined,
                 });
-                if (rdh.meta.tableRule) {
-                  afterRdh.meta.tableRule = rdh.meta.tableRule;
-                }
                 if (rdh.meta.codeItems) {
                   afterRdh.meta.codeItems = rdh.meta.codeItems;
                 }
@@ -421,10 +412,6 @@ export class MdhViewProvider extends BaseViewProvider {
               meta: rdh.meta,
               prepare: useDatabase ? { useDatabaseName: useDatabase } : undefined,
             });
-            if (rdh.meta.tableRule) {
-              newRdh.meta.tableRule = rdh.meta.tableRule;
-              await runRuleEngine(newRdh);
-            }
             if (rdh.meta.codeItems) {
               newRdh.meta.codeItems = rdh.meta.codeItems;
               await resolveCodeLabel(newRdh);

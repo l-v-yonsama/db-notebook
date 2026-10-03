@@ -67,7 +67,7 @@ function cellNeedsConnection(input: CellInput): boolean {
  *
  * CellMetadataInput deliberately exposes a curated subset of CellMeta (see
  * src/types/Notebook.ts): fields like `chart` (needs result columns that
- * don't exist yet) and `ruleFile`/`codeResolverFile` (separate file schemas)
+ * don't exist yet) and `codeResolverFile` (a separate file schema)
  * aren't things a model authoring a cell up front can fill in correctly.
  */
 export async function buildNotebookCells(

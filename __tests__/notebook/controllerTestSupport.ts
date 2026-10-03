@@ -128,7 +128,6 @@ vi.mock("../../src/utilities/configUtil", () => ({
     withComment: false,
     withRowNo: false,
     withCodeLabel: false,
-    withRuleViolation: false,
     dateFormat: "YYYY-MM-DD",
     timestampFormat: "YYYY-MM-DD HH:mm:ss",
     eol: "\n",

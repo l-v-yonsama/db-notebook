@@ -1,6 +1,5 @@
 import { NotebookCell, NotebookCellKind, NotebookEditor, window } from "vscode";
 import { CodeResolverParams } from "../shared/CodeResolverParams";
-import { RecordRule } from "../shared/RecordRule";
 import { CellMeta, NotebookToolbarClickEvent } from "../types/Notebook";
 import { readFileOnWorkspace } from "./fsUtil";
 
@@ -10,9 +9,7 @@ import {
   DBType,
   isPartiQLType,
   isRDSType,
-  stringConditionToJsonCondition,
 } from "@l-v-yonsama/multi-platform-database-drivers";
-import { ResultSetData } from "@l-v-yonsama/rdh";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 
 export const isMarkupCell = (cell: NotebookCell): boolean => {
@@ -157,24 +154,6 @@ export const isPreExecution = (cell: NotebookCell): boolean => {
     return false;
   }
   return true;
-};
-
-export const readRuleFile = async (
-  metadata: CellMeta,
-  rdh: ResultSetData
-): Promise<RecordRule | undefined> => {
-  const { ruleFile } = metadata;
-  if (ruleFile) {
-    const text = await readFileOnWorkspace(ruleFile);
-    if (text) {
-      const rule = JSON.parse(text) as RecordRule;
-      rule.tableRule.details.forEach((detail) => {
-        stringConditionToJsonCondition(detail.conditions, rdh.keys);
-      });
-      return rule;
-    }
-  }
-  return undefined;
 };
 
 export const readCodeResolverFile = async (

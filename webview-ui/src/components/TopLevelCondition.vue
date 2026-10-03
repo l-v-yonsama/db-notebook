@@ -68,17 +68,7 @@
             </td>
             <td class="val">
               <div v-if="hasValueOperator(conditionList[idx].operator)" class="val-def">
-                <VsCodeDropdown
-                  v-if="selectableValType(conditionList[idx].operator)"
-                  v-model="conditionList[idx].params!.valType"
-                  :items="valTypeItems"
-                  :transparent="true"
-                  :required="true"
-                  class="valType"
-                  @change="changeCondition({ name: 'valType', condition })"
-                ></VsCodeDropdown>
                 <VsCodeTextField
-                  v-if="conditionList[idx].params!.valType === 'static'"
                   v-model="conditionList[idx].value"
                   :maxlength="256"
                   :transparent="true"
@@ -89,18 +79,8 @@
                 ></VsCodeTextField>
                 <p
                   style="margin: 0 3px"
-                  v-if="!selectableValType(conditionList[idx].operator)"
                   v-text="toExample(conditionList[idx])"
                 ></p>
-                <VsCodeDropdown
-                  v-if="conditionList[idx].params!.valType === 'column' && selectableValType(conditionList[idx].operator)"
-                  v-model="conditionList[idx].params!.valColumn"
-                  :items="columnItems"
-                  :transparent="true"
-                  :required="true"
-                  @change="changeCondition({ name: 'valColumn', condition })"
-                  style="flex-grow: 1"
-                ></VsCodeDropdown>
               </div>
             </td>
             <td class="ctl">
@@ -120,7 +100,6 @@
         <TopLevelCondition
           v-model="nestedList[idx]"
           :columnItems="columnItems"
-          :rule-base-mode="props.ruleBaseMode"
           :lv="props.lv + 1"
           @change="updateSuperTextDocument()"
           @deleteTopLevelCondition="deleteTopLevelConditionAndUpdateDocument(idx)"
@@ -132,7 +111,7 @@
 
 <script setup lang="ts">
 import type { DropdownItem } from "@/types/Components";
-import { RULE_BASE_OPERATORS, VIEW_CONDITIONAL_OPERATORS } from "@/utilities/RRuleUtil";
+import { OPERATORS } from "@/utilities/ViewConditionUtil";
 import { computed, ref } from "vue";
 import VsCodeButton from "./base/VsCodeButton.vue";
 import VsCodeDropdown from "./base/VsCodeDropdown.vue";
@@ -144,7 +123,7 @@ import {
   isAnyConditions,
   isConditionProperties,
   isTopLevelCondition,
-} from "@/utilities/RRuleUtil";
+} from "@/utilities/ViewConditionUtil";
 import type {
   AllConditions,
   AnyConditions,
@@ -154,9 +133,8 @@ import type {
 import { GeneralColumnType, isNumericLike } from "@l-v-yonsama/rdh";
 
 type Props = {
-  modelValue: any; // TableRuleDetail["conditions"];
+  modelValue: TopLevelCondition;
   columnItems: DropdownItem[];
-  ruleBaseMode: boolean;
   lv: number;
 };
 const props = defineProps<Props>();
@@ -167,12 +145,6 @@ const andOrSwitch = ref(isAny ? "any" : "all");
 const andOrItems = [
   { label: "AND", value: "all" },
   { label: "OR", value: "any" },
-];
-
-const valTypeItems = [
-  { label: "-", value: "" },
-  { label: "STATIC", value: "static" },
-  { label: "COLUMN", value: "column" },
 ];
 
 const conditionList = ref([] as ConditionProperties[]);
@@ -198,7 +170,7 @@ if (isAnyConditions(props.modelValue)) {
   });
 }
 
-const operatorItems = props.ruleBaseMode ? RULE_BASE_OPERATORS : VIEW_CONDITIONAL_OPERATORS;
+const operatorItems = OPERATORS;
 
 const emit = defineEmits<{
   (event: "update:modelValue", modelValue: any): void;
@@ -223,23 +195,7 @@ function handleOnChange(key: string, event: any) {
   emit("change");
 }
 
-const changeCondition = (params?: { name: string; condition: ConditionProperties }) => {
-  if (params) {
-    const { name, condition } = params;
-    if (name === "valType") {
-      if (condition.params?.valType === "static") {
-        condition.value = "";
-      } else {
-        condition.value = {
-          fact: "",
-        };
-      }
-    } else if (name === "valColumn") {
-      condition.value = {
-        fact: condition.params!.valColumn,
-      };
-    }
-  }
+const changeCondition = () => {
   if (isAllConditions(props.modelValue)) {
     const modelValue = Object.assign(props.modelValue, {}) as AllConditions;
     modelValue.all.splice(0, modelValue.all.length);
@@ -277,10 +233,6 @@ const addCondition = () => {
     fact: "",
     operator: "",
     value: "",
-    params: {
-      valType: "static",
-      valColumn: "",
-    },
   };
   if (isAny) {
     modelValue["any"].push(prop);
@@ -309,13 +261,7 @@ const updateSuperTextDocument = () => {
 };
 
 const hasValueOperator = (ope: string): boolean => {
-  return ope !== "isNull" && ope !== "isNotNull" && ope !== "isNil" && ope !== "isNotNil";
-};
-
-// レコードルール向けの場合は比較値の指定方法を選択可能
-// 但し、比較値が配列になる場合は選択不可能
-const selectableValType = (ope: string): boolean => {
-  return props.ruleBaseMode && ope !== "between" && ope !== "in" && ope !== "notIn";
+  return ope !== "isNull" && ope !== "isNotNull";
 };
 
 const toExample = (p: ConditionProperties): string => {
@@ -359,9 +305,6 @@ section.condition {
       .no {
         width: 60px;
         max-width: 60px;
-      }
-      .valType {
-        margin-right: 3px;
       }
       .ctl {
         width: 60px;

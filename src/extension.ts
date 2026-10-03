@@ -62,7 +62,6 @@ import { ScanPanel } from "./panels/ScanPanel";
 import { SubscriptionSettingPanel } from "./panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "./panels/ViewConditionPanel";
 import { registerResourceTreeCommand } from "./treeData/resource/ResourceTreeCommand";
-import { activateRuleEditor } from "./editors/rule/activator";
 import { registerToolActivityTreeCommand } from "./treeData/toolActivity/ToolActivityTreeCommand";
 import { ToolActivityTreeProvider } from "./treeData/toolActivity/ToolActivityTreeProvider";
 import { onDidChangeActivity } from "./treeData/toolActivity/ToolInvocationTracker";
@@ -228,8 +227,6 @@ export async function activate(context: ExtensionContext) {
   // Notebook
   activateNotebook(context, stateStorage);
 
-  // Record rule editor
-  activateRuleEditor(context, stateStorage);
   // Code resolver editor
   activateCodeResolverEditor(context, stateStorage);
 

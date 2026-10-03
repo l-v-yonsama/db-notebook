@@ -4,7 +4,7 @@
 //   common.ts            - TOC records, shared header, single-result-set table writer
 //   logAnalysisWorkbook.ts - log analysis workbook
 //   diffWorkbook.ts      - diff workbook
-//   recordRuleSheet.ts   - record rule / undo change sheet generation
+//   undoChangeSheet.ts   - undo change sheet generation
 //   rdhWorkbook.ts        - normal RDH workbook
 // Consumers import this directory instead of depending on an individual
 // workbook implementation.

@@ -56,7 +56,6 @@ import type {
 import type { AiMaskingLevel, PreparedAiPayload } from "./AiDataMasking";
 import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSummary";
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
-import type { RecordRule } from "./RecordRule";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 import type { CloudWatchDashboardHostMessage } from "./observability";
 
@@ -85,7 +84,6 @@ export type MessageEventData =
   | PerformanceTuningPreviewPanelEventData
   | AiDataMaskingPreviewPanelEventData
   | PerformanceTuningBindParametersPanelEventData
-  | RecordRuleEditorEventData
   | ScanPanelEventData
   | SubscriptionSettingPanelEventData
   | ToolsViewEventData
@@ -828,7 +826,6 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
       preparationVisible: boolean;
       connectionSettingNames: string[];
       codeFileItems: LabelValueItem[];
-      ruleFileItems: LabelValueItem[];
       columnItems: RdhKey[];
     };
   }
@@ -955,19 +952,6 @@ export type SubscriptionPayloadsViewEventData = BaseMessageEventData<
       subscriptionName: string;
       isSubscribed: boolean;
       rdh: ResultSetData | null;
-    };
-  }
->;
-
-export type RecordRuleEditorEventData = BaseMessageEventData<
-  BaseMessageEventDataCommand,
-  "RecordRuleEditor",
-  {
-    initialize?: {
-      connectionSettingNames: string[];
-      schema?: DbSchema;
-      recordRule: RecordRule;
-      scrollPos: number;
     };
   }
 >;

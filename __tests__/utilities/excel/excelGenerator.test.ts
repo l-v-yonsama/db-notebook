@@ -48,7 +48,6 @@ const makeRdh = (opts: {
   rows: Record<string, any>[];
   sqlStatement?: string;
   binds?: string[];
-  ruleViolationSummary?: Record<string, number>;
 }): ResultSetData => {
   const rdhKeys = opts.keys.map((k) =>
     createRdhKey({ name: k.name, type: k.type, comment: k.comment })
@@ -59,9 +58,6 @@ const makeRdh = (opts: {
   (rdh.meta as any).tableName = opts.tableName;
   if (opts.comment) {
     (rdh.meta as any).comment = opts.comment;
-  }
-  if (opts.ruleViolationSummary) {
-    (rdh.meta as any).ruleViolationSummary = opts.ruleViolationSummary;
   }
   if (opts.sqlStatement) {
     rdh.sqlStatement = opts.sqlStatement;
@@ -138,29 +134,6 @@ describe("createQueryResultSheet (via createBookFromRdh)", () => {
     expect(sheet.getCell(9, 2).value).toBe("id");
     expect(sheet.getCell(10, 2).value).toBe("Order ID");
     expect(sheet.getCell(11, 2).value).toBe(100);
-  });
-
-  it("ルール違反サマリーがある場合、サマリー行を挟んでからヘッダー/データ行を書く", async () => {
-    const rdh = makeRdh({
-      tableName: "accounts",
-      keys: [{ name: "id", type: GeneralColumnType.INTEGER, comment: "ID" }],
-      rows: [{ id: 100 }],
-      ruleViolationSummary: { rule1: 3 },
-    });
-
-    const targetPath = tmpXlsxPath();
-    await createBookFromRdh(rdh, targetPath);
-
-    const workbook = await readWorkbook(targetPath);
-    const sheet = workbook.worksheets[0];
-
-    expect(sheet.getCell(1, 2).value).toBe("■ accounts");
-    expect(sheet.getCell(2, 2).value).toBe("Rule violation");
-    expect(sheet.getCell(2, 4).value).toBe("*1: rule1: 3");
-
-    expect(sheet.getCell(4, 2).value).toBe("id");
-    expect(sheet.getCell(5, 2).value).toBe("ID");
-    expect(sheet.getCell(6, 2).value).toBe(100);
   });
 
   it("データ行が0件の場合はNo records.を書いて終わる", async () => {
@@ -378,7 +351,7 @@ describe("Excel theme setting", () => {
 });
 
 describe("createBookFromDiffList", () => {
-  it("TOC・before/afterシート・Undo Changes・Record Rulesシートを生成する", async () => {
+  it("TOC・before/afterシート・Undo Changesシートを生成する", async () => {
     const rdh1 = makeRdh({
       tableName: "users",
       comment: "user table",
@@ -391,7 +364,6 @@ describe("createBookFromDiffList", () => {
         { id: 2, name: "Bob" },
       ],
       sqlStatement: "SELECT * FROM users",
-      ruleViolationSummary: { rule1: 1 },
     });
     const rdh2 = makeRdh({
       tableName: "users",
@@ -418,7 +390,6 @@ describe("createBookFromDiffList", () => {
     const options: BookCreateOption = {
       rdh: { outputAllOnOneSheet: false },
       diff: { displayOnlyChanged: false },
-      rule: { withRecordRule: true },
     };
     const err = await createBookFromDiffList(
       [
@@ -437,12 +408,8 @@ describe("createBookFromDiffList", () => {
 
     const workbook = await readWorkbook(targetPath);
     const sheetNames = workbook.worksheets.map((s) => s.name);
-    // RECORD_RULES is intentionally not asserted here: it's only created when a row
-    // actually has a rule-engine "Rul" annotation attached (requires rdh.meta.tableRule
-    // wired up by the rule engine, which is out of scope for this smoke test), so
-    // options.rule.withRecordRule:true above just exercises the "no violations" branch.
     expect(sheetNames).toEqual(
-      expect.arrayContaining(["TOC", "before", "after", "UNDO_CHANGES"])
+      ["TOC", "before", "after", "UNDO_CHANGES"]
     );
 
     const toc = workbook.getWorksheet("TOC")!;
@@ -463,7 +430,7 @@ describe("createBookFromDiffList", () => {
     expect(before.getCell("B3").value).toBe("SELECT * FROM users");
   });
 
-  it("undoChangeStatementsやwithRecordRuleが無ければ該当シートを作らない", async () => {
+  it("undoChangeStatementsが無ければUndo Changesシートを作らない", async () => {
     const rdh1 = makeRdh({
       tableName: "orders",
       keys: [{ name: "id", type: GeneralColumnType.INTEGER }],
@@ -494,7 +461,6 @@ describe("createBookFromDiffList", () => {
     const sheetNames = workbook.worksheets.map((s) => s.name);
     expect(sheetNames).toEqual(expect.arrayContaining(["before", "after"]));
     expect(sheetNames).not.toContain("UNDO_CHANGES");
-    expect(sheetNames).not.toContain("RECORD_RULES");
   });
 });
 

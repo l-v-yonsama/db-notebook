@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { DropdownItem, SecondaryItem } from "@/types/Components";
 import type {
-  UpdateTextDocumentActionCommand,
   ViewConditionPanelEventData,
   ViewConditionParams,
 } from "@/utilities/vscode";
@@ -98,7 +97,6 @@ const parseDynamoAttrType = (typeString: string): GeneralColumnType => {
   return GeneralColumnType.UNKNOWN;
 };
 
-
 const initialize = (v: ViewConditionPanelEventData["value"]["initialize"]): void => {
   if (v === undefined) {
     return;
@@ -169,10 +167,6 @@ const editorItem = ref({
         fact: "",
         operator: "",
         value: "",
-        params: {
-          valType: "static",
-          valColumn: "",
-        },
       },
     ],
   },
@@ -184,7 +178,7 @@ const cancel = () => {
     params: {},
   });
 };
-const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {
+const updateTextDocument = () => {
   visibleCondition.value = false;
   nextTick(() => {
     visibleCondition.value = true;
@@ -334,7 +328,7 @@ defineExpose({
                 style="margin-right: auto">Specify</VsCodeCheckbox>
             </legend>
             <TopLevelConditionVue v-if="visibleCondition && specifyCondition" v-model="editorItem.conditions"
-              :columnItems="columnItems" :rule-base-mode="false" :lv="0" @change="updateTextDocument()" />
+              :columnItems="columnItems" :lv="0" @change="updateTextDocument()" />
           </fieldset>
         </div>
         <fieldset class="conditions">

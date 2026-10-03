@@ -8,7 +8,7 @@ import {
 } from "../../../src/utilities/excel/excelTheme";
 
 describe("applyExcelTheme", () => {
-  it("暗色テーマでも見出し・差分・警告を区別できる色にする", () => {
+  it("暗色テーマでも見出し・差分・エラーを区別できる色にする", () => {
     const book = new Excel.Workbook();
     const sheet = book.addWorksheet("diff");
     const header = sheet.getCell("A1");
@@ -18,16 +18,16 @@ describe("applyExcelTheme", () => {
     const added = sheet.getCell("A2");
     added.value = "new";
     fillCell(added, "Add");
-    const warning = sheet.getCell("A3");
-    warning.value = "rule";
-    fillCell(warning, "Rul");
+    const error = sheet.getCell("A3");
+    error.value = "error";
+    fillCell(error, "Err");
 
     applyExcelTheme(book, "roastery");
 
     expect(header.fill).toMatchObject({ fgColor: { argb: "FF6B4A35" } });
     expect(header.font.color?.argb).toBe("FFF6E5CA");
     expect(added.fill).toMatchObject({ fgColor: { argb: "FF394731" } });
-    expect(warning.fill).toMatchObject({ fgColor: { argb: "FF62502C" } });
+    expect(error.fill).toMatchObject({ fgColor: { argb: "FF713837" } });
     expect(added.font.color?.argb).toBe("FFF6E5CA");
   });
 

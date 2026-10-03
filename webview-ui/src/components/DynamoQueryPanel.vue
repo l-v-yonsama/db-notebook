@@ -8,7 +8,6 @@ import {
   type DynamoQueryPanelEventData,
   type DynamoQueryProjectionConstraintView,
   type DynamoQueryProjectionMode,
-  type UpdateTextDocumentActionCommand
 } from "@/utilities/vscode";
 import {
   provideVSCodeDesignSystem,
@@ -43,7 +42,6 @@ const FILTER_OPERATORS: DropdownItem[] = [
   ...OPERATORS,
   { label: "CONTAINS", value: "contains" },
 ];
-
 
 const ONLY_EQUAL_OPERATORS: DropdownItem[] = [
   { label: "=", value: "equal" },
@@ -283,7 +281,7 @@ const deleteFilter = (idx: number) => {
   filters.value.splice(idx, 1);
   ok(true);
 };
-const updateTextDocument = (values?: UpdateTextDocumentActionCommand["params"]["values"]) => {
+const updateTextDocument = () => {
   ok(true);
 };
 const recieveMessage = (data: DynamoQueryPanelEventData) => {
@@ -300,8 +298,6 @@ const recieveMessage = (data: DynamoQueryPanelEventData) => {
       break;
   }
 };
-
-
 
 defineExpose({
   recieveMessage,

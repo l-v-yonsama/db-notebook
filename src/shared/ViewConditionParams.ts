@@ -1,7 +1,7 @@
-import type { TableRuleDetail } from "@l-v-yonsama/rdh";
+import type { TopLevelCondition } from "./ViewCondition";
 
 export type ViewConditionParams = {
-  conditions: TableRuleDetail["conditions"];
+  conditions: TopLevelCondition;
   specfyCondition: boolean;
   limit: number;
   editable: boolean;

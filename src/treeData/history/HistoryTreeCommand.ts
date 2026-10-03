@@ -48,7 +48,6 @@ import {
   normalizeQuery,
   resolveTableAliasMap,
   resolveTargetTables,
-  runRuleEngine,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetData, resolveCodeLabel } from "@l-v-yonsama/rdh";
 import { CellMeta } from "../../types/Notebook";
@@ -58,7 +57,7 @@ import { showWindowErrorMessage } from "../../utilities/alertUtil";
 import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
 import { existsFileOnWorkspace } from "../../utilities/fsUtil";
 import { log } from "../../utilities/logger";
-import { readCodeResolverFile, readRuleFile } from "../../utilities/notebookUtil";
+import { readCodeResolverFile } from "../../utilities/notebookUtil";
 import { buildObservationFromHistory } from "./dynamoDbHistoryObservation";
 import type { DynamoDbPerformanceTuningPreviewRequest } from "../../performanceTuning/preview/dynamoDbPerformanceTuningPreview";
 import {
@@ -96,9 +95,6 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     };
     if (history.codeResolverFile) {
       metadata.codeResolverFile = history.codeResolverFile;
-    }
-    if (history.ruleFile) {
-      metadata.ruleFile = history.ruleFile;
     }
     sqlCell.metadata = metadata;
     return sqlCell;
@@ -450,23 +446,6 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     if (ok && result) {
       const cell = createNotebookSqlCellByHistory(history);
 
-      if (cell.metadata && history.ruleFile && (await existsFileOnWorkspace(history.ruleFile))) {
-        const rrule = await readRuleFile(cell.metadata, result);
-        if (rrule) {
-          result.meta.tableRule = rrule.tableRule;
-
-          try {
-            await runRuleEngine(result);
-          } catch (e) {
-            throw new Error(
-              `RuleEngineError:${(e as Error).message}. Unuse or review the following file. ${
-                history.ruleFile
-              }`
-            );
-          }
-        }
-      }
-
       if (
         cell.metadata &&
         history.codeResolverFile &&
@@ -491,7 +470,6 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
         variables: history.variables,
         meta: result.meta,
         summary: result.summary,
-        ruleFile: history.ruleFile,
         codeResolverFile: history.codeResolverFile,
         executedAt: Date.now(),
         status: "success",
@@ -504,7 +482,6 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
         connectionName: history.connectionName,
         sqlDoc: history.sqlDoc,
         variables: history.variables,
-        ruleFile: history.ruleFile,
         codeResolverFile: history.codeResolverFile,
         executedAt: Date.now(),
         status: "error",

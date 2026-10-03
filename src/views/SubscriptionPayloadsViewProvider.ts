@@ -174,9 +174,6 @@ export class SubscriptionPayloadsViewProvider extends BaseViewProvider {
             rdh: {
               outputAllOnOneSheet: true,
             },
-            rule: {
-              withRecordRule: true,
-            },
           })
         : await createHtmlFromRdhList([this.rdh], uri.fsPath);
     if (message) {

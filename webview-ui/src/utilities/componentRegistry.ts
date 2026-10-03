@@ -37,7 +37,6 @@ import WriteHttpEventToClipboardParamsPanel from "@/components/WriteHttpEventToC
 
 // ===== Editor(既存データの編集系) =====
 import CodeResolverEditor from "@/components/CodeResolverEditor.vue";
-import RecordRuleEditor from "@/components/RecordRuleEditor.vue";
 
 // Maps each ComponentName to the Vue component App.vue mounts for it.
 // Not every ComponentName has an entry (e.g. ExportHtmlParamsPanel has no
@@ -79,6 +78,5 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> &
   PerformanceTuningBindParametersPanel: PerformanceTuningBindParametersPanel, // Preview前のBind Parameters確認
 
   // ----- Editor -----
-  RecordRuleEditor: RecordRuleEditor, // レコード検証ルールの編集
   CodeResolverEditor: CodeResolverEditor, // コード値(コードマスタ)解決設定の編集
 };

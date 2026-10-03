@@ -21,7 +21,6 @@ export type ComponentName =
   | "DBFormView"
   | "ERDiagramSettingsPanel"
   | "CfnDiagramSettingsPanel"
-  | "RecordRuleEditor"
   | "NotebookCellMetadataPanel"
   | "SubscriptionSettingPanel"
   | "CodeResolverEditor"

@@ -2,7 +2,7 @@
   "name": "database-notebook",
   "displayName": "Database notebook",
   "description": "Turn ad-hoc investigations across databases, logs, and cloud resources into something you can save, share, and re-run. Manage SQL, JavaScript/TypeScript, and Markdown together in one notebook file, with a database manager for MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, and MQTT. Reuse the same saved connections as AI tools in GitHub Copilot Chat (Agent mode) or via a standalone MCP server. Try it in minutes with the built-in SQLite demo -- no external database required.",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "packageManager": "npm@10.9.4",
   "publisher": "HirotakaYoshioka",
   "author": "l-v-yonsama <32474032+l-v-yonsama@users.noreply.github.com>",
@@ -119,22 +119,6 @@
           "Redis Command"
         ],
         "configuration": "./languages/redis/redis.json"
-      },
-      {
-        "id": "rrule",
-        "filenames": [
-          "*.rrule"
-        ],
-        "extensions": [
-          ".rrule"
-        ],
-        "aliases": [
-          "Record rule"
-        ],
-        "icon": {
-          "dark": "media/dark/checklist.svg",
-          "light": "media/light/checklist.svg"
-        }
       },
       {
         "id": "cresolver",
@@ -466,6 +450,11 @@
           "group": "others@3"
         },
         {
+          "command": "database-notebook.quick-open-resource",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
+          "group": "others@4"
+        },
+        {
           "command": "database-notebook.connect",
           "when": "view == database-notebook-connections && viewItem =~ /^.+dbType:Mqtt.+connected:false,support:false,false.*$/",
           "group": "inline"
@@ -543,7 +532,7 @@
         {
           "command": "database-notebook.show-publish-editor-panel",
           "when": "view == database-notebook-connections && viewItem =~ /^Subscription.*/",
-          "group": "z-record-rule@8"
+          "group": "others@8"
         },
         {
           "command": "database-notebook.specify-default-connection-for-sql-cell",
@@ -691,19 +680,14 @@
           "group": "db-resourc@2"
         },
         {
+          "command": "database-notebook.open-table-select-notebook",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "db-resourc@4"
+        },
+        {
           "submenu": "database-notebook.viewRowsSubmenu",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "db-resourc@3"
-        },
-        {
-          "command": "database-notebook.create-blank-record-rule",
-          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
-          "group": "inline"
-        },
-        {
-          "command": "database-notebook.create-blank-record-rule",
-          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
-          "group": "z-record-rule@8"
         },
         {
           "command": "database-notebook.show-scan-panel",
@@ -851,9 +835,24 @@
           "group": "clipboard"
         },
         {
+          "command": "database-notebook.copy-qualified-table-name",
+          "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
+          "group": "clipboard@2"
+        },
+        {
           "command": "database-notebook.copy-column-names",
           "when": "view == database-notebook-connections && viewItem =~ /^Table.*/",
           "group": "clipboard"
+        },
+        {
+          "command": "database-notebook.add-resource-favorite",
+          "when": "view == database-notebook-connections && viewItem =~ /^(Table|DynamoTable|LogGroup|Bucket|Queue|Identity|SsmParameter|SecretsManagerSecret|CfnStack).*favorite:false/",
+          "group": "favorites@1"
+        },
+        {
+          "command": "database-notebook.remove-resource-favorite",
+          "when": "view == database-notebook-connections && viewItem =~ /^(Table|DynamoTable|LogGroup|Bucket|Queue|Identity|SsmParameter|SecretsManagerSecret|CfnStack).*favorite:true/",
+          "group": "favorites@1"
         }
       ],
       "database-notebook.viewRowsSubmenu": [
@@ -880,6 +879,16 @@
         },
         {
           "command": "database-notebook.focus-filter",
+          "when": "view == database-notebook-connections",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.quick-open-resource",
+          "when": "view == database-notebook-connections",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.show-resource-favorites",
           "when": "view == database-notebook-connections",
           "group": "navigation"
         },
@@ -1047,15 +1056,6 @@
     },
     "customEditors": [
       {
-        "viewType": "database-notebook.ruleEditor",
-        "displayName": "DB record rule editor",
-        "selector": [
-          {
-            "filenamePattern": "*.rrule"
-          }
-        ]
-      },
-      {
         "viewType": "database-notebook.codeResolverEditor",
         "displayName": "code label resolver editor",
         "selector": [
@@ -1066,13 +1066,6 @@
       }
     ],
     "commands": [
-      {
-        "command": "database-notebook.create-blank-record-rule",
-        "title": "Create a new blank DB record rule",
-        "shortTitle": "Database Record rule",
-        "category": "Database Notebook",
-        "icon": "$(checklist)"
-      },
       {
         "command": "database-notebook.create-blank-code-resolver",
         "title": "Create a new blank Code label resolver",
@@ -1231,14 +1224,36 @@
       },
       {
         "command": "database-notebook.refresh-resources",
-        "title": "Refresh Setting Panel",
-        "shortTitle": "Refresh",
+        "title": "Reload Saved Connection Settings",
+        "shortTitle": "Reload Settings",
         "icon": "$(refresh)"
       },
       {
         "command": "database-notebook.focus-filter",
         "title": "Filter",
         "icon": "$(search)"
+      },
+      {
+        "command": "database-notebook.quick-open-resource",
+        "title": "Quick Open Database Object",
+        "shortTitle": "Quick Open Object",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "database-notebook.show-resource-favorites",
+        "title": "Favorite Database Objects",
+        "shortTitle": "Favorites",
+        "icon": "$(star)"
+      },
+      {
+        "command": "database-notebook.add-resource-favorite",
+        "title": "Add to Favorites",
+        "icon": "$(star-empty)"
+      },
+      {
+        "command": "database-notebook.remove-resource-favorite",
+        "title": "Remove from Favorites",
+        "icon": "$(star-full)"
       },
       {
         "command": "database-notebook.start-mcp-server",
@@ -1276,8 +1291,8 @@
       },
       {
         "command": "database-notebook.load-database-schema",
-        "title": "Load Database Schema",
-        "shortTitle": "Load DB Schema",
+        "title": "Load or Reload Database Schema",
+        "shortTitle": "Load/Reload Schema",
         "icon": "$(list-tree)"
       },
       {
@@ -1379,6 +1394,15 @@
       {
         "command": "database-notebook.copy-resource-name",
         "title": "Copy Resource Name"
+      },
+      {
+        "command": "database-notebook.copy-qualified-table-name",
+        "title": "Copy Qualified Table Name"
+      },
+      {
+        "command": "database-notebook.open-table-select-notebook",
+        "title": "Open SELECT in New Notebook",
+        "icon": "$(notebook)"
       },
       {
         "command": "database-notebook.copy-column-names",
@@ -1861,6 +1885,34 @@
           "type": "boolean",
           "default": true,
           "description": "Enable clickable links between paired ResultSets (before / after) in Excel output."
+        },
+        "output.Excel: Theme": {
+          "scope": "resource",
+          "type": "string",
+          "enum": [
+            "unspecified",
+            "light",
+            "warm",
+            "slate",
+            "sage",
+            "midnight",
+            "chalkboard",
+            "patisserie",
+            "roastery"
+          ],
+          "enumDescriptions": [
+            "Keep the existing Excel appearance.",
+            "Clean light theme.",
+            "Warm paper and terracotta.",
+            "Cool blue and slate.",
+            "Soft green and sage.",
+            "Dark navy.",
+            "Cafe chalkboard.",
+            "Cafe patisserie.",
+            "Cafe roastery."
+          ],
+          "default": "unspecified",
+          "description": "Color and font theme for Excel output. Unspecified keeps the existing appearance. The free PT Sans, PT Serif, PT Mono and PT Sans Narrow fonts must be installed on the computer opening the workbook."
         },
         "output.Html: Create Table of Contents": {
           "scope": "resource",
@@ -3060,14 +3112,15 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^2.1.0",
-    "@l-v-yonsama/rdh": "^1.1.0",
+    "@l-v-yonsama/multi-platform-database-drivers": "^3.0.0",
+    "@l-v-yonsama/rdh": "^2.0.0",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",
     "axios": "^1.5.1",
     "axios-har-tracker": "^0.6.1",
     "bytes": "^3.1.2",
     "dayjs": "^1.11.7",
+    "enum-values": "^1.2.1",
     "exceljs": "^4.3.0",
     "execa": "^5.1.1",
     "fast-json-stable-stringify": "^2.1.0",
@@ -3075,12 +3128,14 @@
     "iconv-lite": "^0.6.3",
     "jmespath": "^0.16.0",
     "jsonc-parser": "^3.3.1",
+    "mqtt-packet": "^9.0.2",
     "prismjs": "^1.30.0",
     "qs": "^6.11.2",
     "shelljs": "^0.8.5",
     "short-unique-id": "^4.4.4",
     "store": "^2.0.12",
     "throttle-debounce": "^5.0.0",
+    "tslib": "^2.8.1",
     "typescript": "~6.0.3",
     "xregexp": "^5.1.2",
     "zod": "3.24.1"

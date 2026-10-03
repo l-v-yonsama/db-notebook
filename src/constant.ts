@@ -171,10 +171,6 @@ export const CELL_TOOLBAR_FORMAT = `${EXTENSION_NAME}.cell-toolbar-format`;
 export const CELL_TOOLBAR_DUPLICATE_WITH_METADATA = `${EXTENSION_NAME}.cell-toolbar-duplicate-with-metadata`;
 
 //---------------------------------------------------
-// RECORD RULE EDITOR
-//---------------------------------------------------
-export const CREATE_NEW_RECORD_RULE = `${EXTENSION_NAME}.create-blank-record-rule`;
-export const RECORD_RULE_TYPE = `${EXTENSION_NAME}.ruleEditor`;
 
 //---------------------------------------------------
 // CODE RESOLVER EDITOR

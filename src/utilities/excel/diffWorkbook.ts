@@ -1,12 +1,9 @@
-import { getRecordRuleResults } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   DiffResult,
   GeneralColumnType,
   RdhKey,
-  RecordRuleValidationResult,
   ResultSetData,
   RowHelper,
-  RuleAnnotation,
   CodeResolvedAnnotation,
   UpdateAnnotation,
 } from "@l-v-yonsama/rdh";
@@ -14,9 +11,9 @@ import dayjs from "dayjs";
 import { EnumValues } from "enum-values";
 import * as Excel from "exceljs";
 import { getOutputConfig, getResultsetConfig } from "../configUtil";
-import { fillCell, getCellFormat, setAnyValueByIndex, setTableHeaderCell, toRuleMarker } from "./cellStyle";
+import { fillCell, getCellFormat, setAnyValueByIndex, setTableHeaderCell } from "./cellStyle";
 import { BookCreateOption, createCommonHeader, writeTocRecords } from "./common";
-import { createRecordRulesSheet, createUndoChangeSheet } from "./recordRuleSheet";
+import { createUndoChangeSheet } from "./undoChangeSheet";
 import {
   applyExcelTheme,
   registerExcelThemeDataRange,
@@ -185,7 +182,7 @@ export async function createBookFromDiffList(
         if (!rdh) {
           continue;
         }
-        const { tableName, comment, ruleViolationSummary } = rdh.meta;
+        const { tableName, comment } = rdh.meta;
 
         cur.tableRowNoList.push(cur.rowNo);
         if (outputCondig.excel.displayTableNameAndStatement) {
@@ -248,25 +245,6 @@ export async function createBookFromDiffList(
           }
         } else {
           cur.rowNo++; // for Link to before/after sheet space
-        }
-
-        if (ruleViolationSummary) {
-          const names = Object.keys(ruleViolationSummary);
-          cell = sheet.getCell(cur.rowNo, 1);
-          setTableHeaderCell(cell);
-          if (names.length === 1) {
-            cell.value = `Rule violation`;
-            sheet.mergeCells(`B${cur.rowNo}:C${cur.rowNo}`);
-          } else {
-            cell.value = `Rule violations`;
-            sheet.mergeCells(`B${cur.rowNo}:C${cur.rowNo + names.length - 1}`);
-          }
-          names.forEach((name, idx) => {
-            cell = sheet.getCell(cur.rowNo, 3);
-            cell.value = `*${idx + 1}: ${name}: ${ruleViolationSummary[name]}`;
-            cur.rowNo++;
-          });
-          cur.rowNo++;
         }
 
         const startIndex = cur.rowNo;
@@ -344,25 +322,13 @@ export async function createBookFromDiffList(
             rdh.keys.forEach((column: RdhKey, colIdx: number) => {
               let colBasePos = displayRowno ? 2 : 1;
               let annotationMessage: any = undefined;
-              let ruleMarker: string | undefined = undefined;
               let resolvedLabel: string | undefined = undefined;
               let format = getCellFormat(column.type);
               const v = values[column.name];
               const cell = sheet.getCell(cur.rowNo, colBasePos + colIdx);
 
               const isHyperText = column.meta && column.meta.is_hyperlink === true;
-              const ruleAnnonations = RowHelper.filterAnnotationByKeyOf<RuleAnnotation>(
-                rdhRow,
-                column.name,
-                "Rul"
-              );
-              if (ruleAnnonations.length) {
-                ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
-              }
 
-              if (ruleMarker) {
-                fillCell(cell, "Rul");
-              }
               if (inserted) {
                 fillCell(cell, "Add");
               } else if (removed) {
@@ -395,7 +361,6 @@ export async function createBookFromDiffList(
                 annotationMessage,
                 isHyperText,
                 format,
-                ruleMarker,
                 resolvedLabel,
               });
             });
@@ -451,26 +416,6 @@ export async function createBookFromDiffList(
       const tocRecords = createUndoChangeSheet(workbook, undoList);
       if (tocSheet) {
         tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
-      }
-    }
-
-    // RECORD RULES
-    if (options?.rule?.withRecordRule === true) {
-      tocRowNo += 2;
-      const ruleResultList = list
-        .map((it) => getRecordRuleResults(it.rdh2))
-        .filter((it) => it !== undefined) as RecordRuleValidationResult[];
-      if (ruleResultList.length) {
-        if (tocSheet) {
-          cell = tocSheet.getCell(`C${tocRowNo}`);
-          cell.value = "■ Record Rules";
-        }
-        tocRowNo++;
-        // create a sheet.
-        const tocRecords = createRecordRulesSheet(workbook, ruleResultList);
-        if (tocSheet) {
-          tocRowNo += writeTocRecords(tocSheet, tocRecords, tocRowNo);
-        }
       }
     }
 

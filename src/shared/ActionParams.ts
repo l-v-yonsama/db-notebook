@@ -87,7 +87,6 @@ export type ActionCommand =
   | SaveValuesActionCommand
   | DeleteKeyActionCommand
   | CopyAwsSecretValueActionCommand
-  | UpdateTextDocumentActionCommand
   | UpdateKeywordActionCommand
   | UpdateCodeResolverTextDocumentActionCommand
   | CountAllTablesActionCommand
@@ -319,25 +318,6 @@ export type OkActionCommand = BaseActionCommand<"ok">;
 export type ReadyActionCommand = BaseActionCommand<"ready">;
 
 export type ExecuteActionCommand = BaseActionCommand<"execute">;
-
-export type UpdateTextDocumentActionCommand = BaseActionCommand<
-  "updateTextDocument",
-  {
-    newText: string;
-    values?: {
-      name:
-        | "cancel"
-        | "change"
-        | "add-rule"
-        | "edit-rule"
-        | "delete-rule"
-        | "save-rule"
-        | "duplicate-rule";
-      detail?: any;
-    };
-    scrollPos: number;
-  }
->;
 
 export type CountAllTablesActionCommand = BaseActionCommand<
   "countAllTables",

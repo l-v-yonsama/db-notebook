@@ -14,7 +14,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.4.0",
     "@fortawesome/free-solid-svg-icons": "^6.4.0",
     "@fortawesome/vue-fontawesome": "^3.0.0-5",
-    "@l-v-yonsama/rdh": "^1.1.0",
+    "@l-v-yonsama/rdh": "^2.0.0",
     "@virtual-list/vue": "^1.2.0",
     "@vscode/codicons": "^0.0.32",
     "@vscode/webview-ui-toolkit": "^1.2.1",
@@ -28,7 +28,7 @@
     "vue-click-outside-element": "^3.1.2"
   },
   "devDependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^2.1.0",
+    "@l-v-yonsama/multi-platform-database-drivers": "^3.0.0",
     "@types/node": "22.18.10",
     "@types/splitpanes": "^2.2.1",
     "@types/vscode-webview": "^1.57.0",

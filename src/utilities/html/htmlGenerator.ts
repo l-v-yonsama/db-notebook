@@ -182,7 +182,6 @@ export const createHtmlFromRdhList = async (
 ): Promise<string> => {
   const toMarkdownConfig = getToStringParamByConfig({
     withCodeLabel: true,
-    withRuleViolation: true,
   });
 
   const cells: NotebookCell[] = [];

@@ -2,6 +2,16 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [4.0.0] - 2026-10-04
+
+### Breaking Changes
+
+- Removed business rule validation.
+
+### Changed
+
+- Updated `@l-v-yonsama/multi-platform-database-drivers` to 3.0.0 and `@l-v-yonsama/rdh` to 2.0.0.
+
 ## [3.0.0] - 2026-09-02
 
 ### Breaking Changes

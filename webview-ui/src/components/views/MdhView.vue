@@ -151,7 +151,7 @@ const resetActiveInnerRdh = async () => {
   editable.value = newRdh.meta?.editable === true;
   refreshable.value = tabItem.refreshable;
   describable.value =
-    newRdh.keys.some((it) => isNumericLike(it.type)) && tabItem.title != "Statistics";
+    newRdh.keys.some((it) => isNumericLike(it.type)) && tabItem.title !== "Statistics";
 
   await nextTick();
 

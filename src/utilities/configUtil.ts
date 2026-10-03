@@ -157,7 +157,6 @@ export const getToStringParamByConfig = (options?: Partial<ToStringParam>): ToSt
     withComment: rdh.header.displayComment,
     withRowNo: rdh.displayRowno,
     withCodeLabel: true,
-    withRuleViolation: true,
     dateFormat: rdh.dateFormat,
     timestampFormat: rdh.timestampFormat,
     eol: rdh.eol,

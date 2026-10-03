@@ -98,7 +98,6 @@ export type QueryHistory = {
   summary?: RdhSummary;
   // CellMeta
   connectionName: string;
-  ruleFile?: string;
   codeResolverFile?: string;
   executedAt?: number;
   status?: "success" | "error";

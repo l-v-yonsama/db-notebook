@@ -8,7 +8,6 @@ import {
   RdhKey,
   ResultSetData,
   RowHelper,
-  RuleAnnotation,
 } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
 import { EnumValues } from "enum-values";
@@ -23,7 +22,6 @@ import {
   getImageTypeFromContentType,
   setAnyValueByIndex,
   setTableHeaderCell,
-  toRuleMarker,
 } from "./cellStyle";
 import { registerExcelThemeDataRange, registerExcelThemeSqlBlock } from "./excelTheme";
 
@@ -47,9 +45,6 @@ export type BookCreateOption = {
   };
   diff?: {
     displayOnlyChanged: boolean;
-  };
-  rule?: {
-    withRecordRule: boolean;
   };
   files?: any[];
   title?: string;
@@ -138,14 +133,6 @@ export function createQueryResultSheet(
     });
   }
 
-  if (rdh.meta.ruleViolationSummary) {
-    plusNo += writeRuleViolationSummarySection(
-      sheet,
-      rdh.meta.ruleViolationSummary,
-      baseRowNo + plusNo
-    );
-  }
-
   plusNo += writeHeaderSection(sheet, rdh, baseRowNo + plusNo, rdhConfig);
 
   plusNo += writeDataRowsSection(book, sheet, rdh, baseRowNo + plusNo, rdhConfig, options);
@@ -225,32 +212,6 @@ function writeTitleAndSqlStatementSection(
   return plusNo;
 }
 
-function writeRuleViolationSummarySection(
-  sheet: Excel.Worksheet,
-  ruleViolationSummary: Record<string, number>,
-  baseRowNo: number
-): number {
-  let plusNo = 0;
-  const names = Object.keys(ruleViolationSummary);
-  let cell = sheet.getCell(baseRowNo, 2);
-  setTableHeaderCell(cell);
-  if (names.length === 1) {
-    cell.value = `Rule violation`;
-    sheet.mergeCells(`B${baseRowNo}:C${baseRowNo}`);
-  } else {
-    cell.value = `Rule violations`;
-    sheet.mergeCells(`B${baseRowNo}:C${baseRowNo + names.length - 1}`);
-  }
-  names.forEach((name, idx) => {
-    cell = sheet.getCell(baseRowNo + plusNo, 4);
-    cell.value = `*${idx + 1}: ${name}: ${ruleViolationSummary[name]}`;
-    plusNo++;
-  });
-  plusNo++;
-
-  return plusNo;
-}
-
 function writeHeaderSection(
   sheet: Excel.Worksheet,
   rdh: ResultSetData,
@@ -318,7 +279,6 @@ function writeDataRowsSection(
 ): number {
   let plusNo = 0;
   const { displayRowno } = rdhConfig;
-  const { ruleViolationSummary } = rdh.meta;
 
   if (rdh.rows.length > 0) {
     registerExcelThemeDataRange(sheet, {
@@ -339,7 +299,6 @@ function writeDataRowsSection(
       }
       rdh.keys.forEach((column: RdhKey, colIdx: number) => {
         let colBasePos = displayRowno ? 3 : 2;
-        let ruleMarker: string | undefined = undefined;
         let resolvedLabel: string | undefined = undefined;
 
         const v = values[column.name];
@@ -368,18 +327,9 @@ function writeDataRowsSection(
             setAnyValueByIndex(cell, values?.downloadUrl, { isHyperText: true });
           }
         } else {
-          const ruleAnnonations = RowHelper.filterAnnotationByKeyOf<RuleAnnotation>(
-            rdhRow,
-            column.name,
-            "Rul"
-          );
           let format = getCellFormat(column.type);
           const cell = sheet.getCell(baseRowNo + plusNo, colBasePos + colIdx);
           let isHyperText = column.meta && column.meta.is_hyperlink === true;
-          if (ruleAnnonations.length) {
-            ruleMarker = toRuleMarker(ruleViolationSummary, ruleAnnonations);
-            fillCell(cell, "Rul");
-          }
           if (
             RowHelper.filterAnnotationByKeyOf<ErrorAnnotation>(rdhRow, column.name, "Err").length
           ) {
@@ -406,7 +356,6 @@ function writeDataRowsSection(
           const styleOptions: CellStyleOptionsParams = {
             isHyperText,
             format,
-            ruleMarker,
             resolvedLabel,
           };
           if (options?.adjustRow) {

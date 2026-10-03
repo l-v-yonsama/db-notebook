@@ -345,7 +345,6 @@ const cookieToText = (cookies: Cookie[], isMarkdown: boolean) => {
     withComment: false,
     withRowNo: true,
     withCodeLabel: false,
-    withRuleViolation: false,
   };
 
   return isMarkdown ? rdb.toMarkdown(outputDetail) : rdb.toString(outputDetail);
