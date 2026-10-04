@@ -253,7 +253,13 @@ describe("Excel theme setting", () => {
       const workbook = await readWorkbook(targetPath);
       const toc = workbook.getWorksheet("TOC")!;
       const result = workbook.getWorksheet("RESULT_SETS")!;
-      expect(toc.getCell("C4").font.name).toBe("PT Mono");
+      let expectedFontName: string | undefined;
+      if (process.platform === "darwin") {
+        expectedFontName = "PT Mono";
+      } else if (process.platform === "win32") {
+        expectedFontName = "Consolas";
+      }
+      expect(toc.getCell("C4").font.name).toBe(expectedFontName);
       expect(toc.getCell("C4").font.color?.argb).toBe("FFE9EDF2");
       expect(toc.getCell("C4").border.left?.style).toBe("medium");
       expect(toc.getCell("D4").fill).toMatchObject({ fgColor: { argb: "FF3B4B5B" } });
@@ -263,7 +269,7 @@ describe("Excel theme setting", () => {
       expect(toc.getCell("J2").fill?.fgColor?.argb).toBe("FF151B23");
       expect(result.getCell("B4").font.color?.argb).toBe("FFE9EDF2");
       expect(result.getCell("B6").fill).toMatchObject({ fgColor: { argb: "FF151B23" } });
-      expect(result.getCell("B6").font.name).toBe("PT Mono");
+      expect(result.getCell("B6").font.name).toBe(expectedFontName);
       expect(result.properties.tabColor?.argb).toBe("FF7BB9D3");
     } finally {
       getConfiguration.mockImplementation(original);
