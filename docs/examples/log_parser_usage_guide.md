@@ -2,6 +2,8 @@
 
 This document explains how to use the `Log Parser` feature and how it works internally.
 
+To compare SQL extracted from two logs, see the [SQL Log Comparison Usage Guide](sql_log_comparison_usage_guide.md).
+
 ---
 
 ## Overview

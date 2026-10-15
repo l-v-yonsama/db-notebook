@@ -184,11 +184,13 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
 
 </details>
 
-### SQLログ解析機能
+### SQLログ解析・比較機能
 
 Log Parse機能は、アプリケーションログを解析し、構造化されたSQL実行データを抽出します。
+SQL Log Comparison機能は、2つのログから抽出したSQLを比較し、差分と元ログの行をExcelレポートに出力します。
 
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
+- [SQL Log Comparison Usage Guide](/docs/examples/sql_log_comparison_usage_guide.md)
 
 ## AI / MCP
 
@@ -209,6 +211,7 @@ Log Parse機能は、アプリケーションログを解析し、構造化さ�
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 - [Performance Tuning Guide（Experimental / 実験的機能）](/docs/examples/performanceTuning.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
+- [SQL Log Comparison Usage Guide](/docs/examples/sql_log_comparison_usage_guide.md)
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
 - [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
 - [Using Database Notebook's AI Tools via a Standalone MCP Server](/docs/examples/mcpServerUsageGuide.md)

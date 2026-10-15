@@ -185,11 +185,13 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
 
 </details>
 
-### SQL Log Parse Feature
+### SQL Log Parse and Comparison
 
 The Log Parse feature analyzes application logs and extracts structured SQL execution data.
+SQL Log Comparison compares SQL from two logs and exports an Excel report with differences and source lines.
 
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
+- [SQL Log Comparison Usage Guide](/docs/examples/sql_log_comparison_usage_guide.md)
 
 ## AI / MCP
 
@@ -210,6 +212,7 @@ The Log Parse feature analyzes application logs and extracts structured SQL exec
 - [Database Notebook file Variable sharing – SQL examples (LIKE / IN / exact match)](/docs/examples/databaseNotebookVariableSharing.md)
 - [Performance Tuning Guide (Experimental)](/docs/examples/performanceTuning.md)
 - [Log Parser Usage Guide](/docs/examples/log_parser_usage_guide.md)
+- [SQL Log Comparison Usage Guide](/docs/examples/sql_log_comparison_usage_guide.md)
 - [Connecting to SQL Server with Entra ID (Azure AD) authentication](/docs/examples/entraIdAuthentication.md)
 - [Using Database Notebook's AI Tools from GitHub Copilot Chat](/docs/examples/lmToolsUsageGuide.md)
 - [Using Database Notebook's AI Tools via a Standalone MCP Server](/docs/examples/mcpServerUsageGuide.md)
