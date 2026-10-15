@@ -66,6 +66,13 @@ describe("Log parse workflow", () => {
         unmatchedEventCount: 25,
         unmatchedEventStartLines: Array.from({ length: 20 }, (_, i) => i + 1),
       })
-    ).toContain("25 log events did not match the field pattern. First 20 start lines:");
+    ).toContain("First 20 start lines:");
+    const diagnostics = formatLogParseDiagnostics({
+      unmatchedEventCount: 1,
+      unmatchedEventStartLines: [1],
+      unmatchedEventSamples: ['Line 1: event split matched; fields through level matched; field 3 (thread) did not match.'],
+    });
+    expect(diagnostics).toContain('1 log event did not match the field pattern.');
+    expect(diagnostics).toContain('Classify was not run for these events.');
   });
 });

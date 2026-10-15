@@ -21,6 +21,9 @@ describe("applyExcelTheme", () => {
     const error = sheet.getCell("A3");
     error.value = "error";
     fillCell(error, "Err");
+    const review = sheet.getCell("A4");
+    review.value = "review";
+    review.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFCC" } };
 
     applyExcelTheme(book, "roastery");
 
@@ -28,6 +31,7 @@ describe("applyExcelTheme", () => {
     expect(header.font.color?.argb).toBe("FFF6E5CA");
     expect(added.fill).toMatchObject({ fgColor: { argb: "FF394731" } });
     expect(error.fill).toMatchObject({ fgColor: { argb: "FF713837" } });
+    expect(review.fill).toMatchObject({ fgColor: { argb: "FF5C4424" } });
     expect(added.font.color?.argb).toBe("FFF6E5CA");
   });
 

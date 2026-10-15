@@ -2,7 +2,7 @@ import * as Excel from "exceljs";
 import { ExcelTheme } from "../../types/Config";
 
 type SelectedTheme = Exclude<ExcelTheme, "unspecified">;
-type SemanticFill = "added" | "updated" | "deleted" | "error";
+type SemanticFill = "added" | "updated" | "deleted" | "warning" | "error";
 type DataRange = { firstRow: number; lastRow: number; firstCol: number; lastCol: number };
 type SqlBlock = { headingRow: number; firstRow: number; lastRow: number; firstCol: number };
 
@@ -36,6 +36,7 @@ type Palette = {
   added: string;
   updated: string;
   deleted: string;
+  warning: string;
   error: string;
 };
 
@@ -92,6 +93,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FFDFF0D8",
     updated: "FFD9EDF7",
     deleted: "FFF2DEDE",
+    warning: "FFFFF2CC",
     error: "FFFF8E8E",
   },
   warm: {
@@ -103,6 +105,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FFDFF0D8",
     updated: "FFD9EDF7",
     deleted: "FFF2DEDE",
+    warning: "FFFFF2CC",
     error: "FFFF8E8E",
   },
   slate: {
@@ -114,6 +117,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FFDFF0D8",
     updated: "FFD9EDF7",
     deleted: "FFF2DEDE",
+    warning: "FFFFF2CC",
     error: "FFFF8E8E",
   },
   sage: {
@@ -125,6 +129,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FFDFF0D8",
     updated: "FFD9EDF7",
     deleted: "FFF2DEDE",
+    warning: "FFFFF2CC",
     error: "FFFF8E8E",
   },
   midnight: {
@@ -136,6 +141,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FF274735",
     updated: "FF29475A",
     deleted: "FF60383E",
+    warning: "FF5A4C2A",
     error: "FF73383B",
   },
   chalkboard: {
@@ -147,6 +153,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FF2C5039",
     updated: "FF2B4B54",
     deleted: "FF613D40",
+    warning: "FF5B4F2D",
     error: "FF743A3B",
   },
   patisserie: {
@@ -158,6 +165,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FFDFF0D8",
     updated: "FFD9EDF7",
     deleted: "FFF2DEDE",
+    warning: "FFFFF2CC",
     error: "FFFF8E8E",
   },
   roastery: {
@@ -169,6 +177,7 @@ const PALETTES: Record<SelectedTheme, Palette> = {
     added: "FF394731",
     updated: "FF324758",
     deleted: "FF633A3A",
+    warning: "FF5C4424",
     error: "FF713837",
   },
 };
@@ -177,6 +186,11 @@ const LEGACY_FILLS: Record<string, SemanticFill> = {
   FFDFF0D8: "added",
   FFD9EDF7: "updated",
   FFF2DEDE: "deleted",
+  FFCCFFCC: "added",
+  FFE6F4EA: "added",
+  FFE6F0FF: "updated",
+  FFFFCCCC: "deleted",
+  FFFFFFCC: "warning",
   FFFF8E8E: "error",
 };
 
@@ -255,6 +269,7 @@ export function applyExcelTheme(
     added: solidFill(palette.added),
     updated: solidFill(palette.updated),
     deleted: solidFill(palette.deleted),
+    warning: solidFill(palette.warning),
     error: solidFill(palette.error),
   };
 

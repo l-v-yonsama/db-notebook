@@ -98,6 +98,7 @@ export const HISTORY_VIEW_ID = `${EXTENSION_NAME}-histories`;
 //---------------------------------------------------
 export const SHOW_CSV = `${EXTENSION_NAME}.show-csv-file`;
 export const SHOW_LOG = `${EXTENSION_NAME}.show-log-file`;
+export const COMPARE_SQL_LOGS = `${EXTENSION_NAME}.compare-sql-logs`;
 export const SHOW_HAR = `${EXTENSION_NAME}.show-har-file`;
 export const OPEN_MDH_VIEWER = `${EXTENSION_NAME}.open-mdh-viewer`;
 export const OPEN_DIFF_MDH_VIEWER = `${EXTENSION_NAME}.open-diff-mdh-viewer`;

@@ -686,6 +686,7 @@ defineExpose({ recieveMessage });
   }
   .diagnostic {
     color: var(--vscode-editorWarning-foreground);
+    p { white-space: pre-line; }
   }
 }
 :deep(.toolbar) {

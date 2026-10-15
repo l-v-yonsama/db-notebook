@@ -14,6 +14,7 @@ export type ComponentName =
   | "HarFilePanel"
   | "HttpEventPanel"
   | "LogParseSettingPanel"
+  | "SqlLogComparisonPanel"
   | "LogParseResultView"
   | "ViewConditionPanel"
   | "PublishEditorPanel"

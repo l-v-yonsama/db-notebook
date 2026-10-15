@@ -50,7 +50,7 @@ describe.each(packageConsumers)("Log parser dependency contract ($name)", ({ pac
     const diagnostics: LogParseDiagnostics | undefined = result.diagnostics;
     expect(result.ok).toBe(true);
     expect(result.logEvents).toHaveLength(1);
-    expect(diagnostics).toEqual({
+    expect(diagnostics).toMatchObject({
       unmatchedEventCount: 1,
       unmatchedEventStartLines: [2],
     });

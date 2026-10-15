@@ -9,6 +9,7 @@ import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { HistoryTreeProvider } from "./treeData/history/HistoryTreeProvider";
 import { ResourceTreeProvider } from "./treeData/resource/ResourceTreeProvider";
 import { StateStorage } from "./utilities/StateStorage";
+import { SqlLogComparisonPanel } from "./panels/SqlLogComparisonPanel";
 
 import { activateCodeResolverEditor } from "./editors/codeResolver/activator";
 import {
@@ -20,6 +21,7 @@ import {
   BOTTOM_TOOLS_VIEWID,
   BOTTOM_TOPIC_PAYLOADS_VIEWID,
   CLOSE_SUBSCRIPTION_PAYLOADS_VIEWER,
+  COMPARE_SQL_LOGS,
   EXTENSION_NAME,
   HISTORY_VIEW_ID,
   OPEN_CHARTS_VIEWER,
@@ -237,6 +239,9 @@ export async function activate(context: ExtensionContext) {
     });
     registerDisposableCommand(SHOW_LOG, async (logUri: Uri) => {
       LogParseSettingPanel.render(context.extensionUri, logUri);
+    });
+    registerDisposableCommand(COMPARE_SQL_LOGS, async (uri?: Uri, selectedUris?: Uri[]) => {
+      SqlLogComparisonPanel.show(context.extensionUri, context.extension.packageJSON.version, context.globalState, uri, selectedUris);
     });
     registerDisposableCommand(SHOW_HAR, async (harUri: Uri) => {
       HarFilePanel.render(context.extensionUri, harUri);

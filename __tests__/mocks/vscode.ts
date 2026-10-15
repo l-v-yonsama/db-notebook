@@ -60,12 +60,16 @@ export class EventEmitter<T> {
 export class Uri {
   private constructor(public readonly fsPath: string) {}
 
+  get scheme(): string { return "file"; }
+  get path(): string { return this.fsPath; }
+  get authority(): string { return ""; }
+
   static file(fsPath: string): Uri {
     return new Uri(fsPath);
   }
 
   static joinPath(base: Uri, ...segments: string[]): Uri {
-    return new Uri([base.fsPath, ...segments].join("/").replace(/\/+/g, "/"));
+    return new Uri(require("node:path").posix.normalize([base.fsPath, ...segments].join("/")));
   }
 
   static parse(value: string): Uri {
@@ -85,6 +89,17 @@ export enum ProgressLocation {
   SourceControl = 1,
   Window = 10,
   Notification = 15,
+}
+
+export enum FileType {
+  Unknown = 0,
+  File = 1,
+  Directory = 2,
+  SymbolicLink = 64,
+}
+
+export class RelativePattern {
+  constructor(public readonly base: unknown, public readonly pattern: string) {}
 }
 
 export const window = {
@@ -121,6 +136,20 @@ export const window = {
   showWarningMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
   showErrorMessage: vi.fn(async (..._args: unknown[]) => undefined as string | undefined),
   showQuickPick: vi.fn(async (..._args: unknown[]) => undefined as unknown),
+  showOpenDialog: vi.fn(async (..._args: unknown[]) => undefined as Uri[] | undefined),
+  showSaveDialog: vi.fn(async (..._args: unknown[]) => undefined as Uri | undefined),
+  createWebviewPanel: vi.fn((..._args: unknown[]) => ({
+    webview: {
+      html: "",
+      cspSource: "vscode-webview:",
+      asWebviewUri: vi.fn((uri: Uri) => uri),
+      postMessage: vi.fn(async (..._message: unknown[]) => true),
+      onDidReceiveMessage: vi.fn((_listener: (message: unknown) => void) => ({ dispose: () => {} })),
+    },
+    onDidDispose: vi.fn((_listener: () => void) => ({ dispose: () => {} })),
+    reveal: vi.fn(),
+    dispose: vi.fn(),
+  })),
 };
 
 export const commands = {
@@ -156,6 +185,8 @@ export const workspace = {
     get: (_key: string, defaultValue?: unknown) => defaultValue,
   })),
   workspaceFolders: undefined as { uri: Uri; name?: string; index?: number }[] | undefined,
+  getWorkspaceFolder: vi.fn((_uri: Uri) => undefined as { uri: Uri; name: string } | undefined),
+  findFiles: vi.fn(async (..._args: unknown[]) => [] as Uri[]),
   notebookDocuments: [] as unknown[],
   openNotebookDocument: vi.fn(async (_uri: Uri) => {
     throw new Error("workspace.openNotebookDocument is not mocked in this test");

@@ -24,6 +24,7 @@ import ERDiagramSettings from "@/components/ERDiagramSettings.vue";
 import HarFilePanel from "@/components/HarFilePanel.vue";
 import HttpEventPanel from "@/components/HttpEventPanel.vue";
 import LogParseSettingPanel from "@/components/LogParseSettingPanel/LogParseSettingPanel.vue";
+import SqlLogComparisonPanel from "@/components/SqlLogComparisonPanel.vue";
 import NotebookCellMetadataPanel from "@/components/NotebookCellMetadataPanel.vue";
 import PerformanceTuningBindParametersPanel from "@/components/PerformanceTuningBindParametersPanel.vue";
 import PerformanceTuningPreviewPanel from "@/components/PerformanceTuningPreviewPanel.vue";
@@ -62,6 +63,7 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> &
   CreateInsertScriptSettingsPanel: CreateInsertScriptSettingsPanel, // INSERT文生成の設定
   CsvParseSettingPanel: CsvParseSettingPanel, // CSV取り込み設定
   LogParseSettingPanel: LogParseSettingPanel, // ログ解析設定
+  SqlLogComparisonPanel: SqlLogComparisonPanel, // SQLログ比較
   HarFilePanel: HarFilePanel, // HARファイル(通信ログ)の表示
   ScanPanel: ScanPanel, // リソース/テーブルのスキャン(検索)
   DynamoQueryPanel: DynamoQueryPanel, // DynamoDBクエリの実行

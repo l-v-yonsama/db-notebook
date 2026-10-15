@@ -2,6 +2,19 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [4.1.0] - 2026-10-15
+
+### Added
+- Added comparison of two SQL logs, with an Excel report showing SQL differences, WHERE clause comparison results, and links to the original log lines.
+
+Changed
+
+- Improved log parsing diagnostics to show where field matching failed.
+
+### Dependencies
+- @l-v-yonsama/multi-platform-database-drivers: 3.1.0
+- @l-v-yonsama/rdh: 2.0.0
+
 ## [4.0.0] - 2026-10-04
 
 ### Breaking Changes

@@ -59,9 +59,9 @@ export function formatLogParseDiagnostics(diagnostics?: LogParseDiagnostics): st
   const positions = truncated
     ? `First ${unmatchedEventStartLines.length} start lines`
     : "Start lines";
-  return `${unmatchedEventCount} log event${
-    unmatchedEventCount === 1 ? "" : "s"
-  } did not match the field pattern. ${positions}: ${unmatchedEventStartLines.join(", ")}.`;
+  const samples = diagnostics.unmatchedEventSamples ?? [];
+  return `${unmatchedEventCount} log event${unmatchedEventCount === 1 ? "" : "s"} did not match the field pattern. ${positions}: ${unmatchedEventStartLines.join(", ")}.` +
+    (samples.length ? `\n${samples.join("\n")}\nClassify was not run for these events.` : "");
 }
 
 export function getLogParseNextAction(
