@@ -12,6 +12,7 @@ import { RpcInvokePanel } from "../../src/panels/RpcInvokePanel";
 import { createDriver, removeDriver, workflow } from "../../src/utilities/driverResolver";
 import type { ResourceTreeProvider } from "../../src/treeData/resource/ResourceTreeProvider";
 import type { StateStorage } from "../../src/utilities/StateStorage";
+import type { RpcInvokeHistoryStore } from "../../src/utilities/RpcInvokeHistoryStore";
 
 vi.mock("../../src/utilities/driverResolver", () => ({
   createDriver: vi.fn(),
@@ -48,6 +49,7 @@ const getConnectionSettingByName = vi.fn(async () => setting);
 const getLoadedRpcMethodContext = vi.fn(() => ({ connection: { name: "fixture" }, service }));
 const storage = { getConnectionSettingByName } as unknown as StateStorage;
 const tree = { getLoadedRpcMethodContext } as unknown as ResourceTreeProvider;
+const addHistory = vi.fn().mockResolvedValue(undefined);
 
 const currentPanel = () => vi.mocked(window.createWebviewPanel).mock.results.at(-1)!.value;
 const messages = () =>
@@ -90,6 +92,7 @@ const startClientStream = async (streamMethod: RpcMethod, streamService: RpcServ
 
 beforeEach(() => {
   vi.clearAllMocks();
+  RpcInvokePanel.setHistoryStore({ add: addHistory } as unknown as RpcInvokeHistoryStore);
   vi.mocked(createDriver).mockReset();
   getLoadedRpcMethodContext.mockReturnValue({ connection: { name: "fixture" }, service });
   RpcInvokePanel.render(Uri.file("/extension"), storage, tree, method, service, "fixture");
@@ -97,6 +100,7 @@ beforeEach(() => {
 
 afterEach(() => {
   currentPanel().onDidDispose.mock.calls[0]?.[0]();
+  RpcInvokePanel.setHistoryStore(undefined);
 });
 
 describe("RpcInvokePanel", () => {
@@ -157,6 +161,17 @@ describe("RpcInvokePanel", () => {
     expect(html.contentsHtml).toContain("Hana");
     expect(html.headersHtml).toContain("x-rpc-tag");
     expect(html.trailersHtml).toContain("x-rpc-trailer");
+    expect(addHistory).toHaveBeenCalledTimes(1);
+    expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
+      path: method.path,
+      callKind: "unary",
+      outcome: "success",
+      sentCount: 1,
+      receivedCount: 1,
+      grpcStatus: { code: 0, name: "OK" },
+    }));
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("Hana");
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("x-rpc-tag");
   });
 
   it("rejects stale methods and forged metadata before running a workflow", async () => {
@@ -183,6 +198,21 @@ describe("RpcInvokePanel", () => {
     });
     expect(messages().at(-1).value.error).toContain("Invalid RPC request or metadata");
     expect(workflow).not.toHaveBeenCalled();
+    expect(addHistory).not.toHaveBeenCalled();
+  });
+
+  it("does not record invalid JSON as an invocation", async () => {
+    await send({
+      command: "invokeRpc",
+      params: {
+        connectionName: "fixture",
+        service: service.fullName,
+        method: method.name,
+        requestJson: "{broken",
+      },
+    });
+    expect(workflow).not.toHaveBeenCalled();
+    expect(addHistory).not.toHaveBeenCalled();
   });
 
   it("shows statusCode failures without exposing the saved Bearer token", async () => {
@@ -203,6 +233,10 @@ describe("RpcInvokePanel", () => {
       command: "error",
       value: { error: "denied [redacted] statusCode:16" },
     });
+    expect(addHistory).toHaveBeenCalledTimes(1);
+    expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({ outcome: "error" }));
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("fixture-secret");
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("denied");
   });
 
   it("routes a bidirectional stream through a dedicated driver and releases it", async () => {
@@ -276,6 +310,15 @@ describe("RpcInvokePanel", () => {
     await vi.waitFor(() => {
       expect(messages().some((message) => message.command === "streamCompleted")).toBe(true);
     });
+    expect(addHistory).toHaveBeenCalledTimes(1);
+    expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
+      path: streamMethod.path,
+      callKind: "bidiStreaming",
+      outcome: "cancelled",
+      sentCount: 1,
+      receivedCount: 1,
+    }));
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("stream-test");
     expect(messages().find((message) => message.command === "streamEvent")).toMatchObject({
       value: { streamEvent: { sessionId, event: { type: "received", contents: { value: "ok" } } } },
     });
@@ -328,6 +371,42 @@ describe("RpcInvokePanel", () => {
     expect(driver.disconnect).toHaveBeenCalledTimes(2);
     expect(removeDriver).toHaveBeenCalledTimes(2);
     expect(messages().at(-1).value.streamError.error).toContain("invalid method");
+    expect(addHistory).toHaveBeenCalledTimes(2);
+    expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
+      callKind: "clientStreaming", outcome: "error", sentCount: 0, receivedCount: 0,
+    }));
+  });
+
+  it("records a timed out stream once with final counts and status", async () => {
+    const { streamMethod, streamService } = selectClientStream();
+    const session = {
+      kind: "clientStreaming",
+      events: { async *[Symbol.asyncIterator]() { /* No messages. */ } },
+      completion: Promise.resolve({
+        outcome: "timeout",
+        status: { code: 4, name: "DEADLINE_EXCEEDED", details: "secret detail" },
+        elapsedMs: 20,
+        sentCount: 2,
+        receivedCount: 1,
+      }),
+      cancel: vi.fn(),
+    };
+    const driver = {
+      connect: vi.fn().mockResolvedValue(""),
+      openProtoJsonStream: vi.fn().mockReturnValue(session),
+      disconnect: vi.fn().mockResolvedValue(""),
+    };
+    vi.mocked(createDriver).mockResolvedValue(driver as any);
+    await startClientStream(streamMethod, streamService);
+    await vi.waitFor(() => expect(addHistory).toHaveBeenCalledTimes(1));
+    expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
+      callKind: "clientStreaming",
+      outcome: "timeout",
+      sentCount: 2,
+      receivedCount: 1,
+      grpcStatus: { code: 4, name: "DEADLINE_EXCEEDED" },
+    }));
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("secret detail");
   });
 
   it("releases a driver after closing the panel while connect is pending", async () => {

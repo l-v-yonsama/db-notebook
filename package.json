@@ -332,7 +332,16 @@
           "name": "Query histories",
           "visibility": "visible",
           "icon": "media/logo.png",
-          "contextualTitle": "Histories"
+          "contextualTitle": "Histories",
+          "when": "!databaseNotebook.rpcHistoryMode"
+        },
+        {
+          "id": "database-notebook-rpc-histories",
+          "name": "RPC histories",
+          "visibility": "visible",
+          "icon": "media/logo.png",
+          "contextualTitle": "RPC Histories",
+          "when": "databaseNotebook.rpcHistoryMode"
         },
         {
           "id": "database-notebook-mcpserver",
@@ -800,6 +809,11 @@
           "group": "9_danger@1"
         },
         {
+          "command": "database-notebook.rpc-histories.delete",
+          "when": "view == database-notebook-rpc-histories && viewItem == rpcInvokeHistory",
+          "group": "inline"
+        },
+        {
           "command": "database-notebook.start-mcp-server",
           "when": "view == database-notebook-mcpserver && viewItem =~ /stopped/",
           "group": "inline"
@@ -940,6 +954,16 @@
         {
           "command": "database-notebook.delete-all-query-histories",
           "when": "view == database-notebook-histories",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.refresh-rpc-histories",
+          "when": "view == database-notebook-rpc-histories",
+          "group": "navigation"
+        },
+        {
+          "command": "database-notebook.delete-all-rpc-histories",
+          "when": "view == database-notebook-rpc-histories",
           "group": "navigation"
         }
       ],
@@ -1557,6 +1581,24 @@
         "title": "Refresh query histories",
         "shortTitle": "Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "database-notebook.refresh-rpc-histories",
+        "title": "Refresh RPC histories",
+        "shortTitle": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "database-notebook.delete-all-rpc-histories",
+        "title": "Delete all RPC histories",
+        "shortTitle": "Delete all",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "database-notebook.rpc-histories.delete",
+        "title": "Delete selected RPC history",
+        "shortTitle": "Delete",
+        "icon": "$(trash)"
       },
       {
         "command": "database-notebook.delete-all-query-histories",

@@ -93,6 +93,10 @@ export const FOCUS_QUERY_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFi
 export const SORT_QUERY_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
 export const SORT_QUERY_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
 export const HISTORY_VIEW_ID = `${EXTENSION_NAME}-histories`;
+export const RPC_HISTORY_VIEW_ID = `${EXTENSION_NAME}-rpc-histories`;
+export const REFRESH_RPC_HISTORIES = `${EXTENSION_NAME}.refresh-rpc-histories`;
+export const DELETE_RPC_HISTORY = `${EXTENSION_NAME}.rpc-histories.delete`;
+export const DELETE_ALL_RPC_HISTORY = `${EXTENSION_NAME}.delete-all-rpc-histories`;
 
 //---------------------------------------------------
 // OPEN VIEWERS
