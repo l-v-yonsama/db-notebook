@@ -76,6 +76,17 @@ describe("RpcInvokeHistoryStore", () => {
     expect(provider.getTreeItem(list[3]).command).toMatchObject({
       command: "database-notebook.rpc-histories.openInInvokePanel",
     });
-    expect(String(provider.getTreeItem(list[4]).tooltip)).not.toContain("Alice");
+    const tooltip = provider.getTreeItem(list[4]).tooltip as { value: string };
+    expect(tooltip.value).toContain('```json\n{\n  "name": "Alice"\n}');
+    expect((provider.getTreeItem(list[1]).tooltip as { value: string }).value).not.toContain("**Request**");
+
+    const longRequest = `{"data":"${"x".repeat(5000)}TAIL_MARKER"}`;
+    await store.add({ ...sample(6), requestJson: longRequest });
+    const latest = (await store.list())[0];
+    const longTooltip = (provider.getTreeItem(latest).tooltip as { value: string }).value;
+    expect(longTooltip).toContain("```json");
+    expect(longTooltip).toContain("Preview truncated.");
+    expect(longTooltip).not.toContain("TAIL_MARKER");
+    expect(latest.requestJson).toBe(longRequest);
   });
 });

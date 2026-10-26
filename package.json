@@ -1198,7 +1198,7 @@
       {
         "command": "database-notebook.show-rpc-invoke-panel",
         "title": "Invoke RPC",
-        "icon": "$(play)"
+        "icon": "$(open-preview)"
       },
       {
         "command": "database-notebook.create-connection-setting",
