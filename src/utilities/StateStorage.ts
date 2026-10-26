@@ -74,7 +74,9 @@ type DbResInfo = {
   res?: DbDatabase[];
 };
 
-type SecretParamName = "password" | "clientSecret" | "sessionToken";
+type SecretParamName = "password" | "clientSecret" | "sessionToken" | "rpcToken";
+
+const cloneSetting = (setting: ConnectionSetting): ConnectionSetting => structuredClone(setting);
 
 export class StateStorage {
   private resMap = new Map<string, DbResInfo>();
@@ -517,7 +519,7 @@ export class StateStorage {
 
   async getConnectionSettingList(): Promise<ConnectionSetting[]> {
     // log(`${PREFIX} getConnectionSettingList`);
-    const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
+    const list = this.getPasswordlessConnectionSettingList().map(cloneSetting);
     for (const it of list) {
       if (it.id) {
         it.password = await this.getSecret(it.id, "password");
@@ -526,6 +528,9 @@ export class StateStorage {
         }
         if (it.dbType === "Aws" && it.awsSetting) {
           it.awsSetting.sessionToken = await this.getSecret(it.id, "sessionToken");
+        }
+        if (it.dbType === DBType.RPC && it.rpc?.authentication?.type === "bearer") {
+          it.rpc.authentication.token = (await this.getSecret(it.id, "rpcToken")) ?? "";
         }
       }
     }
@@ -584,7 +589,8 @@ export class StateStorage {
   async getConnectionSettingByName(name: string): Promise<ConnectionSetting | undefined> {
     // log(`${PREFIX} getConnectionSettingByName(${name})`);
     const list = this.context.globalState.get<ConnectionSetting[]>(STORAGE_KEY, []);
-    const setting = list.find((it) => it.name === name);
+    const stored = list.find((it) => it.name === name);
+    const setting = stored && cloneSetting(stored);
     if (setting) {
       if (setting.id) {
         setting.password = await this.getSecret(setting.id, "password");
@@ -593,6 +599,9 @@ export class StateStorage {
         }
         if (setting.dbType === "Aws" && setting.awsSetting) {
           setting.awsSetting.sessionToken = await this.getSecret(setting.id, "sessionToken");
+        }
+        if (setting.dbType === DBType.RPC && setting.rpc?.authentication?.type === "bearer") {
+          setting.rpc.authentication.token = (await this.getSecret(setting.id, "rpcToken")) ?? "";
         }
       }
       return setting;
@@ -677,7 +686,7 @@ export class StateStorage {
   }
 
   async addConnectionSetting(setting: ConnectionSetting): Promise<boolean> {
-    const list = await this.getConnectionSettingList();
+    const list = this.getPasswordlessConnectionSettingList().map(cloneSetting);
     if (list.some((it) => it.name === setting.name)) {
       return false;
     }
@@ -687,13 +696,14 @@ export class StateStorage {
     await this.removePasswordAndStoreOnSecret(setting);
     await this.removeClientSecretAndStoreOnSecret(setting);
     await this.removeAwsSessionTokenAndStoreOnSecret(setting);
+    await this.removeRpcTokenAndStoreOnSecret(setting);
     list.push(setting);
     await this.context.globalState.update(STORAGE_KEY, list);
     return true;
   }
 
   async editConnectionSetting(setting: ConnectionSetting): Promise<boolean> {
-    const list = await this.getConnectionSettingList();
+    const list = this.getPasswordlessConnectionSettingList().map(cloneSetting);
     const idx = list.findIndex((it) => it.name === setting.name);
     if (idx < 0) {
       return false;
@@ -704,6 +714,10 @@ export class StateStorage {
     await this.removePasswordAndStoreOnSecret(setting);
     await this.removeClientSecretAndStoreOnSecret(setting);
     await this.removeAwsSessionTokenAndStoreOnSecret(setting);
+    await this.removeRpcTokenAndStoreOnSecret(setting);
+    if (list[idx].dbType === DBType.RPC && setting.dbType !== DBType.RPC) {
+      await this.deleteSecret(setting.id, "rpcToken");
+    }
 
     list.splice(idx, 1, setting);
     await this.context.globalState.update(STORAGE_KEY, list);
@@ -713,7 +727,7 @@ export class StateStorage {
 
   async deleteConnectionSetting(name: string): Promise<boolean> {
     // log(`${PREFIX} deleteConnectionSetting name:[${name}]`);
-    const list = await this.getConnectionSettingList();
+    const list = this.getPasswordlessConnectionSettingList().map(cloneSetting);
     const idx = list.findIndex((it) => it.name === name);
     if (idx < 0) {
       return false;
@@ -726,6 +740,9 @@ export class StateStorage {
       }
       if (removed[0].dbType === "Aws" && removed[0].awsSetting) {
         await this.deleteSecret(removed[0].id, "sessionToken");
+      }
+      if (removed[0].dbType === DBType.RPC) {
+        await this.deleteSecret(removed[0].id, "rpcToken");
       }
     }
     await this.context.globalState.update(STORAGE_KEY, list);
@@ -759,6 +776,21 @@ export class StateStorage {
         await this.storeSecret(setting.id, "sessionToken", setting.awsSetting.sessionToken);
         setting.awsSetting.sessionToken = undefined;
       }
+    }
+  }
+
+  private async removeRpcTokenAndStoreOnSecret(setting: ConnectionSetting): Promise<void> {
+    if (!setting.id || setting.dbType !== DBType.RPC || !setting.rpc?.authentication) {
+      return;
+    }
+    const auth = setting.rpc.authentication;
+    if (auth.type === "bearer") {
+      if (auth.token) {
+        await this.storeSecret(setting.id, "rpcToken", auth.token);
+      }
+      auth.token = "";
+    } else {
+      await this.deleteSecret(setting.id, "rpcToken");
     }
   }
 

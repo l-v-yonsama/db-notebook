@@ -33,13 +33,13 @@ const LANG_ALIASES: Record<string, string> = {
   coffee: "coffeescript",
 };
 
-export const createCodeHtmlString = async ({
+export const createCodeHtmlStringSync = ({
   code,
   lang,
 }: {
   code: string;
   lang: string;
-}): Promise<string> => {
+}): string => {
   if (typeof code !== "string") {
     throw new Error(`code type(${typeof code}) must be string type. ` + code);
   }
@@ -55,6 +55,11 @@ export const createCodeHtmlString = async ({
   }
   return `<pre class="code-highlight"><code>${escapeHtml(code)}</code></pre>`;
 };
+
+export const createCodeHtmlString = async (params: {
+  code: string;
+  lang: string;
+}): Promise<string> => createCodeHtmlStringSync(params);
 
 function resolveLanguageId(lang: string): string | undefined {
   const id = LANG_ALIASES[lang?.toLowerCase()] ?? lang?.toLowerCase();

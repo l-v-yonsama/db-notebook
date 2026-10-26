@@ -30,6 +30,7 @@ import PerformanceTuningBindParametersPanel from "@/components/PerformanceTuning
 import PerformanceTuningPreviewPanel from "@/components/PerformanceTuningPreviewPanel.vue";
 import AiDataMaskingPreviewPanel from "@/components/AiDataMaskingPreviewPanel.vue";
 import PublishEditorPanel from "@/components/PublishEditorPanel.vue";
+import RpcInvokePanel from "@/components/RpcInvokePanel.vue";
 import ScanPanel from "@/components/ScanPanel.vue";
 import SubscriptionSettingPanel from "@/components/SubscriptionSettingPanel.vue";
 import VariablesPanel from "@/components/VariablesPanel.vue";
@@ -68,6 +69,7 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> &
   ScanPanel: ScanPanel, // リソース/テーブルのスキャン(検索)
   DynamoQueryPanel: DynamoQueryPanel, // DynamoDBクエリの実行
   PublishEditorPanel: PublishEditorPanel, // MQTT publish/subscribeの編集
+  RpcInvokePanel: RpcInvokePanel,
   SubscriptionSettingPanel: SubscriptionSettingPanel, // MQTT等のサブスクリプション設定
   ViewConditionPanel: ViewConditionPanel, // クエリ抽出条件の設定
   VariablesPanel: VariablesPanel, // 変数の一覧・編集

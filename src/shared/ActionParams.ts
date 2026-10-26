@@ -12,6 +12,11 @@ import type { ModeType } from "./ModeType";
 import type { QueryStatisticsSearchParams } from "./QueryStatisticsParams";
 import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
 import type { AiMaskingLevel, AiPayloadFindingResolution } from "./AiDataMasking";
+import type {
+  RpcInvokeRequest,
+  RpcStreamAction,
+  RpcStreamSendAction,
+} from "./RpcInvokePanelParams";
 
 export type TabIdParam = {
   tabId: string;
@@ -112,7 +117,18 @@ export type ActionCommand =
   | RunObservedDynamoDbReadActionCommand
   | RunPerformanceTuningBenchmarkActionCommand
   | SelectPerformanceTuningBaselineActionCommand
-  | ClearPerformanceTuningBaselineActionCommand;
+  | ClearPerformanceTuningBaselineActionCommand
+  | InvokeRpcActionCommand
+  | StartRpcStreamActionCommand
+  | SendRpcStreamMessageActionCommand
+  | FinishRpcStreamSendingActionCommand
+  | CancelRpcStreamActionCommand;
+
+export type InvokeRpcActionCommand = BaseActionCommand<"invokeRpc", RpcInvokeRequest>;
+export type StartRpcStreamActionCommand = BaseActionCommand<"startRpcStream", RpcInvokeRequest>;
+export type SendRpcStreamMessageActionCommand = BaseActionCommand<"sendRpcStreamMessage", RpcStreamSendAction>;
+export type FinishRpcStreamSendingActionCommand = BaseActionCommand<"finishRpcStreamSending", RpcStreamAction>;
+export type CancelRpcStreamActionCommand = BaseActionCommand<"cancelRpcStream", RpcStreamAction>;
 
 export type NameWithComment = {
   name: string;

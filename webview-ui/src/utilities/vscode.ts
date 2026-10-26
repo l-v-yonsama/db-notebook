@@ -23,6 +23,7 @@ export * from "../../../src/shared/PerformanceTuningBinds";
 export * from "../../../src/shared/PerformanceTuningComparison";
 export * from "../../../src/shared/PerformanceTuningHumanSummary";
 export * from "../../../src/shared/PublishEditorParams";
+export * from "../../../src/shared/RpcInvokePanelParams";
 export * from "../../../src/shared/QueryStatisticsParams";
 export * from "../../../src/shared/ViewCondition";
 export * from "../../../src/shared/RunResultMetadata";
@@ -49,11 +50,13 @@ class VSCodeAPIWrapper {
    * @param message Abitrary data (must be JSON serializable) to send to the extension context.
    */
   public postMessage(message: unknown) {
+    const sensitive = typeof message === "object" && message !== null &&
+      "command" in message && message.command === "invokeRpc";
     if (this.vsCodeApi) {
-      console.log("postMessage", JSON.stringify(message));
+      console.log("postMessage", sensitive ? "invokeRpc [payload omitted]" : JSON.stringify(message));
       this.vsCodeApi.postMessage(message);
     } else {
-      console.log(message);
+      console.log(sensitive ? "invokeRpc [payload omitted]" : message);
     }
   }
 

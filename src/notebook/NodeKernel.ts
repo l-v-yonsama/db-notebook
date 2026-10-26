@@ -1,4 +1,4 @@
-import { ConnectionSetting } from "@l-v-yonsama/multi-platform-database-drivers";
+import { ConnectionSetting, DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr } from "@l-v-yonsama/rdh";
 import * as cp from "child_process";
 import dayjs from "dayjs";
@@ -44,7 +44,8 @@ export class NodeKernel {
 
   static async create(connectionSettings: ConnectionSetting[]): Promise<NodeKernel> {
     const tmpDir = await createDirectoryOnTmpStorage(`${new Date().getTime()}`);
-    return new NodeKernel(connectionSettings, tmpDir);
+    // RPC cell execution is not supported yet. Keep Bearer tokens out of generated scripts.
+    return new NodeKernel(connectionSettings.filter((setting) => setting.dbType !== DBType.RPC), tmpDir);
   }
 
   getStoredVariables(): NotebookExecutionVariables {

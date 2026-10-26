@@ -431,12 +431,12 @@
       "view/item/context": [
         {
           "command": "database-notebook.open-db-notebook",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/ && viewItem =~ /sqlNotebook:true/",
           "group": "inline"
         },
         {
           "command": "database-notebook.open-db-notebook",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/ && viewItem =~ /sqlNotebook:true/",
           "group": "others@3"
         },
         {
@@ -451,7 +451,7 @@
         },
         {
           "command": "database-notebook.quick-open-resource",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+support:true,false.*$/ && viewItem =~ /sqlNotebook:true/",
           "group": "others@4"
         },
         {
@@ -535,13 +535,23 @@
           "group": "others@8"
         },
         {
+          "command": "database-notebook.show-rpc-invoke-panel",
+          "when": "view == database-notebook-connections && viewItem =~ /^RpcMethod,.*/",
+          "group": "inline"
+        },
+        {
+          "command": "database-notebook.show-rpc-invoke-panel",
+          "when": "view == database-notebook-connections && viewItem =~ /^RpcMethod,.*/",
+          "group": "db-resourc@2"
+        },
+        {
           "command": "database-notebook.specify-default-connection-for-sql-cell",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:false.*support:true,.+$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:false.*support:true,.+$/ && viewItem =~ /sqlNotebook:true/",
           "group": "others@4"
         },
         {
           "command": "database-notebook.clear-default-connection-for-sql-cell",
-          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:true.*support:true,.+$/",
+          "when": "view == database-notebook-connections && viewItem =~ /^Connection,.+CD:true.*support:true,.+$/ && viewItem =~ /sqlNotebook:true/",
           "group": "others@4"
         },
         {
@@ -1155,6 +1165,11 @@
         "command": "database-notebook.show-publish-editor-panel",
         "title": "Open publish editor",
         "icon": "$(empty-window)"
+      },
+      {
+        "command": "database-notebook.show-rpc-invoke-panel",
+        "title": "Invoke RPC",
+        "icon": "$(play)"
       },
       {
         "command": "database-notebook.create-connection-setting",
@@ -3123,7 +3138,7 @@
     "vscode-test": "^1.5.0"
   },
   "dependencies": {
-    "@l-v-yonsama/multi-platform-database-drivers": "^3.1.0",
+    "@l-v-yonsama/multi-platform-database-drivers": "file:../db-drivers",
     "@l-v-yonsama/rdh": "^2.0.0",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@types/har-format": "^1.2.14",

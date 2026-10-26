@@ -1,6 +1,8 @@
 import {
   DbConnection,
   DbResource,
+  DBType,
+  RPCDriver,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import * as vscode from "vscode";
@@ -10,7 +12,7 @@ import { ComponentName } from "./shared/ComponentName";
 import { DBFormEventData } from "./shared/MessageEventData";
 import { ModeType } from "./shared/ModeType";
 import { showWindowErrorMessage } from "./utilities/alertUtil";
-import { createDriver } from "./utilities/driverResolver";
+import { createDriver, workflow } from "./utilities/driverResolver";
 import { log } from "./utilities/logger";
 import { StateStorage } from "./utilities/StateStorage";
 import { createWebviewContent } from "./utilities/webview/webviewUtil";
@@ -99,12 +101,21 @@ export class SQLConfigurationViewProvider implements vscode.WebviewViewProvider 
           {
             log(`${PREFIX} Test connection ${params.dbType}`);
             try {
-              const driver = await createDriver(params, true);
-              const message = await driver.test(true);
+              const message = params.dbType === DBType.RPC
+                ? (await workflow<RPCDriver>(
+                    params,
+                    async (driver) => driver.getInfomationSchemas(),
+                    true
+                  )).message
+                : await (await createDriver(params, true)).test(true);
               if (message) {
                 showWindowErrorMessage(message);
               } else {
-                vscode.window.showInformationMessage("OK");
+                vscode.window.showInformationMessage(
+                  params.dbType === DBType.RPC && params.rpc?.authentication?.type === "bearer"
+                    ? "Connection and schema OK. Bearer token acceptance requires an RPC call."
+                    : "OK"
+                );
               }
             } catch (e) {
               showWindowErrorMessage(e);

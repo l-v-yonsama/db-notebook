@@ -58,6 +58,15 @@ import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSumm
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 import type { CloudWatchDashboardHostMessage } from "./observability";
+import type {
+  RpcInvokeResultView,
+  RpcInvokeTarget,
+  RpcStreamConnectingView,
+  RpcStreamCompletedView,
+  RpcStreamErrorView,
+  RpcStreamEventView,
+  RpcStreamStartedView,
+} from "./RpcInvokePanelParams";
 
 export type MessageEventData =
   | CloudWatchDashboardHostMessage
@@ -79,6 +88,7 @@ export type MessageEventData =
   | LogParseResultViewEventData
   | MdhViewEventData
   | PublishEditorPanelEventData
+  | RpcInvokePanelEventData
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | PerformanceTuningPreviewPanelEventData
@@ -98,6 +108,21 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
   componentName: U;
   value: V;
 };
+
+export type RpcInvokePanelEventData = BaseMessageEventData<
+  "initialize" | "result" | "error" | "streamConnecting" | "streamStarted" | "streamEvent" | "streamCompleted" | "streamError",
+  "RpcInvokePanel",
+  {
+    initialize?: RpcInvokeTarget;
+    result?: RpcInvokeResultView;
+    error?: string;
+    streamConnecting?: RpcStreamConnectingView;
+    streamStarted?: RpcStreamStartedView;
+    streamEvent?: RpcStreamEventView;
+    streamCompleted?: RpcStreamCompletedView;
+    streamError?: RpcStreamErrorView;
+  }
+>;
 
 export type AiDataMaskingPreviewPanelEventData = BaseMessageEventData<
   "initialize" | "ai-send-preview" | "ai-send-preview-closed",
