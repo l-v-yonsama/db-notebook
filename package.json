@@ -810,7 +810,12 @@
         },
         {
           "command": "database-notebook.rpc-histories.delete",
-          "when": "view == database-notebook-rpc-histories && viewItem == rpcInvokeHistory",
+          "when": "view == database-notebook-rpc-histories && viewItem =~ /^rpcInvokeHistory/",
+          "group": "9_danger@1"
+        },
+        {
+          "command": "database-notebook.rpc-histories.openInInvokePanel",
+          "when": "view == database-notebook-rpc-histories && viewItem == rpcInvokeHistoryRestorable",
           "group": "inline"
         },
         {
@@ -1599,6 +1604,12 @@
         "title": "Delete selected RPC history",
         "shortTitle": "Delete",
         "icon": "$(trash)"
+      },
+      {
+        "command": "database-notebook.rpc-histories.openInInvokePanel",
+        "title": "Open in Invoke RPC",
+        "shortTitle": "Open",
+        "icon": "$(open-preview)"
       },
       {
         "command": "database-notebook.delete-all-query-histories",

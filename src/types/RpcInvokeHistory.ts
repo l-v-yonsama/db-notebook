@@ -11,4 +11,6 @@ export type RpcInvokeHistory = {
   receivedCount: number;
   outcome: "success" | "error" | "cancelled" | "timeout";
   grpcStatus?: { code: number; name: string };
+  // Only unary/server-streaming requests within the storage size limit are restorable.
+  requestJson?: string;
 };

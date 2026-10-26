@@ -165,6 +165,7 @@ describe("RpcInvokePanel", () => {
     expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
       path: method.path,
       callKind: "unary",
+      requestJson,
       outcome: "success",
       sentCount: 1,
       receivedCount: 1,
@@ -172,6 +173,23 @@ describe("RpcInvokePanel", () => {
     }));
     expect(JSON.stringify(addHistory.mock.calls)).not.toContain("Hana");
     expect(JSON.stringify(addHistory.mock.calls)).not.toContain("x-rpc-tag");
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("x-request-id");
+  });
+
+  it("restores a history request when reopening the same method without executing it", () => {
+    RpcInvokePanel.render(
+      Uri.file("/extension"), storage, tree, method, service, "fixture", '{"id":"first"}'
+    );
+    const first = messages().at(-1).value.initialize;
+    expect(first.restoredRequestJson).toBe('{"id":"first"}');
+    expect(first.restoreId).toEqual(expect.any(String));
+    RpcInvokePanel.render(
+      Uri.file("/extension"), storage, tree, method, service, "fixture", '{"id":"second"}'
+    );
+    const second = messages().at(-1).value.initialize;
+    expect(second.restoredRequestJson).toBe('{"id":"second"}');
+    expect(second.restoreId).not.toBe(first.restoreId);
+    expect(workflow).not.toHaveBeenCalled();
   });
 
   it("rejects stale methods and forged metadata before running a workflow", async () => {
@@ -319,6 +337,7 @@ describe("RpcInvokePanel", () => {
       receivedCount: 1,
     }));
     expect(JSON.stringify(addHistory.mock.calls)).not.toContain("stream-test");
+    expect(addHistory.mock.calls[0][0].requestJson).toBeUndefined();
     expect(messages().find((message) => message.command === "streamEvent")).toMatchObject({
       value: { streamEvent: { sessionId, event: { type: "received", contents: { value: "ok" } } } },
     });
@@ -349,6 +368,48 @@ describe("RpcInvokePanel", () => {
       expect(removeDriver).toHaveBeenCalledWith(driver);
     });
     expect(session.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("records one server-streaming request for restoration", async () => {
+    const streamMethod = new RpcMethod(
+      "Watch", "/rpcfixture.v1.StreamingTestService/Watch", "rpcfixture.v1.WatchRequest",
+      "rpcfixture.v1.StreamItem", false, true
+    );
+    const streamService = new RpcService(
+      "StreamingTestService", "rpcfixture.v1.StreamingTestService", "advertised"
+    );
+    streamService.addChild(streamMethod);
+    getLoadedRpcMethodContext.mockReturnValue({ connection: { name: "fixture" }, service: streamService });
+    RpcInvokePanel.render(Uri.file("/extension"), storage, tree, streamMethod, streamService, "fixture");
+    const session = {
+      kind: "serverStreaming",
+      events: { async *[Symbol.asyncIterator]() { /* No messages. */ } },
+      completion: Promise.resolve({ outcome: "success", elapsedMs: 3, sentCount: 1, receivedCount: 2 }),
+      cancel: vi.fn(),
+    };
+    vi.mocked(createDriver).mockResolvedValue({
+      connect: vi.fn().mockResolvedValue(""),
+      openProtoJsonStream: vi.fn().mockReturnValue(session),
+      disconnect: vi.fn().mockResolvedValue(""),
+    } as any);
+    await send({
+      command: "startRpcStream",
+      params: {
+        connectionName: "fixture",
+        service: streamService.fullName,
+        method: streamMethod.name,
+        requestJson: '{"filter":"recent"}',
+        metadata: { "x-request-id": "not-saved" },
+      },
+    });
+    await vi.waitFor(() => expect(addHistory).toHaveBeenCalledTimes(1));
+    expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
+      callKind: "serverStreaming",
+      requestJson: '{"filter":"recent"}',
+      sentCount: 1,
+      receivedCount: 2,
+    }));
+    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("not-saved");
   });
 
   it("releases the dedicated driver when connect or stream creation fails", async () => {

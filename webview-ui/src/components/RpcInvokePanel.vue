@@ -178,8 +178,9 @@ const recieveMessage = (message: RpcInvokePanelEventData): void => {
       target.value?.requestTemplate !== next.requestTemplate ||
       target.value?.requestDescription !== next.requestDescription ||
       target.value?.responseDescription !== next.responseDescription
+      || (next.restoreId !== undefined && target.value?.restoreId !== next.restoreId)
     ) {
-      requestJson.value = next.requestTemplate;
+      requestJson.value = next.restoredRequestJson ?? next.requestTemplate;
       metadataJson.value = "";
       result.value = undefined;
       error.value = "";

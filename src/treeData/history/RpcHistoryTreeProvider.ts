@@ -1,7 +1,8 @@
 import dayjs from "dayjs";
 import * as vscode from "vscode";
 import { RpcInvokeHistory } from "../../types/RpcInvokeHistory";
-import { RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
+import { isRestorableRpcHistory, RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
+import { OPEN_RPC_HISTORY_IN_INVOKE_PANEL } from "../../constant";
 
 export class RpcHistoryTreeProvider implements vscode.TreeDataProvider<RpcInvokeHistory> {
   private readonly changed = new vscode.EventEmitter<void>();
@@ -21,7 +22,16 @@ export class RpcHistoryTreeProvider implements vscode.TreeDataProvider<RpcInvoke
       `${serviceName}/${history.method}`,
       vscode.TreeItemCollapsibleState.None
     );
-    item.contextValue = "rpcInvokeHistory";
+    item.contextValue = isRestorableRpcHistory(history)
+      ? "rpcInvokeHistoryRestorable"
+      : "rpcInvokeHistory";
+    if (isRestorableRpcHistory(history)) {
+      item.command = {
+        command: OPEN_RPC_HISTORY_IN_INVOKE_PANEL,
+        title: "Open in Invoke RPC",
+        arguments: [history],
+      };
+    }
     const status = history.outcome === "success" ? "OK" :
       history.outcome === "error" ? "Failed" :
       history.outcome === "cancelled" ? "Cancelled" : "Timeout";

@@ -16,6 +16,8 @@ export type RpcInvokeTarget = {
   requestStream: boolean;
   responseStream: boolean;
   requestTemplate: string;
+  restoredRequestJson?: string;
+  restoreId?: string;
   requestDescription: string;
   responseDescription: string;
   requestDescriptionHtml: string;

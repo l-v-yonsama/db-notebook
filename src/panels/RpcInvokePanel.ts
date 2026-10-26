@@ -85,7 +85,8 @@ export class RpcInvokePanel extends BasePanel {
     tree: ResourceTreeProvider,
     method: RpcMethod,
     service: RpcService,
-    connectionName: string
+    connectionName: string,
+    restoredRequestJson?: string
   ): void {
     if (!this.currentPanel) {
       const panel = window.createWebviewPanel(
@@ -105,7 +106,7 @@ export class RpcInvokePanel extends BasePanel {
     } else {
       this.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     }
-    this.currentPanel.selectMethod(method, service, connectionName);
+    this.currentPanel.selectMethod(method, service, connectionName, restoredRequestJson);
   }
 
   getComponentName(): ComponentName {
@@ -141,7 +142,12 @@ export class RpcInvokePanel extends BasePanel {
     };
   }
 
-  private selectMethod(method: RpcMethod, service: RpcService, connectionName: string): void {
+  private selectMethod(
+    method: RpcMethod,
+    service: RpcService,
+    connectionName: string,
+    restoredRequestJson?: string
+  ): void {
     if (this.startingStream || this.activeStream) {
       void this.post({
         command: "streamError",
@@ -167,6 +173,10 @@ export class RpcInvokePanel extends BasePanel {
       requestStream: method.requestStream,
       responseStream: method.responseStream,
       requestTemplate: requestView.data,
+      ...(restoredRequestJson !== undefined && {
+        restoredRequestJson,
+        restoreId: randomUUID(),
+      }),
       requestDescription: requestView.description,
       responseDescription,
       requestDescriptionHtml: createCodeHtmlStringSync({
@@ -303,6 +313,7 @@ export class RpcInvokePanel extends BasePanel {
         sentCount: 0,
         receivedCount: 0,
         outcome: "error",
+        requestJson: validated.request.requestJson,
       };
       let sent = false;
       const { ok, message, result } = await workflow<RPCDriver, UnaryResult<unknown>>(
@@ -429,6 +440,7 @@ export class RpcInvokePanel extends BasePanel {
         sentCount: 0,
         receivedCount: 0,
         outcome: "error",
+        ...(!requestStream && { requestJson: validated.request.requestJson }),
       };
       if (abort.signal.aborted) throw new Error("RPC stream start cancelled.");
       const driver = await createDriver<RPCDriver>(setting, false);

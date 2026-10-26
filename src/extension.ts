@@ -246,7 +246,13 @@ export async function activate(context: ExtensionContext) {
     stateStorage,
     historyTreeProvider,
   });
-  registerRpcHistoryTreeCommands(context, rpcHistoryStore, rpcHistoryTreeProvider);
+  registerRpcHistoryTreeCommands(
+    context,
+    rpcHistoryStore,
+    rpcHistoryTreeProvider,
+    stateStorage,
+    dbResourceTree
+  );
 
   registerDisposableCommand("database-notebook.focus-filter", async () => {
     await commands.executeCommand(`${CONNECTION_VIEW_ID}.focus`);

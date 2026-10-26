@@ -97,6 +97,7 @@ export const RPC_HISTORY_VIEW_ID = `${EXTENSION_NAME}-rpc-histories`;
 export const REFRESH_RPC_HISTORIES = `${EXTENSION_NAME}.refresh-rpc-histories`;
 export const DELETE_RPC_HISTORY = `${EXTENSION_NAME}.rpc-histories.delete`;
 export const DELETE_ALL_RPC_HISTORY = `${EXTENSION_NAME}.delete-all-rpc-histories`;
+export const OPEN_RPC_HISTORY_IN_INVOKE_PANEL = `${EXTENSION_NAME}.rpc-histories.openInInvokePanel`;
 
 //---------------------------------------------------
 // OPEN VIEWERS
