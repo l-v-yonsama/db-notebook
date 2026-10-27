@@ -127,6 +127,10 @@ export const SHOW_GETTING_STARTED = `${EXTENSION_NAME}.show-getting-started`;
 // NOTE BOOK
 //---------------------------------------------------
 export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;
+export const ADD_RPC_NOTEBOOK_CELL = `${EXTENSION_NAME}.add-rpc-notebook-cell`;
+export const ADD_RPC_NOTEBOOK_CELL_FROM_RESOURCE = `${EXTENSION_NAME}.add-rpc-notebook-cell-from-resource`;
+export const CELL_SELECT_RPC_METHOD = `${EXTENSION_NAME}.cell.select-rpc-method`;
+export const CELL_SHOW_RPC_INVOKE_SETTINGS = `${EXTENSION_NAME}.cell.show-rpc-invoke-settings`;
 export const CREATE_NOTEBOOK_FROM_SQL = `${EXTENSION_NAME}.create-dbn-from-sql`;
 export const CREATE_SQLITE_DEMO = `${EXTENSION_NAME}.create-sqlite-demo`;
 export const RESET_SQLITE_DEMO = `${EXTENSION_NAME}.reset-sqlite-demo`;

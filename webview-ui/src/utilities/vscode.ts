@@ -51,12 +51,13 @@ class VSCodeAPIWrapper {
    */
   public postMessage(message: unknown) {
     const sensitive = typeof message === "object" && message !== null &&
-      "command" in message && message.command === "invokeRpc";
+      "command" in message &&
+      (message.command === "invokeRpc" || message.command === "saveRpcCellMetadata");
     if (this.vsCodeApi) {
-      console.log("postMessage", sensitive ? "invokeRpc [payload omitted]" : JSON.stringify(message));
+      console.log("postMessage", sensitive ? `${message.command} [payload omitted]` : JSON.stringify(message));
       this.vsCodeApi.postMessage(message);
     } else {
-      console.log(sensitive ? "invokeRpc [payload omitted]" : message);
+      console.log(sensitive ? `${message.command} [payload omitted]` : message);
     }
   }
 

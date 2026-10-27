@@ -71,6 +71,9 @@ describe("RpcInvokeHistoryStore", () => {
       undefined, undefined, undefined, '{"id":2}', '{"name":"Alice"}',
     ]);
     const provider = new RpcHistoryTreeProvider(store);
+    expect(provider.getTreeItem(list[3]).description).toContain("1 Sent, 1 Received (0.010 sec)");
+    expect(provider.getTreeItem(list[4]).description).toContain("1 Received (0.010 sec)");
+    expect(provider.getTreeItem(list[4]).description).toContain("OK(0)");
     expect(provider.getTreeItem(list[0]).command).toBeUndefined();
     expect(provider.getTreeItem(list[1]).command).toBeUndefined();
     expect(provider.getTreeItem(list[3]).command).toMatchObject({

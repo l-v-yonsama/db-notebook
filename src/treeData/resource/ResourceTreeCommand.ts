@@ -27,6 +27,8 @@ import {
   createFullSchemaERDiagramParams,
   createSimpleERDiagramParams,
   resolveLastOrderByColumn,
+  buildRpcRequestTemplate,
+  getRpcCallKind,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   ExtensionContext,
@@ -38,6 +40,8 @@ import {
   window
 } from "vscode";
 import {
+  ADD_RPC_NOTEBOOK_CELL,
+  ADD_RPC_NOTEBOOK_CELL_FROM_RESOURCE,
   ADD_SUBSCRIPTION,
   CLEAR_DEFAULT_CON_FOR_SQL_CELL,
   CONNECT,
@@ -106,6 +110,7 @@ import { DynamoQueryPanel } from "../../panels/DynamoQueryPanel";
 import { ERDiagramSettingsPanel } from "../../panels/ERDiagramSettingsPanel";
 import { PublishEditorPanel } from "../../panels/PublishEditorPanel";
 import { RpcInvokePanel } from "../../panels/RpcInvokePanel";
+import { rpcRequestTemplateBody } from "../../notebook/rpcCell";
 import { ScanPanel } from "../../panels/ScanPanel";
 import { SubscriptionSettingPanel } from "../../panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "../../panels/ViewConditionPanel";
@@ -233,6 +238,28 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
       current.connection.name
     );
   }));
+  context.subscriptions.push(commands.registerCommand(
+    ADD_RPC_NOTEBOOK_CELL_FROM_RESOURCE,
+    async (method: RpcMethod) => {
+      if (!(method instanceof RpcMethod)) {
+        return;
+      }
+      const current = dbResourceTree.getLoadedRpcMethodContext(method);
+      if (!current) {
+        await window.showInformationMessage("The RPC schema has changed. Reload the tree and select the method again.");
+        return;
+      }
+      const template = buildRpcRequestTemplate(method, current.database.messageDefinitions);
+      await commands.executeCommand(ADD_RPC_NOTEBOOK_CELL, {
+        connectionName: current.connection.name,
+        service: current.service.fullName,
+        method: method.name,
+        path: method.path,
+        callKind: getRpcCallKind(method),
+        dataJson: rpcRequestTemplateBody(template.data, method.requestStream),
+      });
+    }
+  ));
 
   const favoriteFromMatch = (match: LoadedResourceMatch, connectionId: string): ResourceFavorite => ({
     connectionId,

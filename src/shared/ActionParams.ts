@@ -73,6 +73,7 @@ export type ActionCommand =
   | DisconnectActionCommand
   | SaveCompareKeysActionCommand
   | SaveNotebookCellMetadataActionCommand
+  | SaveRpcCellMetadataActionCommand
   | OutputActionCommand
   | WriteToClipboardActionCommand
   | WriteHttpEventToClipboardActionCommand
@@ -122,13 +123,15 @@ export type ActionCommand =
   | StartRpcStreamActionCommand
   | SendRpcStreamMessageActionCommand
   | FinishRpcStreamSendingActionCommand
-  | CancelRpcStreamActionCommand;
+  | CancelRpcStreamActionCommand
+  | OutputRpcHtmlActionCommand;
 
 export type InvokeRpcActionCommand = BaseActionCommand<"invokeRpc", RpcInvokeRequest>;
 export type StartRpcStreamActionCommand = BaseActionCommand<"startRpcStream", RpcInvokeRequest>;
 export type SendRpcStreamMessageActionCommand = BaseActionCommand<"sendRpcStreamMessage", RpcStreamSendAction>;
 export type FinishRpcStreamSendingActionCommand = BaseActionCommand<"finishRpcStreamSending", RpcStreamAction>;
 export type CancelRpcStreamActionCommand = BaseActionCommand<"cancelRpcStream", RpcStreamAction>;
+export type OutputRpcHtmlActionCommand = BaseActionCommand<"outputRpcHtml", Record<string, never>>;
 
 export type NameWithComment = {
   name: string;
@@ -401,6 +404,11 @@ export type SaveNotebookCellMetadataActionCommand = BaseActionCommand<
   {
     metadata: CellMeta;
   }
+>;
+
+export type SaveRpcCellMetadataActionCommand = BaseActionCommand<
+  "saveRpcCellMetadata",
+  { metadataJson: string }
 >;
 
 export type CreateUndoChangeSqlActionCommand = BaseActionCommand<"createUndoChangeSql", TabIdParam>;

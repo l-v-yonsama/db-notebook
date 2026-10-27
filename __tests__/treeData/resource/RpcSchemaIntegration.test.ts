@@ -8,6 +8,7 @@ import {
   RpcPackage,
   RpcService,
   RPCDriver,
+  buildRpcRequestTemplate,
   type UnaryResult,
   type ConnectionSetting,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -20,7 +21,6 @@ import { ResourceTreeProvider } from "../../../src/treeData/resource/ResourceTre
 import { RpcInvokePanel } from "../../../src/panels/RpcInvokePanel";
 import { StateStorage } from "../../../src/utilities/StateStorage";
 import { workflow } from "../../../src/utilities/driverResolver";
-import { buildRpcRequestTemplate } from "../../../src/utilities/rpcRequestTemplate";
 
 const driversRoot = path.resolve(__dirname, "../../../../db-drivers");
 const fixtureProto = path.join(driversRoot, "docker/rpc-test/fixture.proto");
@@ -203,7 +203,9 @@ describe.skipIf(process.env.RPC_TEST_INTEGRATION !== "1")("RPC schema tree (Dock
       connection.name
     );
     const panel = vi.mocked(window.createWebviewPanel).mock.results.at(-1)!.value;
-    const initialTarget = panel.webview.postMessage.mock.calls[0][0].value.initialize;
+    const initialTarget = panel.webview.postMessage.mock.calls
+      .map((call: unknown[]) => call[0])
+      .find((message: { command: string }) => message.command === "initialize")?.value.initialize;
     expect(JSON.parse(initialTarget.requestTemplate)).toEqual({ id: "0" });
     expect(initialTarget.requestDescription).toContain("message GetCustomerRequest");
     expect(initialTarget.responseDescription).toContain("message Customer");

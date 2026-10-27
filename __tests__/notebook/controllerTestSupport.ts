@@ -194,10 +194,10 @@ export const makeNotebook = (cells: NotebookCell[], path = "/fake/test.dbnb"): N
   return notebook;
 };
 
-export const setupController = () => {
+export const setupController = (rpcCellService?: any) => {
   const context = { subscriptions: [] } as unknown as ExtensionContext;
   const stateStorage = makeStateStorage();
-  const controller = new MainController(context, stateStorage);
+  const controller = new MainController(context, stateStorage, rpcCellService);
   const controllerObj = (notebooks.createNotebookController as Mock).mock.results.at(-1)!.value;
   return { controller, controllerObj, stateStorage };
 };

@@ -23,6 +23,7 @@ const metadataJson = ref("");
 const result = ref<RpcInvokeResultView>();
 const error = ref("");
 const inProgress = ref(false);
+const reportAvailable = ref(false);
 const activeTab = ref<ResultTab>("data");
 const activeRequestTab = ref<RequestTab>("data");
 const isStreaming = computed(() => !!(target.value?.requestStream || target.value?.responseStream));
@@ -164,6 +165,10 @@ const close = (): void => {
   vscode.postCommand({ command: "cancel", params: {} });
 };
 
+const outputHtml = (): void => {
+  vscode.postCommand({ command: "outputRpcHtml", params: {} });
+};
+
 const recieveMessage = (message: RpcInvokePanelEventData): void => {
   if (message.command === "initialize" && message.value.initialize) {
     const next = message.value.initialize;
@@ -197,6 +202,7 @@ const recieveMessage = (message: RpcInvokePanelEventData): void => {
       streamLastSequence.value = 0;
       streamCompletion.value = undefined;
       streamError.value = "";
+      reportAvailable.value = false;
     }
     target.value = next;
     inProgress.value = false;
@@ -248,6 +254,8 @@ const recieveMessage = (message: RpcInvokePanelEventData): void => {
     if (issue.sessionId && issue.sessionId !== streamSessionId.value) return;
     streamError.value = issue.error;
     if (!issue.sessionId) streamState.value = issue.error.includes("cancelled") ? "cancelled" : "failed";
+  } else if (message.command === "reportAvailable") {
+    reportAvailable.value = message.value.reportAvailable === true;
   }
 };
 
@@ -279,6 +287,7 @@ defineExpose({ recieveMessage });
         <VsCodeButton v-if="target?.requestStream && streamState === 'open'" title="Close the request side and wait for the response" @click="finishStreamSending">Finish Sending</VsCodeButton>
         <VsCodeButton v-if="['connecting', 'open', 'sendingClosed'].includes(streamState)" title="Cancel RPC stream" @click="cancelStream">Cancel</VsCodeButton>
       </template>
+      <VsCodeButton :disabled="!reportAvailable || inProgress || ['connecting', 'open', 'sendingClosed', 'cancelling'].includes(streamState)" title="Save RPC result as HTML" @click="outputHtml">Output HTML</VsCodeButton>
     </PanelActionToolbar>
 
     <div class="body">
@@ -338,11 +347,11 @@ defineExpose({ recieveMessage });
         <legend>
           Response
           <span v-if="result" class="response-status">
-            · Status: {{ result.status.code }} {{ result.status.name }} · {{ result.elapsedMs }} ms
+            · Status: {{ result.status.name }}({{ result.status.code }}) · {{ result.elapsedMs }} ms
           </span>
           <span v-else-if="isStreaming && streamCompletion" class="response-status">
             · {{ streamCompletion.outcome }}
-            <template v-if="streamCompletion.status"> · Status: {{ streamCompletion.status.code }} {{ streamCompletion.status.name }}</template>
+            <template v-if="streamCompletion.status"> · Status: {{ streamCompletion.status.name }}({{ streamCompletion.status.code }})</template>
             · {{ streamCompletion.elapsedMs }} ms
           </span>
         </legend>

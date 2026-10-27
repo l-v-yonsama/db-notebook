@@ -1,4 +1,4 @@
-import { prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
+import { getRpcCallKind, prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
 import { abbr, escapeHtml, ResultSetData, ResultSetDataBuilder } from "@l-v-yonsama/rdh";
 import dayjs from "dayjs";
 import { promises as fs } from "fs";
@@ -15,6 +15,9 @@ import { mediaDir } from "../../constant";
 import { ExtChartData, ExtChartOptions, PairPlotChartParams } from "../../shared/ExtChartJs";
 import { DiffTabInnerItem } from "../../shared/MessageEventData";
 import { RunResultMetadata } from "../../shared/RunResultMetadata";
+import type { RpcNotebookResult } from "../../shared/RunResultMetadata";
+import type { RpcInvokeTarget } from "../../shared/RpcInvokePanelParams";
+import { decodeRpcCellSource, isRpcCellMetadata, RPC_RESPONSE_MIME } from "../../notebook/rpcCell";
 import { CellMeta } from "../../types/Notebook";
 import { ChartsViewParams } from "../../types/views";
 import { createReportChartViewParams } from "../../observability/report/reportChartAdapter";
@@ -29,12 +32,16 @@ export type { MarkdownValues } from "./common";
 import { createAxiosTocInfoHtml, MarkdownValues } from "./common";
 import { createResponseBodyMarkdown } from "../httpUtil";
 import { logError } from "../logger";
-import { isMarkupCell, isMemcachedCell, isRedisCell } from "../notebookUtil";
+import { isMemcachedCell, isRedisCell } from "../notebookUtil";
+import { formatRpcStatus, formatRpcTransferSummary } from "../rpcResultSummary";
 const PREFIX = "[utilities/html/htmlGenerator]";
 
 type CreateHtmlOptionsParams = {
   isCellOrigin: boolean;
+  rpcDescriptions?: ReadonlyMap<ReportCell, RpcReportDescriptions>;
 };
+
+type RpcReportDescriptions = { request: string; response: string };
 
 // highlight.js doesn't recognize some of our VS Code-specific cell languageIds
 // -- map them to the closest hljs-supported language so the HTML export gets
@@ -43,8 +50,9 @@ type CreateHtmlOptionsParams = {
 // a dedicated hljs "redis" language (see report.html) since bash's keywords
 // are lowercase-only and don't match redis-cli's uppercase convention.
 const HLJS_LANGUAGE_ALIASES: { [languageId: string]: string } = {
-  shellscript: "bash",
-  bat: "dos",
+  "shellscript": "bash",
+  "bat": "dos",
+  "rpc-json": "json",
 };
 
 const toHljsLanguage = (languageId: string): string =>
@@ -52,9 +60,230 @@ const toHljsLanguage = (languageId: string): string =>
 
 export const createHtmlFromNotebook = async (
   notebook: NotebookDocument,
-  fsPath: string
+  fsPath: string,
+  getRpcDescriptions?: (cell: NotebookCell) => Promise<RpcReportDescriptions>
 ): Promise<string> => {
-  return createHtml(notebook.getCells(), fsPath, { isCellOrigin: true });
+  const cells = notebook.getCells();
+  const rpcDescriptions = new Map<ReportCell, RpcReportDescriptions>();
+  if (getRpcDescriptions) {
+    for (const cell of cells) {
+      if (cell.document.languageId !== "rpc-json") {
+        continue;
+      }
+      try {
+        rpcDescriptions.set(cell, await getRpcDescriptions(cell));
+      } catch {
+        // A report remains exportable when its live descriptor cannot be loaded.
+      }
+    }
+  }
+  return createHtml(cells, fsPath, { isCellOrigin: true, rpcDescriptions });
+};
+
+type ReportCell = Pick<NotebookCell, "kind" | "metadata" | "outputs"> & {
+  document: Pick<TextDocument, "languageId" | "getText">;
+};
+
+/** The panel uses the same one-cell rendering path as notebook HTML export. */
+export const createHtmlFromRpcResult = async (
+  target: RpcInvokeTarget,
+  requestJson: string,
+  result: RpcNotebookResult,
+  fsPath: string,
+  omittedRequestCount = 0,
+  metadataJson = "{}"
+): Promise<string> => {
+  const cell: ReportCell = {
+    kind: NotebookCellKind.Code,
+    document: { languageId: "rpc-json", getText: () => requestJson },
+    metadata: {
+      connectionName: target.connectionName,
+      rpc: {
+        version: 2,
+        id: "report",
+        service: target.service,
+        method: target.method,
+        path: target.path,
+        callKind: getRpcCallKind(target),
+        metadataJson,
+      },
+      ...(omittedRequestCount > 0 && {
+        cellLabel: `${omittedRequestCount} earlier sent messages omitted from request`,
+      }),
+    },
+    outputs: [new NotebookCellOutput([NotebookCellOutputItem.json(result, RPC_RESPONSE_MIME)])],
+  };
+  return createHtml([cell], fsPath, {
+    isCellOrigin: false,
+    rpcDescriptions: new Map([
+      [cell, { request: target.requestDescription, response: target.responseDescription }],
+    ]),
+  });
+};
+
+const readRpcResult = (output: NotebookCellOutput): RpcNotebookResult | undefined => {
+  const item = output.items.find((it) => it.mime === RPC_RESPONSE_MIME);
+  if (!item) {
+    return undefined;
+  }
+  try {
+    const data: unknown = item.data;
+    const value: unknown =
+      data instanceof Uint8Array ? JSON.parse(Buffer.from(data).toString("utf8")) : data;
+    if (!value || typeof value !== "object") {
+      return undefined;
+    }
+    const result = value as Partial<RpcNotebookResult>;
+    if (
+      result.version !== 1 ||
+      result.kind !== "response" ||
+      !["running", "success", "error", "cancelled", "timeout"].includes(result.outcome ?? "") ||
+      typeof result.elapsedMs !== "number" ||
+      typeof result.receivedCount !== "number"
+    ) {
+      return undefined;
+    }
+    return result as RpcNotebookResult;
+  } catch {
+    return undefined;
+  }
+};
+
+// JSON escape sequences preserve the value while preventing a string containing
+// a Markdown code fence from ending the report template's highlighted code block.
+const safeRpcCode = (value: string): string => value.replace(/`/g, "\\u0060");
+const rpcJson = (value: unknown): string => safeRpcCode(JSON.stringify(value, null, 2) ?? "null");
+
+const rpcRequestTitle = (cell: ReportCell): string => {
+  const rpc = (
+    cell.metadata as
+      | {
+          rpc?: {
+            callKind?: string;
+            service?: string;
+            method?: string;
+          };
+        }
+      | undefined
+  )?.rpc;
+  const kind = rpc?.callKind || "RPC";
+  const path = rpc?.service && rpc?.method ? ` ${rpc.service}/${rpc.method}` : "";
+  return `${kind}${path}`;
+};
+
+const rpcResultSummary = (result: RpcNotebookResult): string => {
+  const status = result.status ? `${formatRpcStatus(result.status)} · ` : "";
+  return `${status}${formatRpcTransferSummary(
+    result.receivedCount,
+    result.elapsedMs,
+    result.sentCount
+  )}`;
+};
+
+const appendRpcTabs = (html: string[], tabClass: string, tabs: readonly string[]): void => {
+  html.push('<div class="tabs is-boxed is-small"><ul>');
+  for (const [index, tab] of tabs.entries()) {
+    const title = tab[0].toUpperCase() + tab.slice(1);
+    html.push(
+      `<li${
+        index === 0 ? ' class="is-active"' : ""
+      }><a data-tab="${tab}" data-id-class="${tabClass}">${title}</a></li>`
+    );
+  }
+  html.push("</ul></div>");
+};
+
+const appendRpcPane = (html: string[], tabClass: string, tab: string, contents: string[]): void => {
+  html.push(
+    `<div id="${tabClass}-${tab}" class="block ${tabClass}"${
+      tab === "data" ? "" : ' style="display:none;"'
+    }>`
+  );
+  html.push(...contents);
+  html.push("</div>");
+};
+
+const appendRpcResult = (
+  result: RpcNotebookResult,
+  html: string[],
+  markdownValues: MarkdownValues,
+  id: string,
+  responseDescription?: string
+): void => {
+  const color =
+    result.outcome === "success"
+      ? "is-primary"
+      : result.outcome === "running"
+      ? "is-warning"
+      : "is-danger";
+  html.push(
+    `<div class="notification ${color} is-light" style="padding:10px; margin-bottom:10px;font-size:small;"><span class="tag ${color} is-light">RPC Result</span> ${escapeHtml(
+      rpcResultSummary(result)
+    )}</div>`
+  );
+  if (result.error) {
+    html.push(`<div class="notification is-danger is-light">${escapeHtml(result.error)}</div>`);
+  }
+  const tabClass = `${id}_tab`;
+  appendRpcTabs(html, tabClass, ["data", "headers", "trailers", "descriptor"]);
+
+  const addJson = (pane: string[], value: unknown, suffix: string, label?: string): void => {
+    const codeId = `${id}_${suffix}`;
+    if (label) {
+      pane.push(`<h5 class="subtitle is-6">${escapeHtml(label)}</h5>`);
+    }
+    pane.push(`<div id="${codeId}" class="block"></div>`);
+    markdownValues[codeId] = { lang: "json", s: escapeHtml(rpcJson(value)) };
+  };
+  const data: string[] = [];
+  if (result.contents !== undefined) {
+    addJson(data, result.contents, "data");
+  } else if (result.messages?.length) {
+    for (const [index, message] of result.messages.entries()) {
+      addJson(
+        data,
+        message.contents,
+        `message_${index}`,
+        `#${message.index} · ${new Date(message.at).toLocaleString()}`
+      );
+    }
+  } else {
+    data.push("<p>No messages</p>");
+  }
+  if (result.droppedCount) {
+    data.push(
+      `<p>${escapeHtml(
+        String(result.droppedCount)
+      )} older messages omitted. Only retained messages are shown.</p>`
+    );
+  }
+  const headers: string[] = [];
+  if (result.headers) {
+    addJson(headers, result.headers, "headers");
+  } else {
+    headers.push("<p>No headers</p>");
+  }
+  const trailers: string[] = [];
+  if (result.trailers) {
+    addJson(trailers, result.trailers, "trailers");
+  } else {
+    trailers.push("<p>No trailers</p>");
+  }
+
+  const descriptor: string[] = [`<div id="${id}_descriptor" class="block"></div>`];
+  markdownValues[`${id}_descriptor`] = {
+    lang: "protobuf",
+    s: escapeHtml(safeRpcCode(responseDescription || "Descriptor unavailable")),
+  };
+
+  for (const [tab, contents] of [
+    ["data", data],
+    ["headers", headers],
+    ["trailers", trailers],
+    ["descriptor", descriptor],
+  ] as const) {
+    appendRpcPane(html, tabClass, tab, contents);
+  }
 };
 
 export const createHtmlFromDiffList = async (
@@ -233,7 +462,7 @@ export const createHtmlFromRdhList = async (
 };
 
 const createHtml = async (
-  cells: NotebookCell[],
+  cells: ReportCell[],
   fsPath: string,
   options: CreateHtmlOptionsParams
 ): Promise<string> => {
@@ -300,17 +529,47 @@ const createHtml = async (
       if (cellLabel) {
         htmlContents.push(`<h5 class="subtitle is-5">${escapeHtml(cellLabel)}</h5>`);
       }
-      if (isMarkupCell(cell)) {
+      if (cell.kind === NotebookCellKind.Markup) {
         htmlContents.push(`<div id="${id}" class="block">`);
         htmlContents.push("</div>");
         markdownValues[id] = { lang: "Markup", s: escapeHtml(cell.document.getText()) };
       } else {
-        htmlContents.push(`<div id="${id}" class="block">`);
-        htmlContents.push("</div>");
-        markdownValues[id] = {
-          lang: toHljsLanguage(cell.document.languageId),
-          s: escapeHtml(cell.document.getText()),
-        };
+        if (cell.document.languageId === "rpc-json") {
+          htmlContents.push(`<p class="subtitle is-6">${escapeHtml(rpcRequestTitle(cell))}</p>`);
+          const tabClass = `${id}_request_tab`;
+          const source = decodeRpcCellSource(
+            cell.document.getText(),
+            isRpcCellMetadata(cell.metadata) ? cell.metadata : undefined
+          );
+          appendRpcTabs(htmlContents, tabClass, ["data", "metadata", "descriptor"]);
+          appendRpcPane(htmlContents, tabClass, "data", [`<div id="${id}" class="block"></div>`]);
+          const metadataId = `${id}_request_metadata`;
+          appendRpcPane(htmlContents, tabClass, "metadata", [
+            `<div id="${metadataId}" class="block"></div>`,
+          ]);
+          markdownValues[metadataId] = {
+            lang: "json",
+            s: escapeHtml(safeRpcCode(source.metadataJson)),
+          };
+          const descriptorId = `${id}_request_descriptor`;
+          appendRpcPane(htmlContents, tabClass, "descriptor", [
+            `<div id="${descriptorId}" class="block"></div>`,
+          ]);
+          markdownValues[descriptorId] = {
+            lang: "protobuf",
+            s: escapeHtml(
+              safeRpcCode(options.rpcDescriptions?.get(cell)?.request || "Descriptor unavailable")
+            ),
+          };
+          markdownValues[id] = { lang: "json", s: escapeHtml(safeRpcCode(source.dataJson)) };
+        } else {
+          htmlContents.push(`<div id="${id}" class="block">`);
+          htmlContents.push("</div>");
+          markdownValues[id] = {
+            lang: toHljsLanguage(cell.document.languageId),
+            s: escapeHtml(cell.document.getText()),
+          };
+        }
 
         if (
           cell.outputs.some(
@@ -324,12 +583,13 @@ const createHtml = async (
           );
         } else {
           cell.outputs.forEach((output, oidx) => {
+            const rpcResult = readRpcResult(output);
             output.items.forEach((item) => {
               switch (item.mime) {
                 case "text/plain":
                 case "application/vnd.code.notebook.stdout":
                   {
-                    if (cell.document.languageId !== "sql") {
+                    if (cell.document.languageId !== "sql" && !rpcResult) {
                       htmlContents.push(`<div class="block">`);
                       htmlContents.push(
                         `<div class="notification is-info is-light" style="padding:10px; margin-bottom:10px;font-size:small; white-space:pre-wrap;">${escapeHtml(
@@ -354,6 +614,15 @@ const createHtml = async (
                   break;
               }
             });
+            if (rpcResult) {
+              appendRpcResult(
+                rpcResult,
+                htmlContents,
+                markdownValues,
+                `${id}_${oidx}_rpc`,
+                options.rpcDescriptions?.get(cell)?.response
+              );
+            }
             let idx2 = 0;
             if (output.metadata) {
               const metadata: RunResultMetadata = output.metadata;
@@ -564,6 +833,9 @@ const createHtml = async (
               }
             }
           });
+          if (cell.document.languageId === "rpc-json" && cell.outputs.length === 0) {
+            htmlContents.push(`<p>Response · Not executed</p>`);
+          }
         }
       }
       htmlContents.push(`</div>`);
@@ -579,7 +851,7 @@ const createHtml = async (
                 "YYYY-MM-DD HH:mm"
               )} in <a href="https://marketplace.visualstudio.com/items?itemName=HirotakaYoshioka.database-notebook">Database notebook</a>
               <br />
-              <small>${fsPath}</small>
+              <small>${escapeHtml(fsPath)}</small>
             </p>`);
     reportText = reportText.replace(/<!-- __FOOTER_CONTENTS__ -->/, htmlContents.join("\n"));
 
@@ -622,8 +894,8 @@ const getMarkdownTocPreview = (text: string): string => {
   return line;
 };
 
-const getTocInfoHtml = (cell: NotebookCell): string => {
-  if (isMarkupCell(cell)) {
+const getTocInfoHtml = (cell: ReportCell): string => {
+  if (cell.kind === NotebookCellKind.Markup) {
     const preview = getMarkdownTocPreview(cell.document.getText());
     return (
       '<span class="tag is-info is-light">Markdown</span>' +
@@ -642,6 +914,49 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
     s = `<span class="tag is-info is-light">${escapeHtml(language)}</span>`;
   } else if (cell.document.languageId) {
     s = `<span class="tag is-info is-light">${cell.document.languageId}</span>`;
+  }
+
+  if (cell.document.languageId === "rpc-json") {
+    const rpc = (cell.metadata as CellMeta & { rpc?: { service?: string; method?: string } }).rpc;
+    const method =
+      rpc?.service && rpc?.method ? ` ${escapeHtml(`${rpc.service}/${rpc.method}`)}` : "";
+    const skipped = cell.outputs.some(
+      (it) =>
+        (it.metadata as RunResultMetadata)?.status === "skipped" &&
+        (it.metadata as RunResultMetadata)?.lmResult === undefined
+    );
+    if (skipped) {
+      return `${s}<span class="tag is-warning is-light">Skipped</span>${method}${labelText}`;
+    }
+    const rpcResult = cell.outputs.map(readRpcResult).find((it) => it !== undefined);
+    if (!rpcResult) {
+      const hasError = cell.outputs.some(
+        (output) =>
+          (output.metadata as RunResultMetadata)?.status === "error" ||
+          output.items.some((item) =>
+            [
+              "application/vnd.code.notebook.stderr",
+              "application/vnd.code.notebook.error",
+            ].includes(item.mime)
+          )
+      );
+      const status = cell.outputs.length === 0 ? "Not executed" : hasError ? "Error" : "Executed";
+      const color = cell.outputs.length === 0 ? "is-info" : hasError ? "is-danger" : "is-primary";
+      return `${s}<span class="tag ${color} is-light">${status}</span>${method}${labelText}`;
+    }
+    const outcome = {
+      success: ["Executed", "is-primary"],
+      error: ["Error", "is-danger"],
+      timeout: ["Timeout", "is-danger"],
+      cancelled: ["Cancelled", "is-warning"],
+      running: ["Running", "is-warning"],
+    }[rpcResult.outcome];
+    return (
+      `${s}<span class="tag ${outcome[1]} is-light">${outcome[0]}</span>${method}` +
+      `<span class="tag is-primary is-light">RPC Result</span> ${escapeHtml(
+        rpcResultSummary(rpcResult)
+      )}${labelText}`
+    );
   }
 
   if (cell.outputs.length === 0) {
@@ -670,7 +985,7 @@ const getTocInfoHtml = (cell: NotebookCell): string => {
   if (hasError) {
     s += '<span class="tag is-danger is-light">Error</span>';
   } else {
-    s += '<span class="tag is-primary is-light">Exequted</span>';
+    s += '<span class="tag is-primary is-light">Executed</span>';
   }
 
   cell.outputs.forEach((output, idx3) => {

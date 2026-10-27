@@ -89,6 +89,7 @@ export type MessageEventData =
   | MdhViewEventData
   | PublishEditorPanelEventData
   | RpcInvokePanelEventData
+  | RpcCellInvokeSettingsPanelEventData
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | PerformanceTuningPreviewPanelEventData
@@ -110,7 +111,7 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
 };
 
 export type RpcInvokePanelEventData = BaseMessageEventData<
-  "initialize" | "result" | "error" | "streamConnecting" | "streamStarted" | "streamEvent" | "streamCompleted" | "streamError",
+  "initialize" | "result" | "error" | "streamConnecting" | "streamStarted" | "streamEvent" | "streamCompleted" | "streamError" | "reportAvailable",
   "RpcInvokePanel",
   {
     initialize?: RpcInvokeTarget;
@@ -121,6 +122,7 @@ export type RpcInvokePanelEventData = BaseMessageEventData<
     streamEvent?: RpcStreamEventView;
     streamCompleted?: RpcStreamCompletedView;
     streamError?: RpcStreamErrorView;
+    reportAvailable?: boolean;
   }
 >;
 
@@ -853,6 +855,18 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
       codeFileItems: LabelValueItem[];
       columnItems: RdhKey[];
     };
+  }
+>;
+
+export type RpcCellInvokeSettingsPanelEventData = BaseMessageEventData<
+  "initialize" | "descriptor" | "saved" | "error",
+  "RpcCellInvokeSettingsPanel",
+  {
+    connectionName?: string;
+    method?: string;
+    metadataJson?: string;
+    descriptor?: string;
+    error?: string;
   }
 >;
 

@@ -62,6 +62,7 @@
     "virtualWorkspaces": true
   },
   "activationEvents": [
+    "onRenderer:database-notebook-rpc-renderer",
     "onNotebook:database-notebook-type",
     "onNotebook:database-notebook-report-type",
     "onStartupFinished"
@@ -75,6 +76,11 @@
       }
     ],
     "languages": [
+      {
+        "id": "rpc-json",
+        "aliases": ["RPC JSON"],
+        "configuration": "./languages/rpc-json/language-configuration.json"
+      },
       {
         "id": "cwql",
         "filenames": [
@@ -157,6 +163,11 @@
     ],
     "grammars": [
       {
+        "language": "rpc-json",
+        "scopeName": "source.rpc-json",
+        "path": "./languages/rpc-json/syntax.json"
+      },
+      {
         "language": "cwql",
         "scopeName": "source.cloudwatch",
         "path": "./languages/cwql/syntaxe.json"
@@ -189,6 +200,16 @@
           {
             "filenamePattern": "*.dbnr"
           }
+        ]
+      }
+    ],
+    "notebookRenderer": [
+      {
+        "id": "database-notebook-rpc-renderer",
+        "displayName": "RPC Request and Response",
+        "entrypoint": "./media/rpcNotebookRenderer.js",
+        "mimeTypes": [
+          "application/vnd.db-notebook.rpc-response+json"
         ]
       }
     ],
@@ -552,6 +573,11 @@
           "command": "database-notebook.show-rpc-invoke-panel",
           "when": "view == database-notebook-connections && viewItem =~ /^RpcMethod,.*/",
           "group": "db-resourc@2"
+        },
+        {
+          "command": "database-notebook.add-rpc-notebook-cell-from-resource",
+          "when": "view == database-notebook-connections && viewItem =~ /^RpcMethod,.*/",
+          "group": "db-resourc@3"
         },
         {
           "command": "database-notebook.specify-default-connection-for-sql-cell",
@@ -1084,17 +1110,17 @@
         {
           "command": "database-notebook.cell-toolbar-format",
           "group": "inline",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json')"
         },
         {
           "command": "database-notebook.cell-toolbar-duplicate-with-metadata",
           "group": "inline",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json')"
         },
         {
           "command": "database-notebook.cell-toolbar-duplicate-with-metadata",
           "group": "1_modification",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' ) "
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json')"
         }
       ]
     },
@@ -1128,6 +1154,30 @@
         "title": "Create a new blank Database Notebook",
         "shortTitle": "Database Notebook",
         "category": "Database Notebook"
+      },
+      {
+        "command": "database-notebook.add-rpc-notebook-cell",
+        "title": "Add RPC Request Cell",
+        "category": "Database Notebook",
+        "icon": "$(add)"
+      },
+      {
+        "command": "database-notebook.add-rpc-notebook-cell-from-resource",
+        "title": "Add RPC Request Cell to Notebook",
+        "category": "Database Notebook",
+        "icon": "$(notebook)"
+      },
+      {
+        "command": "database-notebook.cell.select-rpc-method",
+        "title": "Select RPC Method",
+        "category": "Database Notebook",
+        "icon": "$(symbol-method)"
+      },
+      {
+        "command": "database-notebook.cell.show-rpc-invoke-settings",
+        "title": "Edit metadata / Show descriptor",
+        "category": "Database Notebook",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "database-notebook.create-sqlite-demo",

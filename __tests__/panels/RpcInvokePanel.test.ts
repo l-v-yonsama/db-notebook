@@ -7,6 +7,9 @@ import {
   type UnaryResult,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { Uri, window } from "vscode";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RpcInvokePanel } from "../../src/panels/RpcInvokePanel";
 import { createDriver, removeDriver, workflow } from "../../src/utilities/driverResolver";
@@ -47,7 +50,11 @@ method.addChild(new RpcMessage("Customer", "rpcfixture.v1.Customer", "response")
 
 const getConnectionSettingByName = vi.fn(async () => setting);
 const getLoadedRpcMethodContext = vi.fn(() => ({ connection: { name: "fixture" }, service }));
-const storage = { getConnectionSettingByName } as unknown as StateStorage;
+const storage = {
+  getConnectionSettingByName,
+  getPreviousSaveFolder: vi.fn(async () => undefined),
+  setPreviousSaveFolder: vi.fn(async () => undefined),
+} as unknown as StateStorage;
 const tree = { getLoadedRpcMethodContext } as unknown as ResourceTreeProvider;
 const addHistory = vi.fn().mockResolvedValue(undefined);
 
@@ -104,6 +111,78 @@ afterEach(() => {
 });
 
 describe("RpcInvokePanel", () => {
+  it("exports the executed unary request and response through the shared HTML report", async () => {
+    const targetPath = path.join(os.tmpdir(), `rpc-panel-${Date.now()}.html`);
+    vi.mocked(window.showSaveDialog).mockResolvedValueOnce(Uri.file(targetPath));
+    vi.mocked(workflow).mockResolvedValue({
+      ok: true, message: "", result: {
+        contents: { id: "7", name: "Aki" },
+        status: { code: 0, name: "OK", details: "" },
+        elapsedMs: 9,
+      },
+    });
+    try {
+      await send({ command: "invokeRpc", params: {
+        connectionName: "fixture", service: service.fullName, method: method.name,
+        requestJson: '{"id":"7"}', metadata: { "x-trace-id": "abc-123" },
+      } });
+      expect(messages().some((message) => message.command === "reportAvailable" && message.value.reportAvailable)).toBe(true);
+      await send({ command: "outputRpcHtml", params: {} });
+      const html = await fs.promises.readFile(targetPath, "utf8");
+      expect(html).toContain("Aki");
+      expect(html).toContain("id");
+      expect(html).toContain("1 Sent, 1 Received (0.009 sec)");
+      expect(html).toContain("x-trace-id");
+      expect(html).toContain("abc-123");
+      expect(html).toContain('data-tab="metadata" data-id-class="id0_request_tab"');
+      expect(html).toContain('data-tab="descriptor" data-id-class="id0_0_rpc_tab"');
+      expect(html).not.toContain("fixture-secret");
+      await send({ command: "invokeRpc", params: {
+        connectionName: "fixture", service: service.fullName, method: method.name,
+        requestJson: "{broken",
+      } });
+      expect(messages().at(-1).command).toBe("error");
+      await send({ command: "outputRpcHtml", params: {} });
+      expect(window.showSaveDialog).toHaveBeenCalledTimes(1);
+    } finally {
+      await fs.promises.unlink(targetPath).catch(() => undefined);
+    }
+  });
+
+  it("exports the actual sent and received stream messages", async () => {
+    const { streamMethod, streamService } = selectClientStream();
+    const targetPath = path.join(os.tmpdir(), `rpc-stream-${Date.now()}.html`);
+    vi.mocked(window.showSaveDialog).mockResolvedValueOnce(Uri.file(targetPath));
+    const session = {
+      kind: "clientStreaming",
+      events: { async *[Symbol.asyncIterator]() {
+        yield { type: "sent", index: 1, at: 1000, contents: { name: "actually sent" } };
+        yield { type: "received", index: 1, at: 2000, contents: { count: 1 } };
+      } },
+      completion: Promise.resolve({
+        outcome: "success", status: { code: 0, name: "OK", details: "" },
+        elapsedMs: 30, sentCount: 1, receivedCount: 1,
+      }),
+      send: vi.fn(), finishSending: vi.fn(), cancel: vi.fn(),
+    };
+    vi.mocked(createDriver).mockResolvedValue({
+      connect: vi.fn().mockResolvedValue(""),
+      openProtoJsonStream: vi.fn().mockReturnValue(session),
+      disconnect: vi.fn().mockResolvedValue(""),
+    } as any);
+    try {
+      await startClientStream(streamMethod, streamService);
+      await vi.waitFor(() => expect(messages().some((message) => message.command === "reportAvailable" && message.value.reportAvailable)).toBe(true));
+      await send({ command: "outputRpcHtml", params: {} });
+      const html = await fs.promises.readFile(targetPath, "utf8");
+      expect(html).toContain("actually sent");
+      expect(html).toContain("count");
+      expect(html).toContain("1 Sent, 1 Received (0.030 sec)");
+      expect(html).not.toContain("fixture-secret");
+    } finally {
+      await fs.promises.unlink(targetPath).catch(() => undefined);
+    }
+  });
   it("loads the selected unary method and renders status, JSON, headers and trailers", async () => {
     const response: UnaryResult = {
       contents: { id: "1", name: "Hana" },
@@ -114,7 +193,7 @@ describe("RpcInvokePanel", () => {
     };
     vi.mocked(workflow).mockResolvedValue({ ok: true, message: "", result: response });
     await send({ command: "ready", params: {} });
-    expect(messages().at(-1)).toMatchObject({
+    expect(messages().find((message) => message.command === "initialize")).toMatchObject({
       command: "initialize",
       value: {
         initialize: {

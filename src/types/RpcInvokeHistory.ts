@@ -1,10 +1,12 @@
+import type { RpcCallKind } from "@l-v-yonsama/multi-platform-database-drivers";
+
 export type RpcInvokeHistory = {
   id: string;
   connectionName: string;
   service: string;
   method: string;
   path: string;
-  callKind: "unary" | "serverStreaming" | "clientStreaming" | "bidiStreaming";
+  callKind: RpcCallKind;
   invokedAt: number;
   totalElapsedMs: number;
   sentCount: number;

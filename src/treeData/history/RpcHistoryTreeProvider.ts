@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { RpcInvokeHistory } from "../../types/RpcInvokeHistory";
 import { isRestorableRpcHistory, RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
 import { OPEN_RPC_HISTORY_IN_INVOKE_PANEL } from "../../constant";
+import { formatRpcStatus, formatRpcTransferSummary } from "../../utilities/rpcResultSummary";
 
 const REQUEST_PREVIEW_MAX_CHARS = 4096;
 
@@ -42,13 +43,14 @@ export class RpcHistoryTreeProvider implements vscode.TreeDataProvider<RpcInvoke
       history.connectionName,
       history.callKind,
       status,
-      `${history.totalElapsedMs} ms`,
+      formatRpcTransferSummary(
+        history.receivedCount,
+        history.totalElapsedMs,
+        history.callKind === "unary" ? undefined : history.sentCount
+      ),
     ];
-    if (history.callKind !== "unary") {
-      parts.push(`sent ${history.sentCount} / received ${history.receivedCount}`);
-    }
     if (history.grpcStatus) {
-      parts.push(`${history.grpcStatus.name} (${history.grpcStatus.code})`);
+      parts.push(formatRpcStatus(history.grpcStatus));
     }
     item.description = parts.join(" ・ ");
     const tooltip = new vscode.MarkdownString();

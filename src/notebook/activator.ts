@@ -6,6 +6,7 @@ import {
   separateMultipleQueries,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import dayjs from "dayjs";
+import { randomUUID } from "crypto";
 import * as path from "path";
 import {
   commands,
@@ -25,6 +26,9 @@ import {
   WorkspaceEdit,
 } from "vscode";
 import {
+  ADD_RPC_NOTEBOOK_CELL,
+  CELL_SELECT_RPC_METHOD,
+  CELL_SHOW_RPC_INVOKE_SETTINGS,
   CELL_EXECUTE_EXPLAIN,
   CELL_EXECUTE_EXPLAIN_ANALYZE,
   CELL_EXECUTE_QUERY,
@@ -61,6 +65,7 @@ import {
 } from "../constant";
 import { HttpEventPanel } from "../panels/HttpEventPanel";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
+import { RpcCellInvokeSettingsPanel } from "../panels/RpcCellInvokeSettingsPanel";
 import { VariablesPanel } from "../panels/VariablesPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { activateStatusBar } from "../statusBar";
@@ -85,7 +90,10 @@ import {
 } from "../utilities/notebookUtil";
 import { rrmListToRdhList } from "./rrmUtil";
 import { StateStorage } from "../utilities/StateStorage";
+import { RpcInvokeHistoryStore } from "../utilities/RpcInvokeHistoryStore";
 import { MainController, resetCellContext } from "./controller";
+import { RpcCellService } from "./RpcCellService";
+import { getRpcCellMetadata, isRpcCell, isRpcCellMetadata, RpcCellMeta } from "./rpcCell";
 import { activateIntellisense } from "./intellisense";
 import { DBNotebookSerializer } from "./serializer";
 import { ReportNotebookController } from "./report/reportController";
@@ -95,7 +103,11 @@ import { createSqliteDemo, resetSqliteDemo, SqliteDemoOptions } from "./sqliteDe
 
 const PREFIX = "[notebook/activator]";
 
-export function activateNotebook(context: ExtensionContext, stateStorage: StateStorage) {
+export function activateNotebook(
+  context: ExtensionContext,
+  stateStorage: StateStorage,
+  rpcHistoryStore?: RpcInvokeHistoryStore
+) {
   const updatePerformanceTuningCellContext = async (cell: NotebookCell): Promise<void> => {
     const history = await findPerformanceTuningHistoryForCell(stateStorage, cell);
     const activeEditor = window.activeNotebookEditor;
@@ -136,7 +148,10 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
   new ReportNotebookController(context);
   registerReportNotebookStatusBarProviders(context);
 
-  controller = new MainController(context, stateStorage);
+  const rpcCellService = rpcHistoryStore
+    ? new RpcCellService(context, stateStorage, rpcHistoryStore)
+    : undefined;
+  controller = new MainController(context, stateStorage, rpcCellService);
   context.subscriptions.push(controller);
 
   const registerDisposableCommand = (
@@ -150,6 +165,18 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
   // Notebook commands
   {
+    registerDisposableCommand(ADD_RPC_NOTEBOOK_CELL, async (
+      options?: Parameters<RpcCellService["insertCell"]>[0]
+    ) => {
+      await rpcCellService?.insertCell(options);
+    });
+    registerDisposableCommand(CELL_SHOW_RPC_INVOKE_SETTINGS, (cell?: NotebookCell) => {
+      const editor = window.activeNotebookEditor;
+      const target = cell ?? editor?.notebook.cellAt(editor.selection.start);
+      if (target && rpcCellService) {
+        RpcCellInvokeSettingsPanel.render(context.extensionUri, target, rpcCellService);
+      }
+    });
     registerDisposableCommand(CREATE_NEW_NOTEBOOK, async (cells?: NotebookCellData[]) => {
       const newNotebook = await workspace.openNotebookDocument(
         NOTEBOOK_TYPE,
@@ -338,7 +365,11 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         return;
       }
       await stateStorage.setPreviousSaveFolder(path.dirname(uri.fsPath));
-      const message = await createHtmlFromNotebook(notebookEditor.notebook, uri.fsPath);
+      const message = await createHtmlFromNotebook(
+        notebookEditor.notebook,
+        uri.fsPath,
+        rpcCellService ? (cell) => rpcCellService.getDescriptions(cell) : undefined
+      );
       if (message) {
         showWindowErrorMessage(message);
       } else {
@@ -415,10 +446,26 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
           } else {
             metadata.connectionName = result.label;
           }
+          if (isRpcCell(cell)) {
+            const rpc = { ...getRpcCellMetadata(cell).rpc };
+            delete rpc.service;
+            delete rpc.method;
+            delete rpc.path;
+            delete rpc.callKind;
+            (metadata as RpcCellMeta).rpc = rpc;
+          }
           await updateCellMetadata(cell, metadata);
 
           resetCellContext(cell);
         });
+      }
+    });
+
+    registerDisposableCommand(CELL_SELECT_RPC_METHOD, async (cell: NotebookCell) => {
+      try {
+        await rpcCellService?.selectMethod(cell);
+      } catch (error) {
+        await window.showErrorMessage(error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -766,7 +813,7 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
         const options = { ...getFormatterConfig(), dbType };
         log(`${PREFIX} formatQuery options:${JSON.stringify(options)}`);
         edit = new TextEdit(range, formatQuery(doc.getText(), options));
-      } else if (isJsonValueCell(cell)) {
+      } else if (isJsonValueCell(cell) || isRpcCell(cell)) {
         const jsonObj = JSON.parse(doc.getText());
         edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
       } else if (isMqttCell(cell)) {
@@ -797,9 +844,12 @@ export function activateNotebook(context: ExtensionContext, stateStorage: StateS
 
       // ---- メタデータ完全コピー ----
       newCell.metadata = structuredClone(cell.metadata);
+      if (isRpcCell(cell) && isRpcCellMetadata(cell.metadata)) {
+        newCell.metadata.rpc.id = randomUUID();
+      }
 
       // ---- outputs もコピー（Code Cellのみ意味あり）----
-      if (cell.kind === NotebookCellKind.Code) {
+      if (cell.kind === NotebookCellKind.Code && !isRpcCell(cell)) {
         newCell.outputs = cell.outputs.map(
           (output) =>
             new NotebookCellOutput(

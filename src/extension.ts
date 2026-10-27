@@ -260,7 +260,7 @@ export async function activate(context: ExtensionContext) {
   });
 
   // Notebook
-  activateNotebook(context, stateStorage);
+  activateNotebook(context, stateStorage, rpcHistoryStore);
 
   // Code resolver editor
   activateCodeResolverEditor(context, stateStorage);

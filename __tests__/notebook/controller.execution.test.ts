@@ -1,6 +1,6 @@
 import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
 import { ResultSetDataBuilder } from "@l-v-yonsama/rdh";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { commands, workspace } from "vscode";
 import { OPEN_CHARTS_VIEWER, REFRESH_QUERY_HISTORIES } from "../../src/constant";
@@ -19,6 +19,28 @@ import {
 registerControllerTestHooks();
 
 describe("MainController.execute -> _doExecution", () => {
+  it("executes an RPC JSON cell without an input output", async () => {
+    const rpcCellService = {
+      execute: vi.fn(async () => true),
+    };
+    const { controller, controllerObj } = setupController(rpcCellService);
+    const cell = makeCell({
+      languageId: "rpc-json",
+      text: '{}',
+      metadata: {} as any,
+    });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    expect(rpcCellService.execute).toHaveBeenCalledWith(
+      cell,
+      lastExecution(controllerObj)
+    );
+    expect(lastExecution(controllerObj).endedAt.success).toBe(true);
+    controller.dispose();
+  });
+
   it("SQLのSELECT結果からrdh markdown出力を作り、chart設定があればビューアを開く", async () => {
     const { controllerObj, stateStorage } = setupController();
     (stateStorage.getDBTypeByConnectionName as Mock).mockReturnValue(DBType.Postgres);
