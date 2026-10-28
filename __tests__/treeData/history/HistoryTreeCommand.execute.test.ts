@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { commands } from "vscode";
+import { commands, window } from "vscode";
 import { DBType } from "@l-v-yonsama/multi-platform-database-drivers";
-import { EXECUTE_QUERY_HISTORY } from "../../../src/constant";
+import { DELETE_ALL_HISTORIES, EXECUTE_QUERY_HISTORY } from "../../../src/constant";
 import type { QueryHistory } from "../../../src/types/QueryHistory";
 
 const createRDSDriver = vi.fn();
@@ -37,7 +37,12 @@ const partiqlHistory: QueryHistory = {
   request: { kind: "sql" },
 };
 
-const registerAndGetExecuteHandler = (stateStorage: unknown, historyTreeProvider: unknown) => {
+const registerAndGetHandler = (
+  stateStorage: unknown,
+  historyTreeProvider: unknown,
+  commandName = EXECUTE_QUERY_HISTORY,
+  rpcHistoryStore: unknown = { list: async () => [], clear: async () => undefined }
+) => {
   const registered = new Map<string, (...args: any[]) => any>();
   vi.mocked(commands.registerCommand).mockImplementation(((
     command: string,
@@ -51,11 +56,12 @@ const registerAndGetExecuteHandler = (stateStorage: unknown, historyTreeProvider
     context: { extensionUri: {}, subscriptions: [] } as never,
     stateStorage: stateStorage as never,
     historyTreeProvider: historyTreeProvider as never,
+    rpcHistoryStore: rpcHistoryStore as never,
   });
 
-  const handler = registered.get(EXECUTE_QUERY_HISTORY);
+  const handler = registered.get(commandName);
   if (!handler) {
-    throw new Error(`${EXECUTE_QUERY_HISTORY} was not registered`);
+    throw new Error(`${commandName} was not registered`);
   }
   return handler;
 };
@@ -85,7 +91,7 @@ describe("EXECUTE_QUERY_HISTORY", () => {
     };
     const historyTreeProvider = { refresh: vi.fn(async () => undefined) };
 
-    const execute = registerAndGetExecuteHandler(stateStorage, historyTreeProvider);
+    const execute = registerAndGetHandler(stateStorage, historyTreeProvider);
     await execute(partiqlHistory);
 
     expect(createRDSDriver).not.toHaveBeenCalled();
@@ -114,7 +120,7 @@ describe("EXECUTE_QUERY_HISTORY", () => {
     };
     const historyTreeProvider = { refresh: vi.fn(async () => undefined) };
 
-    const execute = registerAndGetExecuteHandler(stateStorage, historyTreeProvider);
+    const execute = registerAndGetHandler(stateStorage, historyTreeProvider);
     await execute({
       id: "h2",
       connectionName: "mysql1",
@@ -125,5 +131,30 @@ describe("EXECUTE_QUERY_HISTORY", () => {
     expect(createRDSDriver).not.toHaveBeenCalled();
     expect(createSQLSupportDriver).toHaveBeenCalledTimes(1);
     expect(workflow).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears Query and RPC histories together from the unified view", async () => {
+    const stateStorage = {
+      getQueryHistoryList: vi.fn(async () => [partiqlHistory]),
+      deleteAllQueryHistories: vi.fn(async () => true),
+    };
+    const rpcHistoryStore = {
+      list: vi.fn(async () => [{ id: "rpc" }]),
+      clear: vi.fn(async () => undefined),
+    };
+    const historyTreeProvider = { refresh: vi.fn(async () => undefined) };
+    vi.mocked(window.showWarningMessage).mockResolvedValue("Delete all" as never);
+    const clear = registerAndGetHandler(
+      stateStorage, historyTreeProvider, DELETE_ALL_HISTORIES, rpcHistoryStore
+    );
+
+    await clear();
+
+    expect(window.showWarningMessage).toHaveBeenCalledWith(
+      "Delete all histories? Query: 1, RPC: 1.", { modal: true }, "Delete all"
+    );
+    expect(stateStorage.deleteAllQueryHistories).toHaveBeenCalledTimes(1);
+    expect(rpcHistoryStore.clear).toHaveBeenCalledTimes(1);
+    expect(historyTreeProvider.refresh).toHaveBeenCalledWith(true);
   });
 });

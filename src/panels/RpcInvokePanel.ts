@@ -23,13 +23,13 @@ import {
 } from "../shared/ActionParams";
 import { ComponentName } from "../shared/ComponentName";
 import { RpcInvokePanelEventData } from "../shared/MessageEventData";
-import { RpcInvokeRequest, RpcInvokeTarget } from "../shared/RpcInvokePanelParams";
+import { RpcInvokeRequest, RpcInvokeRestoration, RpcInvokeTarget } from "../shared/RpcInvokePanelParams";
 import { ResourceTreeProvider } from "../treeData/resource/ResourceTreeProvider";
 import { createDriver, removeDriver, workflow } from "../utilities/driverResolver";
 import { createCodeHtmlString, createCodeHtmlStringSync } from "../utilities/highlighter";
 import { StateStorage } from "../utilities/StateStorage";
-import { RpcInvokeHistory } from "../types/RpcInvokeHistory";
-import { RpcInvokeHistoryStore } from "../utilities/RpcInvokeHistoryStore";
+import { RpcInvokeHistoryAttempt, RpcInvokeHistoryStore } from "../utilities/RpcInvokeHistoryStore";
+import { RpcHistoryRequestCapture } from "../utilities/RpcHistoryRequestCapture";
 import { log } from "../utilities/logger";
 import { createHtmlFromRpcResult } from "../utilities/html/htmlGenerator";
 import { RPC_CAPTURE_BYTES, RPC_CAPTURE_LIMIT, redactRpcToken } from "../utilities/rpcExecution";
@@ -47,7 +47,7 @@ export class RpcInvokePanel extends BasePanel {
     this.historyStore = store;
   }
 
-  private static async recordHistory(history: Omit<RpcInvokeHistory, "id">): Promise<void> {
+  private static async recordHistory(history: RpcInvokeHistoryAttempt): Promise<void> {
     try {
       await this.historyStore?.add(history);
     } catch {
@@ -75,6 +75,9 @@ export class RpcInvokePanel extends BasePanel {
   private reportBytes = 0;
   private reportDroppedReceived = 0;
   private reportDroppedSent = 0;
+  private streamRequestCapture?: RpcHistoryRequestCapture;
+  private readonly pendingStreamSends = new Set<Promise<void>>();
+  private streamSendQueue: Promise<void> = Promise.resolve();
 
   private constructor(
     panel: WebviewPanel,
@@ -92,7 +95,7 @@ export class RpcInvokePanel extends BasePanel {
     method: RpcMethod,
     service: RpcService,
     connectionName: string,
-    restoredRequestJson?: string
+    restoration?: RpcInvokeRestoration
   ): void {
     if (!this.currentPanel) {
       const panel = window.createWebviewPanel(
@@ -112,7 +115,7 @@ export class RpcInvokePanel extends BasePanel {
     } else {
       this.currentPanel.getWebviewPanel().reveal(ViewColumn.One);
     }
-    this.currentPanel.selectMethod(method, service, connectionName, restoredRequestJson);
+    this.currentPanel.selectMethod(method, service, connectionName, restoration);
   }
 
   getComponentName(): ComponentName {
@@ -155,7 +158,7 @@ export class RpcInvokePanel extends BasePanel {
     method: RpcMethod,
     service: RpcService,
     connectionName: string,
-    restoredRequestJson?: string
+    restoration?: RpcInvokeRestoration
   ): void {
     if (this.startingStream || this.activeStream) {
       void this.post({
@@ -188,8 +191,12 @@ export class RpcInvokePanel extends BasePanel {
       requestStream: method.requestStream,
       responseStream: method.responseStream,
       requestTemplate: requestView.data,
-      ...(restoredRequestJson !== undefined && {
-        restoredRequestJson,
+      ...(restoration && {
+        restoredRequestJson: restoration.requestJson,
+        restoredMetadataJson: restoration.requestMetadata
+          ? JSON.stringify(restoration.requestMetadata, null, 2)
+          : undefined,
+        autoInvoke: restoration.autoInvoke,
         restoreId: randomUUID(),
       }),
       requestDescription: requestView.description,
@@ -395,7 +402,7 @@ export class RpcInvokePanel extends BasePanel {
     this.reportMetadataJson = JSON.stringify(validated.request.metadata ?? {}, null, 2);
     this.inProgress = true;
     let token: string | undefined;
-    let history: Omit<RpcInvokeHistory, "id"> | undefined;
+    let history: RpcInvokeHistoryAttempt | undefined;
     let recorded = false;
     try {
       const setting = await this.stateStorage.getConnectionSettingByName(
@@ -408,18 +415,23 @@ export class RpcInvokePanel extends BasePanel {
         setting.rpc?.authentication?.type === "bearer"
           ? setting.rpc.authentication.token
           : undefined;
+      const requestCapture = new RpcHistoryRequestCapture(false);
+      requestCapture.add(validated.request.requestJson);
       history = {
         connectionName: validated.request.connectionName,
         service: validated.request.service,
         method: validated.request.method,
         path,
         callKind: "unary",
-        invokedAt: Date.now(),
+        startedAt: Date.now(),
         totalElapsedMs: 0,
         sentCount: 0,
         receivedCount: 0,
         outcome: "error",
-        requestJson: validated.request.requestJson,
+        requestCapture,
+        ...(validated.request.metadata && Object.keys(validated.request.metadata).length > 0 && {
+          requestMetadata: validated.request.metadata,
+        }),
       };
       let sent = false;
       const { ok, message, result } = await workflow<RPCDriver, UnaryResult<unknown>>(
@@ -435,7 +447,7 @@ export class RpcInvokePanel extends BasePanel {
         },
         false
       );
-      history.totalElapsedMs = Date.now() - history.invokedAt;
+      history.totalElapsedMs = Date.now() - history.startedAt;
       history.sentCount = ok && result ? 1 : sent ? 1 : 0;
       history.receivedCount = ok && result ? 1 : 0;
       history.outcome = ok && result ? "success" : "error";
@@ -489,7 +501,7 @@ export class RpcInvokePanel extends BasePanel {
       });
     } catch (error) {
       if (history && !recorded) {
-        history.totalElapsedMs = Date.now() - history.invokedAt;
+        history.totalElapsedMs = Date.now() - history.startedAt;
         await RpcInvokePanel.recordHistory(history);
       }
       if (version !== this.selectionVersion) {
@@ -504,7 +516,7 @@ export class RpcInvokePanel extends BasePanel {
           cellId: randomUUID(),
           outcome: status?.code === 4 ? "timeout" : "error",
           status: status ? { code: status.code, name: status.name } : undefined,
-          elapsedMs: Date.now() - history.invokedAt,
+          elapsedMs: Date.now() - history.startedAt,
           receivedCount: 0,
           error: redactRpcToken(rawMessage, token),
         });
@@ -548,7 +560,7 @@ export class RpcInvokePanel extends BasePanel {
     let token: string | undefined;
     let cleanup: (() => Promise<string | undefined>) | undefined;
     let handedOff = false;
-    let history: Omit<RpcInvokeHistory, "id"> | undefined;
+    let history: RpcInvokeHistoryAttempt | undefined;
     try {
       await this.post({
         command: "streamConnecting",
@@ -566,18 +578,25 @@ export class RpcInvokePanel extends BasePanel {
           : undefined;
       this.streamToken = token;
       const method = this.method!;
+      const requestCapture = new RpcHistoryRequestCapture(requestStream);
+      if (!requestStream) {
+        requestCapture.add(validated.request.requestJson);
+      }
       history = {
         connectionName: validated.request.connectionName,
         service: validated.request.service,
         method: validated.request.method,
         path: this.target!.path,
         callKind: getRpcCallKind(method),
-        invokedAt: Date.now(),
+        startedAt: Date.now(),
         totalElapsedMs: 0,
         sentCount: 0,
         receivedCount: 0,
         outcome: "error",
-        ...(!requestStream && { requestJson: validated.request.requestJson }),
+        requestCapture,
+        ...(validated.request.metadata && Object.keys(validated.request.metadata).length > 0 && {
+          requestMetadata: validated.request.metadata,
+        }),
       };
       if (abort.signal.aborted) {
         throw new Error("RPC stream start cancelled.");
@@ -606,6 +625,8 @@ export class RpcInvokePanel extends BasePanel {
         throw new Error("RPC stream start cancelled.");
       }
       this.activeStream = session;
+      this.streamRequestCapture = requestCapture;
+      this.streamSendQueue = Promise.resolve();
       history.sentCount = requestStream ? 0 : 1;
       this.streamSequence = 0;
       this.startingStream = false;
@@ -623,9 +644,10 @@ export class RpcInvokePanel extends BasePanel {
       const cleanupError = await cleanup?.();
       if (history) {
         history.outcome = abort.signal.aborted ? "cancelled" : "error";
-        history.totalElapsedMs = Date.now() - history.invokedAt;
+        history.totalElapsedMs = Date.now() - history.startedAt;
         await RpcInvokePanel.recordHistory(history);
       }
+      this.streamRequestCapture = undefined;
       if (!this.disposed && version === this.selectionVersion) {
         const raw = error instanceof Error ? error.message : String(error);
         const message = `${raw}${cleanupError ? `; disconnect: ${cleanupError}` : ""}`;
@@ -652,7 +674,7 @@ export class RpcInvokePanel extends BasePanel {
     session: RpcStreamSession,
     sessionId: string,
     cleanup: () => Promise<string | undefined>,
-    history: Omit<RpcInvokeHistory, "id">,
+    history: RpcInvokeHistoryAttempt,
     token?: string
   ): Promise<void> {
     let eventError: unknown;
@@ -694,7 +716,7 @@ export class RpcInvokePanel extends BasePanel {
         this.streamCleanup = undefined;
       }
     }
-    history.totalElapsedMs = Date.now() - history.invokedAt;
+    history.totalElapsedMs = Date.now() - history.startedAt;
     history.sentCount =
       completion?.sentCount ??
       Math.max(
@@ -713,7 +735,11 @@ export class RpcInvokePanel extends BasePanel {
     if (completion?.status) {
       history.grpcStatus = { code: completion.status.code, name: completion.status.name };
     }
+    await Promise.allSettled([...this.pendingStreamSends]);
     await RpcInvokePanel.recordHistory(history);
+    if (this.streamSessionId === sessionId) {
+      this.streamRequestCapture = undefined;
+    }
     if (!this.disposed && this.streamSessionId === sessionId && this.reportTarget) {
       const received = this.reportEvents.filter(
         (event): event is Extract<RpcStreamEvent, { type: "received" }> => event.type === "received"
@@ -776,14 +802,24 @@ export class RpcInvokePanel extends BasePanel {
     if (!session || this.streamSessionId !== sessionId || !session.send) {
       return;
     }
+    const sendTask = this.streamSendQueue.then(async () => {
+      await session.send!(requestJson);
+      if (this.streamSessionId === sessionId) {
+        this.streamRequestCapture?.add(requestJson);
+      }
+    });
+    this.streamSendQueue = sendTask.catch(() => undefined);
+    this.pendingStreamSends.add(sendTask);
     try {
-      await session.send(requestJson);
+      await sendTask;
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error);
       await this.post({
         command: "streamError",
         value: { streamError: { sessionId, error: redactRpcToken(raw, this.streamToken) } },
       });
+    } finally {
+      this.pendingStreamSends.delete(sendTask);
     }
   }
 
@@ -793,6 +829,7 @@ export class RpcInvokePanel extends BasePanel {
       return;
     }
     try {
+      await Promise.allSettled([...this.pendingStreamSends]);
       await session.finishSending();
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error);

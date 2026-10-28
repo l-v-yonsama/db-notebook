@@ -1,48 +1,35 @@
 import dayjs from "dayjs";
 import * as vscode from "vscode";
 import { RpcInvokeHistory } from "../../types/RpcInvokeHistory";
-import { isRestorableRpcHistory, RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
-import { OPEN_RPC_HISTORY_IN_INVOKE_PANEL } from "../../constant";
+import { isRestorableRpcHistory } from "../../utilities/RpcInvokeHistoryStore";
 import { formatRpcStatus, formatRpcTransferSummary } from "../../utilities/rpcResultSummary";
 
 const REQUEST_PREVIEW_MAX_CHARS = 4096;
 
-export class RpcHistoryTreeProvider implements vscode.TreeDataProvider<RpcInvokeHistory> {
-  private readonly changed = new vscode.EventEmitter<void>();
-  readonly onDidChangeTreeData = this.changed.event;
-
-  constructor(private readonly store: RpcInvokeHistoryStore) {
-    store.onDidChange(() => this.refresh());
-  }
-
-  refresh(): void {
-    this.changed.fire();
-  }
-
-  getTreeItem(history: RpcInvokeHistory): vscode.TreeItem {
+export class RpcHistoryItem extends vscode.TreeItem {
+  constructor(history: RpcInvokeHistory) {
     const serviceName = history.service.split(".").at(-1) || history.service;
-    const item = new vscode.TreeItem(
+    super(
       `${serviceName}/${history.method}`,
       vscode.TreeItemCollapsibleState.None
     );
-    item.contextValue = isRestorableRpcHistory(history)
+    this.contextValue = isRestorableRpcHistory(history)
       ? "rpcInvokeHistoryRestorable"
-      : "rpcInvokeHistory";
-    if (isRestorableRpcHistory(history)) {
-      item.command = {
-        command: OPEN_RPC_HISTORY_IN_INVOKE_PANEL,
-        title: "Open in Invoke RPC",
-        arguments: [history],
-      };
-    }
+      : history.callKind === "unary" || history.callKind === "serverStreaming"
+        ? "rpcInvokeHistoryPanelOnly"
+        : history.requestJson !== undefined
+          ? "rpcInvokeHistoryNotebookOnly"
+          : "rpcInvokeHistory";
     const status = history.outcome === "success" ? "OK" :
       history.outcome === "error" ? "Failed" :
       history.outcome === "cancelled" ? "Cancelled" : "Timeout";
     const parts = [
-      dayjs(history.invokedAt).format("MM/DD HH:mm"),
+      dayjs(Math.max(history.executedAt, history.lastErrorAt ?? 0)).format("MM/DD HH:mm"),
       history.connectionName,
+      "RPC",
       history.callKind,
       status,
+      ...(history.executionCount > 1 ? [`×${history.executionCount}`] : []),
       formatRpcTransferSummary(
         history.receivedCount,
         history.totalElapsedMs,
@@ -52,12 +39,15 @@ export class RpcHistoryTreeProvider implements vscode.TreeDataProvider<RpcInvoke
     if (history.grpcStatus) {
       parts.push(formatRpcStatus(history.grpcStatus));
     }
-    item.description = parts.join(" ・ ");
+    if (history.lastErrorAt) {
+      parts.push(`Last retry ${history.lastErrorOutcome ?? "error"}`);
+    }
+    this.description = parts.join(" ・ ");
     const tooltip = new vscode.MarkdownString();
     tooltip.appendText(history.path);
     tooltip.appendMarkdown("\n\n");
     tooltip.appendText(parts.join(" ・ "));
-    if (isRestorableRpcHistory(history)) {
+    if (history.requestJson) {
       let formatted = history.requestJson;
       try {
         formatted = JSON.stringify(JSON.parse(formatted), null, 2);
@@ -71,17 +61,16 @@ export class RpcHistoryTreeProvider implements vscode.TreeDataProvider<RpcInvoke
         "json"
       );
       if (truncated) {
-        tooltip.appendMarkdown("\n\nPreview truncated. Open in Invoke RPC to see the full request.");
+        tooltip.appendMarkdown("\n\nPreview truncated.");
       }
+    } else {
+      tooltip.appendMarkdown("\n\nRequest Data was not saved because it exceeded 64 KiB.");
     }
-    item.tooltip = tooltip;
-    item.iconPath = history.outcome === "success"
+    this.tooltip = tooltip;
+    this.iconPath = history.lastErrorAt
+      ? new vscode.ThemeIcon("warning", new vscode.ThemeColor("charts.yellow"))
+      : history.outcome === "success"
       ? new vscode.ThemeIcon("pass")
       : new vscode.ThemeIcon("error", new vscode.ThemeColor("charts.red"));
-    return item;
-  }
-
-  getChildren(): Promise<RpcInvokeHistory[]> {
-    return this.store.list();
   }
 }

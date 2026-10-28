@@ -24,6 +24,7 @@ const result = ref<RpcInvokeResultView>();
 const error = ref("");
 const inProgress = ref(false);
 const reportAvailable = ref(false);
+let lastAutoInvokeId = (vscode.getState() as { rpcAutoInvokeId?: string } | undefined)?.rpcAutoInvokeId;
 const activeTab = ref<ResultTab>("data");
 const activeRequestTab = ref<RequestTab>("data");
 const isStreaming = computed(() => !!(target.value?.requestStream || target.value?.responseStream));
@@ -186,7 +187,7 @@ const recieveMessage = (message: RpcInvokePanelEventData): void => {
       || (next.restoreId !== undefined && target.value?.restoreId !== next.restoreId)
     ) {
       requestJson.value = next.restoredRequestJson ?? next.requestTemplate;
-      metadataJson.value = "";
+      metadataJson.value = next.restoredMetadataJson ?? "";
       result.value = undefined;
       error.value = "";
       activeTab.value = "data";
@@ -206,6 +207,12 @@ const recieveMessage = (message: RpcInvokePanelEventData): void => {
     }
     target.value = next;
     inProgress.value = false;
+    if (next.autoInvoke && next.restoreId && next.restoreId !== lastAutoInvokeId) {
+      lastAutoInvokeId = next.restoreId;
+      vscode.setState({ rpcAutoInvokeId: next.restoreId });
+      if (next.responseStream) startStream();
+      else invoke();
+    }
   } else if (message.command === "result") {
     result.value = message.value.result;
     error.value = "";

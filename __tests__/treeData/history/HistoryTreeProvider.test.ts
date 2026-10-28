@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MarkdownString, ThemeIcon } from "vscode";
-import { QueryHistoryItem } from "../../../src/treeData/history/HistoryTreeProvider";
+import { HistoryTreeProvider, QueryHistoryItem } from "../../../src/treeData/history/HistoryTreeProvider";
 import { QUERY_HISTORY_LABEL_MAX_LENGTH } from "../../../src/constant";
 
 describe("QueryHistoryItem", () => {
@@ -112,6 +112,35 @@ describe("QueryHistoryItem", () => {
         status: "success",
       });
       expect(String(item.label).length).toBeLessThanOrEqual(QUERY_HISTORY_LABEL_MAX_LENGTH);
+    }
+  });
+});
+
+describe("HistoryTreeProvider", () => {
+  it("mixes Query and RPC by latest attempt and applies a shared connection filter", async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = new HistoryTreeProvider(
+        { subscriptions: [] } as never,
+        { getQueryHistoryList: async () => [{
+          id: "sql", connectionName: "db", sqlDoc: "select 1", status: "success", executedAt: 10,
+        }] } as never,
+        { list: async () => [{
+          id: "rpc", connectionName: "rpc", service: "p.S", method: "M", path: "/p.S/M",
+          callKind: "unary", executedAt: 5, lastErrorAt: 20, executionCount: 2,
+          requestDigest: "digest", totalElapsedMs: 12, sentCount: 1, receivedCount: 1,
+          outcome: "success",
+        }], onDidChange: () => ({ dispose() {} }) } as never
+      );
+      await provider.refresh(true);
+      const all = await provider.getChildren() as Array<{ id: string }>;
+      expect(all.map((item) => item.id)).toEqual(["rpc", "sql"]);
+      expect(provider.getConnectionNames()).toEqual(["db", "rpc"]);
+      provider.setConnectionFilter("db");
+      expect((await provider.getChildren() as Array<{ id: string }>).map((item) => item.id)).toEqual(["sql"]);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
     }
   });
 });

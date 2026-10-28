@@ -1,95 +1,95 @@
 import { Memento } from "vscode";
-import { describe, expect, it, vi } from "vitest";
-import { RpcInvokeHistoryStore } from "../../src/utilities/RpcInvokeHistoryStore";
-import { RpcInvokeHistory } from "../../src/types/RpcInvokeHistory";
-import { RpcHistoryTreeProvider } from "../../src/treeData/history/RpcHistoryTreeProvider";
-import { RPC_HISTORY_REQUEST_MAX_BYTES } from "../../src/utilities/RpcInvokeHistoryStore";
+import { describe, expect, it } from "vitest";
+import { RpcHistoryItem } from "../../src/treeData/history/RpcHistoryTreeItem";
+import { RpcHistoryRequestCapture, RPC_HISTORY_REQUEST_MAX_BYTES } from "../../src/utilities/RpcHistoryRequestCapture";
+import { RpcInvokeHistoryAttempt, RpcInvokeHistoryStore } from "../../src/utilities/RpcInvokeHistoryStore";
 
-const sample = (index: number): Omit<RpcInvokeHistory, "id"> => ({
-  connectionName: "rpc",
-  service: "fixture.Service",
-  method: `Call${index}`,
-  path: `/fixture.Service/Call${index}`,
-  callKind: "unary",
-  invokedAt: index,
-  totalElapsedMs: 10,
-  sentCount: 1,
-  receivedCount: 1,
-  outcome: "success",
-  grpcStatus: { code: 0, name: "OK" },
-});
-
-describe("RpcInvokeHistoryStore", () => {
-  it("serializes concurrent updates, caps records at 50, and never stores extra data", async () => {
-    const data = new Map<string, unknown>([["database-notebook-sql-history", [{ id: "sql" }]]]);
-    const state = {
-      get: vi.fn((key: string, fallback: unknown) => data.get(key) ?? fallback),
-      update: vi.fn(async (key: string, value: unknown) => {
-        await Promise.resolve();
-        data.set(key, value);
-      }),
-    } as unknown as Memento;
-    const store = new RpcInvokeHistoryStore(state);
-    const changed = vi.fn();
-    store.onDidChange(changed);
-
-    await Promise.all(Array.from({ length: 55 }, (_, index) => store.add({
-      ...sample(index),
-      requestJson: '{"value":1}',
-      metadata: { authorization: "secret token" },
-    } as Omit<RpcInvokeHistory, "id">)));
-    const list = await store.list();
-    expect(list).toHaveLength(50);
-    expect(list[0].method).toBe("Call54");
-    expect(list[49].method).toBe("Call5");
-    expect(changed).toHaveBeenCalledTimes(55);
-    expect(list[0].requestJson).toBe('{"value":1}');
-    expect(JSON.stringify(data.get("database-notebook-rpc-invoke-history"))).not.toContain("secret");
-    expect(data.get("database-notebook-sql-history")).toEqual([{ id: "sql" }]);
-
-    await store.delete(list[0].id);
-    expect(await store.list()).toHaveLength(49);
-    await store.clear();
-    expect(await store.list()).toEqual([]);
-    expect(data.get("database-notebook-sql-history")).toEqual([{ id: "sql" }]);
-  });
-
-  it("restores only bounded unary and server-streaming requests", async () => {
-    const data = new Map<string, unknown>();
-    const state = {
+const state = () => {
+  const data = new Map<string, unknown>();
+  return {
+    data,
+    memento: {
       get: (key: string, fallback: unknown) => data.get(key) ?? fallback,
       update: async (key: string, value: unknown) => { data.set(key, value); },
-    } as Memento;
-    const store = new RpcInvokeHistoryStore(state);
-    await store.add({ ...sample(1), requestJson: '{"name":"Alice"}' });
-    await store.add({ ...sample(2), callKind: "serverStreaming", requestJson: '{"id":2}' });
-    await store.add({ ...sample(3), callKind: "clientStreaming", requestJson: '{"id":3}' });
-    await store.add({ ...sample(4), callKind: "bidiStreaming", requestJson: '{"id":4}' });
-    await store.add({ ...sample(5), requestJson: "x".repeat(RPC_HISTORY_REQUEST_MAX_BYTES + 1) });
-    const list = await store.list();
-    expect(list.map((item) => item.requestJson)).toEqual([
-      undefined, undefined, undefined, '{"id":2}', '{"name":"Alice"}',
-    ]);
-    const provider = new RpcHistoryTreeProvider(store);
-    expect(provider.getTreeItem(list[3]).description).toContain("1 Sent, 1 Received (0.010 sec)");
-    expect(provider.getTreeItem(list[4]).description).toContain("1 Received (0.010 sec)");
-    expect(provider.getTreeItem(list[4]).description).toContain("OK(0)");
-    expect(provider.getTreeItem(list[0]).command).toBeUndefined();
-    expect(provider.getTreeItem(list[1]).command).toBeUndefined();
-    expect(provider.getTreeItem(list[3]).command).toMatchObject({
-      command: "database-notebook.rpc-histories.openInInvokePanel",
-    });
-    const tooltip = provider.getTreeItem(list[4]).tooltip as { value: string };
-    expect(tooltip.value).toContain('```json\n{\n  "name": "Alice"\n}');
-    expect((provider.getTreeItem(list[1]).tooltip as { value: string }).value).not.toContain("**Request**");
+    } as Memento,
+  };
+};
 
-    const longRequest = `{"data":"${"x".repeat(5000)}TAIL_MARKER"}`;
-    await store.add({ ...sample(6), requestJson: longRequest });
-    const latest = (await store.list())[0];
-    const longTooltip = (provider.getTreeItem(latest).tooltip as { value: string }).value;
-    expect(longTooltip).toContain("```json");
-    expect(longTooltip).toContain("Preview truncated.");
-    expect(longTooltip).not.toContain("TAIL_MARKER");
-    expect(latest.requestJson).toBe(longRequest);
+const attempt = (
+  request: string[],
+  kind: RpcInvokeHistoryAttempt["callKind"] = "unary",
+  outcome: RpcInvokeHistoryAttempt["outcome"] = "success"
+): RpcInvokeHistoryAttempt => {
+  const requestCapture = new RpcHistoryRequestCapture(
+    kind === "clientStreaming" || kind === "bidiStreaming"
+  );
+  request.forEach((item) => requestCapture.add(item));
+  return {
+    connectionName: "rpc",
+    service: "fixture.Service",
+    method: "Call",
+    path: "/fixture.Service/Call",
+    callKind: kind,
+    startedAt: Date.now() - 10,
+    totalElapsedMs: 10,
+    sentCount: request.length,
+    receivedCount: 1,
+    outcome,
+    requestCapture,
+  };
+};
+
+describe("RpcInvokeHistoryStore", () => {
+  it("groups equivalent Data and preserves a successful result after a failed retry", async () => {
+    const { data, memento } = state();
+    const store = new RpcInvokeHistoryStore(memento);
+    await store.add({
+      ...attempt(['{"b":2,"a":1}']),
+      requestMetadata: { "x-trace-id": "successful" },
+    });
+    const initial = (await store.list())[0];
+    await store.add({
+      ...attempt(['{ "a": 1, "b": 2 }'], "unary", "error"),
+      requestMetadata: { "x-trace-id": "failed" },
+    });
+    const [grouped] = await store.list();
+    expect((await store.list())).toHaveLength(1);
+    expect(grouped.id).toBe(initial.id);
+    expect(grouped.executionCount).toBe(2);
+    expect(grouped.outcome).toBe("success");
+    expect(grouped.lastErrorOutcome).toBe("error");
+    expect(grouped.lastErrorAt).toBeGreaterThanOrEqual(grouped.executedAt);
+    expect(grouped.requestJson).toBe('{"a":1,"b":2}');
+    expect(grouped.requestMetadata).toEqual({ "x-trace-id": "successful" });
+    expect(new RpcHistoryItem(grouped).contextValue).toBe("rpcInvokeHistoryRestorable");
+    expect(new RpcHistoryItem(grouped).command).toBeUndefined();
+    expect(data.has("database-notebook-rpc-invoke-history-v3")).toBe(true);
+  });
+
+  it("stores an ordered stream as one history and hashes Data beyond the storage limit", async () => {
+    const store = new RpcInvokeHistoryStore(state().memento);
+    await store.add({
+      ...attempt(['{"value":1}', '{"value":2}'], "bidiStreaming"),
+      requestMetadata: {},
+    });
+    const [stream] = await store.list();
+    expect(stream.requestJson).toBe('[{"value":1},{"value":2}]');
+    expect(stream.requestMetadata).toBeUndefined();
+    expect("requestMetadata" in stream).toBe(false);
+    expect(new RpcHistoryItem(stream).command).toBeUndefined();
+    expect(new RpcHistoryItem(stream).contextValue).toBe("rpcInvokeHistoryNotebookOnly");
+    expect(new RpcHistoryItem({ ...stream, requestJson: undefined }).contextValue)
+      .toBe("rpcInvokeHistory");
+    await store.add(attempt(['{"value":2}', '{"value":1}'], "bidiStreaming"));
+    expect(await store.list()).toHaveLength(2);
+
+    const large = `{"data":"${"x".repeat(RPC_HISTORY_REQUEST_MAX_BYTES)}"}`;
+    await store.add(attempt([large], "unary"));
+    await store.add(attempt([large], "unary"));
+    const [oversized] = await store.list();
+    expect(oversized.executionCount).toBe(2);
+    expect(oversized.requestJson).toBeUndefined();
+    expect(oversized.requestDigest).toHaveLength(64);
+    expect(new RpcHistoryItem(oversized).contextValue).toBe("rpcInvokeHistoryPanelOnly");
   });
 });

@@ -7,12 +7,17 @@ export type RpcInvokeHistory = {
   method: string;
   path: string;
   callKind: RpcCallKind;
-  invokedAt: number;
+  executedAt: number;
+  lastErrorAt?: number;
+  lastErrorOutcome?: "error" | "cancelled" | "timeout";
+  executionCount: number;
+  requestDigest: string;
   totalElapsedMs: number;
   sentCount: number;
   receivedCount: number;
   outcome: "success" | "error" | "cancelled" | "timeout";
   grpcStatus?: { code: number; name: string };
-  // Only unary/server-streaming requests within the storage size limit are restorable.
+  // Saved for every call kind when the complete Data fits the storage limit.
   requestJson?: string;
+  requestMetadata?: Record<string, string | string[]>;
 };

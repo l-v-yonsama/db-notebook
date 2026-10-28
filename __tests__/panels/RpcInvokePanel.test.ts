@@ -126,6 +126,9 @@ describe("RpcInvokePanel", () => {
         connectionName: "fixture", service: service.fullName, method: method.name,
         requestJson: '{"id":"7"}', metadata: { "x-trace-id": "abc-123" },
       } });
+      expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
+        requestMetadata: { "x-trace-id": "abc-123" },
+      }));
       expect(messages().some((message) => message.command === "reportAvailable" && message.value.reportAvailable)).toBe(true);
       await send({ command: "outputRpcHtml", params: {} });
       const html = await fs.promises.readFile(targetPath, "utf8");
@@ -244,29 +247,36 @@ describe("RpcInvokePanel", () => {
     expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
       path: method.path,
       callKind: "unary",
-      requestJson,
       outcome: "success",
       sentCount: 1,
       receivedCount: 1,
       grpcStatus: { code: 0, name: "OK" },
+      requestMetadata: { "x-request-id": "abc" },
     }));
+    expect(addHistory.mock.calls[0][0].requestCapture.finish().requestJson).toBe(requestJson);
     expect(JSON.stringify(addHistory.mock.calls)).not.toContain("Hana");
     expect(JSON.stringify(addHistory.mock.calls)).not.toContain("x-rpc-tag");
-    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("x-request-id");
   });
 
   it("restores a history request when reopening the same method without executing it", () => {
     RpcInvokePanel.render(
-      Uri.file("/extension"), storage, tree, method, service, "fixture", '{"id":"first"}'
+      Uri.file("/extension"), storage, tree, method, service, "fixture", {
+        requestJson: '{"id":"first"}',
+        requestMetadata: { "x-request-id": "first" },
+      }
     );
     const first = messages().at(-1).value.initialize;
     expect(first.restoredRequestJson).toBe('{"id":"first"}');
+    expect(first.restoredMetadataJson).toContain('"x-request-id": "first"');
     expect(first.restoreId).toEqual(expect.any(String));
     RpcInvokePanel.render(
-      Uri.file("/extension"), storage, tree, method, service, "fixture", '{"id":"second"}'
+      Uri.file("/extension"), storage, tree, method, service, "fixture", {
+        requestJson: '{"id":"second"}',
+      }
     );
     const second = messages().at(-1).value.initialize;
     expect(second.restoredRequestJson).toBe('{"id":"second"}');
+    expect(second.restoredMetadataJson).toBeUndefined();
     expect(second.restoreId).not.toBe(first.restoreId);
     expect(workflow).not.toHaveBeenCalled();
   });
@@ -414,9 +424,9 @@ describe("RpcInvokePanel", () => {
       outcome: "cancelled",
       sentCount: 1,
       receivedCount: 1,
+      requestMetadata: { "x-request-id": "stream-test" },
     }));
-    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("stream-test");
-    expect(addHistory.mock.calls[0][0].requestJson).toBeUndefined();
+    expect(addHistory.mock.calls[0][0].requestCapture.finish().requestJson).toBe('[{"value":"first"}]');
     expect(messages().find((message) => message.command === "streamEvent")).toMatchObject({
       value: { streamEvent: { sessionId, event: { type: "received", contents: { value: "ok" } } } },
     });
@@ -484,11 +494,11 @@ describe("RpcInvokePanel", () => {
     await vi.waitFor(() => expect(addHistory).toHaveBeenCalledTimes(1));
     expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
       callKind: "serverStreaming",
-      requestJson: '{"filter":"recent"}',
       sentCount: 1,
       receivedCount: 2,
+      requestMetadata: { "x-request-id": "not-saved" },
     }));
-    expect(JSON.stringify(addHistory.mock.calls)).not.toContain("not-saved");
+    expect(addHistory.mock.calls[0][0].requestCapture.finish().requestJson).toBe('{"filter":"recent"}');
   });
 
   it("releases the dedicated driver when connect or stream creation fails", async () => {

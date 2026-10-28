@@ -80,6 +80,7 @@ export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 export const QUERY_HISTORY_LABEL_MAX_LENGTH = 70;
 export const REFRESH_QUERY_HISTORIES = `${EXTENSION_NAME}.refresh-query-histories`;
 export const DELETE_ALL_QUERY_HISTORY = `${EXTENSION_NAME}.delete-all-query-histories`;
+export const DELETE_ALL_HISTORIES = `${EXTENSION_NAME}.delete-all-histories`;
 export const EXECUTE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.execute`;
 export const OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY = `${EXTENSION_NAME}.histories.openDynamoQueryPanel`;
 export const START_PERFORMANCE_TUNING_FROM_HISTORY = `${EXTENSION_NAME}.histories.startPerformanceTuning`;
@@ -93,11 +94,13 @@ export const FOCUS_QUERY_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFi
 export const SORT_QUERY_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
 export const SORT_QUERY_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
 export const HISTORY_VIEW_ID = `${EXTENSION_NAME}-histories`;
-export const RPC_HISTORY_VIEW_ID = `${EXTENSION_NAME}-rpc-histories`;
 export const REFRESH_RPC_HISTORIES = `${EXTENSION_NAME}.refresh-rpc-histories`;
 export const DELETE_RPC_HISTORY = `${EXTENSION_NAME}.rpc-histories.delete`;
 export const DELETE_ALL_RPC_HISTORY = `${EXTENSION_NAME}.delete-all-rpc-histories`;
 export const OPEN_RPC_HISTORY_IN_INVOKE_PANEL = `${EXTENSION_NAME}.rpc-histories.openInInvokePanel`;
+export const OPEN_RPC_HISTORY_AS_NOTEBOOK = `${EXTENSION_NAME}.rpc-histories.openAsNotebook`;
+export const APPEND_RPC_HISTORY_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.rpc-histories.appendToActiveNotebook`;
+export const EXECUTE_RPC_HISTORY = `${EXTENSION_NAME}.rpc-histories.execute`;
 
 //---------------------------------------------------
 // OPEN VIEWERS

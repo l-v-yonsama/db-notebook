@@ -45,6 +45,7 @@
     "CsvViewer",
     "MQTT",
     "mqtt-client",
+    "RPC-client",
     "Copilot",
     "Copilot Chat",
     "AI tools",
@@ -78,7 +79,9 @@
     "languages": [
       {
         "id": "rpc-json",
-        "aliases": ["RPC JSON"],
+        "aliases": [
+          "RPC JSON"
+        ],
         "configuration": "./languages/rpc-json/language-configuration.json"
       },
       {
@@ -350,19 +353,10 @@
         },
         {
           "id": "database-notebook-histories",
-          "name": "Query histories",
+          "name": "Histories",
           "visibility": "visible",
           "icon": "media/logo.png",
-          "contextualTitle": "Histories",
-          "when": "!databaseNotebook.rpcHistoryMode"
-        },
-        {
-          "id": "database-notebook-rpc-histories",
-          "name": "RPC histories",
-          "visibility": "visible",
-          "icon": "media/logo.png",
-          "contextualTitle": "RPC Histories",
-          "when": "databaseNotebook.rpcHistoryMode"
+          "contextualTitle": "Histories"
         },
         {
           "id": "database-notebook-mcpserver",
@@ -835,14 +829,34 @@
           "group": "9_danger@1"
         },
         {
-          "command": "database-notebook.rpc-histories.delete",
-          "when": "view == database-notebook-rpc-histories && viewItem =~ /^rpcInvokeHistory/",
-          "group": "9_danger@1"
+          "command": "database-notebook.rpc-histories.openInInvokePanel",
+          "when": "view == database-notebook-histories && viewItem =~ /^rpcInvokeHistory(Restorable|PanelOnly)$/",
+          "group": "1_open@1"
         },
         {
-          "command": "database-notebook.rpc-histories.openInInvokePanel",
-          "when": "view == database-notebook-rpc-histories && viewItem == rpcInvokeHistoryRestorable",
+          "command": "database-notebook.rpc-histories.openAsNotebook",
+          "when": "view == database-notebook-histories && viewItem =~ /^rpcInvokeHistory(Restorable|NotebookOnly)$/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "database-notebook.rpc-histories.appendToActiveNotebook",
+          "when": "view == database-notebook-histories && viewItem =~ /^rpcInvokeHistory(Restorable|NotebookOnly)$/",
+          "group": "1_open@3"
+        },
+        {
+          "command": "database-notebook.rpc-histories.execute",
+          "when": "view == database-notebook-histories && viewItem == rpcInvokeHistoryRestorable",
           "group": "inline"
+        },
+        {
+          "command": "database-notebook.rpc-histories.execute",
+          "when": "view == database-notebook-histories && viewItem == rpcInvokeHistoryRestorable",
+          "group": "2_run@1"
+        },
+        {
+          "command": "database-notebook.rpc-histories.delete",
+          "when": "view == database-notebook-histories && viewItem =~ /^rpcInvokeHistory/",
+          "group": "9_danger@1"
         },
         {
           "command": "database-notebook.start-mcp-server",
@@ -959,12 +973,12 @@
         },
         {
           "command": "database-notebook.histories.filterByConnection",
-          "when": "view == database-notebook-histories && !databaseNotebook.queryHistoryFiltered",
+          "when": "view == database-notebook-histories && !databaseNotebook.historyFiltered",
           "group": "navigation"
         },
         {
           "command": "database-notebook.histories.clearConnectionFilter",
-          "when": "view == database-notebook-histories && databaseNotebook.queryHistoryFiltered",
+          "when": "view == database-notebook-histories && databaseNotebook.historyFiltered",
           "group": "navigation"
         },
         {
@@ -974,27 +988,17 @@
         },
         {
           "command": "database-notebook.histories.sortByDuration",
-          "when": "view == database-notebook-histories && !databaseNotebook.queryHistorySortByDuration",
+          "when": "view == database-notebook-histories && !databaseNotebook.historySortByDuration",
           "group": "navigation"
         },
         {
           "command": "database-notebook.histories.sortByRecent",
-          "when": "view == database-notebook-histories && databaseNotebook.queryHistorySortByDuration",
+          "when": "view == database-notebook-histories && databaseNotebook.historySortByDuration",
           "group": "navigation"
         },
         {
-          "command": "database-notebook.delete-all-query-histories",
+          "command": "database-notebook.delete-all-histories",
           "when": "view == database-notebook-histories",
-          "group": "navigation"
-        },
-        {
-          "command": "database-notebook.refresh-rpc-histories",
-          "when": "view == database-notebook-rpc-histories",
-          "group": "navigation"
-        },
-        {
-          "command": "database-notebook.delete-all-rpc-histories",
-          "when": "view == database-notebook-rpc-histories",
           "group": "navigation"
         }
       ],
@@ -1633,7 +1637,7 @@
       },
       {
         "command": "database-notebook.refresh-query-histories",
-        "title": "Refresh query histories",
+        "title": "Refresh histories",
         "shortTitle": "Refresh",
         "icon": "$(refresh)"
       },
@@ -1657,13 +1661,37 @@
       },
       {
         "command": "database-notebook.rpc-histories.openInInvokePanel",
-        "title": "Open in Invoke RPC",
+        "title": "Open in RPC Panel",
         "shortTitle": "Open",
         "icon": "$(open-preview)"
       },
       {
+        "command": "database-notebook.rpc-histories.openAsNotebook",
+        "title": "Open selected RPC as notebook",
+        "shortTitle": "Open as notebook",
+        "icon": "$(notebook)"
+      },
+      {
+        "command": "database-notebook.rpc-histories.appendToActiveNotebook",
+        "title": "Append selected RPC to active notebook",
+        "shortTitle": "Append to active notebook",
+        "icon": "$(add)"
+      },
+      {
+        "command": "database-notebook.rpc-histories.execute",
+        "title": "Execute selected RPC",
+        "shortTitle": "Execute",
+        "icon": "$(play)"
+      },
+      {
         "command": "database-notebook.delete-all-query-histories",
         "title": "Delete all query histories",
+        "shortTitle": "Delete all",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "database-notebook.delete-all-histories",
+        "title": "Delete all histories",
         "shortTitle": "Delete all",
         "icon": "$(trash)"
       },
@@ -1711,31 +1739,31 @@
       },
       {
         "command": "database-notebook.histories.filterByConnection",
-        "title": "Filter query histories by connection",
+        "title": "Filter histories by connection",
         "shortTitle": "Filter by connection",
         "icon": "$(filter)"
       },
       {
         "command": "database-notebook.histories.clearConnectionFilter",
-        "title": "Clear query history connection filter",
+        "title": "Clear history connection filter",
         "shortTitle": "Clear filter",
         "icon": "$(filter-filled)"
       },
       {
         "command": "database-notebook.histories.focusFilter",
-        "title": "Filter query histories",
+        "title": "Filter histories",
         "shortTitle": "Filter",
         "icon": "$(search)"
       },
       {
         "command": "database-notebook.histories.sortByDuration",
-        "title": "Sort query histories by duration",
+        "title": "Sort histories by duration",
         "shortTitle": "Sort by duration",
         "icon": "$(clock)"
       },
       {
         "command": "database-notebook.histories.sortByRecent",
-        "title": "Sort query histories by recent",
+        "title": "Sort histories by recent",
         "shortTitle": "Sort by recent",
         "icon": "$(list-ordered)"
       },
@@ -2120,8 +2148,8 @@
         "name": "database-notebook_getSchema",
         "toolReferenceName": "getDbSchema",
         "displayName": "Get Database Schema",
-        "modelDescription": "Returns schema or resource information for a connection managed by Database Notebook, in a format appropriate to its type. For a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle): the CREATE TABLE DDL (columns, types, primary/foreign keys, comments) for a table, or all tables -- optionally narrow with schemaName and/or tableName. For an AWS connection: the configured resources -- S3 bucket names, SQS queue names/URLs, CloudWatch log group names, and DynamoDB table key schemas (partition/sort key, attribute types, GSI/LSI counts) -- optionally narrow with serviceType and/or resourceName. For a Redis connection: each DB index and its key count. For a Memcache connection: key counts per cache tier (hot/warm/cold) and the configured servers. For a Keycloak connection: each realm with user/group counts -- optionally narrow with realmName. For an Auth0 connection: user/organization counts, plus organization/client lists where the connection is configured to retrieve them. For an MQTT connection: the configured topic subscriptions with QoS. All filters are optional and independent; omit any of them to get every match. Use this when the user asks about table/resource structure, columns, relationships, or before writing SQL/inspecting resources against a connection you haven't inspected yet. For searching/browsing individual records or keys within a resource (not just its structure/summary), use scanDbResource instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name. When AI data masking is enabled, comments, descriptions, and default/check literals are processed locally and require preview approval before this definition output is returned.",
-        "userDescription": "Gets table structure (DDL) from a SQL connection, resource details from an AWS connection, or a summary (key counts, realms, topics, etc.) from a Redis/Memcache/Keycloak/Auth0/MQTT connection.",
+        "modelDescription": "Returns schema or resource information for a connection managed by Database Notebook, in a format appropriate to its type. For a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle): the CREATE TABLE DDL (columns, types, primary/foreign keys, comments) for a table, or all tables -- optionally narrow with schemaName and/or tableName. For an AWS connection: the configured resources -- S3 bucket names, SQS queue names/URLs, CloudWatch log group names, and DynamoDB table key schemas (partition/sort key, attribute types, GSI/LSI counts) -- optionally narrow with serviceType and/or resourceName. For a Redis connection: each DB index and its key count. For a Memcache connection: key counts per cache tier (hot/warm/cold) and the configured servers. For a Keycloak connection: each realm with user/group counts -- optionally narrow with realmName. For an Auth0 connection: user/organization counts, plus organization/client lists where the connection is configured to retrieve them. For an MQTT connection: the configured topic subscriptions with QoS. For an RPC connection: discovered service/method names, call kind, request/response message descriptors, and a ProtoJSON request example; optionally narrow with serviceName and/or methodName. All filters are optional and independent; omit any of them to get every match. Use this when the user asks about table/resource structure, columns, relationships, or before writing SQL/inspecting resources against a connection you haven't inspected yet. For searching/browsing individual records or keys within a resource (not just its structure/summary), use scanDbResource instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name. When AI data masking is enabled, comments, descriptions, and default/check literals are processed locally and require preview approval before this definition output is returned.",
+        "userDescription": "Gets SQL table structure, RPC method descriptors, or resource summaries from a saved connection.",
         "canBeReferencedInPrompt": true,
         "icon": "$(symbol-structure)",
         "inputSchema": {
@@ -2157,6 +2185,14 @@
             "realmName": {
               "type": "string",
               "description": "Keycloak connections only. Optional: limit results to a single realm name. Omit to get every realm."
+            },
+            "serviceName": {
+              "type": "string",
+              "description": "RPC connections only. Optional: limit results to a service (prefer its fully qualified name)."
+            },
+            "methodName": {
+              "type": "string",
+              "description": "RPC connections only. Optional: limit results to a method name."
             }
           },
           "required": [
@@ -2221,6 +2257,59 @@
           "required": [
             "connectionName",
             "sql"
+          ]
+        }
+      },
+      {
+        "name": "database-notebook_runRpc",
+        "toolReferenceName": "invokeUnaryRpc",
+        "displayName": "Invoke Unary RPC",
+        "modelDescription": "Invokes one unary gRPC method on an AI-enabled Database Notebook RPC connection. Always asks the user to review the service, method, request Data and Metadata before sending, because the RPC may change remote state. Use getDbSchema first to inspect the request and response descriptor. Streaming methods are not supported here; create an rpc-json notebook cell for streaming. Response data follows the connection's AI data masking policy and the invocation is recorded in Histories.",
+        "userDescription": "Invokes a unary RPC after confirming its request.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(run)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionName": {
+              "type": "string",
+              "description": "Exact AI-enabled RPC connection name."
+            },
+            "serviceName": {
+              "type": "string",
+              "description": "Fully qualified RPC service name."
+            },
+            "methodName": {
+              "type": "string",
+              "description": "RPC method name."
+            },
+            "requestJson": {
+              "type": "string",
+              "description": "One ProtoJSON request object as JSON text."
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Optional outgoing gRPC metadata. Authorization is managed by the connection.",
+              "additionalProperties": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "connectionName",
+            "serviceName",
+            "methodName",
+            "requestJson"
           ]
         }
       },
@@ -2610,7 +2699,7 @@
         "name": "database-notebook_createNotebook",
         "toolReferenceName": "createDbNotebook",
         "displayName": "Create Database Notebook",
-        "modelDescription": "Creates a new Database Notebook (.dbn) file from a list of cells and opens it in the editor. Use this whenever the user asks to create/make/generate a notebook, save queries as a notebook, or put an analysis somewhere they can re-run it -- do not just print SQL/code in chat when the user wants a runnable notebook artifact. Provide notebookPath for a NEW file: this tool refuses to overwrite an existing file or an already-open notebook, so use editDbNotebook instead if one already exists there. Provide either cells (an ordered array of code/markup cells -- use this for mixed-language notebooks, markdown explanations, or per-cell connection/metadata overrides) or sqlText (a convenience that splits raw, possibly multi-statement SQL text into one SQL cell per statement, the same way Database Notebook's own \"Create Notebook from SQL\" command does). Every cell runs on its own independent, auto-committing connection: a \"sql\" cell's value must be exactly one statement (a PL/SQL block or procedure/function/trigger body counts as one statement despite its internal semicolons, but never join separate statements like two UPDATEs into one cell), and must never contain BEGIN/START TRANSACTION/COMMIT/ROLLBACK -- they're unnecessary and can error, since the cell commits automatically the instant it finishes running. Split multiple statements across multiple cells instead. Any cell that runs against a connection (sql, cwql, memcached, or an MQTT publish cell) needs a connectionName -- set it per-cell, or once via the top-level connectionName to apply it to every cell that needs one. Only connections enabled for AI tool use can be set; if you don't already know the exact connection name, call listDbConnections first, and call getDbSchema first if you need table/column names to write correct SQL. This tool only authors the notebook -- it never runs any cell itself.",
+        "modelDescription": "Creates a new Database Notebook (.dbn) file from a list of cells and opens it in the editor. Use this whenever the user asks to create/make/generate a notebook, save queries as a notebook, or put an analysis somewhere they can re-run it -- do not just print SQL/code in chat when the user wants a runnable notebook artifact. Provide notebookPath for a NEW file: this tool refuses to overwrite an existing file or an already-open notebook, so use editDbNotebook instead if one already exists there. Provide either cells (an ordered array of code/markup cells -- use this for mixed-language notebooks, markdown explanations, or per-cell connection/metadata overrides) or sqlText (a convenience that splits raw, possibly multi-statement SQL text into one SQL cell per statement, the same way Database Notebook's own \"Create Notebook from SQL\" command does). Every cell runs on its own independent, auto-committing connection: a \"sql\" cell's value must be exactly one statement (a PL/SQL block or procedure/function/trigger body counts as one statement despite its internal semicolons, but never join separate statements like two UPDATEs into one cell), and must never contain BEGIN/START TRANSACTION/COMMIT/ROLLBACK -- they're unnecessary and can error, since the cell commits automatically the instant it finishes running. Split multiple statements across multiple cells instead. Any cell that runs against a connection (sql, cwql, memcached, rpc-json, or an MQTT publish cell) needs a connectionName -- set it per-cell, or once via the top-level connectionName to apply it to every cell that needs one. Only connections enabled for AI tool use can be set; if you don't already know the exact connection name, call listDbConnections first, and call getDbSchema first if you need table/column names to write correct SQL. For rpc-json cells, set metadata.rpc.service and metadata.rpc.method and put a ProtoJSON object in value (an array of objects for client/bidi streaming); the descriptor supplies path and call kind. This tool only authors the notebook -- it never runs any cell itself.",
         "userDescription": "Creates a new Database Notebook (.dbn) file from a list of cells or raw SQL, and opens it.",
         "canBeReferencedInPrompt": true,
         "icon": "$(notebook)",
@@ -2651,6 +2740,7 @@
                       "javascript",
                       "typescript",
                       "json",
+                      "rpc-json",
                       "cwql",
                       "memcached",
                       "redis",
@@ -2658,7 +2748,7 @@
                       "shellscript",
                       "bat"
                     ],
-                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
+                    "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"rpc-json\": a ProtoJSON RPC request cell; set metadata.rpc.service and metadata.rpc.method, with an object for unary/server streaming or an array for client/bidi streaming. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                   },
                   "value": {
                     "type": "string",
@@ -2670,7 +2760,7 @@
                     "properties": {
                       "connectionName": {
                         "type": "string",
-                        "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                        "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, rpc-json, and MQTT publish cells. Must be a connection enabled for AI tool use."
                       },
                       "useDatabaseName": {
                         "type": "string",
@@ -2702,6 +2792,41 @@
                       "sharedVariableName": {
                         "type": "string",
                         "description": "JavaScript/TypeScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                      },
+                      "rpc": {
+                        "type": "object",
+                        "description": "Required for rpc-json cells. The service and method are verified against the connection's discovered descriptor; method path and call kind are filled automatically. Request metadata is optional.",
+                        "properties": {
+                          "service": {
+                            "type": "string",
+                            "description": "Fully qualified RPC service name, e.g. package.v1.CustomerService."
+                          },
+                          "method": {
+                            "type": "string",
+                            "description": "RPC method name."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Optional outgoing gRPC metadata; values are strings or string arrays. Authorization is managed by the connection.",
+                            "additionalProperties": {
+                              "oneOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "service",
+                          "method"
+                        ]
                       },
                       "publishParams": {
                         "type": "object",
@@ -2811,6 +2936,7 @@
                                 "javascript",
                                 "typescript",
                                 "json",
+                                "rpc-json",
                                 "cwql",
                                 "memcached",
                                 "redis",
@@ -2818,7 +2944,7 @@
                                 "shellscript",
                                 "bat"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"rpc-json\": a ProtoJSON RPC request cell; set metadata.rpc.service and metadata.rpc.method, with an object for unary/server streaming or an array for client/bidi streaming. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                             },
                             "value": {
                               "type": "string",
@@ -2830,7 +2956,7 @@
                               "properties": {
                                 "connectionName": {
                                   "type": "string",
-                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, rpc-json, and MQTT publish cells. Must be a connection enabled for AI tool use."
                                 },
                                 "useDatabaseName": {
                                   "type": "string",
@@ -2862,6 +2988,38 @@
                                 "sharedVariableName": {
                                   "type": "string",
                                   "description": "JavaScript/TypeScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                                },
+                                "rpc": {
+                                  "type": "object",
+                                  "description": "Required for rpc-json cells. Service and method are verified against the discovered descriptor; path and call kind are filled automatically.",
+                                  "properties": {
+                                    "service": {
+                                      "type": "string"
+                                    },
+                                    "method": {
+                                      "type": "string"
+                                    },
+                                    "metadata": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "oneOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "service",
+                                    "method"
+                                  ]
                                 },
                                 "publishParams": {
                                   "type": "object",
@@ -2948,6 +3106,7 @@
                                 "javascript",
                                 "typescript",
                                 "json",
+                                "rpc-json",
                                 "cwql",
                                 "memcached",
                                 "redis",
@@ -2955,7 +3114,7 @@
                                 "shellscript",
                                 "bat"
                               ],
-                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
+                              "description": "Required when kind is \"code\". \"sql\": a SQL query cell -- exactly one statement per cell (a PL/SQL block or procedure/function/trigger body counts as one statement); never include BEGIN/START TRANSACTION/COMMIT/ROLLBACK, each cell auto-commits on its own connection. \"cwql\": a CloudWatch Logs Insights query cell (also requires metadata.logGroupName). \"memcached\": a Memcache command cell. \"redis\": a Redis command cell -- one raw Redis command per cell (e.g. GET mykey, HGETALL myhash), requires connectionName (a Redis connection). \"javascript\": a JS scripting cell. \"typescript\": a TypeScript scripting cell (transpiled and run the same as javascript). \"json\": a JSON value cell, or -- combined with metadata.publishParams -- an MQTT publish cell. \"rpc-json\": a ProtoJSON RPC request cell; set metadata.rpc.service and metadata.rpc.method, with an object for unary/server streaming or an array for client/bidi streaming. \"plaintext\": a raw MQTT publish payload cell (also requires metadata.publishParams). \"shellscript\": a shell script cell (bash/sh/zsh). \"bat\": a Windows batch script cell (experimental, not verified end-to-end on Windows)."
                             },
                             "value": {
                               "type": "string",
@@ -2967,7 +3126,7 @@
                               "properties": {
                                 "connectionName": {
                                   "type": "string",
-                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                                  "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, rpc-json, and MQTT publish cells. Must be a connection enabled for AI tool use."
                                 },
                                 "useDatabaseName": {
                                   "type": "string",
@@ -2999,6 +3158,38 @@
                                 "sharedVariableName": {
                                   "type": "string",
                                   "description": "JavaScript/TypeScript cells only. Exposes this cell's result under this name to later cells in the notebook."
+                                },
+                                "rpc": {
+                                  "type": "object",
+                                  "description": "Required for rpc-json cells. Service and method are verified against the discovered descriptor; path and call kind are filled automatically.",
+                                  "properties": {
+                                    "service": {
+                                      "type": "string"
+                                    },
+                                    "method": {
+                                      "type": "string"
+                                    },
+                                    "metadata": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "oneOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "service",
+                                    "method"
+                                  ]
                                 },
                                 "publishParams": {
                                   "type": "object",
@@ -3082,7 +3273,7 @@
                         "properties": {
                           "connectionName": {
                             "type": "string",
-                            "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, and MQTT publish cells. Must be a connection enabled for AI tool use."
+                            "description": "Required (directly, or via the tool's top-level connectionName) for sql, cwql, memcached, redis, rpc-json, and MQTT publish cells. Must be a connection enabled for AI tool use."
                           },
                           "useDatabaseName": {
                             "type": "string",

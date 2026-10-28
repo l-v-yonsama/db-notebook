@@ -121,6 +121,7 @@ describe("RPC notebook execution", () => {
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(false);
     const cell = createCell('{"id":"42"}');
+    cell.metadata.rpc.metadataJson = '{"x-trace-id":"42"}';
     const execution = createExecution(cell);
     const success = await cellService.execute(cell, execution as any);
 
@@ -130,7 +131,7 @@ describe("RPC notebook execution", () => {
         service: "rpcfixture.v1.CustomerService",
         method: "GetCustomer",
         requestJson: '{"id":"42"}',
-        metadata: {},
+        metadata: { "x-trace-id": "42" },
       })
     );
     expect(driver.disconnect).toHaveBeenCalledTimes(1);
@@ -141,6 +142,7 @@ describe("RPC notebook execution", () => {
         sentCount: 1,
         receivedCount: 1,
         outcome: "success",
+        requestMetadata: { "x-trace-id": "42" },
       })
     );
     expect(execution.replaceOutput).toHaveBeenCalledTimes(1);
@@ -272,7 +274,8 @@ describe("RPC notebook execution", () => {
     expect(historyStore.add).toHaveBeenCalledWith(
       expect.objectContaining({ callKind: kind, sentCount: 2, receivedCount, outcome: "success" })
     );
-    expect(historyStore.add.mock.calls[0][0].requestJson).toBeUndefined();
+    expect(historyStore.add.mock.calls[0][0].requestCapture.finish().requestJson)
+      .toBe('[{"value":"first"},{"value":"second"}]');
     expect(execution.outputs[0].items[0].data.messages).toHaveLength(receivedCount);
     expect(execution.outputs[0].items[0].data.sentCount).toBe(2);
   });

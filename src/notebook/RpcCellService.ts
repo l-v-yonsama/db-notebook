@@ -26,10 +26,10 @@ import {
 } from "vscode";
 import { NOTEBOOK_TYPE } from "../constant";
 import type { RpcNotebookResult } from "../shared/RunResultMetadata";
-import type { RpcInvokeHistory } from "../types/RpcInvokeHistory";
 import { createDriver, removeDriver } from "../utilities/driverResolver";
 import { RPC_CAPTURE_BYTES, RPC_CAPTURE_LIMIT, redactRpcToken } from "../utilities/rpcExecution";
-import { RpcInvokeHistoryStore } from "../utilities/RpcInvokeHistoryStore";
+import { RpcInvokeHistoryAttempt, RpcInvokeHistoryStore } from "../utilities/RpcInvokeHistoryStore";
+import { RpcHistoryRequestCapture } from "../utilities/RpcHistoryRequestCapture";
 import { formatRpcStatus, formatRpcTransferSummary } from "../utilities/rpcResultSummary";
 import { StateStorage } from "../utilities/StateStorage";
 import {
@@ -305,13 +305,14 @@ export class RpcCellService {
     const metadata = getRpcCellMetadata(cell);
     const activeKey = `${cell.notebook.uri.toString()}#${cell.document.uri.toString()}`;
     const started = Date.now();
-    const history: Omit<RpcInvokeHistory, "id"> = {
+    const history: RpcInvokeHistoryAttempt = {
       connectionName: metadata.connectionName ?? "",
       service: metadata.rpc.service ?? "",
       method: metadata.rpc.method ?? "",
       path: metadata.rpc.path ?? "",
       callKind: "unary",
-      invokedAt: started,
+      startedAt: started,
+      requestCapture: new RpcHistoryRequestCapture(false),
       totalElapsedMs: 0,
       sentCount: 0,
       receivedCount: 0,
@@ -373,12 +374,16 @@ export class RpcCellService {
       const source = decodeRpcCellSource(cell.document.getText(), metadata);
       const selected = await this.resolveMethod(cell);
       const request = parseRequest(source, selected.method.requestStream);
+      if (Object.keys(request.metadata).length > 0) {
+        history.requestMetadata = request.metadata;
+      }
       if (cancelled) {
         throw new Error("RPC call cancelled.");
       }
       history.callKind = getRpcCallKind(selected.method);
+      history.requestCapture = new RpcHistoryRequestCapture(selected.method.requestStream);
       if (!selected.method.requestStream) {
-        history.requestJson = request.requestJson;
+        history.requestCapture.add(request.requestJson);
       }
       const setting = await this.stateStorage.getConnectionSettingByName(metadata.connectionName!);
       if (!setting || setting.dbType !== DBType.RPC) {
@@ -495,6 +500,7 @@ export class RpcCellService {
                 throw new Error("RPC call cancelled.");
               }
               await session.send(requestJson);
+              history.requestCapture.add(requestJson);
             }
             if (cancelled) {
               throw new Error("RPC call cancelled.");

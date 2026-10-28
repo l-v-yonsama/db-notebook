@@ -4,12 +4,13 @@
 
 ![logo](./media/logo128.png)
 
-Database Notebook brings SQL, JavaScript/TypeScript, Markdown, and query results together in one notebook file, so you can turn ad-hoc investigations across databases, logs, and cloud resources into something you can save, share, and re-run.
+Database Notebook brings SQL, RPC requests, JavaScript/TypeScript, Markdown, and execution results together in one notebook file, so you can turn ad-hoc investigations across databases, logs, and cloud resources into something you can save, share, and re-run.
 
 ## What it's for
 
 - **Investigate incidents across databases, logs, and cloud resources** — Query production and staging databases, inspect CloudWatch logs, and scan AWS resources (S3, SQS, DynamoDB, Secrets Manager, SSM) — all from the same notebook, so the whole investigation stays in one reusable file.
 - **Keep SQL, JavaScript, Markdown, and results in one reusable file** — Mix SQL, JavaScript/TypeScript, shell, and Markdown cells with variables shared between them, then export the results as HTML or Excel. See [Database Notebook file examples](/docs/examples/databaseNotebook.md).
+- **Call gRPC services from a panel or notebook** — Inspect service definitions, invoke unary or streaming methods, save requests as RPC JSON cells, and export the results as HTML. See the [RPC usage guide](/docs/examples/databaseNotebookRPC.md).
 - **Diagnose and improve slow SQL (Experimental)** — Collect execution plans, table statistics, indexes, and physical-health signals together, then use the evidence to investigate bottlenecks — and compare a saved report from before your change against the current one to see exactly what moved. See the [Performance Tuning Guide](/docs/examples/performanceTuning.md).
 - **Reuse your saved connections from GitHub Copilot Chat / MCP clients** — The same connections you set up in the DB Explorer are available as AI tools in Copilot Chat (Agent mode), and via a standalone MCP server for other MCP clients (Claude Code, Claude Desktop, Cursor, ...). See [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md).
 
@@ -26,7 +27,7 @@ No external database needed — this uses a small local SQLite file.
 
 ## Supported databases & resources
 
-MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT
+MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT, gRPC
 
 ## Detailed features
 
@@ -47,7 +48,7 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
   - Execute query (Default)
   - Execute explain plan (Generates a query plan).
   - Execute explain analyze (Displays actual execution time and statistics)
-- Query history management
+- Query and RPC history management in one Histories view
 - Variable sharing between notebook cells
   - See practical SQL examples using shared variables (LIKE, IN, exact match):
     [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
@@ -205,6 +206,7 @@ SQL Log Comparison compares SQL from two logs and exports an Excel report with d
 ## Reference & samples
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
+- [RPC usage guide](/docs/examples/databaseNotebookRPC.md)
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)

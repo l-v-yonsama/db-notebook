@@ -1,16 +1,22 @@
 import { ExtensionContext, lm } from "vscode";
 import { StateStorage } from "../../utilities/StateStorage";
+import { RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
 import { CreateNotebookTool } from "./CreateNotebookTool";
 import { EditNotebookTool } from "./EditNotebookTool";
 import { GetPerformanceTuningContextTool } from "./GetPerformanceTuningContextTool";
 import { GetSchemaTool } from "./GetSchemaTool";
 import { ListConnectionsTool } from "./ListConnectionsTool";
 import { RunQueryTool } from "./RunQueryTool";
+import { RunRpcTool } from "./RunRpcTool";
 import { RunTransactionTool } from "./RunTransactionTool";
 import { ScanResourceTool } from "./ScanResourceTool";
 import { TestConnectionTool } from "./TestConnectionTool";
 
-export function activateLmTools(context: ExtensionContext, stateStorage: StateStorage) {
+export function activateLmTools(
+  context: ExtensionContext,
+  stateStorage: StateStorage,
+  rpcHistoryStore: RpcInvokeHistoryStore
+) {
   context.subscriptions.push(
     lm.registerTool("database-notebook_testConnection", new TestConnectionTool(stateStorage))
   );
@@ -28,6 +34,9 @@ export function activateLmTools(context: ExtensionContext, stateStorage: StateSt
   );
   context.subscriptions.push(
     lm.registerTool("database-notebook_runQuery", new RunQueryTool(stateStorage))
+  );
+  context.subscriptions.push(
+    lm.registerTool("database-notebook_runRpc", new RunRpcTool(stateStorage, rpcHistoryStore))
   );
   context.subscriptions.push(
     lm.registerTool("database-notebook_scanResource", new ScanResourceTool(stateStorage))

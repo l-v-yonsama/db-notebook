@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotebookCellData, NotebookCellKind } from "vscode";
 import type { StateStorage } from "../../../src/utilities/StateStorage";
+import { DBType, RpcDatabase, RpcMethod, RpcPackage, RpcService } from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellInput, buildNotebookCells } from "../../../src/aiTools/lmTools/notebookCellBuilder";
 
 type ConnectionFixture = { dbType?: string };
@@ -215,6 +216,41 @@ describe("buildNotebookCells", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.message).toMatch(/needs a connectionName/);
+    }
+  });
+
+  it("descriptorからrpc-jsonセルのpathとcallKindを確定し、Dataの形を検証する", async () => {
+    const db = new RpcDatabase("localhost:50051");
+    const pkg = new RpcPackage("example.v1");
+    const service = new RpcService("Greeter", "example.v1.Greeter");
+    service.addChild(new RpcMethod("Hello", "/example.v1.Greeter/Hello", "example.v1.HelloRequest", "example.v1.HelloReply"));
+    pkg.addChild(service);
+    db.addChild(pkg);
+    const stateStorage = makeStateStorage({ connections: { Rpc: { dbType: DBType.RPC } } });
+    (stateStorage as any).getDBTypeByConnectionName = vi.fn(() => DBType.RPC);
+    (stateStorage as any).loadResource = vi.fn(async () => ({ ok: true, result: { db: [db], dbType: DBType.RPC } }));
+    const input: CellInput = {
+      kind: "code", language: "rpc-json", value: '{"name":"Ada"}',
+      metadata: { connectionName: "Rpc", rpc: { service: "example.v1.Greeter", method: "Hello" } },
+    };
+    const result = await buildNotebookCells(stateStorage, [input], undefined);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cells[0].languageId).toBe("rpc-json");
+      expect(result.cells[0].metadata.rpc).toMatchObject({
+        service: "example.v1.Greeter", method: "Hello", path: "/example.v1.Greeter/Hello", callKind: "unary",
+      });
+    }
+    const invalid = await buildNotebookCells(stateStorage, [{ ...input, value: "[]" }], undefined);
+    expect(invalid.ok).toBe(false);
+    const missingConnection = await buildNotebookCells(
+      stateStorage,
+      [{ ...input, metadata: { rpc: { service: "example.v1.Greeter", method: "Hello" } } }],
+      undefined
+    );
+    expect(missingConnection.ok).toBe(false);
+    if (!missingConnection.ok) {
+      expect(missingConnection.message).toContain("needs a connectionName");
     }
   });
 });

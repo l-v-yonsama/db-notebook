@@ -17,6 +17,7 @@ import {
   CLEAR_QUERY_HISTORIES_CONNECTION_FILTER,
   CREATE_NEW_NOTEBOOK,
   DELETE_ALL_QUERY_HISTORY,
+  DELETE_ALL_HISTORIES,
   DELETE_QUERY_HISTORY,
   EXECUTE_QUERY_HISTORY,
   FILTER_QUERY_HISTORIES_BY_CONNECTION,
@@ -52,6 +53,8 @@ import {
 import { ResultSetData, resolveCodeLabel } from "@l-v-yonsama/rdh";
 import { CellMeta } from "../../types/Notebook";
 import { QueryHistory } from "../../types/QueryHistory";
+import { RpcInvokeHistory } from "../../types/RpcInvokeHistory";
+import { RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
 import { MdhViewParams } from "../../types/views";
 import { showWindowErrorMessage } from "../../utilities/alertUtil";
 import { createRDSDriver, createSQLSupportDriver, workflow } from "../../utilities/driverResolver";
@@ -65,19 +68,20 @@ import {
   openPerformanceTuningPreview,
 } from "../../performanceTuning/preview/performanceTuningBindConfirmation";
 import { averageCapacityUnits, averageElapsedTimeMilli } from "../../utilities/queryHistoryUtil";
-import { HistoryTreeProvider } from "./HistoryTreeProvider";
+import { HistoryTreeProvider, isQueryHistory } from "./HistoryTreeProvider";
 import { DynamoQueryPanel } from "../../panels/DynamoQueryPanel";
 
 type HistoryTreeParams = {
   context: ExtensionContext;
   stateStorage: StateStorage;
   historyTreeProvider: HistoryTreeProvider;
+  rpcHistoryStore: RpcInvokeHistoryStore;
 };
 
 const PREFIX = "  [notebook/History]";
 
 export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
-  const { context, stateStorage, historyTreeProvider } = params;
+  const { context, stateStorage, historyTreeProvider, rpcHistoryStore } = params;
 
   const registerDisposableCommand = (
     command: string,
@@ -145,11 +149,14 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
 
   const resolveSelectedHistories = (
     history: QueryHistory,
-    selectedHistories?: QueryHistory[]
-  ): QueryHistory[] =>
-    (selectedHistories && selectedHistories.length > 0 ? selectedHistories : [history]).filter(
-      (item) => item.request?.kind !== "dynamodbQuery"
-    );
+    selectedHistories?: Array<QueryHistory | RpcInvokeHistory>
+  ): QueryHistory[] => {
+    const selected = selectedHistories && selectedHistories.length > 0 ? selectedHistories : [history];
+    if (selected.some((item) => !isQueryHistory(item))) {
+      void window.showInformationMessage("RPC histories were excluded from the Query notebook operation.");
+    }
+    return selected.filter(isQueryHistory).filter((item) => item.request?.kind !== "dynamodbQuery");
+  };
 
   registerDisposableCommand(REFRESH_QUERY_HISTORIES, () => {
     historyTreeProvider.refresh(true);
@@ -167,6 +174,29 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
 
     await stateStorage.deleteAllQueryHistories();
     historyTreeProvider.refresh(true);
+  });
+
+  registerDisposableCommand(DELETE_ALL_HISTORIES, async () => {
+    const [queries, rpc] = await Promise.all([
+      stateStorage.getQueryHistoryList(),
+      rpcHistoryStore.list(),
+    ]);
+    const answer = await window.showWarningMessage(
+      `Delete all histories? Query: ${queries.length}, RPC: ${rpc.length}.`,
+      { modal: true },
+      "Delete all"
+    );
+    if (answer !== "Delete all") {
+      return;
+    }
+    const results = await Promise.allSettled([
+      stateStorage.deleteAllQueryHistories(),
+      rpcHistoryStore.clear(),
+    ]);
+    await historyTreeProvider.refresh(true);
+    if (results.some((result) => result.status === "rejected" || result.value === false)) {
+      window.showErrorMessage("Some histories could not be deleted. The view shows the current state.");
+    }
   });
 
   registerDisposableCommand(DELETE_QUERY_HISTORY, async (history: QueryHistory) => {
@@ -201,7 +231,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
 
   registerDisposableCommand(
     OPEN_QUERY_HISTORIES_AS_NOTEBOOK,
-    async (history: QueryHistory, selectedHistories?: QueryHistory[]) => {
+    async (history: QueryHistory, selectedHistories?: Array<QueryHistory | RpcInvokeHistory>) => {
       const histories = resolveSelectedHistories(history, selectedHistories);
       if (histories.length === 0) {
         return;
@@ -213,7 +243,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
 
   registerDisposableCommand(
     APPEND_QUERY_HISTORIES_TO_ACTIVE_NOTEBOOK,
-    async (history: QueryHistory, selectedHistories?: QueryHistory[]) => {
+    async (history: QueryHistory, selectedHistories?: Array<QueryHistory | RpcInvokeHistory>) => {
       const histories = resolveSelectedHistories(history, selectedHistories);
       if (histories.length === 0) {
         return;
@@ -236,7 +266,7 @@ export const registerHistoryTreeCommand = (params: HistoryTreeParams) => {
     const showAllLabel = "$(list-flat) Show all connections";
     const connectionNames = historyTreeProvider.getConnectionNames();
     const picked = await window.showQuickPick([showAllLabel, ...connectionNames], {
-      placeHolder: "Filter query histories by connection",
+      placeHolder: "Filter histories by connection",
     });
     if (picked === undefined) {
       return;

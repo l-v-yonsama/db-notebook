@@ -71,6 +71,7 @@ export const makeRpcCellData = (
     path?: string;
     callKind?: RpcCallKind;
     dataJson?: string;
+    metadataJson?: string;
   } = {}
 ): NotebookCellData => {
   const cell = new NotebookCellData(
@@ -83,7 +84,7 @@ export const makeRpcCellData = (
     rpc: {
       version: 2,
       id: randomUUID(),
-      metadataJson: "{}",
+      metadataJson: options.metadataJson ?? "{}",
       service: options.service,
       method: options.method,
       path: options.path,

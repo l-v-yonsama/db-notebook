@@ -7,9 +7,7 @@ import {
 import { commands, ExtensionContext, Uri, window } from "vscode";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { HistoryTreeProvider } from "./treeData/history/HistoryTreeProvider";
-import { RpcHistoryTreeProvider } from "./treeData/history/RpcHistoryTreeProvider";
 import { registerRpcHistoryTreeCommands } from "./treeData/history/RpcHistoryTreeCommand";
-import { isRpcHistorySelection } from "./treeData/history/rpcHistorySelection";
 import { RpcInvokeHistoryStore } from "./utilities/RpcInvokeHistoryStore";
 import { RpcInvokePanel } from "./panels/RpcInvokePanel";
 import { ResourceTreeProvider } from "./treeData/resource/ResourceTreeProvider";
@@ -29,7 +27,6 @@ import {
   COMPARE_SQL_LOGS,
   EXTENSION_NAME,
   HISTORY_VIEW_ID,
-  RPC_HISTORY_VIEW_ID,
   OPEN_CHARTS_VIEWER,
   OPEN_COUNT_FOR_ALL_TABLES_VIEWER,
   OPEN_DIFF_MDH_VIEWER,
@@ -108,9 +105,8 @@ export async function activate(context: ExtensionContext) {
   initializeStoragePath(context);
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
-  const historyTreeProvider = new HistoryTreeProvider(context, stateStorage);
   const rpcHistoryStore = new RpcInvokeHistoryStore(context.globalState);
-  const rpcHistoryTreeProvider = new RpcHistoryTreeProvider(rpcHistoryStore);
+  const historyTreeProvider = new HistoryTreeProvider(context, stateStorage, rpcHistoryStore);
   RpcInvokePanel.setHistoryStore(rpcHistoryStore);
   const toolActivityTreeProvider = new ToolActivityTreeProvider(context);
 
@@ -143,8 +139,8 @@ export async function activate(context: ExtensionContext) {
   RdbDashboardPanel.setStateStorage(stateStorage);
 
   configureAiDataMaskingPreview(context.extensionUri);
-  activateLmTools(context, stateStorage);
-  activateMcpServer(context, stateStorage);
+  activateLmTools(context, stateStorage, rpcHistoryStore);
+  activateMcpServer(context, stateStorage, rpcHistoryStore);
 
   window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
   context.subscriptions.push(window.registerFileDecorationProvider(dbResourceTree));
@@ -153,16 +149,13 @@ export async function activate(context: ExtensionContext) {
     canSelectMany: true,
   });
   context.subscriptions.push(historyTreeView);
-  context.subscriptions.push(window.createTreeView(RPC_HISTORY_VIEW_ID, {
-    treeDataProvider: rpcHistoryTreeProvider,
-  }));
   historyTreeProvider.onDidChangeTreeData(() => {
     const filter = historyTreeProvider.getConnectionFilter();
     historyTreeView.description = filter ? `Filtered by: ${filter}` : undefined;
-    commands.executeCommand("setContext", "databaseNotebook.queryHistoryFiltered", !!filter);
+    commands.executeCommand("setContext", "databaseNotebook.historyFiltered", !!filter);
     commands.executeCommand(
       "setContext",
-      "databaseNotebook.queryHistorySortByDuration",
+      "databaseNotebook.historySortByDuration",
       historyTreeProvider.getSortOrder() === "duration"
     );
   });
@@ -185,19 +178,8 @@ export async function activate(context: ExtensionContext) {
     treeDataProvider: dbResourceTree,
     showCollapseAll: true,
   });
-  let rpcModeVersion = 0;
-  const updateRpcHistoryMode = (selected: unknown) => {
-    const version = ++rpcModeVersion;
-    void isRpcHistorySelection(selected, dbResourceTree).then((enabled) => {
-      if (version === rpcModeVersion) {
-        void commands.executeCommand("setContext", "databaseNotebook.rpcHistoryMode", enabled);
-      }
-    });
-  };
-  await commands.executeCommand("setContext", "databaseNotebook.rpcHistoryMode", false);
   dbResourceTreeView.onDidChangeSelection((e) => {
     const item = e.selection[0];
-    updateRpcHistoryMode(item);
     if (!item) {
       return;
     }
@@ -216,9 +198,6 @@ export async function activate(context: ExtensionContext) {
 
     commands.executeCommand("setContext", "databaseNotebook.selectedDbResource", isDbResource);
   });
-  context.subscriptions.push(dbResourceTree.onDidChangeTreeData(() => {
-    updateRpcHistoryMode(dbResourceTreeView.selection[0]);
-  }));
   context.subscriptions.push(dbResourceTreeView);
 
   const helpTreeView = window.createTreeView("database-notebook-helpfeedback", {
@@ -245,11 +224,12 @@ export async function activate(context: ExtensionContext) {
     context,
     stateStorage,
     historyTreeProvider,
+    rpcHistoryStore,
   });
   registerRpcHistoryTreeCommands(
     context,
     rpcHistoryStore,
-    rpcHistoryTreeProvider,
+    historyTreeProvider,
     stateStorage,
     dbResourceTree
   );

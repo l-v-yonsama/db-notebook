@@ -49,8 +49,9 @@ another machine) and requires a bearer token on every request, including the ini
 | --- | --- | --- |
 | List Database Connections | `listDbConnections` | Lists the connections available to AI tools |
 | Test Database Connection | `testDbConnection` | Live connectivity check for one named connection |
-| Get Database Schema | `getDbSchema` | Table DDL / resource structure for one connection |
+| Get Database Schema | `getDbSchema` | Table DDL / resource structure, including RPC descriptors, for one connection |
 | Run Database Query | `runDbQuery` | Runs one SQL statement (or one PartiQL statement against DynamoDB) |
+| Invoke Unary RPC | `invokeUnaryRpc` | Confirms and sends one unary RPC, records history, and masks the response according to the connection setting |
 | Run Database Transaction | `runDbTransaction` | Runs several SQL statements as one all-or-nothing transaction |
 | Scan Database Resource | `scanDbResource` | Searches a non-SQL resource (Redis, Memcache, MQTT, Keycloak, Auth0, AWS S3/SQS/CloudWatch) |
 | Get Performance Tuning Context | `getPerformanceTuningContext` | Returns a read-only execution-plan (SQL) or static access-path/Capacity (DynamoDB PartiQL) snapshot, with schema, statistics, and physical-health/CloudWatch facts, for one statement |
@@ -82,7 +83,7 @@ to check.
 ## 3. Starting the server
 
 The server never starts on its own. In the sidebar's **MCP Server** section (a sibling of DB
-Explorer/Query histories/Help, not inside DB Explorer itself), click the broadcast icon
+Explorer/Histories/Help, not inside DB Explorer itself), click the broadcast icon
 (**Start Database Notebook MCP Server**), or run it from the Command Palette as
 **Database Notebook: Start Database Notebook MCP Server**. A notification shows the server's URL
 and offers three actions (kept to three so VS Code doesn't shrink every label into an unreadable
@@ -351,11 +352,14 @@ any other tool. The DB-engine-level read-only session enforcement (for MySQL/Pos
 Server has no such mechanism, so every statement there needs the client's confirmation regardless
 of type) still applies exactly as it does for Copilot's tools.
 
+`invokeUnaryRpc` additionally shows a local Database Notebook confirmation with the method,
+request Data, and Metadata before sending. The connecting MCP client may also ask for approval.
+
 ## 7. Tool reference
 
 Every tool listed in [1](#1-overview) shares its implementation with the matching Copilot Chat
 tool, so the input fields and result text are identical — the only difference is how you invoke it
-and how writes get confirmed ([6](#6-confirmation-for-writes)). Rather than repeat all seven tools'
+and how writes get confirmed ([6](#6-confirmation-for-writes)). Rather than repeat all eight tools'
 examples here, see
 [the Copilot Chat guide's Tool reference](./lmToolsUsageGuide.md#5-tool-reference) for the full set
 (request shape, sample output, error shapes) — just drop the `#` prefix from a tool's name to get

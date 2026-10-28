@@ -50,14 +50,14 @@ Use the preview to inspect the evidence needed to diagnose a slow statement:
 
 Open the performance tuning preview for the target statement from one of these places:
 
-- **Query History** — select `Open Performance Tuning Preview` for a saved execution.
+- A query entry in **Histories** — select `Open Performance Tuning Preview` for a saved execution.
 - **Query Statistics** — select a statement row, then select `Preview tuning data`.
 - An executed SQL cell in a Database Notebook — select `Performance tuning` from the cell toolbar.
-  The current cell text must have completed successfully and still have a matching successful Query
-  History entry.
+  The current cell text must have completed successfully and still have a matching successful
+  query entry in Histories.
 
 If the SQL contains placeholders, the **Bind Parameters** panel asks for representative values before
-collecting the preview. Values from Query History are prefilled when they are available. The values
+collecting the preview. Values from a query entry in Histories are prefilled when available. The values
 are held only for this preview's parameter-specific plan and any actual-plan or benchmark execution
 you explicitly confirm. They are not copied into the Full Context JSON, AI request, saved tuning
 report, connection settings, telemetry, or logs.
@@ -223,10 +223,10 @@ PartiQL text can contain literals and are not automatically redacted. RDB values
 **Bind Parameters** panel, DynamoDB `ExpressionAttributeValues`, returned item bodies, and pagination
 keys are excluded from the Full Context JSON, AI request, and saved tuning report.
 
-This exclusion does not make Query History itself value-free. For re-execution and editing, a native
-Query run from the DynamoDB Query Panel stores its latest executable input — including
-`ExpressionAttributeValues` — in local Query History, just as SQL history can retain bind variables.
-Protect local Query History accordingly. Performance Tuning converts that request to a value-free
+This exclusion does not make query entries in Histories value-free. For re-execution and editing,
+a native Query run from the DynamoDB Query Panel stores its latest executable input — including
+`ExpressionAttributeValues` — in the local Histories view, just as SQL history can retain bind variables.
+Protect local history accordingly. Performance Tuning converts that request to a value-free
 structural form before creating the context or AI input.
 
 The Full Context JSON remains complete in the notebook even if a large RDB vendor artifact had to
@@ -378,9 +378,9 @@ measurement — it's shown even before any request is sent to DynamoDB.
 
 Open the DynamoDB performance tuning preview from either of these places:
 
-- **Query History**, for a previously-run PartiQL statement, or a native `Query` executed from the
-  DynamoDB Query Panel. For a native Query, first execute it in the Panel, then open its
-  automatically-created Query History entry. Every Panel execution (success or failure) is saved,
+- A query entry in **Histories**, for a previously-run PartiQL statement, or a native `Query`
+  executed from the DynamoDB Query Panel. For a native Query, first execute it in the Panel, then open its
+  automatically-created history entry. Every Panel execution (success or failure) is saved,
   shown with item-based wording and no SQL syntax attached (its history entry has no equivalent of a
   runnable SQL cell). Repeating the same table, index, key condition, filter, Projection,
   consistency, scan direction, and result-item limit with different expression values merges into
@@ -388,14 +388,14 @@ Open the DynamoDB performance tuning preview from either of these places:
   input. A failed retry after a success preserves the last successful input and result statistics,
   and records the failure separately on that history entry.
 - An **executed Notebook cell** running PartiQL against a DynamoDB connection (same entry point as
-  Query History — the cell's toolbar reuses its own most recent matching history entry).
-Opening the preview from a Query History entry (PartiQL or native `Query`) also carries over that
+  Histories — the cell's toolbar reuses its own most recent matching history entry).
+Opening the preview from a query history entry (PartiQL or native `Query`) also carries over that
 entry's most recent execution as observed evidence automatically — see **Observed request** and
 **Query flow** in 8.3 — without needing to run `Run Observed Read` again.
 
 Unlike the SQL path, this never asks for bind values first: the preview never reads item data, so
 no value is needed to open it. If the PartiQL text still has an unresolved `?` placeholder (for
-example, a Query History entry Database Notebook couldn't fully resolve from its recorded variables),
+example, a query history entry Database Notebook couldn't fully resolve from its recorded variables),
 the preview still opens normally — only `Run Observed Read` (8.4) and Benchmark are disabled for
 that statement, with the reason shown next to the button.
 
@@ -407,7 +407,7 @@ the execution plan:
 - **Performance snapshot** — access-path certainty, a rolling Capacity/timing trend from prior
   executions of this exact statement (when available), whether any read has been observed yet, and
   recent throttling activity. `Evidence: Observed read` appears once either `Run Observed Read` (8.4)
-  or a matching Query History execution supplies one.
+  or a matching saved query execution supplies one.
 - **Collection issues** and **Information** — the same two-tier diagnostics pattern as SQL,
   covering things like a permission failure on `DescribeTable`/`GetMetricData`, or that the
   context was shortened to fit the size limit.
@@ -420,7 +420,7 @@ the execution plan:
 - **Table and index definition** — key schema, Capacity mode, approximate item count/size, TTL
   status, and every LSI/GSI's own key schema and projection.
 - **Observed request** — empty until a read has actually been observed (8.4), or carries over
-  evidence from a matching Query History execution. A history-sourced observation whose result was cut
+  evidence from a matching saved query execution. A history-sourced observation whose result was cut
   short (a continuation key remained, or an older saved entry doesn't record that status at all) is
   never presented as the statement's complete result.
 - **CloudWatch window metrics** — when monitoring collection is enabled, the last hour's Consumed
@@ -504,7 +504,7 @@ These hold regardless of what the AI analysis suggests:
   attribute from the base table, adding latency/Capacity beyond the index Query alone; a Global
   Secondary Index can never do this — it simply can't return a non-projected attribute at all, and
   can't use a strongly consistent read either.
-- A `workload` aggregate built from Query History is the sample of this exact statement's executions
+- A `workload` aggregate built from saved query history is the sample of this exact statement's executions
   that happen to be saved locally — not a random or complete sample of every partition/key value the
   statement has ever run against; a wide spread between its minimum and maximum filter pass rate
   points at that skew, not at a single "typical" rate.

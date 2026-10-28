@@ -245,6 +245,9 @@ export async function validateOperations(
       cellCount -= range.end - range.start;
     } else if ("updateCellMetadata" in op) {
       const { cellIndex, metadata } = op.updateCellMetadata;
+      if (metadata?.rpc) {
+        return { ok: false, message: `${label} (updateCellMetadata): use replaceCells to change an RPC method so its path and call kind can be derived from the descriptor.` };
+      }
       if (cellIndex < 0 || cellIndex >= cellCount) {
         return {
           ok: false,

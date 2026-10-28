@@ -4,14 +4,16 @@ import { getPerformanceTuningContextText } from "../../aiTools/lmTools/GetPerfor
 import { getSchemaText } from "../../aiTools/lmTools/GetSchemaTool";
 import { listConnectionsText } from "../../aiTools/lmTools/ListConnectionsTool";
 import { runQueryText } from "../../aiTools/lmTools/RunQueryTool";
+import { runRpcText } from "../../aiTools/lmTools/RunRpcTool";
 import { runTransactionText } from "../../aiTools/lmTools/RunTransactionTool";
 import { scanResourceText } from "../../aiTools/lmTools/ScanResourceTool";
 import { testConnectionText } from "../../aiTools/lmTools/TestConnectionTool";
 import { trackInvocation } from "../../treeData/toolActivity/ToolInvocationTracker";
 import { StateStorage } from "../../utilities/StateStorage";
+import { RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
 
 /**
- * Phase 1 + 2 scope: all read/connection/schema/query tools (everything except the
+ * MCP scope: connection/schema/query/RPC tools (everything except the
  * notebook-authoring tools, `createDbNotebook`/`editDbNotebook`, which stay
  * Copilot-only for now). `getPerformanceTuningContext` is included because it
  * is read-only and does not author a Notebook.
@@ -27,7 +29,8 @@ import { StateStorage } from "../../utilities/StateStorage";
 export function registerTools(
   server: McpServer,
   stateStorage: StateStorage,
-  cancellation?: AbortSignal
+  cancellation?: AbortSignal,
+  rpcHistoryStore?: RpcInvokeHistoryStore
 ): void {
   server.registerTool(
     "listDbConnections",
@@ -69,7 +72,7 @@ export function registerTools(
     "getDbSchema",
     {
       description:
-        "Returns schema or resource information for a connection managed by Database Notebook, in a format appropriate to its type. For a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle): the CREATE TABLE DDL (columns, types, primary/foreign keys, comments) for a table, or all tables -- optionally narrow with schemaName and/or tableName. For an AWS connection: the configured resources -- S3 bucket names, SQS queue names/URLs, CloudWatch log group names, and DynamoDB table key schemas (partition/sort key, attribute types, GSI/LSI counts) -- optionally narrow with serviceType and/or resourceName. For a Redis connection: each DB index and its key count. For a Memcache connection: key counts per cache tier (hot/warm/cold) and the configured servers. For a Keycloak connection: each realm with user/group counts -- optionally narrow with realmName. For an Auth0 connection: user/organization counts, plus organization/client lists where the connection is configured to retrieve them. For an MQTT connection: the configured topic subscriptions with QoS. All filters are optional and independent; omit any of them to get every match. Use this when the user asks about table/resource structure, columns, relationships, or before writing SQL/inspecting resources against a connection you haven't inspected yet. For searching/browsing individual records or keys within a resource (not just its structure/summary), use scanDbResource instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name. When AI data masking is enabled, comments, descriptions, and default/check literals are processed locally and require preview approval before this definition output is returned.",
+        "Returns schema or resource information for a connection managed by Database Notebook, in a format appropriate to its type. For a SQL connection (MySQL, PostgreSQL, SQL Server, SQLite, Oracle): the CREATE TABLE DDL (columns, types, primary/foreign keys, comments) for a table, or all tables -- optionally narrow with schemaName and/or tableName. For an AWS connection: the configured resources -- S3 bucket names, SQS queue names/URLs, CloudWatch log group names, and DynamoDB table key schemas (partition/sort key, attribute types, GSI/LSI counts) -- optionally narrow with serviceType and/or resourceName. For a Redis connection: each DB index and its key count. For a Memcache connection: key counts per cache tier (hot/warm/cold) and the configured servers. For a Keycloak connection: each realm with user/group counts -- optionally narrow with realmName. For an Auth0 connection: user/organization counts, plus organization/client lists where the connection is configured to retrieve them. For an MQTT connection: the configured topic subscriptions with QoS. For an RPC connection: discovered service/method names, call kind, request/response message descriptors, and a ProtoJSON request example; optionally narrow with serviceName and/or methodName. All filters are optional and independent; omit any of them to get every match. Use this when the user asks about table/resource structure, columns, relationships, or before writing SQL/inspecting resources against a connection you haven't inspected yet. For searching/browsing individual records or keys within a resource (not just its structure/summary), use scanDbResource instead. If you don't already know the exact connection name -- e.g. the user described it indirectly, like 'the local MySQL connection' or 'the production database' -- call listDbConnections first to resolve it by name/dbType/environment/description rather than guessing the name. When AI data masking is enabled, comments, descriptions, and default/check literals are processed locally and require preview approval before this definition output is returned.",
       inputSchema: {
         connectionName: z
           .string()
@@ -106,10 +109,38 @@ export function registerTools(
           .describe(
             "Keycloak connections only. Optional: limit results to a single realm name. Omit to get every realm."
           ),
+        serviceName: z
+          .string()
+          .optional()
+          .describe(
+            "RPC connections only. Limit results to a service (prefer its fully qualified name)."
+          ),
+        methodName: z
+          .string()
+          .optional()
+          .describe("RPC connections only. Limit results to a method name."),
       },
     },
-    async ({ connectionName, schemaName, tableName, serviceType, resourceName, realmName }) => {
-      const input = { connectionName, schemaName, tableName, serviceType, resourceName, realmName };
+    async ({
+      connectionName,
+      schemaName,
+      tableName,
+      serviceType,
+      resourceName,
+      realmName,
+      serviceName,
+      methodName,
+    }) => {
+      const input = {
+        connectionName,
+        schemaName,
+        tableName,
+        serviceType,
+        resourceName,
+        realmName,
+        serviceName,
+        methodName,
+      };
       const text = await trackInvocation("mcpServer", "getDbSchema", input, () =>
         getSchemaText(
           stateStorage,
@@ -120,6 +151,8 @@ export function registerTools(
             serviceType,
             resourceName,
             realmName,
+            serviceName,
+            methodName,
           },
           { source: "mcp", cancellation }
         )
@@ -195,6 +228,40 @@ export function registerTools(
       return { content: [{ type: "text", text }] };
     }
   );
+
+  if (rpcHistoryStore) {
+    server.registerTool(
+      "invokeUnaryRpc",
+      {
+        description:
+          "Invoke a unary gRPC method on an AI-enabled Database Notebook RPC connection. Always asks for local confirmation of the method, request JSON, and metadata before sending. The call may modify remote state. Streaming methods are not supported by this tool; use an rpc-json notebook cell. Use getDbSchema with serviceName/methodName first to inspect the descriptor. The response is locally masked according to the connection's AI masking setting before it is returned.",
+        inputSchema: {
+          connectionName: z.string().describe("Exact AI-enabled RPC connection name."),
+          serviceName: z.string().describe("Fully qualified RPC service name."),
+          methodName: z.string().describe("RPC method name."),
+          requestJson: z.string().describe("One ProtoJSON request object, as JSON text."),
+          metadata: z
+            .record(z.union([z.string(), z.array(z.string())]))
+            .optional()
+            .describe(
+              "Optional outgoing gRPC metadata. Authorization is configured on the connection."
+            ),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true },
+      },
+      async (input) => {
+        const safeInput = {
+          connectionName: input.connectionName,
+          serviceName: input.serviceName,
+          methodName: input.methodName,
+        };
+        const text = await trackInvocation("mcpServer", "invokeUnaryRpc", safeInput, () =>
+          runRpcText(stateStorage, rpcHistoryStore, input, { source: "mcp", cancellation })
+        );
+        return { content: [{ type: "text", text }] };
+      }
+    );
+  }
 
   server.registerTool(
     "scanDbResource",

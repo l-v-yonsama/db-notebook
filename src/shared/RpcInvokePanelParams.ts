@@ -17,11 +17,19 @@ export type RpcInvokeTarget = {
   responseStream: boolean;
   requestTemplate: string;
   restoredRequestJson?: string;
+  restoredMetadataJson?: string;
+  autoInvoke?: boolean;
   restoreId?: string;
   requestDescription: string;
   responseDescription: string;
   requestDescriptionHtml: string;
   responseDescriptionHtml: string;
+};
+
+export type RpcInvokeRestoration = {
+  requestJson?: string;
+  requestMetadata?: Record<string, string | string[]>;
+  autoInvoke?: boolean;
 };
 
 export type RpcInvokeRequest = {
