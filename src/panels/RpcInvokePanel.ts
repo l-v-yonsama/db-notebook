@@ -1,7 +1,7 @@
 import {
   DBType,
   RPCDriver,
-  isRpcRequestMetadata,
+  parseRpcRequestMetadata,
   RpcMethod,
   RpcService,
   RpcStreamSession,
@@ -356,10 +356,14 @@ export class RpcInvokePanel extends BasePanel {
       params.connectionName !== target.connectionName ||
       params.service !== target.service ||
       params.method !== target.method ||
-      typeof params.requestJson !== "string" ||
-      !isRpcRequestMetadata(params.metadata)
+      typeof params.requestJson !== "string"
     ) {
       return { error: "Invalid RPC request or metadata." };
+    }
+    try {
+      parseRpcRequestMetadata(params.metadata);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
     }
     const current = this.tree.getLoadedRpcMethodContext(method);
     if (
@@ -404,6 +408,7 @@ export class RpcInvokePanel extends BasePanel {
     let token: string | undefined;
     let history: RpcInvokeHistoryAttempt | undefined;
     let recorded = false;
+    let invokeError: RpcInvokeError | undefined;
     try {
       const setting = await this.stateStorage.getConnectionSettingByName(
         validated.request.connectionName
@@ -436,23 +441,30 @@ export class RpcInvokePanel extends BasePanel {
       let sent = false;
       const { ok, message, result } = await workflow<RPCDriver, UnaryResult<unknown>>(
         setting,
-        (driver) => {
+        async (driver) => {
           sent = true;
-          return driver.invokeUnaryProtoJson({
-            service: validated.request.service,
-            method: validated.request.method,
-            requestJson: validated.request.requestJson,
-            metadata: validated.request.metadata,
-          });
+          try {
+            return await driver.invokeUnaryProtoJson({
+              service: validated.request.service,
+              method: validated.request.method,
+              requestJson: validated.request.requestJson,
+              metadata: validated.request.metadata,
+            });
+          } catch (error) {
+            if (error instanceof RpcInvokeError) invokeError = error;
+            throw error;
+          }
         },
         false
       );
       history.totalElapsedMs = Date.now() - history.startedAt;
       history.sentCount = ok && result ? 1 : sent ? 1 : 0;
       history.receivedCount = ok && result ? 1 : 0;
-      history.outcome = ok && result ? "success" : "error";
+      history.outcome = ok && result ? "success" : invokeError?.status?.code === 4 ? "timeout" : "error";
       if (ok && result) {
         history.grpcStatus = { code: result.status.code, name: result.status.name };
+      } else if (invokeError?.status) {
+        history.grpcStatus = { code: invokeError.status.code, name: invokeError.status.name };
       }
       recorded = true;
       await RpcInvokePanel.recordHistory(history);
@@ -460,7 +472,7 @@ export class RpcInvokePanel extends BasePanel {
         return;
       }
       if (!ok || !result) {
-        throw new Error(message || "RPC invocation failed.");
+        throw invokeError ?? new Error(message || "RPC invocation failed.");
       }
       this.finishReport({
         version: 1,

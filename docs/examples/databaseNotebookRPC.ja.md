@@ -18,7 +18,7 @@ Database Notebook では、gRPC サーバーのメソッドを **Invoke RPC パ�
 
 DB Explorer でメソッドの **Invoke RPC** アイコンまたは右クリックメニューを使います。パネルの左側が **Request**、右側が **Response** です。
 
-- Request の **Data** に ProtoJSON のオブジェクトを入力します。**Metadata** は省略可能な JSON オブジェクトで、値には文字列または文字列配列を指定します。`authorization` は接続定義で管理するため、ここには入力できません。**Description** でメッセージ定義を確認できます。
+- Request の **Data** に ProtoJSON のオブジェクトを入力します。**Metadata** は省略可能な JSON オブジェクトで、値には文字列または文字列配列を指定します。テキスト Metadata のみ対応し、`-bin` で終わるバイナリキーは使用できません。`authorization` は接続定義で管理するため、ここには入力できません。**Description** でメッセージ定義を確認できます。
 - unary と server streaming は Data を 1 件入力して **Invoke** します。
 - client streaming と bidi streaming は **Start** でストリームを開き、Data に次のメッセージを入力して **Send** を必要な回数だけ押します。**Finish Sending** は送信側を閉じて応答を待ちます。途中で止めるときは **Cancel** を使います。
 - Response の **Data / Headers / Trailers / Description** を切り替えて確認できます。結果があるときは **Output HTML** でレポートを保存できます。
@@ -59,6 +59,8 @@ client streaming と bidi streaming では、送信するメッセージを **�
 セルのステータスバーにある **Edit metadata / Show descriptor** から設定パネルを開けます。**Metadata** にリクエストのメタデータを JSON オブジェクトで入力し、**Save** します。例えば `{ "x-request-id": "example" }` と入力できます。空の `{}` はメタデータなしとして扱います。**Descriptor** では選択したメソッドの定義を確認でき、**Reload schema** と **Insert request template** も使えます。Metadata はセル出力ではなくセルの設定なので、実行結果を消しても残ります。Descriptor は設定パネルから再度表示できます。
 
 実行結果にはステータス、所要時間、送受信件数と、**Data / Headers / Trailers** のタブが表示されます。ノートブック上部の **Output HTML** から、RPC セルのリクエストと最後の実行結果を含む HTML レポートを出力できます。
+
+RPC の実行結果は `.dbn` ファイルには保存されません。ノートブックを開き直した後にレスポンスを HTML 出力する場合は、RPC セルを再実行してください。
 
 > セルの言語を RPC JSON に切り替えても、以前の SQL や JSON セルの本文・設定は RPC 用に自動変換されません。RPC の接続、メソッド、本文を設定してください。
 

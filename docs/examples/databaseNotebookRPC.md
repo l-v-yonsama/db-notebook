@@ -18,7 +18,7 @@ Database Notebook can call gRPC methods from the **Invoke RPC panel** or save an
 
 Use a method's **Invoke RPC** icon or context menu in DB Explorer. The **Request** pane is on the left and **Response** is on the right.
 
-- Enter a ProtoJSON object in Request **Data**. Optional **Metadata** is a JSON object whose values are strings or arrays of strings. The connection setting manages `authorization`, so it cannot be entered here. **Description** shows the message definition.
+- Enter a ProtoJSON object in Request **Data**. Optional **Metadata** is a JSON object whose values are strings or arrays of strings. Only text metadata is supported; binary keys ending in `-bin` cannot be used. The connection setting manages `authorization`, so it cannot be entered here. **Description** shows the message definition.
 - For unary and server streaming methods, enter one Data object and select **Invoke**.
 - For client and bidirectional streaming, select **Start**, enter the next message in Data, and select **Send** once per message. **Finish Sending** closes the request side and waits for the response. Use **Cancel** to stop early.
 - Switch between Response **Data / Headers / Trailers / Description**. After a result is available, **Output HTML** saves an HTML report.
@@ -59,6 +59,8 @@ Client and bidirectional streaming cells take an **array of message objects**. A
 Use **Edit metadata / Show descriptor** in the cell status bar to open its settings panel. Enter request **Metadata** as a JSON object, such as `{ "x-request-id": "example" }`, and select **Save**; `{}` means no metadata. **Descriptor** shows the selected method definition and provides **Reload schema** and **Insert request template**. Metadata is stored in cell settings, so clearing execution outputs does not remove it. You can reopen the settings panel to view the Descriptor again.
 
 The result shows status, elapsed time, sent/received counts, and **Data / Headers / Trailers** tabs. Use **Output HTML** in the notebook toolbar to export RPC cell requests and their last execution results to an HTML report.
+
+RPC execution outputs are not saved in the `.dbn` file. After reopening a notebook, run its RPC cells again before exporting their responses to HTML.
 
 > Switching an existing cell's language to RPC JSON does not convert its old SQL or JSON body and settings. Set the RPC connection, method, and request body yourself.
 

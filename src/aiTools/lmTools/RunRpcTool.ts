@@ -2,6 +2,7 @@ import {
   DBType,
   parseRpcRequestMetadata,
   RPCDriver,
+  RpcInvokeError,
   UnaryResult,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
@@ -196,22 +197,32 @@ export async function runRpcText(
       ...(Object.keys(metadata).length ? { requestMetadata: metadata } : {}),
     };
     let sent = false;
+    let invokeError: RpcInvokeError | undefined;
     const response = await workflow<RPCDriver, UnaryResult<unknown>>(
       resolution.setting,
-      (driver) => {
+      async (driver) => {
         sent = true;
-        return driver.invokeUnaryProtoJson({
-          service: service.fullName,
-          method: method.name,
-          requestJson: input.requestJson,
-          metadata,
-        });
+        try {
+          return await driver.invokeUnaryProtoJson({
+            service: service.fullName,
+            method: method.name,
+            requestJson: input.requestJson,
+            metadata,
+          });
+        } catch (error) {
+          if (error instanceof RpcInvokeError) invokeError = error;
+          throw error;
+        }
       },
       false
     );
     attempt.totalElapsedMs = Date.now() - attempt.startedAt;
     attempt.sentCount = sent ? 1 : 0;
     attempt.receivedCount = response.ok && response.result ? 1 : 0;
+    if (invokeError?.status) {
+      attempt.grpcStatus = { code: invokeError.status.code, name: invokeError.status.name };
+      attempt.outcome = invokeError.status.code === 4 ? "timeout" : "error";
+    }
     if (response.ok && response.result) {
       attempt.outcome = "success";
       attempt.grpcStatus = { code: response.result.status.code, name: response.result.status.name };

@@ -401,14 +401,21 @@ describe("RPC notebook execution", () => {
   it("releases the owned driver when cancelled during connection", async () => {
     let finishConnect!: (value: string) => void;
     const driver = {
+      isConnected: false,
       connect: vi.fn(
-        () =>
-          new Promise<string>((resolve) => {
+        async () => {
+          const result = await new Promise<string>((resolve) => {
             finishConnect = resolve;
-          })
+          });
+          driver.isConnected = result === "";
+          return result;
+        }
       ),
       invokeUnaryProtoJson: vi.fn(),
-      disconnect: vi.fn(async () => ""),
+      disconnect: vi.fn(async () => {
+        if (driver.isConnected) driver.isConnected = false;
+        return "";
+      }),
     };
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(false);
@@ -418,8 +425,10 @@ describe("RPC notebook execution", () => {
     await vi.waitFor(() => expect(driver.connect).toHaveBeenCalledTimes(1));
 
     cellService.cancelNotebook(cell.notebook.uri.toString());
+    expect(driver.disconnect).not.toHaveBeenCalled();
     finishConnect("");
     expect(await running).toBe(false);
+    expect(driver.isConnected).toBe(false);
     expect(driver.invokeUnaryProtoJson).not.toHaveBeenCalled();
     expect(driver.disconnect).toHaveBeenCalledTimes(1);
     expect(driverFactory.remove).toHaveBeenCalledWith(driver);

@@ -17,7 +17,10 @@ function installStyle() {
     .dbn-rpc__tab[aria-selected="true"] { border-bottom-color: var(--vscode-focusBorder); color: var(--vscode-textLink-foreground); }
     .dbn-rpc__pane { padding: 8px 10px 10px; }
     .dbn-rpc__pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--vscode-editor-font-family, monospace); max-height: 360px; overflow: auto; }
-    .dbn-rpc__error { color: var(--vscode-errorForeground); margin-bottom: 8px; }
+    .dbn-rpc__error { color: var(--vscode-errorForeground); overflow-wrap: anywhere; padding: 8px 10px 0; }
+    .dbn-rpc__error-details { color: var(--vscode-descriptionForeground); padding: 4px 10px 0; }
+    .dbn-rpc__error-details summary { cursor: pointer; }
+    .dbn-rpc__error-details pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   `;
   if (!style.isConnected) document.head.appendChild(style);
 }
@@ -76,7 +79,7 @@ function renderResponse(data, element, activeTab = "data", onSelect) {
     `${data.receivedCount ?? 0} Received`,
   ];
   const duration = ((data.elapsedMs ?? 0) / 1000).toFixed(3);
-  title.textContent = `Response · ${status} · ${counts.join(", ")} (${duration} sec)`;
+  title.textContent = `Response · ${status} · ${counts.join(", ")} · Total ${duration} sec`;
   const tabs = document.createElement("div");
   tabs.className = "dbn-rpc__tabs";
   tabs.setAttribute("role", "tablist");
@@ -120,16 +123,29 @@ function renderResponse(data, element, activeTab = "data", onSelect) {
         appendJson(pre, pretty(value));
       }
     }
-    if (data.error && active === "data") {
-      const error = document.createElement("div");
-      error.className = "dbn-rpc__error";
-      error.textContent = data.error;
-      pane.replaceChildren(error, pre);
-    } else {
-      pane.replaceChildren(pre);
-    }
+    pane.replaceChildren(pre);
   };
-  root.append(title, tabs, pane);
+  root.append(title);
+  if (data.error) {
+    const summary = data.status?.code !== 0 && data.status?.name
+      ? data.status.name.toLowerCase().replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase())
+      : data.error;
+    const error = document.createElement("div");
+    error.className = "dbn-rpc__error";
+    error.textContent = summary;
+    root.append(error);
+    if (summary !== data.error) {
+      const details = document.createElement("details");
+      details.className = "dbn-rpc__error-details";
+      const label = document.createElement("summary");
+      label.textContent = "Technical details";
+      const raw = document.createElement("pre");
+      raw.textContent = data.error;
+      details.append(label, raw);
+      root.append(details);
+    }
+  }
+  root.append(tabs, pane);
   element.replaceChildren(root);
   show();
 }

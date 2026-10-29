@@ -1,6 +1,7 @@
 import {
   DBType,
   RpcMessage,
+  RpcInvokeError,
   RpcMethod,
   RpcService,
   type ConnectionSetting,
@@ -303,7 +304,18 @@ describe("RpcInvokePanel", () => {
         metadata: { authorization: "Bearer forged" },
       },
     });
-    expect(messages().at(-1).value.error).toContain("Invalid RPC request or metadata");
+    expect(messages().at(-1).value.error).toContain("authorization metadata");
+    await send({
+      command: "invokeRpc",
+      params: {
+        connectionName: "fixture",
+        service: service.fullName,
+        method: method.name,
+        requestJson: "{}",
+        metadata: { "x-payload-bin": "YWJj" },
+      },
+    });
+    expect(messages().at(-1).value.error).toContain("Binary RPC metadata");
     expect(workflow).not.toHaveBeenCalled();
     expect(addHistory).not.toHaveBeenCalled();
   });
@@ -344,6 +356,41 @@ describe("RpcInvokePanel", () => {
     expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({ outcome: "error" }));
     expect(JSON.stringify(addHistory.mock.calls)).not.toContain("fixture-secret");
     expect(JSON.stringify(addHistory.mock.calls)).not.toContain("denied");
+  });
+
+  it("keeps a unary deadline status in history and the response report", async () => {
+    vi.mocked(workflow).mockImplementation(async (_setting, run) => {
+      try {
+        await run({
+          invokeUnaryProtoJson: async () => {
+            throw new RpcInvokeError("deadline exceeded", {
+              kind: "grpc",
+              status: { code: 4, name: "DEADLINE_EXCEEDED", details: "deadline exceeded" },
+            });
+          },
+        } as any);
+      } catch (error) {
+        return { ok: false, message: (error as Error).message } as any;
+      }
+      throw new Error("Expected an RPC failure");
+    });
+    await send({
+      command: "invokeRpc",
+      params: {
+        connectionName: "fixture",
+        service: service.fullName,
+        method: method.name,
+        requestJson: "{}",
+      },
+    });
+    expect(addHistory).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: "timeout",
+      grpcStatus: { code: 4, name: "DEADLINE_EXCEEDED" },
+    }));
+    expect((RpcInvokePanel as any).currentPanel.reportResult).toMatchObject({
+      outcome: "timeout",
+      status: { code: 4, name: "DEADLINE_EXCEEDED" },
+    });
   });
 
   it("routes a bidirectional stream through a dedicated driver and releases it", async () => {

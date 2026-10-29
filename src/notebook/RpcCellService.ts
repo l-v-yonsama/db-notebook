@@ -321,6 +321,7 @@ export class RpcCellService {
     let driver: RPCDriver | undefined;
     let token: string | undefined;
     let disconnectTask: Promise<void> | undefined;
+    let connectInProgress = false;
     const disconnect = (): Promise<void> => {
       if (!driver) {
         return Promise.resolve();
@@ -345,7 +346,7 @@ export class RpcCellService {
       cancelled = true;
       if (session) {
         session.cancel();
-      } else {
+      } else if (!connectInProgress) {
         void disconnect();
       }
     };
@@ -394,7 +395,13 @@ export class RpcCellService {
           ? setting.rpc.authentication.token
           : undefined;
       driver = await createDriver<RPCDriver>(setting, false);
-      const connectError = await driver.connect();
+      connectInProgress = true;
+      let connectError: string;
+      try {
+        connectError = await driver.connect();
+      } finally {
+        connectInProgress = false;
+      }
       if (connectError) {
         throw new Error(connectError);
       }

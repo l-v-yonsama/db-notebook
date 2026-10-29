@@ -998,6 +998,7 @@ defineExpose({
       <p v-if="isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs">{{ queryTimeoutMs }}</p>
       <VsCodeTextField v-if="!isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs"
         v-model="queryTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 60000"></VsCodeTextField>
+      <p v-if="dbType === 'RPC'" class="file-placeholder">Used for unary calls and server reflection. Default: 10000 ms. A short timeout may prevent descriptors from loading before a stream starts.</p>
 
       <label v-show="elmSettings.getLockWaitTimeoutMs().visible" for="lockTimeoutMs">{{
         elmSettings.getLockWaitTimeoutMs().label

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { window } from "vscode";
-import { DBType, RpcDatabase, RpcMethod, RpcPackage, RpcService } from "@l-v-yonsama/multi-platform-database-drivers";
+import { DBType, RpcDatabase, RpcInvokeError, RpcMethod, RpcPackage, RpcService } from "@l-v-yonsama/multi-platform-database-drivers";
 import { runRpcText, RunRpcToolInput } from "../../../src/aiTools/lmTools/RunRpcTool";
 import { workflow } from "../../../src/utilities/driverResolver";
 import type { StateStorage } from "../../../src/utilities/StateStorage";
@@ -65,5 +65,31 @@ describe("runRpcText", () => {
     expect(JSON.parse(text).data).toEqual({ greeting: "Hello Ada" });
     expect(add).toHaveBeenCalledOnce();
     expect(add.mock.calls[0][0]).toMatchObject({ path: "/example.v1.Greeter/Hello", callKind: "unary", outcome: "success", sentCount: 1, receivedCount: 1 });
+  });
+
+  it("records a failed unary gRPC status", async () => {
+    const { stateStorage, historyStore, add } = fixture();
+    vi.mocked(window.showWarningMessage).mockResolvedValue("Invoke RPC");
+    vi.mocked(workflow).mockImplementation(async (_setting, run) => {
+      try {
+        await run({
+          invokeUnaryProtoJson: async () => {
+            throw new RpcInvokeError("invalid request", {
+              kind: "grpc",
+              status: { code: 3, name: "INVALID_ARGUMENT", details: "invalid request" },
+            });
+          },
+        } as any);
+      } catch (error) {
+        return { ok: false, message: (error as Error).message } as any;
+      }
+      throw new Error("Expected an RPC failure");
+    });
+    const text = await runRpcText(stateStorage, historyStore, input, { source: "mcp" });
+    expect(text).toContain("invalid request");
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: "error",
+      grpcStatus: { code: 3, name: "INVALID_ARGUMENT" },
+    }));
   });
 });
