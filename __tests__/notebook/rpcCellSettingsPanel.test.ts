@@ -31,5 +31,6 @@ describe("RPC cell invoke settings panel", () => {
     await vi.waitFor(() => expect(workspace.applyEdit).toHaveBeenCalled());
     const edit = vi.mocked(workspace.applyEdit).mock.calls.at(-1)![0] as any;
     expect(edit.get(cell.notebook.uri)[0].metadata.rpc.metadataJson).toBe('{"x-id":"42"}');
+    await vi.waitFor(() => expect(panel.dispose).toHaveBeenCalledOnce());
   });
 });

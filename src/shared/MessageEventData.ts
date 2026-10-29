@@ -868,7 +868,7 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
 >;
 
 export type RpcCellInvokeSettingsPanelEventData = BaseMessageEventData<
-  "initialize" | "descriptor" | "saved" | "error",
+  "initialize" | "descriptor" | "error",
   "RpcCellInvokeSettingsPanel",
   {
     connectionName?: string;
@@ -880,7 +880,7 @@ export type RpcCellInvokeSettingsPanelEventData = BaseMessageEventData<
 >;
 
 export type RestCellRequestSettingsPanelEventData = BaseMessageEventData<
-  "initialize" | "saved" | "error",
+  "initialize" | "error",
   "RestCellRequestSettingsPanel",
   { method?: string; url?: string; headersJson?: string; timeoutMs?: number; error?: string }
 >;

@@ -32,6 +32,7 @@ import { RpcInvokeHistoryAttempt, RpcInvokeHistoryStore } from "../utilities/Rpc
 import { RpcHistoryRequestCapture } from "../utilities/RpcHistoryRequestCapture";
 import { formatRpcStatus, formatRpcTransferSummary } from "../utilities/rpcResultSummary";
 import { StateStorage } from "../utilities/StateStorage";
+import { resolveJsonTemplate } from "./jsonVariables";
 import {
   decodeRpcCellSource,
   getRpcCellMetadata,
@@ -51,13 +52,14 @@ const objectValue = (value: unknown): value is Record<string, unknown> =>
 
 const parseRequest = (
   source: RpcCellSource,
-  requestStream: boolean
+  requestStream: boolean,
+  variables: Record<string, unknown>
 ): {
   requestJson: string;
   requestJsons: string[];
   metadata: Record<string, string | string[]>;
 } => {
-  const data: unknown = JSON.parse(source.dataJson);
+  const { value: data, json, substituted } = resolveJsonTemplate(source.dataJson, variables);
   const metadata: unknown = source.metadataJson.trim() ? JSON.parse(source.metadataJson) : {};
   if (requestStream) {
     if (!Array.isArray(data) || !data.every(objectValue)) {
@@ -67,7 +69,8 @@ const parseRequest = (
     throw new Error("Data must be a JSON object for unary or server streaming.");
   }
   return {
-    requestJson: source.dataJson,
+    // Keep the original request text when no variable was replaced.
+    requestJson: substituted ? json : source.dataJson,
     requestJsons: requestStream
       ? (data as Record<string, unknown>[]).map((item) => JSON.stringify(item))
       : [],
@@ -301,7 +304,11 @@ export class RpcCellService {
     }
   }
 
-  async execute(cell: NotebookCell, execution: NotebookCellExecution): Promise<boolean> {
+  async execute(
+    cell: NotebookCell,
+    execution: NotebookCellExecution,
+    variables: Record<string, unknown> = {}
+  ): Promise<boolean> {
     const metadata = getRpcCellMetadata(cell);
     const activeKey = `${cell.notebook.uri.toString()}#${cell.document.uri.toString()}`;
     const started = Date.now();
@@ -374,7 +381,7 @@ export class RpcCellService {
       }
       const source = decodeRpcCellSource(cell.document.getText(), metadata);
       const selected = await this.resolveMethod(cell);
-      const request = parseRequest(source, selected.method.requestStream);
+      const request = parseRequest(source, selected.method.requestStream, variables);
       if (Object.keys(request.metadata).length > 0) {
         history.requestMetadata = request.metadata;
       }

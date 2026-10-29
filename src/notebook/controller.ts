@@ -380,7 +380,11 @@ export class MainController {
         if (!this.rpcCellService) {
           throw new Error("RPC notebook service is unavailable.");
         }
-        success = await this.rpcCellService.execute(cell, execution);
+        success = await this.rpcCellService.execute(
+          cell,
+          execution,
+          noteSession.kernel?.getStoredVariables() ?? {}
+        );
       } catch (error) {
         await execution.replaceOutput([
           new NotebookCellOutput([NotebookCellOutputItem.error(error as Error)]),

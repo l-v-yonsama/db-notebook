@@ -153,6 +153,43 @@ describe("RPC notebook execution", () => {
     expect(execution.outputs[0].items[1].data).toContain("OK(0) · 1 Received (0.012 sec)");
   });
 
+  it("resolves typed shared variables before sending a unary request and recording history", async () => {
+    const driver = {
+      connect: vi.fn(async () => ""),
+      invokeUnaryProtoJson: vi.fn(async () => ({
+        contents: { id: "42" },
+        status: { code: 0, name: "OK" },
+        elapsedMs: 12,
+      })),
+      disconnect: vi.fn(async () => ""),
+    };
+    driverFactory.create.mockResolvedValue(driver);
+    const { cellService, historyStore } = createService(false);
+    const source = '{"id":"{{ customerId }}","active":"{{ active }}"}';
+    const cell = createCell(source);
+    const execution = createExecution(cell);
+
+    expect(await cellService.execute(cell, execution as any, { customerId: 42, active: true })).toBe(true);
+
+    const sent = driver.invokeUnaryProtoJson.mock.calls[0][0].requestJson;
+    expect(JSON.parse(sent)).toEqual({ id: 42, active: true });
+    expect(JSON.parse(historyStore.add.mock.calls[0][0].requestCapture.finish().requestJson))
+      .toEqual({ id: 42, active: true });
+    expect(cell.document.getText()).toBe(source);
+  });
+
+  it("does not connect or record history when a request variable is undefined", async () => {
+    const { cellService, historyStore } = createService(false);
+    const cell = createCell('{"id":"{{ missingId }}"}');
+    const execution = createExecution(cell);
+
+    expect(await cellService.execute(cell, execution as any, {})).toBe(false);
+
+    expect(driverFactory.create).not.toHaveBeenCalled();
+    expect(historyStore.add).not.toHaveBeenCalled();
+    expect(execution.outputs[0].items[0].data.error).toContain('Shared variable "missingId" is not defined.');
+  });
+
   it("rejects invalid input before connecting or adding history", async () => {
     const { cellService, historyStore } = createService(false);
     const cell = createCell('{"id":');
@@ -261,10 +298,10 @@ describe("RPC notebook execution", () => {
     };
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(responseStream, true);
-    const cell = createCell('[{"value":"first"},{"value":"second"}]');
+    const cell = createCell('[{"value":"{{ first }}"},{"value":"{{ second }}"}]');
     const execution = createExecution(cell);
 
-    expect(await cellService.execute(cell, execution as any)).toBe(true);
+    expect(await cellService.execute(cell, execution as any, { first: "first", second: "second" })).toBe(true);
     expect(driver.openProtoJsonStream).toHaveBeenCalledWith(
       expect.objectContaining({ requestJson: undefined, metadata: {} })
     );

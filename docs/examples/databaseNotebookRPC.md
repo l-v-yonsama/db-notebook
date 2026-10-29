@@ -56,6 +56,8 @@ Client and bidirectional streaming cells take an **array of message objects**. A
 ]
 ```
 
+Request Data can use notebook shared variables. Write a variable as an entire JSON string value, for example `{ "id": "{{ customerId }}" }`. When the cell runs, `{{ customerId }}` is replaced with the current shared variable value, preserving JSON types such as numbers and booleans. The same syntax works inside each message in a client or bidirectional streaming array. Define variables in a JSON cell marked **Pre-execution** to make them available when running the RPC cell alone. An undefined variable or a value that cannot be represented as JSON stops the call before sending. Request Metadata does not support variable substitution. Histories record the resolved Data that was actually sent; the notebook cell keeps its `{{ ... }}` placeholders.
+
 Use **Edit metadata / Show descriptor** in the cell status bar to open its settings panel. Enter request **Metadata** as a JSON object, such as `{ "x-request-id": "example" }`, and select **Save**; `{}` means no metadata. **Descriptor** shows the selected method definition and provides **Reload schema** and **Insert request template**. Metadata is stored in cell settings, so clearing execution outputs does not remove it. You can reopen the settings panel to view the Descriptor again.
 
 The result shows status, elapsed time, sent/received counts, and **Data / Headers / Trailers** tabs. Use **Output HTML** in the notebook toolbar to export RPC cell requests and their last execution results to an HTML report.

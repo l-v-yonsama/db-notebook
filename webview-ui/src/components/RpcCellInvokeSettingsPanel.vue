@@ -10,7 +10,7 @@ const connectionName = ref("");
 const method = ref("");
 const metadataJson = ref("{}");
 const descriptor = ref("");
-const notice = ref("");
+const errorMessage = ref("");
 const loading = ref(true);
 
 const metadataError = computed(() => {
@@ -51,7 +51,7 @@ const descriptorTokens = computed(() => {
 
 const save = () => {
   if (metadataError.value) return;
-  notice.value = "Saving…";
+  errorMessage.value = "";
   vscode.postCommand({
     command: "saveRpcCellMetadata",
     params: { metadataJson: metadataJson.value },
@@ -64,15 +64,13 @@ const receiveMessage = (data: RpcCellInvokeSettingsPanelEventData) => {
     method.value = data.value.method ?? "";
     metadataJson.value = data.value.metadataJson ?? "{}";
     descriptor.value = "";
-    notice.value = "";
+    errorMessage.value = "";
     loading.value = true;
   } else if (data.command === "descriptor") {
     descriptor.value = data.value.descriptor ?? "";
     loading.value = false;
-  } else if (data.command === "saved") {
-    notice.value = "Saved";
   } else if (data.command === "error") {
-    notice.value = data.value.error ?? "Could not load RPC settings.";
+    errorMessage.value = data.value.error ?? "Could not load RPC settings.";
     loading.value = false;
   }
 };
@@ -82,10 +80,16 @@ defineExpose({ recieveMessage: receiveMessage });
 
 <template>
   <section class="rpc-cell-settings">
-    <PanelActionToolbar @cancel="vscode.postCommand({ command: 'cancel', params: {} })">
-      <VsCodeButton :disabled="!!metadataError" title="Save request metadata" @click="save"
-        >Save</VsCodeButton
-      >
+    <PanelActionToolbar
+      cancel-label=""
+      cancel-title="Close"
+      @cancel="vscode.postCommand({ command: 'cancel', params: {} })"
+    >
+      <template #left>
+        <VsCodeButton :disabled="!!metadataError" title="Save request metadata" @click="save"
+          >Save</VsCodeButton
+        >
+      </template>
     </PanelActionToolbar>
     <p class="target">
       {{ connectionName || "Select an RPC connection" }} · {{ method || "Select an RPC method" }}
@@ -95,6 +99,7 @@ defineExpose({ recieveMessage: receiveMessage });
       <p>Request metadata as a JSON object</p>
       <VsCodeTextArea
         id="rpc-cell-metadata"
+        class="metadata-editor"
         v-model="metadataJson"
         :rows="8"
         placeholder="{}"
@@ -121,13 +126,15 @@ defineExpose({ recieveMessage: receiveMessage });
         v-else
       ><span v-for="(token, index) in descriptorTokens" :key="index" :class="token.kind">{{ token.text }}</span></pre>
     </fieldset>
-    <p v-if="notice" role="status">{{ notice }}</p>
+    <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
   </section>
 </template>
 
 <style scoped>
 .rpc-cell-settings {
   padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .target {
   color: var(--vscode-descriptionForeground);
@@ -140,6 +147,10 @@ fieldset {
 }
 legend {
   font-weight: 600;
+}
+.metadata-editor {
+  width: 100%;
+  box-sizing: border-box;
 }
 .actions {
   display: flex;

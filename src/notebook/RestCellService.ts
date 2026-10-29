@@ -13,7 +13,7 @@ import {
 import type { NodeRunAxiosEvent } from "../shared/RunResultMetadata";
 import { toNodeRunAxiosEvent } from "../utilities/httpUtil";
 import { getRestCellMetadata, isRestCell, REST_METHODS, REST_RESPONSE_MIME } from "./restCell";
-import { resolveRestJsonBody, resolveRestUrlTemplate } from "./restVariables";
+import { resolveRestHeaders, resolveRestJsonBody, resolveRestUrlTemplate } from "./restVariables";
 
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 
@@ -37,31 +37,6 @@ const headerValue = (headers: Record<string, unknown>, name: string): string | u
   const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === name);
   const value = entry?.[1];
   return Array.isArray(value) ? value.join(", ") : value === undefined ? undefined : String(value);
-};
-
-const parseHeaders = (source: string): Record<string, string> => {
-  let value: unknown;
-  try {
-    value = JSON.parse(source.trim() || "{}");
-  } catch {
-    throw new Error("Headers must be a JSON object with string values.");
-  }
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Headers must be a JSON object with string values.");
-  }
-  const headers = value as Record<string, unknown>;
-  for (const [name, item] of Object.entries(headers)) {
-    if (typeof item !== "string" || !name || /[\r\n]/.test(name) || /[\r\n]/.test(item)) {
-      throw new Error(`Header "${name}" must have a single-line string value.`);
-    }
-    if (name.toLowerCase() === "content-type" && !/^application\/json(?:\s*;|\s*$)/i.test(item)) {
-      throw new Error("REST JSON only supports application/json request bodies.");
-    }
-    if (item.includes("{{") || item.includes("}}")) {
-      throw new Error(`Header "${name}" contains an unsupported variable placeholder.`);
-    }
-  }
-  return headers as Record<string, string>;
 };
 
 const responseContent = (response: AxiosResponse<ArrayBuffer>, mimeType: string) => {
@@ -196,7 +171,7 @@ export class RestCellService {
       if (rest.method === "GET" && body !== undefined) {
         throw new Error("GET requests must have an empty body.");
       }
-      const headers = parseHeaders(rest.headersJson ?? "{}");
+      const headers = resolveRestHeaders(rest.headersJson ?? "{}", variables);
       if (
         body !== undefined &&
         !Object.keys(headers).some((key) => key.toLowerCase() === "content-type")

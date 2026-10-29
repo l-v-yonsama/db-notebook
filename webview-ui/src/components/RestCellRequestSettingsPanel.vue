@@ -10,7 +10,7 @@ const method = ref("GET");
 const url = ref("");
 const headersJson = ref("{}");
 const timeoutMs = ref(30000);
-const notice = ref("");
+const errorMessage = ref("");
 const validationError = computed(() => {
   try {
     const parsed = JSON.parse(headersJson.value.trim() || "{}");
@@ -36,7 +36,7 @@ const validationError = computed(() => {
 
 const save = () => {
   if (validationError.value) return;
-  notice.value = "Saving…";
+  errorMessage.value = "";
   vscode.postMessage({
     command: "saveRestCellSettings",
     params: {
@@ -51,25 +51,33 @@ const receiveMessage = (data: RestCellRequestSettingsPanelEventData) => {
     url.value = data.value.url ?? "";
     headersJson.value = data.value.headersJson ?? "{}";
     timeoutMs.value = data.value.timeoutMs ?? 30000;
-    notice.value = "";
-  } else if (data.command === "saved") notice.value = "Saved";
-  else if (data.command === "error")
-    notice.value = data.value.error ?? "Could not save REST settings.";
+    errorMessage.value = "";
+  } else if (data.command === "error")
+    errorMessage.value = data.value.error ?? "Could not save REST settings.";
 };
 defineExpose({ recieveMessage: receiveMessage });
 </script>
 
 <template>
   <section class="rest-settings">
-    <PanelActionToolbar @cancel="vscode.postCommand({ command: 'cancel', params: {} })">
-      <VsCodeButton :disabled="!!validationError" title="Save REST request settings" @click="save"
-        >Save</VsCodeButton
-      >
+    <PanelActionToolbar
+      cancel-label=""
+      cancel-title="Close"
+      @cancel="vscode.postCommand({ command: 'cancel', params: {} })"
+    >
+      <template #left>
+        <VsCodeButton :disabled="!!validationError" title="Save REST request settings" @click="save"
+          >Save</VsCodeButton
+        >
+      </template>
     </PanelActionToolbar>
     <p class="target">{{ method }} {{ url || "Set a URL in the cell status bar" }}</p>
     <fieldset>
       <legend>Headers</legend>
-      <p>Request headers as a JSON object with string values.</p>
+      <p>
+        Request headers as a JSON object with string values. Use
+        <code v-pre>{"Authorization":"Bearer {{ token }}"}</code> to insert a shared variable.
+      </p>
       <VsCodeTextArea
         id="rest-cell-headers"
         class="headers-editor"
@@ -88,13 +96,15 @@ defineExpose({ recieveMessage: receiveMessage });
       Headers and URL are saved in the notebook file. Sent values also appear in exported reports.
     </p>
     <p v-if="validationError" class="error">{{ validationError }}</p>
-    <p v-if="notice" role="status">{{ notice }}</p>
+    <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
   </section>
 </template>
 
 <style scoped>
 .rest-settings {
   padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .target {
   color: var(--vscode-descriptionForeground);

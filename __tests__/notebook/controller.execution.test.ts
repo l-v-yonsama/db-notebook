@@ -30,12 +30,14 @@ describe("MainController.execute -> _doExecution", () => {
       metadata: {} as any,
     });
     makeNotebook([cell]);
+    nodeKernelFake.getStoredVariables.mockReturnValue({ customerId: 42 });
 
     await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
 
     expect(rpcCellService.execute).toHaveBeenCalledWith(
       cell,
-      lastExecution(controllerObj)
+      lastExecution(controllerObj),
+      { customerId: 42 }
     );
     expect(lastExecution(controllerObj).endedAt.success).toBe(true);
     controller.dispose();

@@ -51,6 +51,17 @@ import { setupDbResource } from "./intellisense";
 import { getRpcCellMetadata, isRpcCell, rpcCallKindLabels } from "./rpcCell";
 import { getRestCellMetadata, isRestCell } from "./restCell";
 
+const countJsonObjectKeys = (source: string | undefined): number | undefined => {
+  try {
+    const value: unknown = JSON.parse(source?.trim() || "{}");
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? Object.keys(value).length
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
 
@@ -209,12 +220,24 @@ export class RpcInvokeSettingsProvider implements NotebookCellStatusBarItemProvi
     if (!isRpcCell(cell)) {
       return undefined;
     }
+    const keyCount = countJsonObjectKeys(getRpcCellMetadata(cell).rpc.metadataJson);
+    const metadataLabel =
+      keyCount === undefined
+        ? "Fix invalid metadata"
+        : keyCount === 0
+        ? "Add metadata"
+        : `Edit metadata (${keyCount} ${keyCount === 1 ? "key" : "keys"})`;
     const item = new NotebookCellStatusBarItem(
-      "$(settings-gear) Edit metadata / Show descriptor",
+      `$(settings-gear) ${metadataLabel} / Show descriptor`,
       NotebookCellStatusBarAlignment.Left
     );
     item.command = CELL_SHOW_RPC_INVOKE_SETTINGS;
-    item.tooltip = "RPC Cell Invoke Settings";
+    item.tooltip =
+      keyCount === undefined
+        ? "Invalid request metadata. Open RPC Cell Invoke Settings to fix it."
+        : keyCount === 0
+        ? "No request metadata configured. Open RPC Cell Invoke Settings."
+        : `${keyCount} request metadata ${keyCount === 1 ? "key" : "keys"} configured. Open RPC Cell Invoke Settings.`;
     return item;
   }
 }
@@ -255,12 +278,24 @@ export class RestSettingsProvider implements NotebookCellStatusBarItemProvider {
     if (!isRestCell(cell)) {
       return undefined;
     }
+    const keyCount = countJsonObjectKeys(getRestCellMetadata(cell).rest?.headersJson);
+    const headersLabel =
+      keyCount === undefined
+        ? "Fix invalid headers"
+        : keyCount === 0
+        ? "Add headers"
+        : `Edit headers (${keyCount} ${keyCount === 1 ? "key" : "keys"})`;
     const item = new NotebookCellStatusBarItem(
-      "$(settings-gear) Edit headers / timeout",
+      `$(settings-gear) ${headersLabel} / timeout`,
       NotebookCellStatusBarAlignment.Left
     );
     item.command = CELL_SHOW_REST_SETTINGS;
-    item.tooltip = "REST JSON request settings";
+    item.tooltip =
+      keyCount === undefined
+        ? "Invalid request headers. Open REST JSON Request Settings to fix them."
+        : keyCount === 0
+        ? "No request headers configured. Open REST JSON Request Settings."
+        : `${keyCount} request header ${keyCount === 1 ? "key" : "keys"} configured. Open REST JSON Request Settings.`;
     return item;
   }
 }

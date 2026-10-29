@@ -142,7 +142,6 @@ export class RpcCellInvokeSettingsPanel {
     if (message.command === "insertRpcTemplate") {
       try {
         await this.rpcCellService.insertTemplate(cell);
-        this.post("saved", {});
       } catch (error) {
         this.post("error", { error: String(error) });
       }
@@ -169,7 +168,7 @@ export class RpcCellInvokeSettingsPanel {
       if (!(await workspace.applyEdit(edit))) {
         throw new Error("Could not save RPC metadata.");
       }
-      this.post("saved", {});
+      this.panel.dispose();
     } catch (error) {
       this.post("error", { error: String(error) });
     }

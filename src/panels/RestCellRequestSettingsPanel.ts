@@ -133,7 +133,7 @@ export class RestCellRequestSettingsPanel {
       if (!(await workspace.applyEdit(edit))) {
         throw new Error("Could not save REST settings.");
       }
-      this.post("saved", {});
+      this.panel.dispose();
     } catch (error) {
       this.post("error", { error: error instanceof Error ? error.message : String(error) });
     }
