@@ -2,12 +2,32 @@
 
 All notable changes to the "Database notebook" extension are documented in this file.
 
+## [4.2.0] - 2026-10-30
+
+### Added
+
+- Added gRPC connections to DB Explorer, with server reflection or local `.proto` definitions and inspection of services, methods, messages, and fields.
+- Added the Invoke RPC panel and `rpc-json` notebook cells for unary, server-streaming, client-streaming, and bidirectional-streaming calls. Requests can include metadata, and responses can be inspected in the panel or notebook output.
+- Added `rest-json` notebook cells for HTTP requests with JSON bodies, configurable headers and timeouts, and in-cell response views.
+- Added shared-variable substitution in RPC cell request data and REST cell URLs, JSON bodies, and headers.
+- Added RPC discovery and unary invocation through the AI tools, with support for creating RPC notebook cells.
+- Added RPC and REST request and response details to notebook HTML reports.
+
+### Changed
+
+- Combined query and RPC entries in the Histories view. Stored RPC request data and metadata can be restored to the RPC panel or a notebook where the call type supports it.
+
+### Dependencies
+
+- @l-v-yonsama/multi-platform-database-drivers: 3.2.0
+- @l-v-yonsama/rdh: 2.0.0
+
 ## [4.1.0] - 2026-10-15
 
 ### Added
 - Added comparison of two SQL logs, with an Excel report showing SQL differences, WHERE clause comparison results, and links to the original log lines.
 
-Changed
+### Changed
 
 - Improved log parsing diagnostics to show where field matching failed.
 
