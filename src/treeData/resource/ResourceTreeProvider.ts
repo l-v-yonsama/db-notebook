@@ -21,6 +21,11 @@ import {
   parseDynamoAttrType,
   RdsDatabase,
   RedisDatabase,
+  RpcDatabase,
+  RpcField,
+  RpcMessage,
+  RpcMethod,
+  RpcService,
   resolveLastOrderByColumn,
   ResourceType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
@@ -82,6 +87,7 @@ const DB_TYPE_DISPLAY_NAMES: Record<DBType, string> = {
   [DBType.Auth0]: "Auth0",
   [DBType.Aws]: "AWS",
   [DBType.Mqtt]: "MQTT",
+  [DBType.RPC]: "gRPC",
 };
 
 const toDbTypeDisplayName = (dbType: DBType): string => DB_TYPE_DISPLAY_NAMES[dbType] ?? dbType;
@@ -106,11 +112,13 @@ export type LoadedResourceMatch = {
 };
 
 const activeResourceFilters = (conRes: DbConnection) =>
-  ([
-    ["Resource name", conRes.resourceFilter?.resourceName],
-    ["Schema", conRes.resourceFilter?.schema],
-    ["Table", conRes.resourceFilter?.table],
-  ] as const).filter(([, detail]) => detail?.value?.trim());
+  (
+    [
+      ["Resource name", conRes.resourceFilter?.resourceName],
+      ["Schema", conRes.resourceFilter?.schema],
+      ["Table", conRes.resourceFilter?.table],
+    ] as const
+  ).filter(([, detail]) => detail?.value?.trim());
 
 // Vendor logos for the DBTypes where a safely-licensed brand mark is available.
 // Oracle/SQL Server/AWS/Memcached deliberately stay on generic codicons for now.
@@ -273,9 +281,42 @@ export class ResourceTreeProvider
     return this.parentMap.get(element.id);
   }
 
+  getLoadedRpcMethodContext(
+    method: RpcMethod
+  ): { connection: DbConnection; service: RpcService; database: RpcDatabase } | undefined {
+    const service = this.parentMap.get(method.id);
+    if (!(service instanceof RpcService) || !service.children.includes(method)) {
+      return undefined;
+    }
+    const pkg = this.parentMap.get(service.id);
+    const database = pkg && this.parentMap.get(pkg.id);
+    const connection = database && this.parentMap.get(database.id);
+    if (
+      !(database instanceof RpcDatabase) ||
+      !(connection instanceof DbConnection) ||
+      connection.dbType !== DBType.RPC
+    ) {
+      return undefined;
+    }
+    if (
+      !pkg ||
+      !database ||
+      !pkg.children.some((child) => child === service) ||
+      !database.children.some((child) => child === pkg) ||
+      !(this.stateStorage.getResourceByName(connection.name) ?? []).some(
+        (root) => (root as DbResource) === database
+      )
+    ) {
+      return undefined;
+    }
+    return { connection, service, database };
+  }
+
   getLoadedResourceMatches(connection?: DbConnection): LoadedResourceMatch[] {
     const matches: LoadedResourceMatch[] = [];
-    const connections = connection ? this.conResList.filter((it) => it === connection) : this.conResList;
+    const connections = connection
+      ? this.conResList.filter((it) => it === connection)
+      : this.conResList;
     for (const conRes of connections) {
       const visit = (
         resource: DbResource,
@@ -285,15 +326,26 @@ export class ResourceTreeProvider
       ) => {
         this.parentMap.set(resource.id, parent);
         const currentPath = [...path, resource.name];
-        const currentResourcePath = resource.resourceType === ResourceType.Group
-          ? resourcePath
-          : [...resourcePath, { type: resource.resourceType, name: resource.name }];
+        const currentResourcePath =
+          resource.resourceType === ResourceType.Group
+            ? resourcePath
+            : [...resourcePath, { type: resource.resourceType, name: resource.name }];
         if (SEARCHABLE_RESOURCE_TYPES.has(resource.resourceType)) {
-          matches.push({ resource, connection: conRes, path: currentPath, resourcePath: currentResourcePath });
+          matches.push({
+            resource,
+            connection: conRes,
+            path: currentPath,
+            resourcePath: currentResourcePath,
+          });
         }
         // Columns are not Quick Open targets; avoid walking large column lists.
-        if (resource.resourceType !== ResourceType.Table && resource.resourceType !== ResourceType.DynamoTable) {
-          resource.children.forEach((child) => visit(child, resource, currentPath, currentResourcePath));
+        if (
+          resource.resourceType !== ResourceType.Table &&
+          resource.resourceType !== ResourceType.DynamoTable
+        ) {
+          resource.children.forEach((child) =>
+            visit(child, resource, currentPath, currentResourcePath)
+          );
         }
       };
       (this.stateStorage.getResourceByName(conRes.name) ?? []).forEach((db) =>
@@ -319,7 +371,9 @@ export class ResourceTreeProvider
       return undefined;
     }
     const setting = this.stateStorage.getPasswordlessConnectionSettingByName(current.name);
-    return setting?.id ? { connectionId: setting.id, connectionName: current.name, path } : undefined;
+    return setting?.id
+      ? { connectionId: setting.id, connectionName: current.name, path }
+      : undefined;
   }
 
   // Drop stale parent links for a subtree that's about to be replaced (e.g. on schema reload),
@@ -370,6 +424,7 @@ export class ConnectionListItem extends vscode.TreeItem {
     }
     const support = DBType.Mqtt !== conRes.dbType;
     this.contextValue = `${conRes.resourceType},dbType:${conRes.dbType},CD:${clearableDefault},connected:${conRes.isConnected},support:${support},${conRes.isInProgress}`;
+    this.contextValue += `,sqlNotebook:${conRes.dbType !== DBType.RPC}`;
     this.contextValue += ",tag:dbResource";
 
     const tooltip = new vscode.MarkdownString(encodeHtmlWeak(conRes.name), true);
@@ -385,7 +440,9 @@ export class ConnectionListItem extends vscode.TreeItem {
       tooltip.appendMarkdown(`\\\nDatabase: ${encodeHtmlWeak(conRes.database)}`);
     }
     if (conRes.environment) {
-      tooltip.appendMarkdown(`\\\nEnvironment: ${formatConnectionEnvironmentCapitalized(conRes.environment)}`);
+      tooltip.appendMarkdown(
+        `\\\nEnvironment: ${formatConnectionEnvironmentCapitalized(conRes.environment)}`
+      );
     }
     if (conRes.comment) {
       tooltip.appendMarkdown(`\\\n${encodeHtmlWeak(conRes.comment)}`);
@@ -399,7 +456,12 @@ export class ConnectionListItem extends vscode.TreeItem {
     if (isDefault) {
       tooltip.appendMarkdown("\\\nDefault connection for new SQL cells");
     }
-    const filterTypes = { prefix: "starts with", suffix: "ends with", include: "contains", regex: "regex" };
+    const filterTypes = {
+      prefix: "starts with",
+      suffix: "ends with",
+      include: "contains",
+      regex: "regex",
+    };
     for (const [label, detail] of filters) {
       if (detail) {
         tooltip.appendMarkdown(`\\\n${label} filter (${filterTypes[detail.type]}): `);
@@ -526,6 +588,49 @@ export class DBDatabaseItem extends vscode.TreeItem {
           const res = resource as MqttDatabase;
           iconPath = getIconPath(VENDOR_ICONS.mqtt);
           scannable = false;
+        }
+        break;
+      case ResourceType.RpcDatabase:
+        iconPath = new vscode.ThemeIcon("server");
+        break;
+      case ResourceType.RpcPackage:
+        iconPath = new vscode.ThemeIcon("package");
+        break;
+      case ResourceType.RpcService:
+        {
+          const service = resource as RpcService;
+          iconPath = new vscode.ThemeIcon("symbol-interface");
+          description = service.discovery;
+          tooltip = `${service.fullName} (${service.discovery})`;
+        }
+        break;
+      case ResourceType.RpcMethod:
+        {
+          const method = resource as RpcMethod;
+          iconPath = new vscode.ThemeIcon("symbol-method");
+          const streaming = method.requestStream || method.responseStream;
+          description = streaming ? "streaming" : "unary";
+          tooltip = `${method.path}\n${method.inputType} → ${method.outputType}`;
+        }
+        break;
+      case ResourceType.RpcMessage:
+        {
+          const message = resource as RpcMessage;
+          iconPath = new vscode.ThemeIcon("symbol-struct");
+          description = message.direction ?? "";
+          tooltip = message.fullName;
+        }
+        break;
+      case ResourceType.RpcField:
+        {
+          const field = resource as RpcField;
+          const deprecated = field.deprecated === true;
+          iconPath = new vscode.ThemeIcon(
+            toIconFileName(field.generalType),
+            deprecated ? new vscode.ThemeColor("disabledForeground") : undefined
+          );
+          description = field.getDisplaySummary();
+          tooltip = field.getDisplayDetails();
         }
         break;
       case ResourceType.Key:

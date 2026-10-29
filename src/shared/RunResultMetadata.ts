@@ -53,6 +53,24 @@ export type ShellResult = {
   elapsedTime: number;
 };
 
+/** Display model for an RPC notebook response output. */
+export type RpcNotebookResult = {
+  version: 1;
+  kind: "response";
+  cellId: string;
+  outcome: "running" | "success" | "error" | "cancelled" | "timeout";
+  status?: { code: number; name: string };
+  elapsedMs: number;
+  sentCount?: number;
+  receivedCount: number;
+  contents?: unknown;
+  messages?: Array<{ index: number; at: number; contents: unknown }>;
+  headers?: Record<string, string[]>;
+  trailers?: Record<string, string[]>;
+  error?: string;
+  droppedCount?: number;
+};
+
 export type RunResultMetadata = {
   tableName?: string;
   type?: string;
@@ -63,6 +81,7 @@ export type RunResultMetadata = {
   lmResult?: LMResult;
   mqttPublishResult?: MqttPublishResult;
   shellResult?: ShellResult;
+  rpcResult?: RpcNotebookResult;
   updateJSONCellValues?: JSONCellValues[];
   [key: string]: any;
 };

@@ -10,6 +10,8 @@ import {
   notebooks,
 } from "vscode";
 import {
+  CELL_SELECT_RPC_METHOD,
+  CELL_SHOW_RPC_INVOKE_SETTINGS,
   CELL_MARK_CELL_AS_MQTT,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
   CELL_MARK_CELL_AS_SKIP,
@@ -43,6 +45,7 @@ import {
 } from "../utilities/notebookUtil";
 import { StateStorage } from "../utilities/StateStorage";
 import { setupDbResource } from "./intellisense";
+import { getRpcCellMetadata, isRpcCell, rpcCallKindLabels } from "./rpcCell";
 
 export class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
@@ -173,6 +176,40 @@ export class ConnectionSettingProvider implements NotebookCellStatusBarItemProvi
     const item = new NotebookCellStatusBarItem(tooltip, NotebookCellStatusBarAlignment.Left);
     item.command = CELL_SPECIFY_CONNECTION_TO_USE;
     item.tooltip = tooltip;
+    return item;
+  }
+}
+
+export class RpcMethodProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isRpcCell(cell)) {
+      return undefined;
+    }
+    const { rpc } = getRpcCellMetadata(cell);
+    const name = rpc.service && rpc.method
+      ? `${rpc.service.split(".").at(-1)}/${rpc.method}`
+      : "Select RPC method";
+    const item = new NotebookCellStatusBarItem(
+      `$(symbol-method) ${name}${rpc.callKind ? ` · ${rpcCallKindLabels[rpc.callKind]}` : ""}`,
+      NotebookCellStatusBarAlignment.Left
+    );
+    item.command = CELL_SELECT_RPC_METHOD;
+    item.tooltip = rpc.path ?? "Select an RPC method";
+    return item;
+  }
+}
+
+export class RpcInvokeSettingsProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isRpcCell(cell)) {
+      return undefined;
+    }
+    const item = new NotebookCellStatusBarItem(
+      "$(settings-gear) Edit metadata / Show descriptor",
+      NotebookCellStatusBarAlignment.Left
+    );
+    item.command = CELL_SHOW_RPC_INVOKE_SETTINGS;
+    item.tooltip = "RPC Cell Invoke Settings";
     return item;
   }
 }
@@ -481,6 +518,9 @@ export function registerNotebookStatusBarProviders(
       new ConnectionSettingProvider(stateStorage)
     )
   );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RpcMethodProvider())
+  );
 
   context.subscriptions.push(
     notebooks.registerNotebookCellStatusBarItemProvider(
@@ -526,6 +566,10 @@ export function registerNotebookStatusBarProviders(
       NOTEBOOK_TYPE,
       new CellMetadataProvider(stateStorage)
     )
+  );
+
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RpcInvokeSettingsProvider())
   );
 
   context.subscriptions.push(

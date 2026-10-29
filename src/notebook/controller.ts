@@ -59,6 +59,8 @@ import { RedisKernel } from "./RedisKernel";
 import { ShellKernel } from "./ShellKernel";
 import { SqlKernel } from "./sqlKernel";
 import { registerNotebookStatusBarProviders } from "./statusBarProviders";
+import { isRpcCell, RPC_CELL_LANGUAGE } from "./rpcCell";
+import type { RpcCellService } from "./RpcCellService";
 
 const PREFIX = "[notebook/Controller]";
 
@@ -84,6 +86,7 @@ export class MainController {
     "javascript",
     "typescript",
     "json",
+    RPC_CELL_LANGUAGE,
     "cwql",
     "memcached",
     "redis",
@@ -97,7 +100,11 @@ export class MainController {
   private readonly noteVariables = new Map<string, { [key: string]: any }>();
   private sqlMode: SQLMode | undefined = undefined;
 
-  constructor(private context: ExtensionContext, private stateStorage: StateStorage) {
+  constructor(
+    private context: ExtensionContext,
+    private stateStorage: StateStorage,
+    private rpcCellService?: RpcCellService
+  ) {
     this._controller = notebooks.createNotebookController(
       this.controllerId,
       this.notebookType,
@@ -199,6 +206,7 @@ export class MainController {
 
   private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
     window.setStatusBarMessage("Interrupted", 3000);
+    this.rpcCellService?.cancelNotebook(notebook.uri.toString());
 
     // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
@@ -329,8 +337,29 @@ export class MainController {
     cell: NotebookCell,
     noteSession: NoteSession
   ): Promise<void> {
-    const execution = this._controller.createNotebookCellExecution(cell);
     noteSession.executionOrder++;
+
+    if (isRpcCell(cell)) {
+      const execution = this._controller.createNotebookCellExecution(cell);
+      execution.executionOrder = noteSession.executionOrder;
+      execution.start(Date.now());
+      let success = false;
+      try {
+        if (!this.rpcCellService) {
+          throw new Error("RPC notebook service is unavailable.");
+        }
+        success = await this.rpcCellService.execute(cell, execution);
+      } catch (error) {
+        await execution.replaceOutput([
+          new NotebookCellOutput([NotebookCellOutputItem.error(error as Error)]),
+        ]);
+      } finally {
+        execution.end(success, Date.now());
+      }
+      return;
+    }
+
+    const execution = this._controller.createNotebookCellExecution(cell);
     execution.executionOrder = noteSession.executionOrder;
     execution.start(Date.now());
 

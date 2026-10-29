@@ -57,6 +57,7 @@ export const SHOW_SCAN_PANEL = `${EXTENSION_NAME}.show-scan-panel`;
 export const SHOW_DYNAMO_QUERY_PANEL = `${EXTENSION_NAME}.show-dynamo-query-panel`;
 export const COPY_AWS_SECRET_VALUE = `${EXTENSION_NAME}.copy-aws-secret-value`;
 export const SHOW_PUBLISH_EDITOR_PANEL = `${EXTENSION_NAME}.show-publish-editor-panel`;
+export const SHOW_RPC_INVOKE_PANEL = `${EXTENSION_NAME}.show-rpc-invoke-panel`;
 export const SHOW_METADATA_RDH = `${EXTENSION_NAME}.show-metadata-rdh`;
 export const SHOW_RESOURCE_PROPERTIES = `${EXTENSION_NAME}.show-resource-properties`;
 export const CREATE_ER_DIAGRAM = `${EXTENSION_NAME}.create-er-diagram`;
@@ -79,6 +80,7 @@ export const COPY_COLUMN_NAMES = `${EXTENSION_NAME}.copy-column-names`;
 export const QUERY_HISTORY_LABEL_MAX_LENGTH = 70;
 export const REFRESH_QUERY_HISTORIES = `${EXTENSION_NAME}.refresh-query-histories`;
 export const DELETE_ALL_QUERY_HISTORY = `${EXTENSION_NAME}.delete-all-query-histories`;
+export const DELETE_ALL_HISTORIES = `${EXTENSION_NAME}.delete-all-histories`;
 export const EXECUTE_QUERY_HISTORY = `${EXTENSION_NAME}.histories.execute`;
 export const OPEN_DYNAMO_QUERY_PANEL_FROM_HISTORY = `${EXTENSION_NAME}.histories.openDynamoQueryPanel`;
 export const START_PERFORMANCE_TUNING_FROM_HISTORY = `${EXTENSION_NAME}.histories.startPerformanceTuning`;
@@ -92,6 +94,13 @@ export const FOCUS_QUERY_HISTORIES_FILTER = `${EXTENSION_NAME}.histories.focusFi
 export const SORT_QUERY_HISTORIES_BY_DURATION = `${EXTENSION_NAME}.histories.sortByDuration`;
 export const SORT_QUERY_HISTORIES_BY_RECENT = `${EXTENSION_NAME}.histories.sortByRecent`;
 export const HISTORY_VIEW_ID = `${EXTENSION_NAME}-histories`;
+export const REFRESH_RPC_HISTORIES = `${EXTENSION_NAME}.refresh-rpc-histories`;
+export const DELETE_RPC_HISTORY = `${EXTENSION_NAME}.rpc-histories.delete`;
+export const DELETE_ALL_RPC_HISTORY = `${EXTENSION_NAME}.delete-all-rpc-histories`;
+export const OPEN_RPC_HISTORY_IN_INVOKE_PANEL = `${EXTENSION_NAME}.rpc-histories.openInInvokePanel`;
+export const OPEN_RPC_HISTORY_AS_NOTEBOOK = `${EXTENSION_NAME}.rpc-histories.openAsNotebook`;
+export const APPEND_RPC_HISTORY_TO_ACTIVE_NOTEBOOK = `${EXTENSION_NAME}.rpc-histories.appendToActiveNotebook`;
+export const EXECUTE_RPC_HISTORY = `${EXTENSION_NAME}.rpc-histories.execute`;
 
 //---------------------------------------------------
 // OPEN VIEWERS
@@ -121,6 +130,10 @@ export const SHOW_GETTING_STARTED = `${EXTENSION_NAME}.show-getting-started`;
 // NOTE BOOK
 //---------------------------------------------------
 export const CREATE_NEW_NOTEBOOK = `${EXTENSION_NAME}.create-blank-notebook`;
+export const ADD_RPC_NOTEBOOK_CELL = `${EXTENSION_NAME}.add-rpc-notebook-cell`;
+export const ADD_RPC_NOTEBOOK_CELL_FROM_RESOURCE = `${EXTENSION_NAME}.add-rpc-notebook-cell-from-resource`;
+export const CELL_SELECT_RPC_METHOD = `${EXTENSION_NAME}.cell.select-rpc-method`;
+export const CELL_SHOW_RPC_INVOKE_SETTINGS = `${EXTENSION_NAME}.cell.show-rpc-invoke-settings`;
 export const CREATE_NOTEBOOK_FROM_SQL = `${EXTENSION_NAME}.create-dbn-from-sql`;
 export const CREATE_SQLITE_DEMO = `${EXTENSION_NAME}.create-sqlite-demo`;
 export const RESET_SQLITE_DEMO = `${EXTENSION_NAME}.reset-sqlite-demo`;

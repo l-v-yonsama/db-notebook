@@ -37,6 +37,7 @@ import { setNodeAxiosCompletionItems } from "./intellisenses/nodeAxios";
 import { setNodeDriverResolverCompletionItems } from "./intellisenses/nodeDriverResolver";
 import { setNodeVariablesCompletionItems } from "./intellisenses/nodeVariables";
 import { setSqlStatementCompletionItems } from "./intellisenses/sqlStatements";
+import { registerRpcJsonCompletion, registerRpcJsonDiagnostics } from "./intellisenses/rpcJson";
 import {
   createJsHoverProvider,
   createJsSignatureHelpProvider,
@@ -92,6 +93,8 @@ export function activateIntellisense(context: ExtensionContext, stateStorage: St
   context.subscriptions.push(createJsSignatureHelpProvider());
   context.subscriptions.push(createSQLIntellisense());
   context.subscriptions.push(createCloudwatchQueryIntellisense());
+  context.subscriptions.push(registerRpcJsonCompletion(stateStorage));
+  registerRpcJsonDiagnostics(context);
   context.subscriptions.push(registerMemcachedCompletionProvider());
   setActivateDecorator(context);
   log(`${PREFIX} end activateIntellisense`);

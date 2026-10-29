@@ -13,11 +13,13 @@ import {
   DbSsmParameter,
   DbSubscription,
   DbTable,
+  DBType,
   isRDSType,
   MqttDatabase,
   RDSBaseDriver,
   RdsDatabase,
   RedisDriver,
+  RpcMethod,
   ResourceType,
   SchemaAndTableName,
   createColumnNames,
@@ -25,6 +27,8 @@ import {
   createFullSchemaERDiagramParams,
   createSimpleERDiagramParams,
   resolveLastOrderByColumn,
+  buildRpcRequestTemplate,
+  getRpcCallKind,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import {
   ExtensionContext,
@@ -36,6 +40,8 @@ import {
   window
 } from "vscode";
 import {
+  ADD_RPC_NOTEBOOK_CELL,
+  ADD_RPC_NOTEBOOK_CELL_FROM_RESOURCE,
   ADD_SUBSCRIPTION,
   CLEAR_DEFAULT_CON_FOR_SQL_CELL,
   CONNECT,
@@ -79,6 +85,7 @@ import {
   SHOW_RDB_DASHBOARD,
   SHOW_DYNAMO_QUERY_PANEL,
   SHOW_PUBLISH_EDITOR_PANEL,
+  SHOW_RPC_INVOKE_PANEL,
   SHOW_QUERY_STATISTICS,
   SHOW_RESOURCE_PROPERTIES,
   SHOW_RESOURCE_FAVORITES,
@@ -102,6 +109,8 @@ import { DBRestoreSettingsPanel } from "../../panels/DBRestoreSettingsPanel";
 import { DynamoQueryPanel } from "../../panels/DynamoQueryPanel";
 import { ERDiagramSettingsPanel } from "../../panels/ERDiagramSettingsPanel";
 import { PublishEditorPanel } from "../../panels/PublishEditorPanel";
+import { RpcInvokePanel } from "../../panels/RpcInvokePanel";
+import { rpcRequestTemplateBody } from "../../notebook/rpcCell";
 import { ScanPanel } from "../../panels/ScanPanel";
 import { SubscriptionSettingPanel } from "../../panels/SubscriptionSettingPanel";
 import { ViewConditionPanel } from "../../panels/ViewConditionPanel";
@@ -210,6 +219,47 @@ const registerConnectionSettingCommand = (params: ResourceTreeParams) => {
 
 const registerDbResourceCommand = (params: ResourceTreeParams) => {
   const { context, stateStorage, dbResourceTree, dbResourceTreeView } = params;
+
+  context.subscriptions.push(commands.registerCommand(SHOW_RPC_INVOKE_PANEL, async (method: RpcMethod) => {
+    if (!(method instanceof RpcMethod)) {
+      return;
+    }
+    const current = dbResourceTree.getLoadedRpcMethodContext(method);
+    if (!current) {
+      await window.showInformationMessage("The RPC schema has changed. Reload the tree and select the method again.");
+      return;
+    }
+    RpcInvokePanel.render(
+      context.extensionUri,
+      stateStorage,
+      dbResourceTree,
+      method,
+      current.service,
+      current.connection.name
+    );
+  }));
+  context.subscriptions.push(commands.registerCommand(
+    ADD_RPC_NOTEBOOK_CELL_FROM_RESOURCE,
+    async (method: RpcMethod) => {
+      if (!(method instanceof RpcMethod)) {
+        return;
+      }
+      const current = dbResourceTree.getLoadedRpcMethodContext(method);
+      if (!current) {
+        await window.showInformationMessage("The RPC schema has changed. Reload the tree and select the method again.");
+        return;
+      }
+      const template = buildRpcRequestTemplate(method, current.database.messageDefinitions);
+      await commands.executeCommand(ADD_RPC_NOTEBOOK_CELL, {
+        connectionName: current.connection.name,
+        service: current.service.fullName,
+        method: method.name,
+        path: method.path,
+        callKind: getRpcCallKind(method),
+        dataJson: rpcRequestTemplateBody(template.data, method.requestStream),
+      });
+    }
+  ));
 
   const favoriteFromMatch = (match: LoadedResourceMatch, connectionId: string): ResourceFavorite => ({
     connectionId,
@@ -439,6 +489,10 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   });
 
   commands.registerCommand(OPEN_DB_NOTEBOOK, async (conRes: DbConnection) => {
+    if (conRes.dbType === DBType.RPC) {
+      await window.showInformationMessage("RPC methods cannot run in SQL notebook cells.");
+      return;
+    }
     const cell = new NotebookCellData(NotebookCellKind.Code, "", "sql");
     const metadata: CellMeta = {
       connectionName: conRes.name,
@@ -623,6 +677,10 @@ const registerDbResourceCommand = (params: ResourceTreeParams) => {
   );
 
   commands.registerCommand(SPECIFY_DEFAULT_CON_FOR_SQL_CELL, async (conRes: DbConnection) => {
+    if (conRes.dbType === DBType.RPC) {
+      await window.showInformationMessage("RPC connections cannot be the default for SQL cells.");
+      return;
+    }
     stateStorage.setDefaultConnectionName(conRes.name);
     dbResourceTree.changeConnectionTreeData(conRes);
   });

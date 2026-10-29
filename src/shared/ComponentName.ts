@@ -18,6 +18,8 @@ export type ComponentName =
   | "LogParseResultView"
   | "ViewConditionPanel"
   | "PublishEditorPanel"
+  | "RpcInvokePanel"
+  | "RpcCellInvokeSettingsPanel"
   | "WriteHttpEventToClipboardParamsPanel"
   | "DBFormView"
   | "ERDiagramSettingsPanel"

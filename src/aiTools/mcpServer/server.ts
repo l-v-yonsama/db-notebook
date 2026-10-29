@@ -17,6 +17,7 @@ import {
 } from "./singleton";
 import { registerTools } from "./tools";
 import { StateStorage } from "../../utilities/StateStorage";
+import { RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
 
 const PREFIX = "[mcpServer/server]";
 
@@ -35,7 +36,8 @@ export type McpServerHandle = {
 
 export async function startMcpServer(
   context: ExtensionContext,
-  stateStorage: StateStorage
+  stateStorage: StateStorage,
+  rpcHistoryStore: RpcInvokeHistoryStore
 ): Promise<McpServerHandle> {
   const detection = await acquireOrDetect(context);
   if (!detection.shouldStart) {
@@ -52,12 +54,14 @@ export async function startMcpServer(
 
     let port = 0;
     const server = http.createServer((req, res) => {
-      handleRequest(req, res, token, stateStorage, version, port).catch((e: unknown) => {
-        logError(`${PREFIX} unhandled error: ${getErrorMessage(e)}`);
-        if (!res.headersSent) {
-          res.writeHead(500).end();
+      handleRequest(req, res, token, stateStorage, rpcHistoryStore, version, port).catch(
+        (e: unknown) => {
+          logError(`${PREFIX} unhandled error: ${getErrorMessage(e)}`);
+          if (!res.headersSent) {
+            res.writeHead(500).end();
+          }
         }
-      });
+      );
     });
 
     const config = getMcpServerConfig();
@@ -143,6 +147,7 @@ async function handleRequest(
   res: http.ServerResponse,
   token: string,
   stateStorage: StateStorage,
+  rpcHistoryStore: RpcInvokeHistoryStore,
   version: string,
   port: number
 ): Promise<void> {
@@ -163,7 +168,7 @@ async function handleRequest(
   const server = new McpServer({ name: "database-notebook", version });
   const cancellation = new AbortController();
   req.on("aborted", () => cancellation.abort());
-  registerTools(server, stateStorage, cancellation.signal);
+  registerTools(server, stateStorage, cancellation.signal, rpcHistoryStore);
 
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

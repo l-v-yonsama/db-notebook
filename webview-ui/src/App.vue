@@ -28,7 +28,9 @@ function messageListener(evt: MessageEvent<MessageEventData>) {
     return;
   }
   const { command, componentName, value } = data;
-  console.log("[App.vue] at messageListener ", command, value);
+  if (componentName !== "RpcInvokePanel" && componentName !== "RpcCellInvokeSettingsPanel") {
+    console.log("[App.vue] at messageListener ", command, value);
+  }
 
   if (componentName === currentComponentName.value) {
     activeRef.value?.recieveMessage(data);

@@ -4,7 +4,7 @@
     <p v-if="isShowMode" :id="id">
       {{ showModeValue ? showModeValue : modelValue }}
     </p>
-    <VsCodeTextField v-else :id="id" v-model="inputValue" :placeholder="placeholder" :maxlength="4096"></VsCodeTextField>
+    <VsCodeTextField v-else :id="id" v-model="inputValue" :type="type" :placeholder="placeholder" :maxlength="4096"></VsCodeTextField>
   </div>
 </template>
 
@@ -19,6 +19,7 @@ const props = defineProps<{
   isShowMode: boolean;
   showModeValue?: string;
   id: string;
+  type?: string;
 }>();
 
 const emit = defineEmits<{

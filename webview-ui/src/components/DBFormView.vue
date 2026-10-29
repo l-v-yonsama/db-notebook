@@ -21,7 +21,7 @@ const setConnectionSettingRef = (el: any) => {
 
 const prohibitedNames = ref<string[]>([]);
 const settingItem = ref<ConnectionSetting | undefined>(undefined);
-const resourcePropertiesValues = ref<{ [key: string]: string }>({});
+const resourcePropertiesValues = ref<{ [key: string]: unknown }>({});
 
 const recieveMessage = (data: DBFormEventData) => {
   const { command, value } = data;

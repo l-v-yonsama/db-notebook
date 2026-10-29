@@ -11,7 +11,8 @@ This page shows an example of the use of the VS code extension "Database Noteboo
   - 2.1. [Inserting parent and child records in the same transaction](#21-inserting-parent-and-child-records-in-the-same-transaction)
 - 3. [Multi-language flow: SQL → JavaScript → Markdown](#3-multi-language-flow-sql--javascript--markdown)
 - 4. [DynamoDB Query Result](#4-dynamodb-query-result)
-  - 4.1. [DynamoDB Query Panel: Projection, consistent read, and Query History](#41-dynamodb-query-panel-projection-consistent-read-and-query-history)
+  - 4.1. [DynamoDB Query Panel: Projection, consistent read, and Histories](#41-dynamodb-query-panel-projection-consistent-read-and-histories)
+- 5. [RPC requests](#5-rpc-requests)
 
 ## 1. Query examples
 
@@ -250,7 +251,7 @@ A few things about this line are easy to misread:
   Notebook today, so this is a signal to add/raise a `LIMIT` or narrow the key condition rather than
   an indication anything went wrong.
 
-### 4.1. DynamoDB Query Panel: Projection, consistent read, and Query History
+### 4.1. DynamoDB Query Panel: Projection, consistent read, and Histories
 
 Open the DynamoDB Query Panel from a table's resource-tree context menu. Beyond the target
 (table/LSI/GSI), partition/sort key, sort direction, and filter expressions already covered above,
@@ -272,15 +273,15 @@ it also has:
   request; this caps the items kept in the combined result, not a single request's own `Limit`
   parameter or how many items DynamoDB evaluates across every request it makes.
 - **Build** — switches the Preview between the default native Query input and a standalone PartiQL
-  `SELECT`. `Execute` intentionally remains a native Query in either mode so its Query History result
+  `SELECT`. `Execute` intentionally remains a native Query in either mode so its Histories result
   retains DynamoDB `Count`/`ScannedCount`. In PartiQL mode, **Open in Notebook** can add the generated
   statement to a new or active Notebook; the action is disabled in Native Query mode. Read
   consistency is an API option rather than PartiQL statement text, so that one option is not carried
   into the generated SQL cell.
 
-Every execution — successful or failed — is saved to **Query History** automatically, labeled with an
+Every execution — successful or failed — is saved to **Histories** automatically, labeled with an
 item count instead of a row count and no attached SQL (there is nothing equivalent to run as a SQL
-cell). Native Query history therefore does not show the generic Query History Notebook actions; use
+cell). Native Query history therefore does not show the generic query-history Notebook actions; use
 **Open in DynamoDB Query Panel** to inspect or edit it instead. Re-running the same
 table/index/key-condition/filter/Projection/consistency
 structure with different partition/sort key values merges into that one history entry — the newest
@@ -288,8 +289,22 @@ values are kept for `Execute`, but never shown in the entry's label, tooltip, or
 Tuning** preview (see [Performance Tuning Guide](performanceTuning.md#8-dynamodb)). A failed re-run
 never overwrites the prior successful result; only its error is recorded alongside it.
 
-For a native Query entry created by this panel, choose **Open in DynamoDB Query Panel** from SQL
-History (or use its edit icon). The panel restores the recorded table/LSI/GSI target, maximum item
+For a native Query entry created by this panel, choose **Open in DynamoDB Query Panel** from
+**Histories** (or use its edit icon). The panel restores the recorded table/LSI/GSI target, maximum item
 count, partition and sort-key conditions, sort direction, filters, Projection, and consistent-read
 choice. The restored values can be edited and executed as a new Query; if the recorded table or
 index no longer exists, the panel reports that mismatch instead of silently switching targets.
+
+## 5. RPC requests
+
+Add an RPC connection in DB Explorer, then open a method in the **Invoke RPC** panel or add an
+**RPC JSON** (`rpc-json`) cell to a `.dbn` notebook. RPC cells can sit alongside SQL cells, so one
+notebook can record a workflow that uses both queries and RPC calls. Unary and server streaming
+cells contain one ProtoJSON object; client and bidirectional streaming cells contain an array of
+request objects. The cell status bar selects the connection and method, while **Edit metadata / Show
+descriptor** opens request Metadata and the method definition.
+
+The panel and notebook results can be exported as HTML. RPC calls also appear alongside queries in
+the **Histories** view. See the [RPC usage guide](./databaseNotebookRPC.md) for connection setup,
+request examples, streaming controls, history actions, and export details
+([日本語](./databaseNotebookRPC.ja.md)).

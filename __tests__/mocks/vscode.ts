@@ -171,6 +171,9 @@ export const env = {
 };
 
 export const workspace = {
+  onDidChangeTextDocument: vi.fn((_listener: (e: unknown) => void) => ({
+    dispose: () => {},
+  })),
   onDidCloseNotebookDocument: vi.fn((_listener: (e: unknown) => void) => ({
     dispose: () => {},
   })),
@@ -263,6 +266,9 @@ export class WorkspaceEdit {
   get(uri: { toString(): string }) {
     return this.edits.get(uri.toString()) ?? [];
   }
+  replace(uri: { toString(): string }, range: unknown, newText: string) {
+    this.edits.set(uri.toString(), [{ range, newText }]);
+  }
 }
 
 export class NotebookEdit {
@@ -290,6 +296,10 @@ export class CancellationTokenSource {
 
 export class NotebookCellOutputItem {
   private constructor(public mime: string, public data: unknown) {}
+
+  static json(value: unknown, mime = "application/json") {
+    return new NotebookCellOutputItem(mime, value);
+  }
 
   static text(value: string, mime = "text/plain") {
     return new NotebookCellOutputItem(mime, value);
@@ -332,6 +342,10 @@ const makeNotebookCellExecution = (_cell: unknown) => ({
 });
 
 export const notebooks = {
+  createRendererMessaging: vi.fn((_id: string) => ({
+    onDidReceiveMessage: vi.fn((_listener: (e: unknown) => void) => ({ dispose: () => {} })),
+    postMessage: vi.fn(async (_message: unknown, _editor?: unknown) => false),
+  })),
   createNotebookController: vi.fn((_id: string, _type: string, _label: string) => ({
     supportedLanguages: [] as string[],
     supportsExecutionOrder: false,

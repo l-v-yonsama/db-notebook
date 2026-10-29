@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import VsCodeButton from "../base/VsCodeButton.vue";
 type Props = {
-  values: { [key: string]: string };
+  values: { [key: string]: unknown };
 };
 
 const props = defineProps<Props>();
-const list = Object.entries(props.values).map(([k, v]) => ({
-  k,
-  v,
-}));
+const list = Object.entries(props.values)
+  .filter(([, v]) => v !== undefined)
+  .map(([k, v]) => ({
+    k,
+    v: v === null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v),
+  }));
 
 const abbr = (s: string, len: number) => {
   const slen = s.length;

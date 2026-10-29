@@ -1,13 +1,20 @@
 import { NotebookCellData, NotebookCellKind } from "vscode";
+import {
+  getRpcCallKind,
+  parseRpcRequestMetadata,
+} from "@l-v-yonsama/multi-platform-database-drivers";
 import { CellMeta } from "../../types/Notebook";
 import { StateStorage } from "../../utilities/StateStorage";
+import { makeRpcCellData, RPC_CELL_LANGUAGE } from "../../notebook/rpcCell";
 import { resolveMcpEnabledConnection } from "./mcpAccessControl";
+import { resolveRpcMethod } from "./rpcMethodResolver";
 
 const CODE_LANGUAGES = [
   "sql",
   "javascript",
   "typescript",
   "json",
+  RPC_CELL_LANGUAGE,
   "cwql",
   "memcached",
   "redis",
@@ -22,6 +29,7 @@ const CONNECTION_REQUIRED_LANGUAGES: ReadonlySet<string> = new Set([
   "cwql",
   "memcached",
   "redis",
+  RPC_CELL_LANGUAGE,
 ]);
 
 export type CellMetadataInput = {
@@ -32,6 +40,7 @@ export type CellMetadataInput = {
   logGroupStartTimeOffset?: "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "12h" | "1d" | "1w";
   sharedVariableName?: string;
   publishParams?: { topicName: string; qos: 0 | 1 | 2; retain: boolean };
+  rpc?: { service: string; method: string; metadata?: Record<string, string | string[]> };
 };
 
 export type CellInput = {
@@ -55,7 +64,9 @@ function cellNeedsConnection(input: CellInput): boolean {
   if (input.language && CONNECTION_REQUIRED_LANGUAGES.has(input.language)) {
     return true;
   }
-  return (input.language === "json" || input.language === "plaintext") && !!input.metadata?.publishParams;
+  return (
+    (input.language === "json" || input.language === "plaintext") && !!input.metadata?.publishParams
+  );
 }
 
 /**
@@ -95,11 +106,25 @@ export async function buildNotebookCells(
       if (!cell.language || !CODE_LANGUAGES.includes(cell.language as CodeLanguage)) {
         return {
           ok: false,
-          message: `${label}: language must be one of ${CODE_LANGUAGES.join(", ")} for a code cell.`,
+          message: `${label}: language must be one of ${CODE_LANGUAGES.join(
+            ", "
+          )} for a code cell.`,
         };
       }
       if (cell.language === "cwql" && !cell.metadata?.logGroupName) {
         return { ok: false, message: `${label}: cwql cells require metadata.logGroupName.` };
+      }
+      if (
+        cell.language === RPC_CELL_LANGUAGE &&
+        (!cell.metadata?.rpc?.service || !cell.metadata.rpc.method)
+      ) {
+        return {
+          ok: false,
+          message: `${label}: rpc-json cells require metadata.rpc.service and metadata.rpc.method.`,
+        };
+      }
+      if (cell.language !== RPC_CELL_LANGUAGE && cell.metadata?.rpc) {
+        return { ok: false, message: `${label}: metadata.rpc is only valid for rpc-json cells.` };
       }
     }
 
@@ -128,9 +153,60 @@ export async function buildNotebookCells(
     }
   }
 
-  const built = cells.map((cell) => {
+  const built: NotebookCellData[] = [];
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
     if (cell.kind === "markup") {
-      return new NotebookCellData(NotebookCellKind.Markup, cell.value, "markdown");
+      built.push(new NotebookCellData(NotebookCellKind.Markup, cell.value, "markdown"));
+      continue;
+    }
+
+    if (cell.language === RPC_CELL_LANGUAGE) {
+      try {
+        const name = cell.metadata?.connectionName ?? defaultConnectionName!;
+        const rpc = cell.metadata!.rpc!;
+        const { service, method } = await resolveRpcMethod(
+          stateStorage,
+          name,
+          rpc.service,
+          rpc.method
+        );
+        const value: unknown = JSON.parse(cell.value);
+        const isObject = (item: unknown): item is Record<string, unknown> =>
+          item !== null && typeof item === "object" && !Array.isArray(item);
+        if (
+          method.requestStream ? !Array.isArray(value) || !value.every(isObject) : !isObject(value)
+        ) {
+          return {
+            ok: false,
+            message: `Cell ${i + 1}: ${
+              method.requestStream
+                ? "client/bidi streaming requires a JSON array of request objects"
+                : "unary/server streaming requires a JSON request object"
+            }.`,
+          };
+        }
+        const metadata = parseRpcRequestMetadata(rpc.metadata);
+        const data = makeRpcCellData({
+          connectionName: name,
+          service: service.fullName,
+          method: method.name,
+          path: method.path,
+          callKind: getRpcCallKind(method),
+          dataJson: cell.value,
+          metadataJson: JSON.stringify(metadata),
+        });
+        if (cell.metadata?.markAsSkip !== undefined) {
+          data.metadata = { ...data.metadata, markAsSkip: cell.metadata.markAsSkip };
+        }
+        built.push(data);
+      } catch (error) {
+        return {
+          ok: false,
+          message: `Cell ${i + 1}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+      continue;
     }
 
     const data = new NotebookCellData(NotebookCellKind.Code, cell.value, cell.language!);
@@ -141,8 +217,8 @@ export async function buildNotebookCells(
     if (Object.keys(metadata).length > 0) {
       data.metadata = metadata;
     }
-    return data;
-  });
+    built.push(data);
+  }
 
   return { ok: true, cells: built };
 }

@@ -4,12 +4,13 @@
 
 ![logo](./media/logo128.png)
 
-Database Notebook は、SQL・JavaScript/TypeScript・Markdown・実行結果を一つのNotebookファイルにまとめる VS Code 拡張機能です。DB・ログ・クラウドリソースを横断した場当たり的な調査を、保存・共有・再実行できる形に残せます。
+Database Notebook は、SQL・RPC リクエスト・JavaScript/TypeScript・Markdown・実行結果を一つのNotebookファイルにまとめる VS Code 拡張機能です。DB・ログ・クラウドリソースを横断した場当たり的な調査を、保存・共有・再実行できる形に残せます。
 
 ## 何に役立つか
 
 - **DB・ログ・クラウドリソースを横断した障害調査** — 本番/ステージング環境のDB、CloudWatchログ、AWSリソース(S3, SQS, DynamoDB, Secrets Manager, SSM)を同じNotebookから調査できます。調査全体が一つの再利用可能なファイルにまとまります。
 - **SQL・JavaScript・Markdown・実行結果を一つのファイルで管理** — SQL・JavaScript/TypeScript・シェル・Markdownセルを混在させ、セル間で変数を共有できます。結果はHTMLまたはExcelとして出力可能です。詳細は [Database Notebook file examples](/docs/examples/databaseNotebook.md) を参照してください。
+- **gRPC をパネルまたはノートブックから呼び出す** — サービス定義を確認し、unary・ストリーミングのメソッドを実行できます。リクエストは RPC JSON セルに保存でき、結果は HTML に出力できます。詳細は [RPC 利用ガイド](/docs/examples/databaseNotebookRPC.ja.md) を参照してください。
 - **遅いSQLの診断と改善（Experimental / 実験的機能）** — 実行計画、テーブル統計、インデックス、物理状態のシグナルをまとめて収集し、ボトルネック調査の根拠として利用できます。詳細は [Performance Tuning Guide](/docs/examples/performanceTuning.md) を参照してください。
 - **保存済み接続を GitHub Copilot Chat / MCP クライアントから利用** — DB Explorerで設定した接続を、Copilot Chat(Agent mode)のAIツールとして、また外部のMCPクライアント(Claude Code, Claude Desktop, Cursor, ...)向けのスタンドアロンMCPサーバー経由でも利用できます。詳細は [AI Tools Usage Guide](/docs/examples/lmToolsUsageGuide.md) を参照してください。
 
@@ -26,7 +27,7 @@ Database Notebook は、SQL・JavaScript/TypeScript・Markdown・実行結果を
 
 ## 対応データベース・リソース
 
-MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT
+MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, Auth0, MQTT, gRPC
 
 ## 詳細機能
 
@@ -47,7 +48,7 @@ MySQL, PostgreSQL, SQL Server, SQLite, Oracle, Redis, Memcached, AWS, Keycloak, 
   - クエリ実行(デフォルト)
   - EXPLAINプラン実行(クエリプランを生成)
   - EXPLAIN ANALYZE実行(実際の実行時間と統計情報を表示)
-- クエリ履歴管理
+- クエリ・RPC の履歴をまとめた Histories ビュー
 - Notebookセル間の変数共有
   - 共有変数を使った実践的なSQLの例(LIKE, IN, 完全一致): [Variable sharing – LIKE and IN examples](/docs/examples/databaseNotebookVariableSharing.md)
 - ER図を[mermaid形式](https://mermaid.js.org/syntax/entityRelationshipDiagram.html)、または編集可能なdraw.io形式で生成
@@ -204,6 +205,7 @@ SQL Log Comparison機能は、2つのログから抽出したSQLを比較し、�
 ## リファレンス・サンプル
 
 - [Database Notebook file examples](/docs/examples/databaseNotebook.md)
+- [RPC 利用ガイド](/docs/examples/databaseNotebookRPC.ja.md)
 - [Database Notebook file chart examples](/docs/examples/databaseNotebookChart.md)
 - [Database Notebook file Javascript cell examples](/docs/examples/databaseNotebookJs.md)
 - [Database Notebook file MQTT examples](/docs/examples/databaseNotebookMQTT.md)

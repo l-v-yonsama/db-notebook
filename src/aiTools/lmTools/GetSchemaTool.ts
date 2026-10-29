@@ -34,6 +34,9 @@ export type GetSchemaToolInput = {
   resourceName?: string;
   // Keycloak connections only.
   realmName?: string;
+  // RPC connections only.
+  serviceName?: string;
+  methodName?: string;
 };
 
 type SchemaFetchResult = {
@@ -50,8 +53,16 @@ export class GetSchemaTool implements LanguageModelTool<GetSchemaToolInput> {
     options: LanguageModelToolInvocationOptions<GetSchemaToolInput>,
     token: CancellationToken
   ): Promise<LanguageModelToolResult> {
-    const { connectionName, schemaName, tableName, serviceType, resourceName, realmName } =
-      options.input;
+    const {
+      connectionName,
+      schemaName,
+      tableName,
+      serviceType,
+      resourceName,
+      realmName,
+      serviceName,
+      methodName,
+    } = options.input;
     const text = await trackInvocation("lmTools", "GetSchemaTool", options.input, () =>
       getSchemaText(
         this.stateStorage,
@@ -62,6 +73,8 @@ export class GetSchemaTool implements LanguageModelTool<GetSchemaToolInput> {
           serviceType,
           resourceName,
           realmName,
+          serviceName,
+          methodName,
         },
         { source: "lmTool", cancellation: token }
       )
@@ -83,13 +96,16 @@ export async function getSchemaText(
   filters: GetSchemaFilters,
   options?: AiToolOutputOptions
 ): Promise<string> {
-  const { schemaName, tableName, serviceType, resourceName, realmName } = filters;
+  const { schemaName, tableName, serviceType, resourceName, realmName, serviceName, methodName } =
+    filters;
   log(
     `${PREFIX} invoked connectionName:[${connectionName}] schemaName:[${
       schemaName ?? ""
     }] tableName:[${tableName ?? ""}] serviceType:[${serviceType ?? ""}] resourceName:[${
       resourceName ?? ""
-    }] realmName:[${realmName ?? ""}]`
+    }] realmName:[${realmName ?? ""}] serviceName:[${serviceName ?? ""}] methodName:[${
+      methodName ?? ""
+    }]`
   );
   let text: string;
   try {
@@ -120,6 +136,8 @@ export type GetSchemaFilters = {
   serviceType?: AwsServiceType;
   resourceName?: string;
   realmName?: string;
+  serviceName?: string;
+  methodName?: string;
 };
 
 /**
@@ -131,7 +149,15 @@ export type GetSchemaFilters = {
 export async function getSchemaInfo(
   stateStorage: StateStorage,
   connectionName: string,
-  { schemaName, tableName, serviceType, resourceName, realmName }: GetSchemaFilters
+  {
+    schemaName,
+    tableName,
+    serviceType,
+    resourceName,
+    realmName,
+    serviceName,
+    methodName,
+  }: GetSchemaFilters
 ): Promise<SchemaFetchResult> {
   const resolution = await resolveMcpEnabledConnection(stateStorage, connectionName);
   if (!resolution.ok) {
@@ -157,6 +183,8 @@ export async function getSchemaInfo(
         resourceName,
         serviceType,
         realmName,
+        serviceName,
+        methodName,
       });
       if (text) {
         return { ok: true, message: "", schemaText: text };
@@ -177,6 +205,8 @@ export async function getSchemaInfo(
         resourceName,
         serviceType,
         realmName,
+        serviceName,
+        methodName,
       });
       return text ?? "";
     },
@@ -195,6 +225,8 @@ export async function getSchemaInfo(
         resourceName,
         serviceType,
         realmName,
+        serviceName,
+        methodName,
       }),
     };
   }
@@ -204,7 +236,15 @@ export async function getSchemaInfo(
 function buildNotFoundMessage(
   stateStorage: StateStorage,
   connectionName: string,
-  { schemaName, tableName, resourceName, serviceType, realmName }: GetSchemaFilters
+  {
+    schemaName,
+    tableName,
+    resourceName,
+    serviceType,
+    realmName,
+    serviceName,
+    methodName,
+  }: GetSchemaFilters
 ): string {
   const dbType = stateStorage.getDBTypeByConnectionName(connectionName);
 
@@ -234,6 +274,18 @@ function buildNotFoundMessage(
     return realmName
       ? `No realm named "${realmName}" was found on connection "${connectionName}".`
       : `No realms were found on connection "${connectionName}".`;
+  }
+
+  if (dbType === DBType.RPC) {
+    const target = [
+      serviceName && `service "${serviceName}"`,
+      methodName && `method "${methodName}"`,
+    ]
+      .filter(Boolean)
+      .join(" and ");
+    return `No RPC method was found on connection "${connectionName}"${
+      target ? ` for ${target}` : ""
+    }.`;
   }
 
   return `No schema/resource information was found for connection "${connectionName}"${

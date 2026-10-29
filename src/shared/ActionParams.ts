@@ -12,6 +12,11 @@ import type { ModeType } from "./ModeType";
 import type { QueryStatisticsSearchParams } from "./QueryStatisticsParams";
 import type { SaveValuesInRdhParams } from "./SaveValuesInRdhParams";
 import type { AiMaskingLevel, AiPayloadFindingResolution } from "./AiDataMasking";
+import type {
+  RpcInvokeRequest,
+  RpcStreamAction,
+  RpcStreamSendAction,
+} from "./RpcInvokePanelParams";
 
 export type TabIdParam = {
   tabId: string;
@@ -68,6 +73,7 @@ export type ActionCommand =
   | DisconnectActionCommand
   | SaveCompareKeysActionCommand
   | SaveNotebookCellMetadataActionCommand
+  | SaveRpcCellMetadataActionCommand
   | OutputActionCommand
   | WriteToClipboardActionCommand
   | WriteHttpEventToClipboardActionCommand
@@ -112,7 +118,20 @@ export type ActionCommand =
   | RunObservedDynamoDbReadActionCommand
   | RunPerformanceTuningBenchmarkActionCommand
   | SelectPerformanceTuningBaselineActionCommand
-  | ClearPerformanceTuningBaselineActionCommand;
+  | ClearPerformanceTuningBaselineActionCommand
+  | InvokeRpcActionCommand
+  | StartRpcStreamActionCommand
+  | SendRpcStreamMessageActionCommand
+  | FinishRpcStreamSendingActionCommand
+  | CancelRpcStreamActionCommand
+  | OutputRpcHtmlActionCommand;
+
+export type InvokeRpcActionCommand = BaseActionCommand<"invokeRpc", RpcInvokeRequest>;
+export type StartRpcStreamActionCommand = BaseActionCommand<"startRpcStream", RpcInvokeRequest>;
+export type SendRpcStreamMessageActionCommand = BaseActionCommand<"sendRpcStreamMessage", RpcStreamSendAction>;
+export type FinishRpcStreamSendingActionCommand = BaseActionCommand<"finishRpcStreamSending", RpcStreamAction>;
+export type CancelRpcStreamActionCommand = BaseActionCommand<"cancelRpcStream", RpcStreamAction>;
+export type OutputRpcHtmlActionCommand = BaseActionCommand<"outputRpcHtml", Record<string, never>>;
 
 export type NameWithComment = {
   name: string;
@@ -385,6 +404,11 @@ export type SaveNotebookCellMetadataActionCommand = BaseActionCommand<
   {
     metadata: CellMeta;
   }
+>;
+
+export type SaveRpcCellMetadataActionCommand = BaseActionCommand<
+  "saveRpcCellMetadata",
+  { metadataJson: string }
 >;
 
 export type CreateUndoChangeSqlActionCommand = BaseActionCommand<"createUndoChangeSql", TabIdParam>;

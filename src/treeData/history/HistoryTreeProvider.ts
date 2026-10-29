@@ -9,40 +9,56 @@ import { averageElapsedTimeMilli } from "../../utilities/queryHistoryUtil";
 import { toDynamoDbQueryAnalysisInput } from "../../performanceTuning/preview/dynamoDbQueryAnalysisInput";
 import { log } from "../../utilities/logger";
 import { QUERY_HISTORY_LABEL_MAX_LENGTH } from "../../constant";
+import { RpcInvokeHistory } from "../../types/RpcInvokeHistory";
+import { RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
+import { RpcHistoryItem } from "./RpcHistoryTreeItem";
 
 const PREFIX = "[HistoryTreeProvider]";
 
-export type QueryHistorySortOrder = "recent" | "duration";
+export type HistorySortOrder = "recent" | "duration";
 
-export class HistoryTreeProvider implements vscode.TreeDataProvider<QueryHistory> {
-  private _onDidChangeTreeData: vscode.EventEmitter<QueryHistory | undefined | void> =
-    new vscode.EventEmitter<QueryHistory | undefined | void>();
-  readonly onDidChangeTreeData: vscode.Event<QueryHistory | undefined | void> =
+export const isQueryHistory = (history: QueryHistory | RpcInvokeHistory): history is QueryHistory =>
+  "sqlDoc" in history;
+
+export class HistoryTreeProvider implements vscode.TreeDataProvider<QueryHistory | RpcInvokeHistory> {
+  private _onDidChangeTreeData: vscode.EventEmitter<QueryHistory | RpcInvokeHistory | undefined | void> =
+    new vscode.EventEmitter<QueryHistory | RpcInvokeHistory | undefined | void>();
+  readonly onDidChangeTreeData: vscode.Event<QueryHistory | RpcInvokeHistory | undefined | void> =
     this._onDidChangeTreeData.event;
   private historyResList: QueryHistory[] = [];
+  private rpcHistoryList: RpcInvokeHistory[] = [];
+  private refreshVersion = 0;
   private filterConnectionName: string | undefined;
-  private sortOrder: QueryHistorySortOrder = "recent";
+  private sortOrder: HistorySortOrder = "recent";
 
   constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly stateStorage: StateStorage
+    context: vscode.ExtensionContext,
+    private readonly stateStorage: StateStorage,
+    private readonly rpcStore: RpcInvokeHistoryStore
   ) {
+    context.subscriptions.push(rpcStore.onDidChange(() => void this.refresh(true)));
     this.init();
   }
-  getTreeItem(element: QueryHistory): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    return new QueryHistoryItem(element);
+  getTreeItem(element: QueryHistory | RpcInvokeHistory): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    return isQueryHistory(element) ? new QueryHistoryItem(element) : new RpcHistoryItem(element);
   }
-  getChildren(element?: QueryHistory | undefined): vscode.ProviderResult<QueryHistory[]> {
+  getChildren(element?: QueryHistory | RpcInvokeHistory): vscode.ProviderResult<Array<QueryHistory | RpcInvokeHistory>> {
     try {
-      let list = this.filterConnectionName
-        ? this.historyResList.filter((it) => it.connectionName === this.filterConnectionName)
-        : [...this.historyResList];
-      if (this.sortOrder === "duration") {
-        list = list.sort(
-          (a, b) =>
-            (b.performance?.lastElapsedTimeMilli ?? 0) - (a.performance?.lastElapsedTimeMilli ?? 0)
-        );
+      if (element) {
+        return [];
       }
+      const list: Array<QueryHistory | RpcInvokeHistory> = [
+        ...this.historyResList,
+        ...this.rpcHistoryList,
+      ].filter((it) => !this.filterConnectionName || it.connectionName === this.filterConnectionName);
+      const duration = (it: QueryHistory | RpcInvokeHistory) => isQueryHistory(it)
+        ? it.performance?.lastElapsedTimeMilli ?? it.summary?.elapsedTimeMilli ?? -1
+        : it.totalElapsedMs;
+      const recent = (it: QueryHistory | RpcInvokeHistory) =>
+        Math.max(it.executedAt ?? 0, it.lastErrorAt ?? 0);
+      list.sort((a, b) => this.sortOrder === "duration"
+        ? duration(b) - duration(a)
+        : recent(b) - recent(a));
       return Promise.resolve(list);
     } catch (e) {
       console.error(PREFIX, e);
@@ -51,7 +67,7 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<QueryHistory
   }
 
   getConnectionNames(): string[] {
-    return [...new Set(this.historyResList.map((it) => it.connectionName))];
+    return [...new Set([...this.historyResList, ...this.rpcHistoryList].map((it) => it.connectionName))];
   }
 
   getConnectionFilter(): string | undefined {
@@ -63,11 +79,11 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<QueryHistory
     this._onDidChangeTreeData.fire();
   }
 
-  getSortOrder(): QueryHistorySortOrder {
+  getSortOrder(): HistorySortOrder {
     return this.sortOrder;
   }
 
-  setSortOrder(sortOrder: QueryHistorySortOrder): void {
+  setSortOrder(sortOrder: HistorySortOrder): void {
     this.sortOrder = sortOrder;
     this._onDidChangeTreeData.fire();
   }
@@ -79,11 +95,16 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<QueryHistory
   async refresh(withSettings = false): Promise<void> {
     log(`${PREFIX} refresh`);
     if (withSettings) {
-      this.historyResList.splice(0, this.historyResList.length);
-      const histories = await this.stateStorage.getQueryHistoryList();
-      for (const history of histories) {
-        this.historyResList.push(history);
+      const version = ++this.refreshVersion;
+      const [queries, rpc] = await Promise.all([
+        this.stateStorage.getQueryHistoryList(),
+        this.rpcStore.list(),
+      ]);
+      if (version !== this.refreshVersion) {
+        return;
       }
+      this.historyResList = queries;
+      this.rpcHistoryList = rpc;
     }
     this._onDidChangeTreeData.fire();
   }

@@ -21,6 +21,7 @@ import type {
   IamSolutionSetting,
   MqttSetting,
   OracleSetting,
+  RpcSetting,
   ResourceFilter,
   ResourceFilterDetail,
   SQLServerSetting,
@@ -87,6 +88,16 @@ const oracleConnectionTypeItems: DropdownItem[] = [
     label: "Use Connect String",
     value: "Use Connect String",
   },
+];
+
+const rpcDiscoveryItems: DropdownItem[] = [
+  { label: "Server Reflection", value: "reflection" },
+  { label: "Local proto", value: "proto" },
+];
+
+const rpcAuthenticationItems: DropdownItem[] = [
+  { label: "No authentication (plaintext)", value: "none" },
+  { label: "TLS + Bearer token", value: "bearer" },
 ];
 
 const resourceFilterTypeItems: DropdownItem[] = [
@@ -277,6 +288,11 @@ const props = withDefaults(defineProps<Props>(), {
       clientId: '',
       subscriptionList: []
     },
+    rpc: {
+      protoFilePath: "",
+      discovery: "reflection",
+      authentication: { type: "none" },
+    },
     ssl: {
       use: false,
     },
@@ -287,7 +303,7 @@ const props = withDefaults(defineProps<Props>(), {
 const isShowMode = ref(props.mode === "show");
 const isInProgress = ref(false);
 
-const name = ref(props.item.name);
+const name = ref(props.item.name ?? "");
 const comment = ref(props.item.comment ?? "");
 const environment = ref<ConnectionEnvironment | "">(props.item.environment ?? "");
 const host = ref(props.item.host);
@@ -351,6 +367,24 @@ const sqlServerDomain = ref(props.item.sqlServer?.domain ?? "");
 const oracleConnectionType = ref(props.item.oracle?.connectionType ?? "structured");
 const oracleConnectString = ref(props.item.oracle?.connectString ?? "");
 
+const rpcProtoFilePath = ref(props.item.rpc?.protoFilePath ?? "");
+const rpcIncludeDirs = ref((props.item.rpc?.includeDirs ?? []).join("\n"));
+const rpcDiscovery = ref<"reflection" | "proto">(
+  props.item.rpc?.discovery === "reflection" ||
+    (props.mode === "create" && !props.item.rpc?.discovery && !props.item.rpc?.protoFilePath)
+    ? "reflection" : "proto"
+);
+const rpcVerifyLocalProto = ref(props.item.rpc?.discovery === "verify");
+const rpcAuthenticationType = ref<"none" | "bearer">(
+  props.item.rpc?.authentication?.type ?? "none"
+);
+const rpcCaFilePath = ref(props.item.rpc?.caFilePath ?? "");
+const rpcShowDefaultValues = ref(props.item.rpc?.showDefaultValues === true);
+const rpcStreamTimeoutMs = ref(String(props.item.rpc?.streamTimeoutMs ?? 300000));
+const rpcToken = ref(props.item.rpc?.authentication?.type === "bearer"
+  ? props.item.rpc.authentication.token ?? "" : "");
+const maskedRpcToken = computed(() => maskedString(rpcToken.value));
+
 // resource filters
 type ResourceFilterWithAwsResourceName = ResourceFilter & {
   resourceName?: ResourceFilterDetail;
@@ -409,6 +443,7 @@ function createItem(): ConnectionSetting {
   let oracle: OracleSetting | undefined = undefined;
   let resourceFilter: ResourceFilterWithAwsResourceName | undefined = undefined;
   let mqttSetting: MqttSetting | undefined = undefined;
+  let rpc: RpcSetting | undefined = undefined;
 
   if (DBTypeConst.isAws(dbType.value)) {
     const awsServiceNames = awsServiceSelected.value.join(",").split(",");
@@ -470,6 +505,23 @@ function createItem(): ConnectionSetting {
       subscriptionList: JSON.parse(JSON.stringify(mqttSubscriptionList))
     };
   }
+  if (dbType.value === "RPC") {
+    rpc = {
+      ...(rpcDiscovery.value === "proto" ? {
+        protoFilePath: rpcProtoFilePath.value.trim(),
+        includeDirs: rpcIncludeDirs.value.split(/\r?\n/).map((dir) => dir.trim()).filter(Boolean),
+      } : {}),
+      discovery: rpcDiscovery.value === "reflection" ? "reflection"
+        : rpcVerifyLocalProto.value ? "verify" : "proto",
+      showDefaultValues: rpcShowDefaultValues.value,
+      streamTimeoutMs: Number(rpcStreamTimeoutMs.value.trim() || "300000"),
+      authentication: rpcAuthenticationType.value === "bearer"
+        ? { type: "bearer", token: rpcToken.value }
+        : { type: "none" },
+      caFilePath: rpcAuthenticationType.value === "bearer"
+        ? rpcCaFilePath.value.trim() || undefined : undefined,
+    };
+  }
   if (elmSettings.value.getResourceFilters().visible) {
     resourceFilter = {};
     if (elmSettings.value.getAwsResourceNameFilter().visible && resourceNameFilterType.value) {
@@ -510,10 +562,11 @@ function createItem(): ConnectionSetting {
     sqlServer,
     oracle,
     mqttSetting,
+    rpc,
     resourceFilter
   };
 
-  if (useSsl.value) {
+  if (dbType.value === "RPC" ? rpcAuthenticationType.value === "bearer" : useSsl.value) {
     a["ssl"] = {
       use: true,
     };
@@ -554,13 +607,13 @@ function test() {
   });
 }
 
-function selectFile(targetAttribute: string, title: string, filters?: { [name: string]: string[] }) {
+function selectFile(targetAttribute: string, title: string, filters?: { [name: string]: string[] }, folder = false) {
   vscode.postCommand({
     command: "selectFileActionCommand",
     params: {
       targetAttribute,
-      canSelectFiles: true,
-      canSelectFolders: false,
+      canSelectFiles: !folder,
+      canSelectFolders: folder,
       canSelectMany: false,
       title,
       filters,
@@ -608,6 +661,13 @@ function setDefault() {
   mqttCa.value = '';
   mqttCert.value = '';
   mqttKey.value = '';
+  rpcProtoFilePath.value = "";
+  rpcIncludeDirs.value = "";
+  rpcDiscovery.value = "reflection";
+  rpcVerifyLocalProto.value = false;
+  rpcAuthenticationType.value = "none";
+  rpcCaFilePath.value = "";
+  rpcToken.value = "";
 
   // resource filters
   resourceNameFilterType.value = "";
@@ -623,6 +683,9 @@ const stopProgress = () => {
 };
 
 const selectedFile = (filePath: string, targetAttribute: string) => {
+  if (!filePath) {
+    return;
+  }
   switch (targetAttribute) {
     case 'database':
       database.value = filePath;
@@ -635,6 +698,17 @@ const selectedFile = (filePath: string, targetAttribute: string) => {
       break;
     case 'key':
       mqttKey.value = filePath;
+      break;
+    case 'rpcProtoFilePath':
+      rpcProtoFilePath.value = filePath;
+      break;
+    case 'rpcIncludeDir':
+      if (filePath) {
+        rpcIncludeDirs.value = [...rpcIncludeDirs.value.split(/\r?\n/).filter(Boolean), filePath].join("\n");
+      }
+      break;
+    case 'rpcCaFilePath':
+      rpcCaFilePath.value = filePath;
       break;
   }
 };
@@ -650,7 +724,7 @@ defineExpose({
       <label for="dbType">Database type</label>
       <p v-if="isShowMode" id="dbType">{{ dbType }}</p>
       <div v-else class="first">
-        <VsCodeDropdown id="dbType" v-model="dbType" :items="dbTypeItems"></VsCodeDropdown>
+        <VsCodeDropdown id="dbType" v-model="dbType" :items="dbTypeItems" style="--dropdown-list-max-height: 240px"></VsCodeDropdown>
         <VsCodeButton @click="setDefault" title="Set default values">Default</VsCodeButton>
       </div>
       <label for="name">Connection name</label>
@@ -717,6 +791,57 @@ defineExpose({
       <p v-if="isShowMode" v-show="elmSettings.getPort().visible" id="port">{{ port }}</p>
       <VsCodeTextField v-else v-show="elmSettings.getPort().visible" id="port" v-model="port" type="number">
       </VsCodeTextField>
+
+      <div v-if="dbType === 'RPC'" class="rpc-settings">
+        <label for="rpcDiscovery">Definition source</label>
+        <p v-if="isShowMode">{{ rpcDiscovery === 'reflection' ? 'Server Reflection' : 'Local proto' }}</p>
+        <VsCodeDropdown v-else id="rpcDiscovery" v-model="rpcDiscovery" :items="rpcDiscoveryItems" :width="240" />
+        <p v-if="rpcDiscovery === 'reflection'" class="file-placeholder">Load services and message types from the server. No proto file or import directories are required. The server must support reflection.</p>
+
+        <template v-if="rpcDiscovery === 'proto'">
+          <label for="rpcProtoFilePath">Proto file</label>
+          <p v-if="isShowMode">{{ rpcProtoFilePath }}</p>
+          <div v-else class="rpc-path">
+            <VsCodeTextField id="rpcProtoFilePath" v-model="rpcProtoFilePath" placeholder="Absolute path to .proto" />
+            <VsCodeButton @click="selectFile('rpcProtoFilePath', 'Select a proto file.', { Proto: ['proto'] })">Select</VsCodeButton>
+          </div>
+
+          <label for="rpcIncludeDirs">Proto include directories (one per line, optional)</label>
+          <pre v-if="isShowMode">{{ rpcIncludeDirs }}</pre>
+          <template v-else>
+            <VsCodeTextArea id="rpcIncludeDirs" v-model="rpcIncludeDirs" :rows="3" />
+            <VsCodeButton @click="selectFile('rpcIncludeDir', 'Select a proto include directory.', undefined, true)">Add directory</VsCodeButton>
+          </template>
+
+          <p v-if="isShowMode && rpcVerifyLocalProto">Verify local proto with server reflection</p>
+          <VsCodeCheckbox v-else-if="!isShowMode" id="rpcVerifyLocalProto" v-model="rpcVerifyLocalProto">Verify local proto with server reflection</VsCodeCheckbox>
+        </template>
+
+        <label for="rpcShowDefaultValues">Response JSON</label>
+        <p v-if="isShowMode">{{ rpcShowDefaultValues ? 'Show default values' : 'Omit default values' }}</p>
+        <VsCodeCheckbox v-else id="rpcShowDefaultValues" v-model="rpcShowDefaultValues">Show default values</VsCodeCheckbox>
+        <p class="file-placeholder">Displayed default values do not indicate that a field was sent or stored.</p>
+
+        <label for="rpcStreamTimeoutMs">Stream deadline (ms)</label>
+        <p v-if="isShowMode">{{ rpcStreamTimeoutMs === '0' ? 'Unlimited' : `${rpcStreamTimeoutMs} ms` }}</p>
+        <VsCodeTextField v-else id="rpcStreamTimeoutMs" v-model="rpcStreamTimeoutMs" type="number" :min="0" placeholder="300000" />
+        <p class="file-placeholder">Default: 300000 ms (5 minutes). Enter 0 for no deadline. Closing the Invoke RPC panel still cancels the stream.</p>
+
+        <label for="rpcAuthentication">Authentication</label>
+        <p v-if="isShowMode">{{ rpcAuthenticationType === 'bearer' ? 'TLS + Bearer token' : 'None (plaintext)' }}</p>
+        <VsCodeDropdown v-else id="rpcAuthentication" v-model="rpcAuthenticationType" :items="rpcAuthenticationItems" :width="240" />
+
+        <template v-if="rpcAuthenticationType === 'bearer'">
+          <label for="rpcCaFilePath">CA certificate (optional)</label>
+          <p v-if="isShowMode">{{ rpcCaFilePath }}</p>
+          <div v-else class="rpc-path">
+            <VsCodeTextField id="rpcCaFilePath" v-model="rpcCaFilePath" placeholder="System CA if empty" />
+            <VsCodeButton @click="selectFile('rpcCaFilePath', 'Select a CA certificate.', CA_FILE_FILTERS)">Select</VsCodeButton>
+          </div>
+          <LabeledText id="rpcToken" v-model="rpcToken" :isShowMode="isShowMode"
+            :showModeValue="maskedRpcToken" type="password" label="Bearer token" placeholder="Required" />
+        </template>
+      </div>
 
       <label v-show="elmSettings.getDatabase().visible" for="database">{{
         elmSettings.getDatabase().label ?? "Database"
@@ -873,6 +998,7 @@ defineExpose({
       <p v-if="isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs">{{ queryTimeoutMs }}</p>
       <VsCodeTextField v-if="!isShowMode && elmSettings.getQueryTimeoutMs().visible" id="queryTimeoutMs"
         v-model="queryTimeoutMs" type="number" :maxlength="6" placeholder="e.g. 60000"></VsCodeTextField>
+      <p v-if="dbType === 'RPC'" class="file-placeholder">Used for unary calls and server reflection. Default: 10000 ms. A short timeout may prevent descriptors from loading before a stream starts.</p>
 
       <label v-show="elmSettings.getLockWaitTimeoutMs().visible" for="lockTimeoutMs">{{
         elmSettings.getLockWaitTimeoutMs().label
@@ -1086,6 +1212,26 @@ fieldset.resource-filters {
   p {
     opacity: 0.8;
     margin: 5px 0 0 0;
+  }
+}
+
+.rpc-settings {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+
+  .rpc-path {
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 }
 </style>

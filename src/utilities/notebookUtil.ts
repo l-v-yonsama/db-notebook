@@ -11,6 +11,7 @@ import {
   isRDSType,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
+import { isRpcCell } from "../notebook/rpcCell";
 
 export const isMarkupCell = (cell: NotebookCell): boolean => {
   return cell.kind === NotebookCellKind.Markup;
@@ -49,7 +50,7 @@ export const isShellCell = (cell: NotebookCell): boolean => {
 
 export const isJsonValueCell = (cell: NotebookCell): boolean => {
   const meta = cell.metadata as CellMeta;
-  if (meta.publishParams) {
+  if (meta.publishParams || isRpcCell(cell)) {
     return false;
   }
   return cell.kind === NotebookCellKind.Code && cell.document.languageId === "json";
@@ -63,7 +64,9 @@ export const isJsonValueCell = (cell: NotebookCell): boolean => {
 export const isJsonOrPlaintextCell = (cell: NotebookCell): boolean => {
   const languageId = cell.document.languageId;
   return (
-    cell.kind === NotebookCellKind.Code && (languageId === "json" || languageId === "plaintext")
+    cell.kind === NotebookCellKind.Code &&
+    !isRpcCell(cell) &&
+    (languageId === "json" || languageId === "plaintext")
   );
 };
 
@@ -87,6 +90,11 @@ export type ConnectionCellKind = {
 };
 
 export const CONNECTION_CELL_KINDS: ConnectionCellKind[] = [
+  {
+    name: "RPC",
+    matchesCell: isRpcCell,
+    matchesConnection: (s) => s.dbType === DBType.RPC,
+  },
   {
     name: "SQL",
     matchesCell: isSqlCell,

@@ -58,6 +58,15 @@ import type { PerformanceTuningHumanSummary } from "./PerformanceTuningHumanSumm
 import type { QueryStatisticsViewState } from "./QueryStatisticsParams";
 import type { NodeRunAxiosEvent } from "./RunResultMetadata";
 import type { CloudWatchDashboardHostMessage } from "./observability";
+import type {
+  RpcInvokeResultView,
+  RpcInvokeTarget,
+  RpcStreamConnectingView,
+  RpcStreamCompletedView,
+  RpcStreamErrorView,
+  RpcStreamEventView,
+  RpcStreamStartedView,
+} from "./RpcInvokePanelParams";
 
 export type MessageEventData =
   | CloudWatchDashboardHostMessage
@@ -79,6 +88,8 @@ export type MessageEventData =
   | LogParseResultViewEventData
   | MdhViewEventData
   | PublishEditorPanelEventData
+  | RpcInvokePanelEventData
+  | RpcCellInvokeSettingsPanelEventData
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | PerformanceTuningPreviewPanelEventData
@@ -98,6 +109,22 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
   componentName: U;
   value: V;
 };
+
+export type RpcInvokePanelEventData = BaseMessageEventData<
+  "initialize" | "result" | "error" | "streamConnecting" | "streamStarted" | "streamEvent" | "streamCompleted" | "streamError" | "reportAvailable",
+  "RpcInvokePanel",
+  {
+    initialize?: RpcInvokeTarget;
+    result?: RpcInvokeResultView;
+    error?: string;
+    streamConnecting?: RpcStreamConnectingView;
+    streamStarted?: RpcStreamStartedView;
+    streamEvent?: RpcStreamEventView;
+    streamCompleted?: RpcStreamCompletedView;
+    streamError?: RpcStreamErrorView;
+    reportAvailable?: boolean;
+  }
+>;
 
 export type AiDataMaskingPreviewPanelEventData = BaseMessageEventData<
   "initialize" | "ai-send-preview" | "ai-send-preview-closed",
@@ -828,6 +855,18 @@ export type NotebookCellMetadataPanelEventData = BaseMessageEventData<
       codeFileItems: LabelValueItem[];
       columnItems: RdhKey[];
     };
+  }
+>;
+
+export type RpcCellInvokeSettingsPanelEventData = BaseMessageEventData<
+  "initialize" | "descriptor" | "saved" | "error",
+  "RpcCellInvokeSettingsPanel",
+  {
+    connectionName?: string;
+    method?: string;
+    metadataJson?: string;
+    descriptor?: string;
+    error?: string;
   }
 >;
 

@@ -7,6 +7,9 @@ import {
 import { commands, ExtensionContext, Uri, window } from "vscode";
 import { activateFormProvider, SQLConfigurationViewProvider } from "./form";
 import { HistoryTreeProvider } from "./treeData/history/HistoryTreeProvider";
+import { registerRpcHistoryTreeCommands } from "./treeData/history/RpcHistoryTreeCommand";
+import { RpcInvokeHistoryStore } from "./utilities/RpcInvokeHistoryStore";
+import { RpcInvokePanel } from "./panels/RpcInvokePanel";
 import { ResourceTreeProvider } from "./treeData/resource/ResourceTreeProvider";
 import { StateStorage } from "./utilities/StateStorage";
 import { SqlLogComparisonPanel } from "./panels/SqlLogComparisonPanel";
@@ -102,7 +105,9 @@ export async function activate(context: ExtensionContext) {
   initializeStoragePath(context);
   const stateStorage = new StateStorage(context, context.secrets);
   const dbResourceTree = new ResourceTreeProvider(context, stateStorage);
-  const historyTreeProvider = new HistoryTreeProvider(context, stateStorage);
+  const rpcHistoryStore = new RpcInvokeHistoryStore(context.globalState);
+  const historyTreeProvider = new HistoryTreeProvider(context, stateStorage, rpcHistoryStore);
+  RpcInvokePanel.setHistoryStore(rpcHistoryStore);
   const toolActivityTreeProvider = new ToolActivityTreeProvider(context);
 
   activateLogger(context, EXTENSION_NAME);
@@ -134,8 +139,8 @@ export async function activate(context: ExtensionContext) {
   RdbDashboardPanel.setStateStorage(stateStorage);
 
   configureAiDataMaskingPreview(context.extensionUri);
-  activateLmTools(context, stateStorage);
-  activateMcpServer(context, stateStorage);
+  activateLmTools(context, stateStorage, rpcHistoryStore);
+  activateMcpServer(context, stateStorage, rpcHistoryStore);
 
   window.registerTreeDataProvider(CONNECTION_VIEW_ID, dbResourceTree);
   context.subscriptions.push(window.registerFileDecorationProvider(dbResourceTree));
@@ -147,10 +152,10 @@ export async function activate(context: ExtensionContext) {
   historyTreeProvider.onDidChangeTreeData(() => {
     const filter = historyTreeProvider.getConnectionFilter();
     historyTreeView.description = filter ? `Filtered by: ${filter}` : undefined;
-    commands.executeCommand("setContext", "databaseNotebook.queryHistoryFiltered", !!filter);
+    commands.executeCommand("setContext", "databaseNotebook.historyFiltered", !!filter);
     commands.executeCommand(
       "setContext",
-      "databaseNotebook.queryHistorySortByDuration",
+      "databaseNotebook.historySortByDuration",
       historyTreeProvider.getSortOrder() === "duration"
     );
   });
@@ -219,7 +224,15 @@ export async function activate(context: ExtensionContext) {
     context,
     stateStorage,
     historyTreeProvider,
+    rpcHistoryStore,
   });
+  registerRpcHistoryTreeCommands(
+    context,
+    rpcHistoryStore,
+    historyTreeProvider,
+    stateStorage,
+    dbResourceTree
+  );
 
   registerDisposableCommand("database-notebook.focus-filter", async () => {
     await commands.executeCommand(`${CONNECTION_VIEW_ID}.focus`);
@@ -227,7 +240,7 @@ export async function activate(context: ExtensionContext) {
   });
 
   // Notebook
-  activateNotebook(context, stateStorage);
+  activateNotebook(context, stateStorage, rpcHistoryStore);
 
   // Code resolver editor
   activateCodeResolverEditor(context, stateStorage);

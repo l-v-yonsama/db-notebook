@@ -1,0 +1,6 @@
+{
+  "scopeName": "source.rpc-json",
+  "patterns": [
+    { "include": "source.json" }
+  ]
+}

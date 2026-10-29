@@ -4,9 +4,10 @@ import {
   DbConnection,
   DbDynamoTable,
   RdsDatabase,
+  RpcDatabase,
 } from "@l-v-yonsama/multi-platform-database-drivers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { commands, workspace } from "vscode";
+import { commands, window, workspace } from "vscode";
 import type { ExtensionContext, TreeItem, TreeView } from "vscode";
 import { LOAD_DB_SCHEMA, OPEN_MDH_VIEWER, SCAN_ITEMS } from "../../../src/constant";
 import { registerResourceTreeCommand } from "../../../src/treeData/resource/ResourceTreeCommand";
@@ -114,6 +115,21 @@ describe(`${LOAD_DB_SCHEMA} と resourceTreeAutoExpandTo 設定の連携`, () =>
 
     await handler(conRes);
 
+    expect(revealMock).not.toHaveBeenCalled();
+  });
+
+  it("RPC reflection の再読み込み失敗時は古いツリーを消して原因を表示する", async () => {
+    mockDatabaseConfig("none");
+    const conRes = new DbConnection({ name: "rpc", dbType: DBType.RPC });
+    conRes.addChild(new RpcDatabase("old schema"));
+    const message = "SCHEMA_MISMATCH: method differs from server reflection.";
+    const loadResource = vi.fn(async () => ({ ok: false, message, result: undefined }));
+    const handler = setupCommand(loadResource);
+
+    await handler(conRes);
+
+    expect(conRes.children).toEqual([]);
+    expect(window.showErrorMessage).toHaveBeenCalledWith(message);
     expect(revealMock).not.toHaveBeenCalled();
   });
 });

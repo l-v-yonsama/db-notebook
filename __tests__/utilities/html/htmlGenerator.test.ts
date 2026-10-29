@@ -4,7 +4,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createHtmlFromHarItem, createHtmlFromNotebook } from "../../../src/utilities/html/htmlGenerator";
+import { createHtmlFromHarItem, createHtmlFromNotebook, createHtmlFromRpcResult } from "../../../src/utilities/html/htmlGenerator";
+import { RPC_RESPONSE_MIME } from "../../../src/notebook/rpcCell";
 
 const tmpFiles: string[] = [];
 
@@ -146,6 +147,110 @@ describe("createHtmlFromHarItem", () => {
 });
 
 describe("createHtmlFromNotebook", () => {
+  it("renders RPC MIME response once with highlighted JSON and escaped values", async () => {
+    const targetPath = tmpHtmlPath();
+    const result = {
+      version: 1, kind: "response", cellId: "rpc-1", outcome: "success",
+      status: { code: 0, name: "OK" }, elapsedMs: 12, receivedCount: 1,
+      contents: { value: "</script>```<script>alert(1)</script>" },
+      headers: { "x-test": ["ok"] },
+    };
+    const cell = {
+      kind: 2,
+      document: { languageId: "rpc-json", getText: () => '{"query":"x"}' },
+      metadata: { connectionName: "rpc", rpc: { version: 2, id: "rpc-1", service: "example.Service", method: "Call", callKind: "unary", metadataJson: '{"x-id":"42"}' } },
+      outputs: [{ items: [
+        { mime: RPC_RESPONSE_MIME, data: Buffer.from(JSON.stringify(result)) },
+        { mime: "text/plain", data: Buffer.from("plain summary marker") },
+      ] }],
+    };
+    const err = await createHtmlFromNotebook(
+      { getCells: () => [cell] } as never,
+      targetPath,
+      async () => ({ request: "message RequestMarker {}", response: "message ResponseMarker {}" })
+    );
+    expect(err).toBe("");
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).toContain("example.Service/Call");
+    expect(html).toContain("1 Received (0.012 sec)");
+    expect(html).toContain('>Executed</span> example.Service/Call<span class="tag is-primary is-light">RPC Result</span> OK(0) · 1 Received (0.012 sec)');
+    expect(html).toContain('<span class="tag is-primary is-light">RPC Result</span> OK(0) · 1 Received (0.012 sec)');
+    expect(html).not.toContain("Last execution response");
+    expect(html).toContain("x-test");
+    expect(html).toContain('<p class="subtitle is-6">unary example.Service/Call</p>');
+    expect(html).toContain('data-tab="metadata" data-id-class="id0_request_tab"');
+    expect(html).toContain('data-tab="descriptor" data-id-class="id0_request_tab"');
+    expect(html).toContain('id="id0_request_tab-metadata" class="block id0_request_tab" style="display:none;"');
+    expect(html).toContain('id="id0_request_tab-descriptor" class="block id0_request_tab" style="display:none;"');
+    expect(html).toContain("x-id");
+    expect(html).toContain("RequestMarker");
+    expect(html).toContain("ResponseMarker");
+    expect(html).not.toContain("Cell input at export time");
+    expect(html).toContain('data-tab="data" data-id-class="id0_0_rpc_tab"');
+    expect(html).toContain('id="id0_0_rpc_tab-data" class="block id0_0_rpc_tab"');
+    expect(html).toContain('id="id0_0_rpc_tab-headers" class="block id0_0_rpc_tab" style="display:none;"');
+    expect(html).toContain('id="id0_0_rpc_tab-trailers" class="block id0_0_rpc_tab" style="display:none;"');
+    expect(html).toContain('id="id0_0_rpc_tab-descriptor" class="block id0_0_rpc_tab" style="display:none;"');
+    expect(html).toContain("No trailers");
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain("u0060");
+    expect(html).not.toContain('```&lt;script&gt;');
+    expect(html).not.toContain("plain summary marker");
+    expect(html).toContain('lang":"json"');
+  });
+
+  it("uses the existing report template for a panel RPC result", async () => {
+    const targetPath = tmpHtmlPath();
+    const err = await createHtmlFromRpcResult({
+      connectionName: "rpc", service: "example.Service", method: "Stream", path: "/example.Service/Stream",
+      inputType: "example.Request", outputType: "example.Response", discovery: "advertised",
+      requestStream: true, responseStream: true, requestTemplate: "{}",
+      requestDescription: "message PanelRequest {}", responseDescription: "message PanelResponse {}", requestDescriptionHtml: "", responseDescriptionHtml: "",
+    }, '[{"value":"one"}]', {
+      version: 1, kind: "response", cellId: "panel", outcome: "cancelled", elapsedMs: 42,
+      sentCount: 2, receivedCount: 1,
+      messages: [{ index: 1, at: 1000, contents: { value: "reply" } }], droppedCount: 1,
+    }, targetPath, 1, '{"x-trace":"abc"}');
+    expect(err).toBe("");
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).toContain("earlier sent messages omitted");
+    expect(html).toContain("older messages omitted");
+    expect(html).toContain("2 Sent, 1 Received (0.042 sec)");
+    expect(html).toContain("reply");
+    expect(html).toContain("PanelRequest");
+    expect(html).toContain("PanelResponse");
+    expect(html).toContain('<p class="subtitle is-6">bidiStreaming example.Service/Stream</p>');
+    expect(html).toContain("x-trace");
+    expect(html).toContain('>Cancelled</span> example.Service/Stream<span class="tag is-primary is-light">RPC Result</span> 2 Sent, 1 Received (0.042 sec)');
+    expect(html).toContain('data-tab="trailers" data-id-class="id0_0_rpc_tab"');
+    expect(html).toContain("No headers");
+  });
+
+  it("isolates RPC response tabs for separate cells", async () => {
+    const targetPath = tmpHtmlPath();
+    const result = {
+      version: 1, kind: "response", cellId: "rpc", outcome: "success",
+      elapsedMs: 1, receivedCount: 1, contents: { ok: true },
+    };
+    const cell = {
+      kind: 2,
+      document: { languageId: "rpc-json", getText: () => "{}" },
+      metadata: {},
+      outputs: [{ items: [{ mime: RPC_RESPONSE_MIME, data: Buffer.from(JSON.stringify(result)) }] }],
+    };
+    const err = await createHtmlFromNotebook(
+      { getCells: () => [cell, cell] } as never,
+      targetPath,
+      async () => { throw new Error("schema unavailable"); }
+    );
+    expect(err).toBe("");
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).toContain('data-id-class="id0_0_rpc_tab"');
+    expect(html).toContain('data-id-class="id1_0_rpc_tab"');
+    expect(html).toContain('id="id0_0_rpc_tab-headers"');
+    expect(html).toContain('id="id1_0_rpc_tab-headers"');
+    expect(html).toContain("Descriptor unavailable");
+  });
   it("DBN専用の目次セルをHTMLの目次と本文には重複出力しない", async () => {
     const targetPath = tmpHtmlPath();
     const dbnTocCell = {

@@ -5,6 +5,7 @@ import { DOCS_BASE } from "../../treeData/help/HelpProvider";
 import { existsUri } from "../../utilities/fsUtil";
 import { log, logError } from "../../utilities/logger";
 import { StateStorage } from "../../utilities/StateStorage";
+import { RpcInvokeHistoryStore } from "../../utilities/RpcInvokeHistoryStore";
 import { getMcpServerConfig } from "../../utilities/configUtil";
 import { getErrorMessage } from "../../utilities/errorUtil";
 import { regenerateToken } from "./auth";
@@ -62,10 +63,14 @@ function logTokenRegenerated(handle?: McpServerHandle): void {
   log(`${PREFIX} ${divider}`);
 }
 
-export function activateMcpServer(context: ExtensionContext, stateStorage: StateStorage): void {
+export function activateMcpServer(
+  context: ExtensionContext,
+  stateStorage: StateStorage,
+  rpcHistoryStore: RpcInvokeHistoryStore
+): void {
   context.subscriptions.push(
     commands.registerCommand("database-notebook.start-mcp-server", async () => {
-      await start(context, stateStorage);
+      await start(context, stateStorage, rpcHistoryStore);
     })
   );
   context.subscriptions.push(
@@ -75,7 +80,7 @@ export function activateMcpServer(context: ExtensionContext, stateStorage: State
   );
   context.subscriptions.push(
     commands.registerCommand("database-notebook.regenerate-mcp-token", async () => {
-      await regenerate(context, stateStorage);
+      await regenerate(context, stateStorage, rpcHistoryStore);
     })
   );
   context.subscriptions.push(
@@ -84,7 +89,7 @@ export function activateMcpServer(context: ExtensionContext, stateStorage: State
       // rebinding when one is already running (see startMcpServer's acquireOrDetect) --
       // reused as-is so there's a discoverable way to re-open the copy-URL/token dialog
       // after VS Code's notification auto-dismisses.
-      await start(context, stateStorage);
+      await start(context, stateStorage, rpcHistoryStore);
     })
   );
 
@@ -99,7 +104,7 @@ export function activateMcpServer(context: ExtensionContext, stateStorage: State
   });
 
   if (getMcpServerConfig().autoStart) {
-    start(context, stateStorage).catch((e: unknown) =>
+    start(context, stateStorage, rpcHistoryStore).catch((e: unknown) =>
       logError(`${PREFIX} autoStart failed: ${getErrorMessage(e)}`)
     );
   }
@@ -108,10 +113,11 @@ export function activateMcpServer(context: ExtensionContext, stateStorage: State
 async function start(
   context: ExtensionContext,
   stateStorage: StateStorage,
+  rpcHistoryStore: RpcInvokeHistoryStore,
   reason: ConnectionInfoReason = "started"
 ): Promise<void> {
   try {
-    const handle = await startMcpServer(context, stateStorage);
+    const handle = await startMcpServer(context, stateStorage, rpcHistoryStore);
     await showConnectionInfo(handle, reason);
   } catch (e) {
     const message = getErrorMessage(e);
@@ -131,7 +137,11 @@ async function stop(context: ExtensionContext): Promise<void> {
   window.showInformationMessage("Database Notebook MCP server stopped.");
 }
 
-async function regenerate(context: ExtensionContext, stateStorage: StateStorage): Promise<void> {
+async function regenerate(
+  context: ExtensionContext,
+  stateStorage: StateStorage,
+  rpcHistoryStore: RpcInvokeHistoryStore
+): Promise<void> {
   await regenerateToken(context);
   if (!isRunningHere()) {
     logTokenRegenerated();
@@ -147,7 +157,7 @@ async function regenerate(context: ExtensionContext, stateStorage: StateStorage)
   // value updated. `start()` logs the loud Output-channel announcement itself, from
   // inside `showConnectionInfo()`, once it has the post-restart handle/URL in hand.
   await stopMcpServer(context);
-  await start(context, stateStorage, "regenerated");
+  await start(context, stateStorage, rpcHistoryStore, "regenerated");
 }
 
 export async function showConnectionInfo(

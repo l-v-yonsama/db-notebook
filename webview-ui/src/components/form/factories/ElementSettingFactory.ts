@@ -17,6 +17,7 @@ import {
   SQLiteElementSetting,
 } from "./RdsElementSetting";
 import { RedisElementSetting } from "./RedisElementSetting";
+import { RpcElementSetting } from "./RpcElementSetting";
 
 export class ElementSettingFactory {
   public static create({
@@ -39,6 +40,8 @@ export class ElementSettingFactory {
         return new MemcacheElementSetting();
       case "Redis":
         return new RedisElementSetting();
+      case "RPC":
+        return new RpcElementSetting();
       case "Auth0":
         return new Auth0ElementSetting();
       case "Keycloak":
