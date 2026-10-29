@@ -11,6 +11,9 @@ import {
 } from "vscode";
 import {
   CELL_SELECT_RPC_METHOD,
+  CELL_SELECT_REST_METHOD,
+  CELL_EDIT_REST_URL,
+  CELL_SHOW_REST_SETTINGS,
   CELL_SHOW_RPC_INVOKE_SETTINGS,
   CELL_MARK_CELL_AS_MQTT,
   CELL_MARK_CELL_AS_PRE_EXECUTION,
@@ -46,6 +49,7 @@ import {
 import { StateStorage } from "../utilities/StateStorage";
 import { setupDbResource } from "./intellisense";
 import { getRpcCellMetadata, isRpcCell, rpcCallKindLabels } from "./rpcCell";
+import { getRestCellMetadata, isRestCell } from "./restCell";
 
 export class CellMetadataProvider implements NotebookCellStatusBarItemProvider {
   constructor(private stateStorage: StateStorage) {}
@@ -186,9 +190,10 @@ export class RpcMethodProvider implements NotebookCellStatusBarItemProvider {
       return undefined;
     }
     const { rpc } = getRpcCellMetadata(cell);
-    const name = rpc.service && rpc.method
-      ? `${rpc.service.split(".").at(-1)}/${rpc.method}`
-      : "Select RPC method";
+    const name =
+      rpc.service && rpc.method
+        ? `${rpc.service.split(".").at(-1)}/${rpc.method}`
+        : "Select RPC method";
     const item = new NotebookCellStatusBarItem(
       `$(symbol-method) ${name}${rpc.callKind ? ` · ${rpcCallKindLabels[rpc.callKind]}` : ""}`,
       NotebookCellStatusBarAlignment.Left
@@ -210,6 +215,52 @@ export class RpcInvokeSettingsProvider implements NotebookCellStatusBarItemProvi
     );
     item.command = CELL_SHOW_RPC_INVOKE_SETTINGS;
     item.tooltip = "RPC Cell Invoke Settings";
+    return item;
+  }
+}
+
+export class RestMethodProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isRestCell(cell)) {
+      return undefined;
+    }
+    const item = new NotebookCellStatusBarItem(
+      `$(symbol-method) ${getRestCellMetadata(cell).rest?.method ?? "GET"}`,
+      NotebookCellStatusBarAlignment.Left
+    );
+    item.command = CELL_SELECT_REST_METHOD;
+    item.tooltip = "Select HTTP method";
+    return item;
+  }
+}
+
+export class RestUrlProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isRestCell(cell)) {
+      return undefined;
+    }
+    const url = getRestCellMetadata(cell).rest?.url ?? "";
+    const item = new NotebookCellStatusBarItem(
+      `$(link) ${url ? abbr(url, 48) : "Set URL"}`,
+      NotebookCellStatusBarAlignment.Left
+    );
+    item.command = CELL_EDIT_REST_URL;
+    item.tooltip = url || "Set REST URL";
+    return item;
+  }
+}
+
+export class RestSettingsProvider implements NotebookCellStatusBarItemProvider {
+  provideCellStatusBarItems(cell: NotebookCell): NotebookCellStatusBarItem | undefined {
+    if (!isRestCell(cell)) {
+      return undefined;
+    }
+    const item = new NotebookCellStatusBarItem(
+      "$(settings-gear) Edit headers / timeout",
+      NotebookCellStatusBarAlignment.Left
+    );
+    item.command = CELL_SHOW_REST_SETTINGS;
+    item.tooltip = "REST JSON request settings";
     return item;
   }
 }
@@ -521,6 +572,12 @@ export function registerNotebookStatusBarProviders(
   context.subscriptions.push(
     notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RpcMethodProvider())
   );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RestMethodProvider())
+  );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RestUrlProvider())
+  );
 
   context.subscriptions.push(
     notebooks.registerNotebookCellStatusBarItemProvider(
@@ -569,7 +626,13 @@ export function registerNotebookStatusBarProviders(
   );
 
   context.subscriptions.push(
-    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RpcInvokeSettingsProvider())
+    notebooks.registerNotebookCellStatusBarItemProvider(
+      NOTEBOOK_TYPE,
+      new RpcInvokeSettingsProvider()
+    )
+  );
+  context.subscriptions.push(
+    notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, new RestSettingsProvider())
   );
 
   context.subscriptions.push(

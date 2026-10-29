@@ -90,6 +90,7 @@ export type MessageEventData =
   | PublishEditorPanelEventData
   | RpcInvokePanelEventData
   | RpcCellInvokeSettingsPanelEventData
+  | RestCellRequestSettingsPanelEventData
   | SubscriptionPayloadsViewEventData
   | NotebookCellMetadataPanelEventData
   | PerformanceTuningPreviewPanelEventData
@@ -111,7 +112,15 @@ export type BaseMessageEventData<T, U = ComponentName, V = any> = {
 };
 
 export type RpcInvokePanelEventData = BaseMessageEventData<
-  "initialize" | "result" | "error" | "streamConnecting" | "streamStarted" | "streamEvent" | "streamCompleted" | "streamError" | "reportAvailable",
+  | "initialize"
+  | "result"
+  | "error"
+  | "streamConnecting"
+  | "streamStarted"
+  | "streamEvent"
+  | "streamCompleted"
+  | "streamError"
+  | "reportAvailable",
   "RpcInvokePanel",
   {
     initialize?: RpcInvokeTarget;
@@ -868,6 +877,12 @@ export type RpcCellInvokeSettingsPanelEventData = BaseMessageEventData<
     descriptor?: string;
     error?: string;
   }
+>;
+
+export type RestCellRequestSettingsPanelEventData = BaseMessageEventData<
+  "initialize" | "saved" | "error",
+  "RestCellRequestSettingsPanel",
+  { method?: string; url?: string; headersJson?: string; timeoutMs?: number; error?: string }
 >;
 
 export type ERDiagramSettingsInputParams = {

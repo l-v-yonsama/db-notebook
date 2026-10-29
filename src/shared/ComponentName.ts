@@ -20,6 +20,7 @@ export type ComponentName =
   | "PublishEditorPanel"
   | "RpcInvokePanel"
   | "RpcCellInvokeSettingsPanel"
+  | "RestCellRequestSettingsPanel"
   | "WriteHttpEventToClipboardParamsPanel"
   | "DBFormView"
   | "ERDiagramSettingsPanel"

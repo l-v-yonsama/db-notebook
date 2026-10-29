@@ -18,6 +18,7 @@ import { RunResultMetadata } from "../../shared/RunResultMetadata";
 import type { RpcNotebookResult } from "../../shared/RunResultMetadata";
 import type { RpcInvokeTarget } from "../../shared/RpcInvokePanelParams";
 import { decodeRpcCellSource, isRpcCellMetadata, RPC_RESPONSE_MIME } from "../../notebook/rpcCell";
+import type { RestCellMeta } from "../../notebook/restCell";
 import { CellMeta } from "../../types/Notebook";
 import { ChartsViewParams } from "../../types/views";
 import { createReportChartViewParams } from "../../observability/report/reportChartAdapter";
@@ -53,6 +54,7 @@ const HLJS_LANGUAGE_ALIASES: { [languageId: string]: string } = {
   "shellscript": "bash",
   "bat": "dos",
   "rpc-json": "json",
+  "rest-json": "json",
 };
 
 const toHljsLanguage = (languageId: string): string =>
@@ -563,11 +565,34 @@ const createHtml = async (
           };
           markdownValues[id] = { lang: "json", s: escapeHtml(safeRpcCode(source.dataJson)) };
         } else {
+          let sentRequest:
+            | NonNullable<RunResultMetadata["axiosEvent"]>["entry"]["request"]
+            | undefined;
+          if (cell.document.languageId === "rest-json") {
+            const rest = (cell.metadata as RestCellMeta).rest;
+            sentRequest = cell.outputs
+              .map((output) => (output.metadata as RunResultMetadata)?.axiosEvent?.entry.request)
+              .find((request) => request !== undefined);
+            htmlContents.push(
+              `<p class="subtitle is-6">${escapeHtml(
+                `${sentRequest?.method ?? rest?.method ?? "GET"} ${
+                  sentRequest?.url ?? rest?.url ?? "URL not set"
+                }`
+              )}</p>`
+            );
+            if (sentRequest?.headers.length) {
+              htmlContents.push(
+                `<details><summary>Sent request headers</summary><pre>${escapeHtml(
+                  sentRequest.headers.map(({ name, value }) => `${name}: ${value}`).join("\n")
+                )}</pre></details>`
+              );
+            }
+          }
           htmlContents.push(`<div id="${id}" class="block">`);
           htmlContents.push("</div>");
           markdownValues[id] = {
             lang: toHljsLanguage(cell.document.languageId),
-            s: escapeHtml(cell.document.getText()),
+            s: escapeHtml(sentRequest?.postData?.text ?? cell.document.getText()),
           };
         }
 
@@ -589,7 +614,14 @@ const createHtml = async (
                 case "text/plain":
                 case "application/vnd.code.notebook.stdout":
                   {
-                    if (cell.document.languageId !== "sql" && !rpcResult) {
+                    if (
+                      cell.document.languageId !== "sql" &&
+                      !rpcResult &&
+                      !(
+                        cell.document.languageId === "rest-json" &&
+                        (output.metadata as RunResultMetadata)?.axiosEvent
+                      )
+                    ) {
                       htmlContents.push(`<div class="block">`);
                       htmlContents.push(
                         `<div class="notification is-info is-light" style="padding:10px; margin-bottom:10px;font-size:small; white-space:pre-wrap;">${escapeHtml(
@@ -779,14 +811,21 @@ const createHtml = async (
                 const mdId = `${id}_${idx2++}_md`;
                 htmlContents.push(`<div id="${mdId}" class="block">`);
                 htmlContents.push("</div>");
+                let responseMarkdown: string;
+                try {
+                  responseMarkdown = createResponseBodyMarkdown(
+                    metadata.axiosEvent,
+                    outputCondig.maxCharactersInCell
+                  );
+                } catch {
+                  const response = metadata.axiosEvent.entry.response;
+                  responseMarkdown = `${response.status} ${response.statusText}\n\n${
+                    response.content.text ?? ""
+                  }`;
+                }
                 markdownValues[mdId] = {
                   lang: "Markup",
-                  s: escapeHtml(
-                    createResponseBodyMarkdown(
-                      metadata.axiosEvent,
-                      outputCondig.maxCharactersInCell
-                    )
-                  ),
+                  s: escapeHtml(responseMarkdown),
                 };
               }
               if (metadata.mqttPublishResult) {
@@ -833,7 +872,10 @@ const createHtml = async (
               }
             }
           });
-          if (cell.document.languageId === "rpc-json" && cell.outputs.length === 0) {
+          if (
+            ["rpc-json", "rest-json"].includes(cell.document.languageId) &&
+            cell.outputs.length === 0
+          ) {
             htmlContents.push(`<p>Response · Not executed</p>`);
           }
         }

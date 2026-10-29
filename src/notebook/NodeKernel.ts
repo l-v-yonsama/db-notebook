@@ -159,6 +159,8 @@ export class NodeKernel {
             }
 
             if(res.data && Buffer.isBuffer(res.data)){
+              entry.response.bodySize = res.data.length;
+              entry.response.content.size = res.data.length;
               entry.response.content.text = res.data.toString('base64');
               entry.response.content.encoding = 'base64';
             }

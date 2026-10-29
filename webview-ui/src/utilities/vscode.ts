@@ -50,11 +50,18 @@ class VSCodeAPIWrapper {
    * @param message Abitrary data (must be JSON serializable) to send to the extension context.
    */
   public postMessage(message: unknown) {
-    const sensitive = typeof message === "object" && message !== null &&
+    const sensitive =
+      typeof message === "object" &&
+      message !== null &&
       "command" in message &&
-      (message.command === "invokeRpc" || message.command === "saveRpcCellMetadata");
+      (message.command === "invokeRpc" ||
+        message.command === "saveRpcCellMetadata" ||
+        message.command === "saveRestCellSettings");
     if (this.vsCodeApi) {
-      console.log("postMessage", sensitive ? `${message.command} [payload omitted]` : JSON.stringify(message));
+      console.log(
+        "postMessage",
+        sensitive ? `${message.command} [payload omitted]` : JSON.stringify(message)
+      );
       this.vsCodeApi.postMessage(message);
     } else {
       console.log(sensitive ? `${message.command} [payload omitted]` : message);
