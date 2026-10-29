@@ -41,6 +41,23 @@ describe("MainController.execute -> _doExecution", () => {
     controller.dispose();
   });
 
+  it.each(["rpc-json", "rest-json"])("skips a marked %s cell before invoking its service", async (languageId) => {
+    const rpcCellService = { execute: vi.fn(async () => true) };
+    const restCellService = { execute: vi.fn(async () => true) };
+    const { controllerObj } = setupController(rpcCellService, restCellService);
+    const cell = makeCell({ languageId, metadata: { markAsSkip: true } });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    const execution = lastExecution(controllerObj);
+    expect(rpcCellService.execute).not.toHaveBeenCalled();
+    expect(restCellService.execute).not.toHaveBeenCalled();
+    expect(execution.outputs[0].items[0].data).toBe("### `SKIPPED!`");
+    expect(execution.outputs[0].metadata.status).toBe("skipped");
+    expect(execution.endedAt.success).toBe(true);
+  });
+
   it("SQLのSELECT結果からrdh markdown出力を作り、chart設定があればビューアを開く", async () => {
     const { controllerObj, stateStorage } = setupController();
     (stateStorage.getDBTypeByConnectionName as Mock).mockReturnValue(DBType.Postgres);
@@ -215,7 +232,10 @@ describe("MainController.execute -> _doExecution", () => {
 
   it("markAsSkipのセルはカーネルを呼ばずにSKIPPED出力を積む", async () => {
     const { controllerObj } = setupController();
-    const cell = makeCell({ languageId: "sql", metadata: { markAsSkip: true } });
+    const cell = makeCell({
+      languageId: "sql",
+      metadata: { markAsSkip: true, savingSharedVariables: true, sharedVariableName: "skipped" },
+    });
     makeNotebook([cell]);
 
     await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
@@ -224,6 +244,29 @@ describe("MainController.execute -> _doExecution", () => {
     expect(execution.outputs.some((o: any) => o.items[0].data === "### `SKIPPED!`")).toBe(true);
     expect(sqlKernelRunMock).not.toHaveBeenCalled();
     expect(execution.endedAt.success).toBe(true);
+    expect(nodeKernelFake.updateVariable).toHaveBeenCalledWith(
+      "skipped",
+      expect.objectContaining({ success: true, skipped: true, status: "skipped" })
+    );
+  });
+
+  it("カーネルが実行中にskipを返した場合もSKIPPED出力を積む", async () => {
+    const { controllerObj } = setupController();
+    sqlKernelRunMock.mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      skipped: true,
+      status: "skipped",
+    } as RunResult);
+    const cell = makeCell({ languageId: "sql", metadata: { connectionName: "conn1" } });
+    makeNotebook([cell]);
+
+    await controllerObj.executeHandler([cell], cell.notebook, controllerObj);
+
+    expect(sqlKernelRunMock).toHaveBeenCalled();
+    const execution = lastExecution(controllerObj);
+    expect(execution.outputs[0].items[0].data).toBe("### `SKIPPED!`");
+    expect(execution.outputs[0].metadata.status).toBe("skipped");
   });
 
   it("run()が例外を投げた場合はcatchされエラー出力を積んで失敗として終了する", async () => {

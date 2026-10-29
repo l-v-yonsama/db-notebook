@@ -2,6 +2,10 @@ import { TextDecoder, TextEncoder } from "util";
 import { CancellationToken, NotebookCellData, NotebookData, NotebookSerializer } from "vscode";
 import { RawNotebookData } from "../types/Notebook";
 import { RPC_CELL_LANGUAGE } from "./rpcCell";
+import { REST_CELL_LANGUAGE } from "./restCell";
+
+const transientCellOutput = (language: string): boolean =>
+  language === RPC_CELL_LANGUAGE || language === REST_CELL_LANGUAGE;
 
 export class DBNotebookSerializer implements NotebookSerializer {
   // public readonly label: string = "DB Contents Serializer";
@@ -24,7 +28,7 @@ export class DBNotebookSerializer implements NotebookSerializer {
     const cells = raw.cells.map((item) => {
       const cell = new NotebookCellData(item.kind, item.value, item.language);
       cell.metadata = item.metadata ?? {};
-      cell.outputs = item.language === RPC_CELL_LANGUAGE ? [] : (item.outputs ?? []);
+      cell.outputs = transientCellOutput(item.language) ? [] : item.outputs ?? [];
       return cell;
     });
 
@@ -54,7 +58,7 @@ export class DBNotebookSerializer implements NotebookSerializer {
         language: cell.languageId,
         value: cell.value,
         metadata: cell.metadata ?? {},
-        outputs: cell.languageId === RPC_CELL_LANGUAGE ? [] : (cell.outputs ?? []),
+        outputs: transientCellOutput(cell.languageId) ? [] : cell.outputs ?? [],
       });
     }
 

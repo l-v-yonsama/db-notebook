@@ -61,8 +61,16 @@ import { SqlKernel } from "./sqlKernel";
 import { registerNotebookStatusBarProviders } from "./statusBarProviders";
 import { isRpcCell, RPC_CELL_LANGUAGE } from "./rpcCell";
 import type { RpcCellService } from "./RpcCellService";
+import { isRestCell, REST_CELL_LANGUAGE } from "./restCell";
+import type { RestCellService } from "./RestCellService";
 
 const PREFIX = "[notebook/Controller]";
+
+const skippedCellOutput = (metadata?: RunResultMetadata): NotebookCellOutput =>
+  new NotebookCellOutput(
+    [NotebookCellOutputItem.text("### `SKIPPED!`", "text/markdown")],
+    metadata
+  );
 
 type NoteSession = {
   executionOrder: number;
@@ -87,6 +95,7 @@ export class MainController {
     "typescript",
     "json",
     RPC_CELL_LANGUAGE,
+    REST_CELL_LANGUAGE,
     "cwql",
     "memcached",
     "redis",
@@ -103,7 +112,8 @@ export class MainController {
   constructor(
     private context: ExtensionContext,
     private stateStorage: StateStorage,
-    private rpcCellService?: RpcCellService
+    private rpcCellService?: RpcCellService,
+    private restCellService?: RestCellService
   ) {
     this._controller = notebooks.createNotebookController(
       this.controllerId,
@@ -207,6 +217,7 @@ export class MainController {
   private _interruptHandler(notebook: NotebookDocument): void | Thenable<void> {
     window.setStatusBarMessage("Interrupted", 3000);
     this.rpcCellService?.cancelNotebook(notebook.uri.toString());
+    this.restCellService?.cancelNotebook(notebook.uri.toString());
 
     // log(`${PREFIX} interruptHandler`);
     const noteSession = this.getNoteSession(notebook);
@@ -338,11 +349,32 @@ export class MainController {
     noteSession: NoteSession
   ): Promise<void> {
     noteSession.executionOrder++;
+    const execution = this._controller.createNotebookCellExecution(cell);
+    execution.executionOrder = noteSession.executionOrder;
+    execution.start(Date.now());
+    const cellMeta: CellMeta = cell.metadata;
+    const saveSharedVariables = (result: RunResult & { success: boolean }) => {
+      if (noteSession.kernel && cellMeta?.savingSharedVariables && cellMeta.sharedVariableName) {
+        noteSession.kernel.updateVariable(cellMeta.sharedVariableName, result);
+      }
+    };
+
+    if (cellMeta?.markAsSkip === true) {
+      const metadata: RunResultMetadata = { status: "skipped" };
+      await execution.replaceOutput([skippedCellOutput(metadata)]);
+      execution.end(true, Date.now());
+      saveSharedVariables({
+        success: true,
+        stdout: "",
+        stderr: "",
+        skipped: true,
+        status: "skipped",
+        metadata,
+      });
+      return;
+    }
 
     if (isRpcCell(cell)) {
-      const execution = this._controller.createNotebookCellExecution(cell);
-      execution.executionOrder = noteSession.executionOrder;
-      execution.start(Date.now());
       let success = false;
       try {
         if (!this.rpcCellService) {
@@ -359,9 +391,26 @@ export class MainController {
       return;
     }
 
-    const execution = this._controller.createNotebookCellExecution(cell);
-    execution.executionOrder = noteSession.executionOrder;
-    execution.start(Date.now());
+    if (isRestCell(cell)) {
+      let success = false;
+      try {
+        if (!this.restCellService || !noteSession.kernel) {
+          throw new Error("REST notebook service is unavailable.");
+        }
+        success = await this.restCellService.execute(
+          cell,
+          execution,
+          noteSession.kernel.getStoredVariables()
+        );
+      } catch (error) {
+        await execution.replaceOutput([
+          new NotebookCellOutput([NotebookCellOutputItem.error(error as Error)]),
+        ]);
+      } finally {
+        execution.end(success, Date.now());
+      }
+      return;
+    }
 
     const outputs: NotebookCellOutput[] = [];
     let success = true;
@@ -369,9 +418,8 @@ export class MainController {
     let stderr = "";
     let skipped = false;
     let evaluated = false;
-    let status = "skipped";
+    let status: RunResult["status"] = "skipped";
     let metadata: RunResultMetadata | undefined = undefined;
-    const cellMeta: CellMeta = cell.metadata;
 
     try {
       log(`${PREFIX} _executeAll before run`);
@@ -398,12 +446,7 @@ export class MainController {
         outputs.push(new NotebookCellOutput([NotebookCellOutputItem.stderr(stderr)], metadata));
       }
       if (skipped && !evaluated) {
-        outputs.push(
-          new NotebookCellOutput(
-            [NotebookCellOutputItem.text("### `SKIPPED!`", "text/markdown")],
-            metadata
-          )
-        );
+        outputs.push(skippedCellOutput(metadata));
       }
 
       if (metadata) {
@@ -462,16 +505,7 @@ export class MainController {
     await execution.replaceOutput(outputs);
     execution.end(success, Date.now());
 
-    if (noteSession.kernel && cellMeta.savingSharedVariables && cellMeta.sharedVariableName) {
-      noteSession.kernel.updateVariable(cellMeta.sharedVariableName, {
-        success,
-        stdout,
-        stderr,
-        skipped,
-        status,
-        metadata,
-      });
-    }
+    saveSharedVariables({ success, stdout, stderr, skipped, status, metadata });
   }
 
   private buildRdhOutput(
@@ -611,14 +645,6 @@ export class MainController {
   }
 
   private async run(notebook: NotebookDocument, cell: NotebookCell): Promise<RunResult> {
-    if ((cell.metadata as CellMeta)?.markAsSkip === true) {
-      return {
-        stdout: "",
-        stderr: "",
-        skipped: true,
-        status: "skipped",
-      };
-    }
     const noteSession = this.getNoteSession(notebook);
     if (!noteSession) {
       throw new Error("Missing session");

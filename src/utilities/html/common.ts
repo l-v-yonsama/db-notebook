@@ -1,4 +1,5 @@
 import { prettyTime } from "@l-v-yonsama/multi-platform-database-drivers";
+import { escapeHtml } from "@l-v-yonsama/rdh";
 import { Response } from "har-format";
 
 // Internal leaf module: types/helpers shared by both htmlGenerator.ts (general
@@ -20,7 +21,7 @@ export const createAxiosTocInfoHtml = (
   const statusPrefix = Math.floor(response.status / 100);
   let title = `<span class="tag ${statusPrefix <= 3 ? "is-success" : "is-danger"} is-light">${
     response.status
-  } ${response.statusText}`;
+  } ${escapeHtml(response.statusText)}`;
   if (statusPrefix <= 3) {
     title += "😀";
   } else {
@@ -29,14 +30,14 @@ export const createAxiosTocInfoHtml = (
   title += "</span>";
 
   if (method) {
-    title += ` <span class="tag is-light is-info">${method}</span>`;
+    title += ` <span class="tag is-light is-info">${escapeHtml(method)}</span>`;
   }
   if (response.content.mimeType) {
-    title += ` <span class="tag is-light is-link">${response.content.mimeType}</span>`;
+    title += ` <span class="tag is-light is-link">${escapeHtml(response.content.mimeType)}</span>`;
   }
 
   if (entryTime !== undefined) {
     title += ` <span class="tag is-light is-warning">Time:${prettyTime(entryTime)}</span>`;
   }
-  return title + `<span class="url">${url}</span>`;
+  return title + `<span class="url">${escapeHtml(url)}</span>`;
 };

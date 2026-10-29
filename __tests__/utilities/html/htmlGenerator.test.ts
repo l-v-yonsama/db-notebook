@@ -147,6 +147,28 @@ describe("createHtmlFromHarItem", () => {
 });
 
 describe("createHtmlFromNotebook", () => {
+  it("renders the sent REST request once without the text fallback", async () => {
+    const targetPath = tmpHtmlPath();
+    const entry = makeHar().log.entries[1];
+    entry.request.postData!.text = '{"name":"Resolved"}';
+    entry.request.headers = [{ name: "X-Request", value: "sent" }];
+    const cell = {
+      kind: 2,
+      document: { languageId: "rest-json", getText: () => '{"name":"{{ name }}"}' },
+      metadata: { rest: { version: 1, method: "POST", url: "{{ customersUrl }}" } },
+      outputs: [{
+        items: [{ mime: "text/plain", data: Buffer.from("fallback marker") }],
+        metadata: { status: "executed", axiosEvent: { title: "POST", entry } },
+      }],
+    };
+    expect(await createHtmlFromNotebook({ getCells: () => [cell] } as never, targetPath)).toBe("");
+    const html = await fs.promises.readFile(targetPath, "utf8");
+    expect(html).toContain("https://example.com/api/users");
+    expect(html).toContain("Resolved");
+    expect(html).toContain("Sent request headers");
+    expect(html).not.toContain("fallback marker");
+  });
+
   it("renders RPC MIME response once with highlighted JSON and escaped values", async () => {
     const targetPath = tmpHtmlPath();
     const result = {

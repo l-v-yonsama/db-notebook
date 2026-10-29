@@ -1,0 +1,4 @@
+{
+  "scopeName": "source.rest-json",
+  "patterns": [{ "include": "source.json" }]
+}

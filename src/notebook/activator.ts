@@ -28,6 +28,9 @@ import {
 import {
   ADD_RPC_NOTEBOOK_CELL,
   CELL_SELECT_RPC_METHOD,
+  CELL_SELECT_REST_METHOD,
+  CELL_EDIT_REST_URL,
+  CELL_SHOW_REST_SETTINGS,
   CELL_SHOW_RPC_INVOKE_SETTINGS,
   CELL_EXECUTE_EXPLAIN,
   CELL_EXECUTE_EXPLAIN_ANALYZE,
@@ -66,6 +69,7 @@ import {
 import { HttpEventPanel } from "../panels/HttpEventPanel";
 import { NotebookCellMetadataPanel } from "../panels/NotebookCellMetadataPanel";
 import { RpcCellInvokeSettingsPanel } from "../panels/RpcCellInvokeSettingsPanel";
+import { RestCellRequestSettingsPanel } from "../panels/RestCellRequestSettingsPanel";
 import { VariablesPanel } from "../panels/VariablesPanel";
 import { RunResultMetadata } from "../shared/RunResultMetadata";
 import { activateStatusBar } from "../statusBar";
@@ -93,6 +97,9 @@ import { StateStorage } from "../utilities/StateStorage";
 import { RpcInvokeHistoryStore } from "../utilities/RpcInvokeHistoryStore";
 import { MainController, resetCellContext } from "./controller";
 import { RpcCellService } from "./RpcCellService";
+import { RestCellService } from "./RestCellService";
+import { getRestCellMetadata, isRestCell, REST_METHODS, RestCellMeta } from "./restCell";
+import { registerRestJsonDiagnostics } from "./restJsonDiagnostics";
 import { getRpcCellMetadata, isRpcCell, isRpcCellMetadata, RpcCellMeta } from "./rpcCell";
 import { activateIntellisense } from "./intellisense";
 import { DBNotebookSerializer } from "./serializer";
@@ -115,7 +122,11 @@ export function activateNotebook(
     if (activeCell?.document.uri.toString() !== cell.document.uri.toString()) {
       return;
     }
-    await commands.executeCommand("setContext", "cellCanStartPerformanceTuning", history !== undefined);
+    await commands.executeCommand(
+      "setContext",
+      "cellCanStartPerformanceTuning",
+      history !== undefined
+    );
   };
 
   const updateActivePerformanceTuningCellContext = (): void => {
@@ -132,6 +143,7 @@ export function activateNotebook(
 
   activateStatusBar(context);
   activateIntellisense(context, stateStorage);
+  registerRestJsonDiagnostics(context);
 
   context.subscriptions.push(
     workspace.registerNotebookSerializer(NOTEBOOK_TYPE, new DBNotebookSerializer(), {
@@ -139,11 +151,9 @@ export function activateNotebook(
     })
   );
   context.subscriptions.push(
-    workspace.registerNotebookSerializer(
-      NOTEBOOK_REPORT_TYPE,
-      new DBNotebookReportSerializer(),
-      { transientOutputs: false }
-    )
+    workspace.registerNotebookSerializer(NOTEBOOK_REPORT_TYPE, new DBNotebookReportSerializer(), {
+      transientOutputs: false,
+    })
   );
   new ReportNotebookController(context);
   registerReportNotebookStatusBarProviders(context);
@@ -151,7 +161,12 @@ export function activateNotebook(
   const rpcCellService = rpcHistoryStore
     ? new RpcCellService(context, stateStorage, rpcHistoryStore)
     : undefined;
-  controller = new MainController(context, stateStorage, rpcCellService);
+  controller = new MainController(
+    context,
+    stateStorage,
+    rpcCellService,
+    new RestCellService(context)
+  );
   context.subscriptions.push(controller);
 
   const registerDisposableCommand = (
@@ -165,16 +180,24 @@ export function activateNotebook(
 
   // Notebook commands
   {
-    registerDisposableCommand(ADD_RPC_NOTEBOOK_CELL, async (
-      options?: Parameters<RpcCellService["insertCell"]>[0]
-    ) => {
-      await rpcCellService?.insertCell(options);
-    });
+    registerDisposableCommand(
+      ADD_RPC_NOTEBOOK_CELL,
+      async (options?: Parameters<RpcCellService["insertCell"]>[0]) => {
+        await rpcCellService?.insertCell(options);
+      }
+    );
     registerDisposableCommand(CELL_SHOW_RPC_INVOKE_SETTINGS, (cell?: NotebookCell) => {
       const editor = window.activeNotebookEditor;
       const target = cell ?? editor?.notebook.cellAt(editor.selection.start);
       if (target && rpcCellService) {
         RpcCellInvokeSettingsPanel.render(context.extensionUri, target, rpcCellService);
+      }
+    });
+    registerDisposableCommand(CELL_SHOW_REST_SETTINGS, (cell?: NotebookCell) => {
+      const editor = window.activeNotebookEditor;
+      const target = cell ?? editor?.notebook.cellAt(editor.selection.start);
+      if (target && isRestCell(target)) {
+        RestCellRequestSettingsPanel.render(context.extensionUri, target);
       }
     });
     registerDisposableCommand(CREATE_NEW_NOTEBOOK, async (cells?: NotebookCellData[]) => {
@@ -467,6 +490,39 @@ export function activateNotebook(
       } catch (error) {
         await window.showErrorMessage(error instanceof Error ? error.message : String(error));
       }
+    });
+
+    registerDisposableCommand(CELL_SELECT_REST_METHOD, async (cell: NotebookCell) => {
+      if (!isRestCell(cell)) {
+        return;
+      }
+      const selected = await window.showQuickPick([...REST_METHODS], {
+        title: "Select HTTP method",
+      });
+      if (!selected) {
+        return;
+      }
+      const metadata = getRestCellMetadata(cell);
+      (metadata as RestCellMeta).rest!.method = selected as (typeof REST_METHODS)[number];
+      await updateCellMetadata(cell, metadata);
+    });
+
+    registerDisposableCommand(CELL_EDIT_REST_URL, async (cell: NotebookCell) => {
+      if (!isRestCell(cell)) {
+        return;
+      }
+      const metadata = getRestCellMetadata(cell);
+      const url = await window.showInputBox({
+        title: "REST URL",
+        prompt: "Absolute HTTP(S) URL. Shared variables can be written as {{ name }}.",
+        placeHolder: "https://example.com/v1/customers",
+        value: metadata.rest?.url ?? "",
+      });
+      if (url === undefined) {
+        return;
+      }
+      metadata.rest!.url = url.trim();
+      await updateCellMetadata(cell, metadata);
     });
 
     registerDisposableCommand(CELL_MARK_CELL_AS_MQTT, async (cell: NotebookCell) => {
@@ -813,7 +869,10 @@ export function activateNotebook(
         const options = { ...getFormatterConfig(), dbType };
         log(`${PREFIX} formatQuery options:${JSON.stringify(options)}`);
         edit = new TextEdit(range, formatQuery(doc.getText(), options));
-      } else if (isJsonValueCell(cell) || isRpcCell(cell)) {
+      } else if (isJsonValueCell(cell) || isRpcCell(cell) || isRestCell(cell)) {
+        if (isRestCell(cell) && !doc.getText().trim()) {
+          return;
+        }
         const jsonObj = JSON.parse(doc.getText());
         edit = new TextEdit(range, JSON.stringify(jsonObj, null, 2));
       } else if (isMqttCell(cell)) {
@@ -847,9 +906,16 @@ export function activateNotebook(
       if (isRpcCell(cell) && isRpcCellMetadata(cell.metadata)) {
         newCell.metadata.rpc.id = randomUUID();
       }
+      if (isRestCell(cell)) {
+        (newCell.metadata as RestCellMeta).rest = {
+          ...getRestCellMetadata(cell).rest,
+          version: 1,
+          id: randomUUID(),
+        };
+      }
 
       // ---- outputs もコピー（Code Cellのみ意味あり）----
-      if (cell.kind === NotebookCellKind.Code && !isRpcCell(cell)) {
+      if (cell.kind === NotebookCellKind.Code && !isRpcCell(cell) && !isRestCell(cell)) {
         newCell.outputs = cell.outputs.map(
           (output) =>
             new NotebookCellOutput(

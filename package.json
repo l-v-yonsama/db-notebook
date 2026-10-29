@@ -64,6 +64,7 @@
   },
   "activationEvents": [
     "onRenderer:database-notebook-rpc-renderer",
+    "onRenderer:database-notebook-rest-renderer",
     "onNotebook:database-notebook-type",
     "onNotebook:database-notebook-report-type",
     "onStartupFinished"
@@ -77,6 +78,11 @@
       }
     ],
     "languages": [
+      {
+        "id": "rest-json",
+        "aliases": ["REST JSON"],
+        "configuration": "./languages/rest-json/language-configuration.json"
+      },
       {
         "id": "rpc-json",
         "aliases": [
@@ -166,6 +172,11 @@
     ],
     "grammars": [
       {
+        "language": "rest-json",
+        "scopeName": "source.rest-json",
+        "path": "./languages/rest-json/syntax.json"
+      },
+      {
         "language": "rpc-json",
         "scopeName": "source.rpc-json",
         "path": "./languages/rpc-json/syntax.json"
@@ -207,6 +218,12 @@
       }
     ],
     "notebookRenderer": [
+      {
+        "id": "database-notebook-rest-renderer",
+        "displayName": "REST JSON Response",
+        "entrypoint": "./media/restNotebookRenderer.js",
+        "mimeTypes": ["application/vnd.db-notebook.rest-response+json"]
+      },
       {
         "id": "database-notebook-rpc-renderer",
         "displayName": "RPC Request and Response",
@@ -1114,17 +1131,17 @@
         {
           "command": "database-notebook.cell-toolbar-format",
           "group": "inline",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json')"
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json' || cellLangId == 'rest-json')"
         },
         {
           "command": "database-notebook.cell-toolbar-duplicate-with-metadata",
           "group": "inline",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json')"
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json' || cellLangId == 'rest-json')"
         },
         {
           "command": "database-notebook.cell-toolbar-duplicate-with-metadata",
           "group": "1_modification",
-          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json')"
+          "when": "notebookType == 'database-notebook-type' && (cellLangId == 'sql' || cellLangId == 'json' || cellLangId == 'rpc-json' || cellLangId == 'rest-json')"
         }
       ]
     },

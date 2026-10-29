@@ -32,6 +32,7 @@ import AiDataMaskingPreviewPanel from "@/components/AiDataMaskingPreviewPanel.vu
 import PublishEditorPanel from "@/components/PublishEditorPanel.vue";
 import RpcInvokePanel from "@/components/RpcInvokePanel.vue";
 import RpcCellInvokeSettingsPanel from "@/components/RpcCellInvokeSettingsPanel.vue";
+import RestCellRequestSettingsPanel from "@/components/RestCellRequestSettingsPanel.vue";
 import ScanPanel from "@/components/ScanPanel.vue";
 import SubscriptionSettingPanel from "@/components/SubscriptionSettingPanel.vue";
 import VariablesPanel from "@/components/VariablesPanel.vue";
@@ -72,6 +73,7 @@ export const componentRegistry: Partial<Record<ComponentName, Component>> &
   PublishEditorPanel: PublishEditorPanel, // MQTT publish/subscribeの編集
   RpcInvokePanel: RpcInvokePanel,
   RpcCellInvokeSettingsPanel: RpcCellInvokeSettingsPanel,
+  RestCellRequestSettingsPanel: RestCellRequestSettingsPanel,
   SubscriptionSettingPanel: SubscriptionSettingPanel, // MQTT等のサブスクリプション設定
   ViewConditionPanel: ViewConditionPanel, // クエリ抽出条件の設定
   VariablesPanel: VariablesPanel, // 変数の一覧・編集
