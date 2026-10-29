@@ -34,16 +34,13 @@ import { formatRpcStatus, formatRpcTransferSummary } from "../utilities/rpcResul
 import { StateStorage } from "../utilities/StateStorage";
 import { resolveJsonTemplate } from "./jsonVariables";
 import {
-  decodeRpcCellSource,
   getRpcCellMetadata,
   isRpcCell,
-  isRpcCellMetadata,
   makeRpcCellData,
   RPC_RESPONSE_MIME,
   rpcCallKindLabels,
   rpcRequestTemplateBody,
   RpcCellMeta,
-  RpcCellSource,
 } from "./rpcCell";
 
 type MethodChoice = { method: RpcMethod; service: RpcService; database: RpcDatabase };
@@ -51,7 +48,8 @@ const objectValue = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 const parseRequest = (
-  source: RpcCellSource,
+  dataJson: string,
+  metadataJson: string,
   requestStream: boolean,
   variables: Record<string, unknown>
 ): {
@@ -59,8 +57,8 @@ const parseRequest = (
   requestJsons: string[];
   metadata: Record<string, string | string[]>;
 } => {
-  const { value: data, json, substituted } = resolveJsonTemplate(source.dataJson, variables);
-  const metadata: unknown = source.metadataJson.trim() ? JSON.parse(source.metadataJson) : {};
+  const { value: data, json, substituted } = resolveJsonTemplate(dataJson, variables);
+  const metadata: unknown = metadataJson.trim() ? JSON.parse(metadataJson) : {};
   if (requestStream) {
     if (!Array.isArray(data) || !data.every(objectValue)) {
       throw new Error("Data must be a JSON array of request objects for client or bidi streaming.");
@@ -70,7 +68,7 @@ const parseRequest = (
   }
   return {
     // Keep the original request text when no variable was replaced.
-    requestJson: substituted ? json : source.dataJson,
+    requestJson: substituted ? json : dataJson,
     requestJsons: requestStream
       ? (data as Record<string, unknown>[]).map((item) => JSON.stringify(item))
       : [],
@@ -182,14 +180,15 @@ export class RpcCellService {
     };
     const edit = new WorkspaceEdit();
     edit.set(cell.notebook.uri, [NotebookEdit.updateCellMetadata(cell.index, nextMeta)]);
-    await workspace.applyEdit(edit);
-    const source = decodeRpcCellSource(cell.document.getText(), metadata);
-    const template = buildRpcRequestTemplate(choice.method, choice.database.messageDefinitions);
-    if (["{}", "[]"].includes(source.dataJson.trim())) {
-      await this.writeSource(cell, {
-        ...source,
-        dataJson: rpcRequestTemplateBody(template.data, choice.method.requestStream),
-      });
+    if (!(await workspace.applyEdit(edit))) {
+      throw new Error("Could not select RPC method.");
+    }
+    if (["{}", "[]"].includes(cell.document.getText().trim())) {
+      const template = buildRpcRequestTemplate(choice.method, choice.database.messageDefinitions);
+      await this.writeSource(
+        cell,
+        rpcRequestTemplateBody(template.data, choice.method.requestStream)
+      );
     }
   }
 
@@ -240,40 +239,21 @@ export class RpcCellService {
 
   async insertTemplate(cell: NotebookCell): Promise<void> {
     const target = await this.resolveMethod(cell);
-    const metadata = getRpcCellMetadata(cell);
-    const source = decodeRpcCellSource(cell.document.getText(), metadata);
     const template = buildRpcRequestTemplate(target.method, target.database.messageDefinitions);
-    await this.writeSource(cell, {
-      ...source,
-      dataJson: rpcRequestTemplateBody(template.data, target.method.requestStream),
-    });
+    await this.writeSource(cell, rpcRequestTemplateBody(template.data, target.method.requestStream));
   }
 
-  private async writeSource(cell: NotebookCell, source: RpcCellSource): Promise<void> {
+  private async writeSource(cell: NotebookCell, dataJson: string): Promise<void> {
     const text = cell.document;
-    const current = getRpcCellMetadata(cell);
-    const sourceChanged = text.getText() !== source.dataJson;
-    const metadataChanged =
-      current.rpc.metadataJson !== source.metadataJson || !isRpcCellMetadata(cell.metadata);
-    if (!sourceChanged && !metadataChanged) {
+    if (text.getText() === dataJson) {
       return;
     }
     const edit = new WorkspaceEdit();
-    if (sourceChanged) {
-      edit.replace(
-        text.uri,
-        new Range(text.positionAt(0), text.positionAt(text.getText().length)),
-        source.dataJson
-      );
-    }
-    if (metadataChanged) {
-      edit.set(cell.notebook.uri, [
-        NotebookEdit.updateCellMetadata(cell.index, {
-          ...current,
-          rpc: { ...current.rpc, metadataJson: source.metadataJson },
-        } satisfies RpcCellMeta),
-      ]);
-    }
+    edit.replace(
+      text.uri,
+      new Range(text.positionAt(0), text.positionAt(text.getText().length)),
+      dataJson
+    );
     if (!(await workspace.applyEdit(edit))) {
       throw new Error("Could not update RPC cell input.");
     }
@@ -379,9 +359,13 @@ export class RpcCellService {
       if (cancelled) {
         throw new Error("RPC call cancelled.");
       }
-      const source = decodeRpcCellSource(cell.document.getText(), metadata);
       const selected = await this.resolveMethod(cell);
-      const request = parseRequest(source, selected.method.requestStream, variables);
+      const request = parseRequest(
+        cell.document.getText(),
+        metadata.rpc.metadataJson ?? "{}",
+        selected.method.requestStream,
+        variables
+      );
       if (Object.keys(request.metadata).length > 0) {
         history.requestMetadata = request.metadata;
       }

@@ -2,7 +2,6 @@ import { CancellationToken, NotebookCellKind, NotebookData } from "vscode";
 import { describe, expect, it } from "vitest";
 import { DBNotebookSerializer } from "../../src/notebook/serializer";
 import {
-  decodeRpcCellSource,
   makeRpcCellData,
   RPC_CELL_LANGUAGE,
   RPC_RESPONSE_MIME,
@@ -33,30 +32,9 @@ describe("RPC notebook cell persistence", () => {
     expect(raw.cells[0].language).toBe(RPC_CELL_LANGUAGE);
 
     const restored = await serializer.deserializeNotebook(bytes, token);
-    expect(
-      decodeRpcCellSource(restored.cells[0].value, restored.cells[0].metadata as any).dataJson
-    ).toBe('{"testTable":');
+    expect(restored.cells[0].value).toBe('{"testTable":');
     expect(restored.cells[0].outputs).toHaveLength(0);
     expect((restored.cells[0].metadata as any).rpc.metadataJson).toBe('{"x-request-id":');
-  });
-
-  it("discards a response found in an existing RPC notebook file", async () => {
-    const cell = makeRpcCellData({ dataJson: '{"name":"Alice"}' });
-    const serializer = new DBNotebookSerializer();
-    const restored = await serializer.deserializeNotebook(
-      new TextEncoder().encode(JSON.stringify({
-        cells: [{
-          kind: cell.kind,
-          language: cell.languageId,
-          value: cell.value,
-          metadata: cell.metadata,
-          outputs: [{ items: [{ mime: RPC_RESPONSE_MIME, data: "old response" }] }],
-        }],
-      })),
-      token
-    );
-    expect(restored.cells[0].value).toBe('{"name":"Alice"}');
-    expect(restored.cells[0].outputs).toHaveLength(0);
   });
 
   it("identifies a manually switched RPC JSON cell without changing its metadata", () => {

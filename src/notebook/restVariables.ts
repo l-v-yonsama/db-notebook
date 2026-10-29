@@ -37,10 +37,7 @@ export const resolveRestUrlTemplate = (
   return resolved;
 };
 
-export const resolveRestHeaders = (
-  source: string,
-  variables: Record<string, unknown>
-): Record<string, string> => {
+export const parseRestHeaders = (source: string): Record<string, string> => {
   let value: unknown;
   try {
     value = JSON.parse(source.trim() || "{}");
@@ -50,11 +47,20 @@ export const resolveRestHeaders = (
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Headers must be a JSON object with string values.");
   }
+  for (const [name, item] of Object.entries(value)) {
+    if (typeof item !== "string" || !name || /[\r\n]/.test(name) || /[\r\n]/.test(item)) {
+      throw new Error(`Header "${name}" must have a single-line string value.`);
+    }
+  }
+  return value as Record<string, string>;
+};
+
+export const resolveRestHeaders = (
+  source: string,
+  variables: Record<string, unknown>
+): Record<string, string> => {
   return Object.fromEntries(
-    Object.entries(value).map(([name, item]) => {
-      if (typeof item !== "string" || !name || /[\r\n]/.test(name)) {
-        throw new Error(`Header "${name}" must have a single-line string value.`);
-      }
+    Object.entries(parseRestHeaders(source)).map(([name, item]) => {
       const resolved = resolveStringTemplate(item, variables, `header "${name}"`);
       if (/[\r\n]/.test(resolved)) {
         throw new Error(`Header "${name}" must have a single-line string value.`);

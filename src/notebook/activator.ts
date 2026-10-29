@@ -503,7 +503,7 @@ export function activateNotebook(
         return;
       }
       const metadata = getRestCellMetadata(cell);
-      (metadata as RestCellMeta).rest!.method = selected as (typeof REST_METHODS)[number];
+      metadata.rest.method = selected as (typeof REST_METHODS)[number];
       await updateCellMetadata(cell, metadata);
     });
 
@@ -516,12 +516,12 @@ export function activateNotebook(
         title: "REST URL",
         prompt: "Absolute HTTP(S) URL. Shared variables can be written as {{ name }}.",
         placeHolder: "https://example.com/v1/customers",
-        value: metadata.rest?.url ?? "",
+        value: metadata.rest.url,
       });
       if (url === undefined) {
         return;
       }
-      metadata.rest!.url = url.trim();
+      metadata.rest.url = url.trim();
       await updateCellMetadata(cell, metadata);
     });
 

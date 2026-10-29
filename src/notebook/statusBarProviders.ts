@@ -248,7 +248,7 @@ export class RestMethodProvider implements NotebookCellStatusBarItemProvider {
       return undefined;
     }
     const item = new NotebookCellStatusBarItem(
-      `$(symbol-method) ${getRestCellMetadata(cell).rest?.method ?? "GET"}`,
+      `$(symbol-method) ${getRestCellMetadata(cell).rest.method}`,
       NotebookCellStatusBarAlignment.Left
     );
     item.command = CELL_SELECT_REST_METHOD;
@@ -262,7 +262,7 @@ export class RestUrlProvider implements NotebookCellStatusBarItemProvider {
     if (!isRestCell(cell)) {
       return undefined;
     }
-    const url = getRestCellMetadata(cell).rest?.url ?? "";
+    const url = getRestCellMetadata(cell).rest.url;
     const item = new NotebookCellStatusBarItem(
       `$(link) ${url ? abbr(url, 48) : "Set URL"}`,
       NotebookCellStatusBarAlignment.Left
@@ -278,7 +278,7 @@ export class RestSettingsProvider implements NotebookCellStatusBarItemProvider {
     if (!isRestCell(cell)) {
       return undefined;
     }
-    const keyCount = countJsonObjectKeys(getRestCellMetadata(cell).rest?.headersJson);
+    const keyCount = countJsonObjectKeys(getRestCellMetadata(cell).rest.headersJson);
     const headersLabel =
       keyCount === undefined
         ? "Fix invalid headers"

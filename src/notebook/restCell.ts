@@ -6,21 +6,22 @@ export const REST_RESPONSE_MIME = "application/vnd.db-notebook.rest-response+jso
 export const REST_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 export type RestMethod = (typeof REST_METHODS)[number];
 
-export type RestCellMeta = CellMeta & {
-  rest?: {
-    version: 1;
-    id?: string;
-    method?: RestMethod;
-    url?: string;
-    headersJson?: string;
-    timeoutMs?: number;
-  };
+type RestCellSettings = {
+  version: 1;
+  id?: string;
+  method?: RestMethod;
+  url?: string;
+  headersJson?: string;
+  timeoutMs?: number;
 };
+
+export type RestCellMeta = CellMeta & { rest?: RestCellSettings };
+type ResolvedRestCellMeta = CellMeta & { rest: Required<RestCellSettings> };
 
 export const isRestCell = (cell: NotebookCell): boolean =>
   cell.kind === NotebookCellKind.Code && cell.document.languageId === REST_CELL_LANGUAGE;
 
-export const getRestCellMetadata = (cell: NotebookCell): RestCellMeta => {
+export const getRestCellMetadata = (cell: NotebookCell): ResolvedRestCellMeta => {
   const metadata = (cell.metadata ?? {}) as RestCellMeta;
   return {
     ...metadata,

@@ -10,6 +10,7 @@ import {
   WorkspaceEdit,
 } from "vscode";
 import { getRestCellMetadata, isRestCell } from "../notebook/restCell";
+import { parseRestHeaders } from "../notebook/restVariables";
 import type { RestCellRequestSettingsPanelEventData } from "../shared/MessageEventData";
 import { createWebviewContent } from "../utilities/webview/webviewUtil";
 
@@ -81,7 +82,7 @@ export class RestCellRequestSettingsPanel {
     if (!this.cell) {
       return;
     }
-    const rest = getRestCellMetadata(this.cell).rest!;
+    const rest = getRestCellMetadata(this.cell).rest;
     this.post("initialize", {
       method: rest.method,
       url: rest.url,
@@ -106,18 +107,7 @@ export class RestCellRequestSettingsPanel {
     }
     try {
       const source = message.params?.headersJson?.trim() || "{}";
-      const parsed: unknown = JSON.parse(source);
-      if (
-        !parsed ||
-        typeof parsed !== "object" ||
-        Array.isArray(parsed) ||
-        Object.entries(parsed).some(
-          ([name, value]) =>
-            !name || typeof value !== "string" || /[\r\n]/.test(name) || /[\r\n]/.test(value)
-        )
-      ) {
-        throw new Error("Headers must be a JSON object with single-line string values.");
-      }
+      parseRestHeaders(source);
       const timeoutMs = message.params?.timeoutMs;
       if (typeof timeoutMs !== "number" || !Number.isSafeInteger(timeoutMs) || timeoutMs < 0) {
         throw new Error("Timeout must be a non-negative integer in milliseconds.");
@@ -127,7 +117,7 @@ export class RestCellRequestSettingsPanel {
       edit.set(cell.notebook.uri, [
         NotebookEdit.updateCellMetadata(cell.index, {
           ...metadata,
-          rest: { ...metadata.rest, version: 1, headersJson: source, timeoutMs },
+          rest: { ...metadata.rest, headersJson: source, timeoutMs },
         }),
       ]);
       if (!(await workspace.applyEdit(edit))) {

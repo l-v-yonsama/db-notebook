@@ -374,38 +374,29 @@ export class MainController {
       return;
     }
 
-    if (isRpcCell(cell)) {
+    const rpcCell = isRpcCell(cell);
+    if (rpcCell || isRestCell(cell)) {
       let success = false;
       try {
-        if (!this.rpcCellService) {
-          throw new Error("RPC notebook service is unavailable.");
+        if (rpcCell) {
+          if (!this.rpcCellService) {
+            throw new Error("RPC notebook service is unavailable.");
+          }
+          success = await this.rpcCellService.execute(
+            cell,
+            execution,
+            noteSession.kernel?.getStoredVariables() ?? {}
+          );
+        } else {
+          if (!this.restCellService || !noteSession.kernel) {
+            throw new Error("REST notebook service is unavailable.");
+          }
+          success = await this.restCellService.execute(
+            cell,
+            execution,
+            noteSession.kernel.getStoredVariables()
+          );
         }
-        success = await this.rpcCellService.execute(
-          cell,
-          execution,
-          noteSession.kernel?.getStoredVariables() ?? {}
-        );
-      } catch (error) {
-        await execution.replaceOutput([
-          new NotebookCellOutput([NotebookCellOutputItem.error(error as Error)]),
-        ]);
-      } finally {
-        execution.end(success, Date.now());
-      }
-      return;
-    }
-
-    if (isRestCell(cell)) {
-      let success = false;
-      try {
-        if (!this.restCellService || !noteSession.kernel) {
-          throw new Error("REST notebook service is unavailable.");
-        }
-        success = await this.restCellService.execute(
-          cell,
-          execution,
-          noteSession.kernel.getStoredVariables()
-        );
       } catch (error) {
         await execution.replaceOutput([
           new NotebookCellOutput([NotebookCellOutputItem.error(error as Error)]),

@@ -210,7 +210,9 @@ export async function runRpcText(
             metadata,
           });
         } catch (error) {
-          if (error instanceof RpcInvokeError) invokeError = error;
+          if (error instanceof RpcInvokeError) {
+            invokeError = error;
+          }
           throw error;
         }
       },

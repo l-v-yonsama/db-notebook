@@ -451,7 +451,9 @@ export class RpcInvokePanel extends BasePanel {
               metadata: validated.request.metadata,
             });
           } catch (error) {
-            if (error instanceof RpcInvokeError) invokeError = error;
+            if (error instanceof RpcInvokeError) {
+              invokeError = error;
+            }
             throw error;
           }
         },

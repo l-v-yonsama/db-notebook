@@ -39,8 +39,7 @@ const headerValue = (headers: Record<string, unknown>, name: string): string | u
   return Array.isArray(value) ? value.join(", ") : value === undefined ? undefined : String(value);
 };
 
-const responseContent = (response: AxiosResponse<ArrayBuffer>, mimeType: string) => {
-  const bytes = Buffer.from(response.data);
+const responseContent = (bytes: Buffer, mimeType: string) => {
   const textResponse =
     /^text\//i.test(mimeType) || /(?:\+json|\/json|\+xml|\/xml|javascript)/i.test(mimeType);
   return {
@@ -63,6 +62,7 @@ const normalizeEntry = (
   const requestHeaders = response.config.headers.toJSON() as Record<string, unknown>;
   const responseHeaders = { ...response.headers } as Record<string, unknown>;
   const mimeType = headerValue(responseHeaders, "content-type") ?? "application/octet-stream";
+  const responseBytes = Buffer.from(response.data);
   const queryString: QueryString[] = [...new URL(url).searchParams].map(([name, value]) => ({
     name,
     value,
@@ -95,10 +95,10 @@ const normalizeEntry = (
       httpVersion: "HTTP/1.1",
       cookies: [],
       headers: asHarHeaders(responseHeaders),
-      content: responseContent(response, mimeType),
+      content: responseContent(responseBytes, mimeType),
       redirectURL: headerValue(responseHeaders, "location") ?? "",
       headersSize: -1,
-      bodySize: Buffer.from(response.data).length,
+      bodySize: responseBytes.length,
     },
     cache: {},
     timings: { blocked: -1, dns: -1, connect: -1, send: -1, wait: elapsedMs, receive: -1, ssl: -1 },
@@ -153,7 +153,7 @@ export class RestCellService {
     if (!isRestCell(cell)) {
       return false;
     }
-    const rest = getRestCellMetadata(cell).rest!;
+    const rest = getRestCellMetadata(cell).rest;
     const startedAt = Date.now();
     const activeKey = `${cell.notebook.uri.toString()}#${cell.document.uri.toString()}`;
     const abort = new AbortController();
@@ -163,22 +163,22 @@ export class RestCellService {
     this.active.set(activeKey, cancel);
     let view: RestResponseView;
     try {
-      if (!REST_METHODS.includes(rest.method!)) {
+      if (!REST_METHODS.includes(rest.method)) {
         throw new Error("Select a supported HTTP method.");
       }
-      const url = resolveRestUrlTemplate(rest.url ?? "", variables);
+      const url = resolveRestUrlTemplate(rest.url, variables);
       const body = resolveRestJsonBody(cell.document.getText(), variables);
       if (rest.method === "GET" && body !== undefined) {
         throw new Error("GET requests must have an empty body.");
       }
-      const headers = resolveRestHeaders(rest.headersJson ?? "{}", variables);
+      const headers = resolveRestHeaders(rest.headersJson, variables);
       if (
         body !== undefined &&
         !Object.keys(headers).some((key) => key.toLowerCase() === "content-type")
       ) {
         headers["Content-Type"] = "application/json";
       }
-      const timeout = rest.timeoutMs ?? 30000;
+      const timeout = rest.timeoutMs;
       if (!Number.isSafeInteger(timeout) || timeout < 0) {
         throw new Error("Timeout must be a non-negative integer in milliseconds.");
       }
@@ -206,16 +206,16 @@ export class RestCellService {
       }
       const elapsedMs = Date.now() - startedAt;
       const event = toNodeRunAxiosEvent(
-        normalizeEntry(raw, response, url, rest.method!, body, startedAt, elapsedMs)
+        normalizeEntry(raw, response, url, rest.method, body, startedAt, elapsedMs)
       );
-      view = { version: 1, cellId: rest.id!, outcome: "success", elapsedMs, event };
+      view = { version: 1, cellId: rest.id, outcome: "success", elapsedMs, event };
     } catch (error) {
       const elapsedMs = Date.now() - startedAt;
       const cancelled = abort.signal.aborted || axios.isCancel(error);
       const timeout = axios.isAxiosError(error) && error.code === "ECONNABORTED";
       view = {
         version: 1,
-        cellId: rest.id!,
+        cellId: rest.id,
         outcome: cancelled ? "cancelled" : timeout ? "timeout" : "error",
         elapsedMs,
         error: cancelled
@@ -229,7 +229,7 @@ export class RestCellService {
       if (abort.signal.aborted && view.outcome === "success") {
         view = {
           version: 1,
-          cellId: rest.id!,
+          cellId: rest.id,
           outcome: "cancelled",
           elapsedMs: Date.now() - startedAt,
           error: "Request cancelled.",

@@ -27,17 +27,6 @@ export type RpcCellMeta = CellMeta & {
   };
 };
 
-export type RpcCellSource = {
-  dataJson: string;
-  metadataJson: string;
-};
-
-export const decodeRpcCellSource = (value: string, metadata?: RpcCellMeta): RpcCellSource => ({
-  dataJson: value,
-  metadataJson:
-    typeof metadata?.rpc.metadataJson === "string" ? metadata.rpc.metadataJson : "{}",
-});
-
 export const isRpcCellMetadata = (metadata: unknown): metadata is RpcCellMeta => {
   const rpc = (metadata as { rpc?: RpcCellMeta["rpc"] } | undefined)?.rpc;
   return rpc?.version === 2 && typeof rpc.id === "string";

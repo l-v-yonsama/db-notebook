@@ -17,7 +17,7 @@ import { DiffTabInnerItem } from "../../shared/MessageEventData";
 import { RunResultMetadata } from "../../shared/RunResultMetadata";
 import type { RpcNotebookResult } from "../../shared/RunResultMetadata";
 import type { RpcInvokeTarget } from "../../shared/RpcInvokePanelParams";
-import { decodeRpcCellSource, isRpcCellMetadata, RPC_RESPONSE_MIME } from "../../notebook/rpcCell";
+import { isRpcCellMetadata, RPC_RESPONSE_MIME } from "../../notebook/rpcCell";
 import type { RestCellMeta } from "../../notebook/restCell";
 import { CellMeta } from "../../types/Notebook";
 import { ChartsViewParams } from "../../types/views";
@@ -539,10 +539,9 @@ const createHtml = async (
         if (cell.document.languageId === "rpc-json") {
           htmlContents.push(`<p class="subtitle is-6">${escapeHtml(rpcRequestTitle(cell))}</p>`);
           const tabClass = `${id}_request_tab`;
-          const source = decodeRpcCellSource(
-            cell.document.getText(),
-            isRpcCellMetadata(cell.metadata) ? cell.metadata : undefined
-          );
+          const metadataJson = isRpcCellMetadata(cell.metadata)
+            ? cell.metadata.rpc.metadataJson ?? "{}"
+            : "{}";
           appendRpcTabs(htmlContents, tabClass, ["data", "metadata", "descriptor"]);
           appendRpcPane(htmlContents, tabClass, "data", [`<div id="${id}" class="block"></div>`]);
           const metadataId = `${id}_request_metadata`;
@@ -551,7 +550,7 @@ const createHtml = async (
           ]);
           markdownValues[metadataId] = {
             lang: "json",
-            s: escapeHtml(safeRpcCode(source.metadataJson)),
+            s: escapeHtml(safeRpcCode(metadataJson)),
           };
           const descriptorId = `${id}_request_descriptor`;
           appendRpcPane(htmlContents, tabClass, "descriptor", [
@@ -563,7 +562,7 @@ const createHtml = async (
               safeRpcCode(options.rpcDescriptions?.get(cell)?.request || "Descriptor unavailable")
             ),
           };
-          markdownValues[id] = { lang: "json", s: escapeHtml(safeRpcCode(source.dataJson)) };
+          markdownValues[id] = { lang: "json", s: escapeHtml(safeRpcCode(cell.document.getText())) };
         } else {
           let sentRequest:
             | NonNullable<RunResultMetadata["axiosEvent"]>["entry"]["request"]

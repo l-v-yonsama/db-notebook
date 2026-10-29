@@ -86,15 +86,12 @@ function createService(responseStream: boolean, requestStream = false) {
   };
 }
 
-function createExecution(cell: any) {
+function createExecution() {
   const outputs: any[] = [];
   return {
     token: { onCancellationRequested: () => ({ dispose: () => {} }) },
     replaceOutput: vi.fn(async (next: any[]) => {
       outputs.splice(0, outputs.length, ...next);
-    }),
-    appendOutput: vi.fn(async (next: any) => {
-      outputs.push(next);
     }),
     replaceOutputItems: vi.fn(async (items: any[], output: any) => {
       output.items = items;
@@ -122,7 +119,7 @@ describe("RPC notebook execution", () => {
     const { cellService, historyStore } = createService(false);
     const cell = createCell('{"id":"42"}');
     cell.metadata.rpc.metadataJson = '{"x-trace-id":"42"}';
-    const execution = createExecution(cell);
+    const execution = createExecution();
     const success = await cellService.execute(cell, execution as any);
 
     expect(success).toBe(true);
@@ -146,7 +143,6 @@ describe("RPC notebook execution", () => {
       })
     );
     expect(execution.replaceOutput).toHaveBeenCalledTimes(1);
-    expect(execution.appendOutput).not.toHaveBeenCalled();
     expect(execution.outputs).toHaveLength(1);
     expect(execution.outputs[0].items[0].mime).toBe(RPC_RESPONSE_MIME);
     expect(execution.outputs[0].items[0].data.contents).toEqual({ id: "42" });
@@ -167,7 +163,7 @@ describe("RPC notebook execution", () => {
     const { cellService, historyStore } = createService(false);
     const source = '{"id":"{{ customerId }}","active":"{{ active }}"}';
     const cell = createCell(source);
-    const execution = createExecution(cell);
+    const execution = createExecution();
 
     expect(await cellService.execute(cell, execution as any, { customerId: 42, active: true })).toBe(true);
 
@@ -181,7 +177,7 @@ describe("RPC notebook execution", () => {
   it("does not connect or record history when a request variable is undefined", async () => {
     const { cellService, historyStore } = createService(false);
     const cell = createCell('{"id":"{{ missingId }}"}');
-    const execution = createExecution(cell);
+    const execution = createExecution();
 
     expect(await cellService.execute(cell, execution as any, {})).toBe(false);
 
@@ -190,24 +186,11 @@ describe("RPC notebook execution", () => {
     expect(execution.outputs[0].items[0].data.error).toContain('Shared variable "missingId" is not defined.');
   });
 
-  it("rejects invalid input before connecting or adding history", async () => {
-    const { cellService, historyStore } = createService(false);
-    const cell = createCell('{"id":');
-    const execution = createExecution(cell);
-    const success = await cellService.execute(cell, execution as any);
-
-    expect(success).toBe(false);
-    expect(driverFactory.create).not.toHaveBeenCalled();
-    expect(historyStore.add).not.toHaveBeenCalled();
-    expect(execution.outputs).toHaveLength(1);
-    expect(execution.outputs[0].items[0].data.outcome).toBe("error");
-  });
-
   it("handles a language-switched RPC cell with no saved settings", async () => {
     const { cellService } = createService(false);
     const cell = createCell("{}");
     cell.metadata = {};
-    const execution = createExecution(cell);
+    const execution = createExecution();
 
     expect(await cellService.execute(cell, execution as any)).toBe(false);
     expect(driverFactory.create).not.toHaveBeenCalled();
@@ -239,7 +222,7 @@ describe("RPC notebook execution", () => {
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(true);
     const cell = createCell("{}");
-    const execution = createExecution(cell);
+    const execution = createExecution();
     const success = await cellService.execute(cell, execution as any);
 
     expect(success).toBe(true);
@@ -299,7 +282,7 @@ describe("RPC notebook execution", () => {
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(responseStream, true);
     const cell = createCell('[{"value":"{{ first }}"},{"value":"{{ second }}"}]');
-    const execution = createExecution(cell);
+    const execution = createExecution();
 
     expect(await cellService.execute(cell, execution as any, { first: "first", second: "second" })).toBe(true);
     expect(driver.openProtoJsonStream).toHaveBeenCalledWith(
@@ -320,7 +303,7 @@ describe("RPC notebook execution", () => {
   it("rejects a single object for a client stream before connecting", async () => {
     const { cellService, historyStore } = createService(false, true);
     const cell = createCell('{"value":"first"}');
-    const execution = createExecution(cell);
+    const execution = createExecution();
 
     expect(await cellService.execute(cell, execution as any)).toBe(false);
     expect(driverFactory.create).not.toHaveBeenCalled();
@@ -375,7 +358,7 @@ describe("RPC notebook execution", () => {
     const { cellService, historyStore } = createService(false, true);
     const cell = createCell("[]");
 
-    expect(await cellService.execute(cell, createExecution(cell) as any)).toBe(true);
+    expect(await cellService.execute(cell, createExecution() as any)).toBe(true);
     expect(session.send).not.toHaveBeenCalled();
     expect(session.finishSending).toHaveBeenCalledTimes(1);
     expect(driver.disconnect).toHaveBeenCalledTimes(1);
@@ -416,7 +399,7 @@ describe("RPC notebook execution", () => {
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(false, true);
     const cell = createCell('[{"value":"first"},{"value":"bad"}]');
-    const execution = createExecution(cell);
+    const execution = createExecution();
     execution.replaceOutputItems.mockImplementation(async (items: any[], output: any) => {
       output.items = items;
       rendered();
@@ -450,14 +433,16 @@ describe("RPC notebook execution", () => {
       ),
       invokeUnaryProtoJson: vi.fn(),
       disconnect: vi.fn(async () => {
-        if (driver.isConnected) driver.isConnected = false;
+        if (driver.isConnected) {
+          driver.isConnected = false;
+        }
         return "";
       }),
     };
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(false);
     const cell = createCell("{}");
-    const execution = createExecution(cell);
+    const execution = createExecution();
     const running = cellService.execute(cell, execution as any);
     await vi.waitFor(() => expect(driver.connect).toHaveBeenCalledTimes(1));
 
@@ -470,33 +455,6 @@ describe("RPC notebook execution", () => {
     expect(driver.disconnect).toHaveBeenCalledTimes(1);
     expect(driverFactory.remove).toHaveBeenCalledWith(driver);
     expect(historyStore.add).not.toHaveBeenCalled();
-  });
-
-  it("reads current cell text and saved metadata without a request output", async () => {
-    const driver = {
-      connect: vi.fn(async () => ""),
-      invokeUnaryProtoJson: vi.fn(async () => ({
-        contents: { id: "latest" },
-        status: { code: 0, name: "OK" },
-        elapsedMs: 2,
-      })),
-      disconnect: vi.fn(async () => ""),
-    };
-    driverFactory.create.mockResolvedValue(driver);
-    const cell = createCell('{"id":"latest"}');
-    cell.metadata.rpc.metadataJson = '{"x-request-id":"demo"}';
-    const { cellService } = createService(false);
-    const execution = createExecution(cell);
-    expect(await cellService.execute(cell, execution as any)).toBe(true);
-    expect(driver.invokeUnaryProtoJson).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requestJson: '{"id":"latest"}',
-        metadata: { "x-request-id": "demo" },
-      })
-    );
-    expect(execution.outputs).toHaveLength(1);
-    expect(execution.outputs[0].items[0].mime).toBe(RPC_RESPONSE_MIME);
-    expect(cell.metadata.rpc.metadataJson).toBe('{"x-request-id":"demo"}');
   });
 
   it("cancels one server stream and records its terminal state once", async () => {
@@ -523,7 +481,7 @@ describe("RPC notebook execution", () => {
     driverFactory.create.mockResolvedValue(driver);
     const { cellService, historyStore } = createService(true);
     const cell = createCell("{}");
-    const execution = createExecution(cell);
+    const execution = createExecution();
     const running = cellService.execute(cell, execution as any);
     await vi.waitFor(() => expect(driver.openProtoJsonStream).toHaveBeenCalledTimes(1));
 

@@ -162,7 +162,7 @@ export class RpcCellInvokeSettingsPanel {
       edit.set(cell.notebook.uri, [
         NotebookEdit.updateCellMetadata(cell.index, {
           ...metadata,
-          rpc: { ...metadata.rpc, version: 2, metadataJson },
+          rpc: { ...metadata.rpc, metadataJson },
         }),
       ]);
       if (!(await workspace.applyEdit(edit))) {
